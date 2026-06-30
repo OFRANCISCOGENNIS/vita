@@ -82,34 +82,102 @@ function fmt2js(v) {
 
 class DataTable {
     constructor(containerEl, { columns, data, pageSize = 50, defaultSort = null }) {
-        this.container = containerEl;
-        this.columns   = columns;
-        this.allData   = data;
-        this.filtered  = [...data];
-        this.pageSize  = pageSize;
-        this.page      = 1;
-        this.sortCol   = defaultSort ? defaultSort[0] : null;
-        this.sortDir   = defaultSort ? defaultSort[1] : 'asc';
+        this.container   = containerEl;
+        this.columns     = columns;
+        this.allData     = data;
+        this.filtered    = [...data];
+        this.pageSize    = pageSize;
+        this.page        = 1;
+        this.sortCol     = defaultSort ? defaultSort[0] : null;
+        this.sortDir     = defaultSort ? defaultSort[1] : 'asc';
+        this.globalTerm  = '';
+        this.globalCol   = null;
+        this.colFilters  = {};   // { key: { type:'text'|'exact', val:string } }
         this.render();
     }
 
-    filter(term, colKey) {
-        const t = (term || '').toLowerCase();
+    applyFilters() {
         this.filtered = this.allData.filter(row => {
-            if (!t) return true;
-            if (colKey) return String(row[colKey] || '').toLowerCase().includes(t);
-            return this.columns.some(c => String(row[c.key] || '').toLowerCase().includes(t));
+            // global toolbar search
+            if (this.globalTerm) {
+                const t = this.globalTerm.toLowerCase();
+                if (this.globalCol) {
+                    if (!String(row[this.globalCol] || '').toLowerCase().includes(t)) return false;
+                } else {
+                    if (!this.columns.some(c => String(row[c.key] || '').toLowerCase().includes(t))) return false;
+                }
+            }
+            // per-column filters
+            for (const [key, f] of Object.entries(this.colFilters)) {
+                if (!f.val) continue;
+                const cell = String(row[key] || '');
+                if (f.type === 'exact') { if (cell !== f.val) return false; }
+                else                    { if (!cell.toLowerCase().includes(f.val.toLowerCase())) return false; }
+            }
+            return true;
         });
         this.page = 1;
         this.renderBody();
         this.renderPager();
     }
 
+    filter(term, colKey) {
+        this.globalTerm = term || '';
+        this.globalCol  = colKey || null;
+        this.applyFilters();
+    }
+
     filterExact(val, colKey) {
-        this.filtered = this.allData.filter(row => !val || String(row[colKey] || '') === val);
-        this.page = 1;
-        this.renderBody();
-        this.renderPager();
+        this.colFilters[colKey] = { type: 'exact', val: val || '' };
+        this.applyFilters();
+    }
+
+    enableColumnFilters(defs) {
+        // defs: array aligned with this.columns
+        // each entry: null | { type:'text' } | { type:'select', options:[] }
+        this._cfDefs = defs;
+        this._renderFilterRow();
+    }
+
+    _renderFilterRow() {
+        const thead = this.thead.parentElement;
+        const old = thead.querySelector('tr.filter-row');
+        if (old) old.remove();
+
+        const tr = document.createElement('tr');
+        tr.className = 'filter-row';
+
+        this.columns.forEach((col, i) => {
+            const def = this._cfDefs && this._cfDefs[i];
+            const th = document.createElement('th');
+            if (!def) {
+                tr.appendChild(th);
+                return;
+            }
+            if (def.type === 'select') {
+                const sel = document.createElement('select');
+                sel.className = 'col-filter-select';
+                sel.innerHTML = '<option value="">Todos</option>' +
+                    def.options.map(o => `<option value="${o}">${o}</option>`).join('');
+                sel.addEventListener('change', () => {
+                    this.colFilters[col.key] = { type: 'exact', val: sel.value };
+                    this.applyFilters();
+                });
+                th.appendChild(sel);
+            } else {
+                const inp = document.createElement('input');
+                inp.className = 'col-filter-input';
+                inp.placeholder = '🔍 filtrar';
+                inp.addEventListener('input', () => {
+                    this.colFilters[col.key] = { type: 'text', val: inp.value };
+                    this.applyFilters();
+                });
+                th.appendChild(inp);
+            }
+            tr.appendChild(th);
+        });
+
+        thead.appendChild(tr);
     }
 
     sort(key) {
@@ -130,6 +198,26 @@ class DataTable {
         return this.filtered.slice(start, start + this.pageSize);
     }
 
+    exportXLSX() {
+        if (!window.XLSX) { alert('SheetJS não disponível'); return; }
+        const headers = this.columns.map(c => c.label);
+        const rows = this.filtered.map(row =>
+            this.columns.map(c => {
+                const v = row[c.key];
+                if (v === undefined || v === null) return '';
+                if (typeof v === 'number') return v;
+                return String(v);
+            })
+        );
+        const ws = window.XLSX.utils.aoa_to_sheet([headers, ...rows]);
+        ws['!cols'] = headers.map((h, i) => ({
+            wch: Math.min(50, Math.max(h.length + 2, ...rows.slice(0, 200).map(r => String(r[i] || '').length)))
+        }));
+        const wb = window.XLSX.utils.book_new();
+        window.XLSX.utils.book_append_sheet(wb, ws, 'Dados');
+        window.XLSX.writeFile(wb, 'inventario_export.xlsx');
+    }
+
     render() {
         this.container.innerHTML = `
         <div class="table-toolbar">
@@ -137,6 +225,7 @@ class DataTable {
           <div style="display:flex;align-items:center;gap:8px;">
             <span class="table-count"></span>
             <button class="export-btn" onclick="this.closest('.table-wrap').dispatchEvent(new Event('export'))">⬇ CSV</button>
+            <button class="export-btn excel-btn" onclick="this.closest('.table-wrap').dispatchEvent(new Event('exportxlsx'))">⬇ Excel</button>
           </div>
         </div>
         <div style="overflow-x:auto">
@@ -151,7 +240,8 @@ class DataTable {
         this.pager = this.container.querySelector('.table-pagination');
         this.countEl = this.container.querySelector('.table-count');
 
-        this.container.addEventListener('export', () => this.exportCSV());
+        this.container.addEventListener('export',      () => this.exportCSV());
+        this.container.addEventListener('exportxlsx', () => this.exportXLSX());
         this.renderHeaders();
         this.renderBody();
         this.renderPager();
@@ -354,31 +444,52 @@ function renderAnalise(res) {
     const el = document.getElementById('analise-content');
     el.innerHTML = '<div class="table-wrap" id="tbl-analise"></div>';
 
+    const linhas = res.resultSAP.linhas;
+
+    // compute option lists before building DataTable
+    const uniq = (key) => [...new Set(linhas.map(r => r[key]).filter(Boolean))].sort();
+    const famOpts   = uniq('familia');
+    const tipoOpts  = uniq('tipo');
+    const sitOpts   = uniq('sitText');
+    const aprovOpts = uniq('aprovacao');
+
     const cols = [
-        { key:'pep3', label:'PEP3' },
-        { key:'pep4', label:'PEP4' },
-        { key:'cod',  label:'Cód Material', render: v => `<span class="mono">${v||''}</span>` },
-        { key:'familia', label:'Família' },
-        { key:'tipo', label:'Tipo' },
-        { key:'desc', label:'Descrição' },
-        { key:'libSAP', label:'SAP', render: v => `<span class="text-right">${v !== '' && v !== undefined ? toNum(v).toFixed(2).replace(/\.?0+$/,'') : ''}</span>` },
-        { key:'prjCAD', label:'PRJ', render: v => `<span class="text-right">${v !== '' && v !== undefined ? toNum(v).toFixed(2).replace(/\.?0+$/,'') : ''}</span>` },
-        { key:'valor', label:'Valor R$', render: v => v ? fmtMoeda(toNum(v)) : '' },
-        { key:'sitText', label:'Situação', render: v => chipSit(v||'') },
-        { key:'aprovacao', label:'Aprovação', render: v => chipAprov(v||'') },
-        { key:'motivo', label:'Motivo' },
+        { key:'pep3',     label:'PEP3' },
+        { key:'pep4',     label:'PEP4' },
+        { key:'cod',      label:'Cód Material', render: v => `<span class="mono">${v||''}</span>` },
+        { key:'familia',  label:'Família' },
+        { key:'tipo',     label:'Tipo' },
+        { key:'desc',     label:'Descrição' },
+        { key:'libSAP',   label:'SAP',      render: v => `<span class="text-right">${v !== '' && v !== undefined ? toNum(v).toFixed(2).replace(/\.?0+$/,'') : ''}</span>` },
+        { key:'prjCAD',   label:'PRJ',      render: v => `<span class="text-right">${v !== '' && v !== undefined ? toNum(v).toFixed(2).replace(/\.?0+$/,'') : ''}</span>` },
+        { key:'valor',    label:'Valor R$', render: v => v ? fmtMoeda(toNum(v)) : '' },
+        { key:'sitText',  label:'Situação', render: v => chipSit(v||'') },
+        { key:'aprovacao',label:'Aprovação',render: v => chipAprov(v||'') },
+        { key:'motivo',   label:'Motivo' },
     ];
 
     const dt = new DataTable(document.getElementById('tbl-analise'), {
-        columns: cols, data: res.resultSAP.linhas, pageSize: 100
+        columns: cols, data: linhas, pageSize: 100
     });
-    dt.addSearch('Pesquisar...', null);
 
-    const statusOpts = [...new Set(res.resultSAP.linhas.map(r => r.aprovacao).filter(Boolean))];
-    dt.addSelect('Aprovação', statusOpts, 'aprovacao');
+    // toolbar: global search only (column filters handle the rest)
+    dt.addSearch('Busca global...', null);
 
-    const famOpts = [...new Set(res.resultSAP.linhas.map(r => r.familia).filter(Boolean))].sort();
-    dt.addSelect('Família', famOpts, 'familia');
+    // per-column filter row
+    dt.enableColumnFilters([
+        { type: 'text' },                          // pep3
+        { type: 'text' },                          // pep4
+        { type: 'text' },                          // cod
+        { type: 'select', options: famOpts },      // familia
+        { type: 'select', options: tipoOpts },     // tipo
+        { type: 'text' },                          // desc
+        null,                                      // libSAP (numérico)
+        null,                                      // prjCAD (numérico)
+        null,                                      // valor  (numérico)
+        { type: 'select', options: sitOpts },      // sitText
+        { type: 'select', options: aprovOpts },    // aprovacao
+        { type: 'text' },                          // motivo
+    ]);
 }
 
 // ── RACIONALIZAÇÃO COM ────────────────────────────────────────
