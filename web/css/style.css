@@ -494,6 +494,31 @@ body {
 .export-btn.excel-btn { color: #15734A; border-color: #15734A22; }
 .export-btn.excel-btn:hover { background: #F0FDF4; border-color: #15734A; }
 
+/* ── BOTÃO EXPORTAR EXCEL COMPLETO ───────────────────────── */
+.painel-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding: 16px 20px 0;
+}
+.btn-excel-full {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 22px;
+  background: #15734A;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--font);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(21,115,74,.25);
+  transition: background .15s, box-shadow .15s;
+  letter-spacing: .01em;
+}
+.btn-excel-full:hover { background: #0f5c3a; box-shadow: 0 2px 8px rgba(21,115,74,.35); }
+
 /* ── COLUMN FILTERS ROW ──────────────────────────────────────── */
 .filter-row th {
   padding: 4px 6px !important;
