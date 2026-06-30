@@ -6,6 +6,8 @@
 
 let RESULTADO = null;
 let currentFileName = '';
+let currentWB = null;
+let currentWBPrecos = null;
 
 // ── COLORS MAP ────────────────────────────────────────────────
 
@@ -64,6 +66,16 @@ function chipStatus(st) {
 function chipRisco(r) {
     const map = { 'ALTO':'alto','MEDIO':'medio','BAIXO':'baixo','OK':'semrisco' };
     return `<span class="chip chip-${map[r]||'semrisco'}">${r}</span>`;
+}
+
+function chipPU(s) {
+    const map = { 'DENTRO':'ok','ABAIXO DO MINIMO':'insuficiente','ACIMA DO MAXIMO':'reprovado','SEM REFERENCIA':'semreferencia' };
+    return `<span class="chip chip-${map[s]||'semreferencia'}">${s}</span>`;
+}
+
+function fmt2js(v) {
+    const n = parseFloat(v);
+    return isNaN(n) ? '' : n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 // ── TABLE BUILDER ─────────────────────────────────────────────
@@ -230,6 +242,7 @@ function renderPainel(res) {
     const nPep3 = resultSAP.nAprov + resultSAP.nReprov;
     const pctAprov = nPep3 > 0 ? Math.round(resultSAP.nAprov / nPep3 * 100) : 0;
     const nAlertas = resultAlertas.alertas.length;
+    const pu = res.resultPU || { nDiverg: 0, sobreprecoTotal: 0, linhas: [] };
 
     // contagem por tipo de alerta
     const tiposCont = {};
@@ -267,14 +280,14 @@ function renderPainel(res) {
         <div class="kpi-sub">apontamentos encontrados</div>
       </div>
       <div class="kpi-card">
-        <div class="kpi-label">Obras no Ranking</div>
-        <div class="kpi-value">${fmtNum(resultRanking.obras.length)}</div>
-        <div class="kpi-sub">PEP3 com score calculado</div>
+        <div class="kpi-label">Divergências de Preço</div>
+        <div class="kpi-value ${res.temPrecos ? 'amber' : ''}">${res.temPrecos ? fmtNum(pu.nDiverg) : '—'}</div>
+        <div class="kpi-sub">${res.temPrecos ? 'PU fora da faixa min/max' : 'sem base de preços'}</div>
       </div>
       <div class="kpi-card">
-        <div class="kpi-label">Obras Risco ALTO</div>
-        <div class="kpi-value red">${fmtNum(resultRanking.obras.filter(o=>o.risco==='ALTO').length)}</div>
-        <div class="kpi-sub">score ≥ 60</div>
+        <div class="kpi-label">Sobrepreço Potencial</div>
+        <div class="kpi-value ${res.temPrecos ? 'red' : ''}">${res.temPrecos ? fmtMoeda(pu.sobreprecoTotal) : '—'}</div>
+        <div class="kpi-sub">${res.temPrecos ? '(PU − max) × qtd' : 'carregue a base de preços'}</div>
       </div>
       <div class="kpi-card">
         <div class="kpi-label">Valor em Risco</div>
@@ -400,6 +413,72 @@ function renderCOM(res) {
     dt.addSelect('Família', famOpts, 'familia');
 }
 
+// ── PREÇO UNITÁRIO ────────────────────────────────────────────
+
+function renderPreco(res) {
+    const el = document.getElementById('preco-content');
+
+    if (!res.temPrecos) {
+        el.innerHTML = `
+          <div class="table-wrap" style="padding:32px 20px">
+            <div class="empty-state">
+              <div class="icon">💰</div>
+              <p>Nenhuma base de preços carregada.</p>
+              <p style="font-size:12px;color:var(--muted);max-width:540px;margin:8px auto 16px">
+                Carregue o arquivo <b>BASE DE PREÇOS.xlsx</b> (colunas <b>MATERIAL</b>, <b>MIN PU</b>, <b>MAX PU</b>)
+                para habilitar a análise de preço unitário, os alertas de subvalorização e o peso de preço no ranking de risco.
+              </p>
+              <button class="btn-upload" onclick="document.getElementById('preco-file-input').click()">Carregar base de preços</button>
+              <input type="file" id="preco-file-input" accept=".xlsx,.xlsm,.xls" style="display:none">
+              <div class="upload-error" id="preco-error" style="margin-top:12px"></div>
+            </div>
+          </div>`;
+        document.getElementById('preco-file-input').addEventListener('change', e => processPrecoFile(e.target.files[0]));
+        return;
+    }
+
+    const pu = res.resultPU;
+    const nDentro = pu.linhas.filter(l => l.status === 'DENTRO').length;
+
+    el.innerHTML = `
+      <div class="cards-row cards-4">
+        <div class="kpi-card"><div class="kpi-label">Itens com PU</div><div class="kpi-value">${fmtNum(pu.linhas.length)}</div><div class="kpi-sub">com código, qtd e valor</div></div>
+        <div class="kpi-card"><div class="kpi-label">Dentro da Faixa</div><div class="kpi-value green">${fmtNum(nDentro)}</div><div class="kpi-sub">PU entre min e max</div></div>
+        <div class="kpi-card"><div class="kpi-label">Divergências</div><div class="kpi-value amber">${fmtNum(pu.nDiverg)}</div><div class="kpi-sub">abaixo do min ou acima do max</div></div>
+        <div class="kpi-card"><div class="kpi-label">Sobrepreço Potencial</div><div class="kpi-value red">${fmtMoeda(pu.sobreprecoTotal)}</div><div class="kpi-sub">(PU − max) × qtd</div></div>
+      </div>
+      <div style="text-align:right;margin-bottom:8px">
+        <button class="btn-reset" onclick="document.getElementById('preco-file-input2').click()">↻ Trocar base de preços</button>
+        <input type="file" id="preco-file-input2" accept=".xlsx,.xlsm,.xls" style="display:none">
+      </div>
+      <div class="table-wrap" id="tbl-preco"></div>`;
+
+    document.getElementById('preco-file-input2').addEventListener('change', e => processPrecoFile(e.target.files[0]));
+
+    const cols = [
+        { key:'pep3',   label:'PEP3' },
+        { key:'pep4',   label:'PEP4' },
+        { key:'tipoOD', label:'OD' },
+        { key:'cod',    label:'Cód', render: v => `<span class="mono">${v||''}</span>` },
+        { key:'desc',   label:'Descrição' },
+        { key:'und',    label:'Und' },
+        { key:'qtd',    label:'Qtd', render: v => fmt2js(v) },
+        { key:'valor',  label:'Valor R$', render: v => fmtMoeda(v) },
+        { key:'pu',     label:'PU', render: v => fmt2js(v) },
+        { key:'min',    label:'Min PU', render: v => v === '' ? '' : fmt2js(v) },
+        { key:'max',    label:'Max PU', render: v => v === '' ? '' : fmt2js(v) },
+        { key:'status', label:'Status', render: v => chipPU(v||'') },
+        { key:'obs',    label:'Observação' },
+    ];
+
+    const dt = new DataTable(document.getElementById('tbl-preco'), { columns: cols, data: pu.linhas, pageSize: 100 });
+    dt.addSearch('Pesquisar...', null);
+    const stOpts = [...new Set(pu.linhas.map(r => r.status).filter(Boolean))];
+    dt.addSelect('Status', stOpts, 'status');
+    const odOpts = [...new Set(pu.linhas.map(r => r.tipoOD).filter(Boolean))].sort();
+    dt.addSelect('OD', odOpts, 'tipoOD');
+}
+
 // ── ALERTAS CRÍTICOS ──────────────────────────────────────────
 
 function renderAlertas(res) {
@@ -442,6 +521,8 @@ function renderRanking(res) {
         { key:'valor',       label:'Valor Obra', render: v => fmtMoeda(v) },
         { key:'situacao',    label:'Situação', render: v => chipAprov(v) },
         { key:'alertas',     label:'Alertas', render: v => v ? `<b style="color:var(--red)">${v}</b>` : '0' },
+        { key:'divergPU',    label:'Diverg. Preço', render: v => v ? `<b style="color:var(--amber)">${v}</b>` : '0' },
+        { key:'sobrepreco',  label:'Sobrepreço R$', render: v => v ? fmtMoeda(v) : '—' },
         { key:'comFora',     label:'COM Fora NT.006', render: v => v ? `<b style="color:var(--amber)">${v}</b>` : '0' },
         { key:'score',       label:'Score', render: v => `<b>${v}</b>` },
         { key:'risco',       label:'Risco', render: v => chipRisco(v) },
@@ -476,6 +557,7 @@ function renderAll(res) {
     renderPainel(res);
     renderAnalise(res);
     renderCOM(res);
+    renderPreco(res);
     renderAlertas(res);
     renderRanking(res);
 }
@@ -509,10 +591,11 @@ function processFile(file) {
     reader.onload = e => {
         try {
             const data = new Uint8Array(e.target.result);
-            const wb = XLSX.read(data, { type: 'array' });
+            currentWB = XLSX.read(data, { type: 'array' });
+            currentWBPrecos = null;
             setTimeout(() => {
                 try {
-                    const res = Inventario.gerarInventario(wb);
+                    const res = Inventario.gerarInventario(currentWB, currentWBPrecos);
                     showLoading(false);
                     if (res.erro) { showError(res.erro); return; }
                     document.getElementById('upload-section').style.display = 'none';
@@ -529,6 +612,46 @@ function processFile(file) {
             showLoading(false);
             showError('Erro ao ler o arquivo: ' + err.message);
             console.error(err);
+        }
+    };
+    reader.readAsArrayBuffer(file);
+}
+
+function processPrecoFile(file) {
+    if (!file || !currentWB) return;
+    const errEl = document.getElementById('preco-error');
+    const setErr = msg => { if (errEl) { errEl.textContent = msg; errEl.style.display = 'block'; } };
+    if (!file.name.match(/\.(xlsx|xlsm|xls)$/i)) {
+        setErr('Selecione um arquivo Excel válido (.xlsx, .xlsm ou .xls).'); return;
+    }
+    showLoading(true);
+    const reader = new FileReader();
+    reader.onload = e => {
+        try {
+            const data = new Uint8Array(e.target.result);
+            currentWBPrecos = XLSX.read(data, { type: 'array' });
+            setTimeout(() => {
+                try {
+                    const res = Inventario.gerarInventario(currentWB, currentWBPrecos);
+                    showLoading(false);
+                    if (res.erro) { setErr(res.erro); return; }
+                    if (!res.temPrecos) {
+                        currentWBPrecos = null;
+                        renderAll(res);
+                        const e2 = document.getElementById('preco-error');
+                        if (e2) {
+                            e2.textContent = 'Nenhuma faixa de preço reconhecida (esperado colunas MATERIAL, MIN PU, MAX PU).';
+                            e2.style.display = 'block';
+                        }
+                    } else {
+                        renderAll(res);
+                    }
+                } catch (err) {
+                    showLoading(false); setErr('Erro ao processar: ' + err.message); console.error(err);
+                }
+            }, 50);
+        } catch (err) {
+            showLoading(false); setErr('Erro ao ler o arquivo: ' + err.message); console.error(err);
         }
     };
     reader.readAsArrayBuffer(file);

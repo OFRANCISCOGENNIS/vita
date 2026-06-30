@@ -316,7 +316,14 @@ Executada **por último** para não interferir nas leituras entre abas:
 - Coluna 14 recebe cor linha a linha via loop VBA (sem formatação condicional), porque `FormatConditions` com fórmulas em português falham no Excel PT-BR.
 - É o comportamento intencional (comentado no código), mas torna a formatação estática — alterar o valor depois não atualiza a cor automaticamente.
 
-### 13.6 `On Error Resume Next` extensivo
+### 13.6 Bug no `ProcessarPrecoUnitario` — STATUS sobrescreve MAX PU (linhas 2043–2044)
+- A linha 2043 escreve `mx` na coluna 11 (MAX PU) e a linha 2044 imediatamente sobrescreve a **mesma** coluna 11 com `st` (STATUS). O cabeçalho coloca STATUS na coluna 12.
+- Consequência: a coluna 12 (STATUS) fica **vazia**, e o MAX PU é perdido.
+- O `ProcessarRankingRisco` lê o STATUS de PU na coluna 12 (`pp(r, 12)`), que está vazia → **a dimensão de preço unitário nunca pontua no score de risco do VBA**, apesar de `PESO_PU = 3` estar definido.
+- **Correção sugerida:** `ws.Cells(outRow, 11).Value = mx` e `ws.Cells(outRow, 12).Value = st`.
+- *A versão web já implementa o comportamento correto: MIN/MAX e STATUS em campos separados, e o PU efetivamente entra no score do ranking.*
+
+### 13.7 `On Error Resume Next` extensivo
 - Usado em vários blocos de formatação para tolerar erros de UI (congelamento de painéis, AutoFilter). Pode mascarar erros reais durante depuração.
 
 ---

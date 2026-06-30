@@ -40,6 +40,10 @@ function temPalavra(descNorm, termo) {
     return s.includes(' ' + termo + ' ');
 }
 
+function fmt2(v) {
+    return Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
 // ── mapa NT.006 ───────────────────────────────────────────────
 
 function criarMapaNT006() {
@@ -548,7 +552,8 @@ function processarCOMInventario(dados) {
 
 // ── ALERTAS CRÍTICOS ──────────────────────────────────────────
 
-function processarAlertaCritico(dados) {
+function processarAlertaCritico(dados, precos) {
+    precos = precos || new Map();
     const alertas = [];
     const p4pep3  = new Map();
     const p4odi   = new Map();
@@ -629,6 +634,20 @@ function processarAlertaCritico(dados) {
 
         if (tipo === 'UC' && !famN.startsWith('COND') && !famN.startsWith('CABO') && !cod)
             alertas.push({ tipo:'UC - COD MATERIAL VAZIO', pep3, pep4, desc, familia: String(row.familia || ''), valor, motivo:'Código de material não preenchido' });
+
+        // subvalorização de UC (só quando há base de preços carregada)
+        if (precos.size > 0 && tipo === 'UC' && !famN.startsWith('COND') && !famN.startsWith('CABO') && cod) {
+            const codN = normCod(cod);
+            if (precos.has(codN) && qtd > 0 && valor > 0) {
+                const refP = precos.get(codN), unit = valor / qtd;
+                if (refP > 0 && unit < refP * TOL_SUBVAL && (refP - unit) * qtd >= MIN_DIVERG_RS)
+                    alertas.push({ tipo:'UC SUBVALORIZADO', pep3, pep4, cod, desc, familia: String(row.familia || ''), valor, qtd, pu: unit, ref: refP,
+                        motivo:`PU ${fmt2(unit)} abaixo de ${Math.round(TOL_SUBVAL*100)}% da referência (${fmt2(refP)})` });
+            } else if (codN && qtd > 0 && valor > 0) {
+                alertas.push({ tipo:'UC - PRECO NAO ENCONTRADO', pep3, pep4, cod, desc, familia: String(row.familia || ''), valor, qtd,
+                    motivo:'Material sem preço de referência na base de preços' });
+            }
+        }
     }
 
     // lacre × medidor
@@ -653,8 +672,9 @@ function processarAlertaCritico(dados) {
 
 // ── RANKING DE RISCO ──────────────────────────────────────────
 
-function processarRankingRisco(resultSAP, resultCOM, resultAlertas) {
-    const valOb = new Map(), repOb = new Map(), alOb = new Map(), comOb = new Map();
+function processarRankingRisco(resultSAP, resultCOM, resultAlertas, resultPU) {
+    const valOb = new Map(), repOb = new Map(), alOb = new Map(), comOb = new Map(),
+          puOb = new Map(), sobOb = new Map();
 
     // dados da análise SAP×PRJ
     for (const row of resultSAP.linhas) {
@@ -673,6 +693,19 @@ function processarRankingRisco(resultSAP, resultCOM, resultAlertas) {
         if (!valOb.has(p3)) valOb.set(p3, 0);
     }
 
+    // divergências de preço unitário + sobrepreço potencial
+    if (resultPU) {
+        for (const row of resultPU.linhas) {
+            const p3 = row.pep3;
+            if (!p3) continue;
+            if (row.status === 'ABAIXO DO MINIMO' || row.status === 'ACIMA DO MAXIMO') {
+                puOb.set(p3, (puOb.get(p3) || 0) + 1);
+                if (!valOb.has(p3)) valOb.set(p3, 0);
+                if (row.sobre > 0) sobOb.set(p3, (sobOb.get(p3) || 0) + row.sobre);
+            }
+        }
+    }
+
     // COM fora do previsto
     for (const row of resultCOM.linhas) {
         const p3 = row.pep3;
@@ -688,6 +721,7 @@ function processarRankingRisco(resultSAP, resultCOM, resultAlertas) {
         let score = 0;
         if (repOb.get(p3)) score += PESO_REPROV;
         score += Math.min((alOb.get(p3) || 0) * PESO_ALERTA, CAP_ALERTA);
+        score += Math.min((puOb.get(p3) || 0) * PESO_PU, CAP_PU);
         score += Math.min((comOb.get(p3) || 0) * PESO_COM, CAP_COM);
         if (score > 100) score = 100;
 
@@ -695,16 +729,132 @@ function processarRankingRisco(resultSAP, resultCOM, resultAlertas) {
         const parts = [];
         if (repOb.get(p3)) parts.push('REPROVADO na análise SAP×PRJ');
         if (alOb.get(p3)) parts.push(`${alOb.get(p3)} alerta(s) crítico(s)`);
+        if (puOb.get(p3)) {
+            let t = `${puOb.get(p3)} diverg. de preço`;
+            if (sobOb.get(p3) > 0) t += ` (sobrepreço R$ ${fmt2(sobOb.get(p3))})`;
+            parts.push(t);
+        }
         if (comOb.get(p3)) parts.push(`${comOb.get(p3)} COM fora do previsto`);
         const diagnostico = parts.join(' | ') || 'Sem apontamentos';
 
         obras.push({ pep3: p3, valor: valOb.get(p3)||0, situacao: repOb.get(p3) ? 'REPROVADO' : 'APROVADO',
-            alertas: alOb.get(p3)||0, comFora: comOb.get(p3)||0,
+            alertas: alOb.get(p3)||0, divergPU: puOb.get(p3)||0, sobrepreco: sobOb.get(p3)||0, comFora: comOb.get(p3)||0,
             score, risco, diagnostico });
     }
 
     obras.sort((a, b) => b.score - a.score || b.valor - a.valor);
     return { obras };
+}
+
+// ── BASE DE PREÇOS ────────────────────────────────────────────
+
+// Faixa MIN/MAX por código. Procura aba interna no workbook principal
+// (BASE PRECOS / BASE DE PRECOS / BASE DE PREÇOS); se não houver e um
+// workbook de preços for fornecido, usa a aba correspondente dele (ou a 1ª).
+// Colunas: MATERIAL | TEXTO MATERIAL | MIN PU | MAX PU. Retorna Map cod → {min,max,texto}.
+function carregarFaixaPrecos(wb, wbPrecos) {
+    const fx = new Map();
+    const faixaNomes = ['BASE PRECOS', 'BASE DE PRECOS'];
+
+    let src = null, sheetName = null;
+    for (const n of (wb.SheetNames || [])) if (faixaNomes.includes(normStr(n))) { src = wb; sheetName = n; break; }
+    if (!src && wbPrecos && wbPrecos.SheetNames) {
+        for (const n of wbPrecos.SheetNames) if (faixaNomes.includes(normStr(n))) { src = wbPrecos; sheetName = n; break; }
+        if (!src && wbPrecos.SheetNames.length) { src = wbPrecos; sheetName = wbPrecos.SheetNames[0]; }
+    }
+    if (!src) return fx;
+
+    const raw = XLSX.utils.sheet_to_json(src.Sheets[sheetName], { header: 1, defval: '' });
+    if (raw.length < 2) return fx;
+
+    const hdr = raw[0].map(h => normStr(h));
+    let cMat = -1, cTxt = -1, cMin = -1, cMax = -1;
+    hdr.forEach((h, i) => {
+        if (h === 'MATERIAL') cMat = i;
+        else if (h === 'TEXTO MATERIAL') cTxt = i;
+        else if (h === 'MIN PU') cMin = i;
+        else if (h === 'MAX PU') cMax = i;
+    });
+    if (cMat < 0) cMat = 0;
+    if (cTxt < 0) cTxt = 1;
+    if (cMin < 0) cMin = 3;
+    if (cMax < 0) cMax = 4;
+
+    for (let r = 1; r < raw.length; r++) {
+        const cod = normCod(raw[r][cMat]);
+        if (cod && !fx.has(cod))
+            fx.set(cod, { min: toNum(raw[r][cMin]), max: toNum(raw[r][cMax]), texto: String(raw[r][cTxt] || '').trim() });
+    }
+    return fx;
+}
+
+// Preço de referência (único) por código, p/ alerta de subvalorização.
+// Prioriza aba interna "PRECOS" (cod col 1, preço col 2); senão usa o ponto
+// médio (min+max)/2 da faixa.
+function carregarPrecos(wb, faixa) {
+    const precos = new Map();
+    const sheetName = (wb.SheetNames || []).find(n => normStr(n) === 'PRECOS');
+    if (sheetName) {
+        const raw = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { header: 1, defval: '' });
+        for (let r = 1; r < raw.length; r++) {
+            const cod = normCod(raw[r][0]), p = toNum(raw[r][1]);
+            if (cod && p > 0 && !precos.has(cod)) precos.set(cod, p);
+        }
+    }
+    if (precos.size === 0 && faixa) {
+        for (const [cod, f] of faixa) {
+            let mx = f.max; if (mx <= 0) mx = f.min;
+            const md = (f.min + mx) / 2;
+            if (md > 0) precos.set(cod, md);
+        }
+    }
+    return precos;
+}
+
+// ── PREÇO UNITÁRIO ────────────────────────────────────────────
+
+function processarPrecoUnitario(dados, faixa) {
+    const linhas = [];
+    let nDiverg = 0, sobreprecoTotal = 0;
+
+    for (const row of dados) {
+        const cod   = normCod(row.cod);
+        const qtd   = toNum(row.libSAP);
+        const valor = toNum(row.valor);
+        if (!cod || qtd === 0 || valor === 0) continue;
+
+        const pu = valor / qtd;
+        const f  = faixa.get(cod);
+        let status, obs, mn = '', mx = '', sobre = 0;
+
+        if (f) {
+            mn = f.min; mx = f.max;
+            if (pu < mn) {
+                status = 'ABAIXO DO MINIMO'; obs = `PU ${fmt2(pu)} < min ${fmt2(mn)}`; nDiverg++;
+            } else if (pu > mx) {
+                status = 'ACIMA DO MAXIMO'; obs = `PU ${fmt2(pu)} > max ${fmt2(mx)}`; nDiverg++;
+                if (qtd > 0) { sobre = (pu - mx) * qtd; sobreprecoTotal += sobre; }
+            } else {
+                status = 'DENTRO'; obs = `Dentro da faixa (${fmt2(mn)} a ${fmt2(mx)})`;
+            }
+        } else {
+            status = 'SEM REFERENCIA'; obs = 'Material sem faixa na base de preços';
+        }
+
+        const pep4U   = String(row.pep4 || '').trim().toUpperCase();
+        const suf     = pep4U.slice(-2);
+        const tipoPep = normStr(row.tipoPep || '');
+        const tipoOD  = suf === '.I' ? 'ODI' : suf === '.M' ? 'ODM' : suf === '.S' ? 'ODS' : suf === '.D' ? 'ODD'
+                      : tipoPep === 'I' ? 'ODI' : tipoPep === 'M' ? 'ODM' : tipoPep === 'S' ? 'ODS' : tipoPep === 'D' ? 'ODD' : '-';
+
+        linhas.push({
+            pep3: String(row.pep3 || '').trim(), pep4: String(row.pep4 || '').trim(),
+            tipo: String(row.tipo || '').trim(), cod, desc: String(row.desc || ''), und: String(row.und || ''),
+            qtd, valor, pu, min: f ? mn : '', max: f ? mx : '', status, obs, tipoOD, sobre
+        });
+    }
+
+    return { linhas, nDiverg, sobreprecoTotal };
 }
 
 // ── ENTRY POINT ───────────────────────────────────────────────
@@ -716,12 +866,17 @@ function gerarInventario(wb, wbPrecos) {
     const { dados } = lerBase(wb, sheetName);
     if (!dados.length) return { erro: 'A aba base está vazia.' };
 
+    const faixa     = carregarFaixaPrecos(wb, wbPrecos);
+    const temPrecos = faixa.size > 0;
+    const precos    = temPrecos ? carregarPrecos(wb, faixa) : new Map();
+
     const resultSAP     = processarSAPxPRJ(dados);
     const resultCOM     = processarCOMInventario(dados);
-    const resultAlertas = processarAlertaCritico(dados);
-    const resultRanking = processarRankingRisco(resultSAP, resultCOM, resultAlertas);
+    const resultPU      = temPrecos ? processarPrecoUnitario(dados, faixa) : { linhas: [], nDiverg: 0, sobreprecoTotal: 0 };
+    const resultAlertas = processarAlertaCritico(dados, precos);
+    const resultRanking = processarRankingRisco(resultSAP, resultCOM, resultAlertas, resultPU);
 
-    return { sheetName, resultSAP, resultCOM, resultAlertas, resultRanking };
+    return { sheetName, temPrecos, resultSAP, resultCOM, resultPU, resultAlertas, resultRanking };
 }
 
 window.Inventario = { gerarInventario };

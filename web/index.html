@@ -59,6 +59,7 @@
     <button class="tab-btn active" data-tab="painel">📊 Painel do Gestor</button>
     <button class="tab-btn" data-tab="analise">⚡ Análise SAP × PRJ</button>
     <button class="tab-btn" data-tab="com">🔧 Racionalização COM</button>
+    <button class="tab-btn" data-tab="preco">💰 Preço Unitário</button>
     <button class="tab-btn" data-tab="alertas">🚨 Alertas Críticos</button>
     <button class="tab-btn" data-tab="ranking">📈 Ranking de Risco</button>
   </nav>
@@ -90,6 +91,19 @@
     <div id="com-content"></div>
   </div>
 
+  <!-- PREÇO UNITÁRIO -->
+  <div class="tab-pane" id="pane-preco">
+    <div style="margin-bottom:20px">
+      <div class="section-title">Análise de Preço Unitário</div>
+      <p style="font-size:12px;color:var(--muted)">
+        PU = VALOR ÷ QTD comparado com a faixa MIN/MAX da base de preços. Requer o arquivo
+        <b>BASE DE PREÇOS.xlsx</b> (colunas <b>MATERIAL</b>, <b>MIN PU</b>, <b>MAX PU</b>) — ou uma aba
+        <b>BASE PRECOS</b> dentro da própria planilha.
+      </p>
+    </div>
+    <div id="preco-content"></div>
+  </div>
+
   <!-- ALERTAS CRÍTICOS -->
   <div class="tab-pane" id="pane-alertas">
     <div style="margin-bottom:20px">
@@ -106,7 +120,7 @@
     <div style="margin-bottom:20px">
       <div class="section-title">Ranking de Risco por Obra (PEP3)</div>
       <p style="font-size:12px;color:var(--muted)">
-        Score 0–100 calculado por reprovação (40 pts) + alertas críticos (até 24 pts) + COM fora do NT.006 (até 18 pts).
+        Score 0–100 calculado por reprovação (40 pts) + alertas críticos (até 24 pts) + divergências de preço (até 18 pts) + COM fora do NT.006 (até 18 pts).
         Ordenado do maior para o menor risco.
       </p>
     </div>
