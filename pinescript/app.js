@@ -137,6 +137,13 @@ function recomputarIndicadores() {
     computed.atrMedia = sma(computed.atrValues, atrMediaLen);
 }
 
+let confLive = { long: 0, short: 0, enabled: 0 };  // pontuação de confluência na última vela
+
+function rotuloFatores(fat) {
+    const ok = fat.filter(f => f.on && f.ok).map(f => f.k);
+    return ok.length ? ok.join('·') : '—';
+}
+
 function recomputarSinais() {
     const useTendencia = document.getElementById('useTendencia').checked;
     const useEma200 = document.getElementById('useEma200').checked;
@@ -147,6 +154,9 @@ function recomputarSinais() {
     const useEstrutura = document.getElementById('useEstrutura').checked;
     const estruturaLookback = parseInt(document.getElementById('estruturaLookback').value);
     const cooldownVelas = parseInt(document.getElementById('cooldownVelas').value);
+    const confMode = document.getElementById('confMode').value;              // 'score' | 'estrita'
+    const minScore = parseInt(document.getElementById('minScore').value);
+    const janela = Math.max(1, parseInt(document.getElementById('confJanela').value));
 
     const { closes, emaR, emaL, ema200, rsiValues, atrValues, atrMedia, highs, lows } = computed;
 
@@ -159,6 +169,18 @@ function recomputarSinais() {
         maxRec.push(mx); minRec.push(mn);
     }
 
+    // Cruzamentos de RSI por vela — usados com JANELA de confluência, para que o
+    // momentum (reversão da sobrevenda/sobrecompra) possa alinhar com o rompimento
+    // de estrutura dentro de N velas (antes só valia na MESMA vela = quase nunca).
+    const momLongBar = [], momShortBar = [];
+    for (let i = 0; i < closes.length; i++) {
+        momLongBar.push(i >= 1 && crossover(rsiValues[i], rsiValues[i - 1], rsiSobrevenda));
+        momShortBar.push(i >= 1 && crossunder(rsiValues[i], rsiValues[i - 1], rsiSobrecompra));
+    }
+    const recente = (arr, i) => { for (let j = Math.max(0, i - janela + 1); j <= i; j++) if (arr[j]) return true; return false; };
+
+    const enabledCount = [useTendencia, useEma200, useMomentum, useVolatilidade, useEstrutura].filter(Boolean).length;
+
     sinaisLong = []; sinaisShort = [];
     let barras = 999999;
     for (let i = 1; i < closes.length; i++) {
@@ -167,18 +189,44 @@ function recomputarSinais() {
         const tS = emaR[i] !== null && emaL[i] !== null && emaR[i] < emaL[i];
         const maL = ema200[i] !== null && closes[i] > ema200[i];
         const maS = ema200[i] !== null && closes[i] < ema200[i];
-        const moL = crossover(rsiValues[i], rsiValues[i - 1], rsiSobrevenda);
-        const moS = crossunder(rsiValues[i], rsiValues[i - 1], rsiSobrecompra);
+        const moL = recente(momLongBar, i);
+        const moS = recente(momShortBar, i);
         const vo = atrValues[i] !== null && atrMedia[i] !== null && atrValues[i] > atrMedia[i];
         const eL = closes[i] > maxRec[i - 1];
         const eS = closes[i] < minRec[i - 1];
 
-        const longBruto = (!useTendencia || tL) && (!useEma200 || maL) && (!useMomentum || moL) && (!useVolatilidade || vo) && (!useEstrutura || eL);
-        const shortBruto = (!useTendencia || tS) && (!useEma200 || maS) && (!useMomentum || moS) && (!useVolatilidade || vo) && (!useEstrutura || eS);
-        const cool = barras >= cooldownVelas;
+        const fatL = [
+            { k: 'T', on: useTendencia, ok: tL }, { k: 'Ma', on: useEma200, ok: maL },
+            { k: 'Mo', on: useMomentum, ok: moL }, { k: 'V', on: useVolatilidade, ok: vo },
+            { k: 'E', on: useEstrutura, ok: eL }
+        ];
+        const fatS = [
+            { k: 'T', on: useTendencia, ok: tS }, { k: 'Ma', on: useEma200, ok: maS },
+            { k: 'Mo', on: useMomentum, ok: moS }, { k: 'V', on: useVolatilidade, ok: vo },
+            { k: 'E', on: useEstrutura, ok: eS }
+        ];
+        const longScore = fatL.filter(f => f.on && f.ok).length;
+        const shortScore = fatS.filter(f => f.on && f.ok).length;
 
-        if (longBruto && cool) { sinaisLong.push({ index: i, preco: closes[i] }); barras = 0; }
-        else if (shortBruto && cool) { sinaisShort.push({ index: i, preco: closes[i] }); barras = 0; }
+        let longSig, shortSig;
+        if (confMode === 'estrita') {
+            longSig = enabledCount > 0 && longScore === enabledCount;
+            shortSig = enabledCount > 0 && shortScore === enabledCount;
+        } else {
+            longSig = longScore >= minScore && longScore > shortScore;
+            shortSig = shortScore >= minScore && shortScore > longScore;
+        }
+
+        const cool = barras >= cooldownVelas;
+        if (longSig && cool) {
+            sinaisLong.push({ index: i, preco: closes[i], score: longScore, enabled: enabledCount, fatores: rotuloFatores(fatL) });
+            barras = 0;
+        } else if (shortSig && cool) {
+            sinaisShort.push({ index: i, preco: closes[i], score: shortScore, enabled: enabledCount, fatores: rotuloFatores(fatS) });
+            barras = 0;
+        }
+
+        if (i === closes.length - 1) confLive = { long: longScore, short: shortScore, enabled: enabledCount };
     }
 }
 
@@ -190,8 +238,8 @@ function recomputarEntradas() {
     const tf = tfMinutes(), exp = expMinutes();
     const N = Math.max(1, Math.round(exp / tf));
     const brutos = [
-        ...sinaisLong.map(s => ({ index: s.index, dir: 'CALL' })),
-        ...sinaisShort.map(s => ({ index: s.index, dir: 'PUT' }))
+        ...sinaisLong.map(s => ({ index: s.index, dir: 'CALL', score: s.score, enabled: s.enabled, fatores: s.fatores })),
+        ...sinaisShort.map(s => ({ index: s.index, dir: 'PUT', score: s.score, enabled: s.enabled, fatores: s.fatores }))
     ].sort((a, b) => a.index - b.index);
 
     entradas = brutos.map(s => {
@@ -206,7 +254,7 @@ function recomputarEntradas() {
             else if (s.dir === 'CALL') resultado = expPrice > entryPrice ? 'WIN' : 'LOSS';
             else resultado = expPrice < entryPrice ? 'WIN' : 'LOSS';
         }
-        return { index: s.index, dir: s.dir, entryTime: c.time, entryPrice, expMin: exp, expTime, resultado, expPrice };
+        return { index: s.index, dir: s.dir, entryTime: c.time, entryPrice, expMin: exp, expTime, resultado, expPrice, score: s.score, enabled: s.enabled, fatores: s.fatores };
     });
 }
 
@@ -332,7 +380,7 @@ function atualizarMarcadores() {
         position: e.dir === 'CALL' ? 'belowBar' : 'aboveBar',
         color: e.dir === 'CALL' ? '#26a69a' : '#ef5350',
         shape: e.dir === 'CALL' ? 'arrowUp' : 'arrowDown',
-        text: `${e.dir} • exp ${e.expMin}m`
+        text: `${e.dir} ${e.score}/${e.enabled} • ${e.expMin}m`
     })).sort((a, b) => a.time - b.time);
     serieVelas.setMarkers(marc);
 }
@@ -366,6 +414,13 @@ function atualizarPaineis() {
     }
     document.getElementById('currentBias').textContent = bias;
 
+    // Medidor de confluência ao vivo (pontuação na última vela)
+    const en = confLive.enabled || 1;
+    document.getElementById('confBarCall').style.width = Math.round(confLive.long / en * 100) + '%';
+    document.getElementById('confBarPut').style.width = Math.round(confLive.short / en * 100) + '%';
+    document.getElementById('confScoreCall').textContent = confLive.long + '/' + confLive.enabled;
+    document.getElementById('confScorePut').textContent = confLive.short + '/' + confLive.enabled;
+
     const fs = document.getElementById('filtersStatus');
     fs.innerHTML = '';
     [
@@ -390,7 +445,9 @@ function atualizarPaineis() {
         tr.innerHTML =
             `<td>${entradas.length - idx}</td><td>${fmtHora(e.entryTime)}</td>` +
             `<td class="${dc}">${e.dir === 'CALL' ? '▲ CALL' : '▼ PUT'}</td>` +
-            `<td>${e.entryPrice}</td><td>${e.expMin} min</td><td>${fmtHora(e.expTime)}</td>` +
+            `<td>${e.entryPrice}</td>` +
+            `<td class="cell-fatores">${e.fatores} <b>(${e.score}/${e.enabled})</b></td>` +
+            `<td>${e.expMin} min</td><td>${fmtHora(e.expTime)}</td>` +
             `<td class="${rc}">${e.resultado}</td>`;
         tbody.appendChild(tr);
     });
@@ -622,6 +679,91 @@ async function carregarSimbolos() {
 }
 
 // ============================================================================
+// BLOCO 10.5 — NOTÍCIAS EM TEMPO REAL (RSS via proxy CORS, keyless)
+// ============================================================================
+
+// Proxy CORS que embrulha o RSS em JSON {contents:"<xml>"} — sobrescrevível por ?news=
+const NEWS_PROXY = _params.get('news') || 'https://api.allorigins.win/get?url=';
+const NEWS_FEEDS = [
+    { name: 'Cointelegraph', url: 'https://cointelegraph.com/rss' },
+    { name: 'CoinDesk', url: 'https://www.coindesk.com/arc/outboundfeeds/rss/' }
+];
+let noticias = [];
+let newsTimer = null;
+
+function escapeHtml(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+
+function tempoRelativo(d) {
+    const s = Math.floor((Date.now() - d.getTime()) / 1000);
+    if (s < 60) return 'agora';
+    if (s < 3600) return 'há ' + Math.floor(s / 60) + ' min';
+    if (s < 86400) return 'há ' + Math.floor(s / 3600) + ' h';
+    return 'há ' + Math.floor(s / 86400) + ' d';
+}
+
+function baseAsset() {
+    const s = symbolAtual();
+    return s.replace(/(USDT|BUSD|USDC|FDUSD|TUSD|USD|BTC|ETH|BRL|EUR|TRY)$/, '') || s;
+}
+
+async function carregarNoticias() {
+    const status = document.getElementById('newsStatus');
+    status.textContent = 'Atualizando…';
+    try {
+        const todas = [];
+        for (const feed of NEWS_FEEDS) {
+            try {
+                const resp = await fetch(NEWS_PROXY + encodeURIComponent(feed.url));
+                if (!resp.ok) continue;
+                const data = await resp.json();
+                const xml = data.contents || '';
+                const doc = new DOMParser().parseFromString(xml, 'text/xml');
+                [...doc.querySelectorAll('item')].slice(0, 15).forEach(it => {
+                    const title = (it.querySelector('title')?.textContent || '').trim();
+                    const link = (it.querySelector('link')?.textContent || '').trim();
+                    const pd = it.querySelector('pubDate')?.textContent;
+                    if (title) todas.push({ title, link, date: pd ? new Date(pd) : new Date(), source: feed.name });
+                });
+            } catch (e) { /* pula feed com erro */ }
+        }
+        if (!todas.length) throw new Error('sem itens');
+        todas.sort((a, b) => b.date - a.date);
+        noticias = todas.slice(0, 30);
+        status.textContent = 'Atualizado ' + fmtHora(Math.floor(Date.now() / 1000));
+        renderNoticias();
+    } catch (err) {
+        status.textContent = 'Indisponível (requer internet)';
+        document.getElementById('newsList').innerHTML =
+            '<div class="news-empty">Não foi possível carregar notícias agora (requer internet). O restante do simulador continua funcionando.</div>';
+    }
+}
+
+function renderNoticias() {
+    const soMoeda = document.getElementById('newsSoMoeda').checked;
+    const base = baseAsset().toLowerCase();
+    const nomes = {
+        btc: ['btc', 'bitcoin'], eth: ['eth', 'ethereum'], sol: ['sol', 'solana'], xrp: ['xrp', 'ripple'],
+        bnb: ['bnb', 'binance'], doge: ['doge', 'dogecoin'], ada: ['ada', 'cardano'], avax: ['avax', 'avalanche'],
+        link: ['chainlink', 'link'], matic: ['polygon', 'matic'], ltc: ['litecoin', 'ltc']
+    };
+    const termos = nomes[base] || [base];
+    let lista = noticias;
+    if (soMoeda) lista = noticias.filter(n => termos.some(t => n.title.toLowerCase().includes(t)));
+
+    const el = document.getElementById('newsList');
+    if (!lista.length) {
+        el.innerHTML = '<div class="news-empty">Nenhuma notícia' + (soMoeda ? ' para ' + baseAsset() : '') + ' no momento.</div>';
+        return;
+    }
+    el.innerHTML = lista.map(n =>
+        `<a class="news-item" href="${escapeHtml(n.link)}" target="_blank" rel="noopener">` +
+        `<span class="news-time">${tempoRelativo(n.date)}</span>` +
+        `<span class="news-title">${escapeHtml(n.title)}</span>` +
+        `<span class="news-src">${escapeHtml(n.source)}</span></a>`
+    ).join('');
+}
+
+// ============================================================================
 // BLOCO 11 — EVENTOS
 // ============================================================================
 
@@ -634,8 +776,11 @@ document.getElementById('timeframe').addEventListener('change', function () {
 });
 document.getElementById('symbol').addEventListener('change', function () {
     montarWidgetTV();   // sincroniza o widget oficial com o novo par
+    renderNoticias();   // re-filtra notícias pela nova moeda
     if (fonte() === 'binance') carregar();
 });
+document.getElementById('btnNews').addEventListener('click', carregarNoticias);
+document.getElementById('newsSoMoeda').addEventListener('change', renderNoticias);
 document.getElementById('expiracao').addEventListener('change', function () {
     if (!dados.length) { carregar(); return; }
     recomputarEntradas();
@@ -655,6 +800,8 @@ function iniciar() {
     montarWidgetTV();   // gráfico oficial do TradingView no topo (assíncrono, com retry)
     carregarSimbolos();
     carregar();
+    carregarNoticias(); // notícias em tempo real
+    newsTimer = setInterval(carregarNoticias, 60000);  // auto-refresh a cada 60s
 }
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', iniciar);

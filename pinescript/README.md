@@ -12,6 +12,39 @@ Abra **`Simulador_Standalone.html`** com duplo-clique — a interface e a lib de
 gráficos estão embutidas. Regenere-o com `node build_standalone.js` após editar
 os fontes.
 
+## 🎯 Confluência (modos e pontuação)
+
+A confluência ganhou dois modos, no grupo **Confluência** do painel:
+
+- **Pontuação (mín. X de Y)** — dispara quando pelo menos **X** dos filtros ativos
+  concordam na direção (e vence a direção com mais fatores). É o padrão e resolve o
+  problema de a confluência estrita quase nunca ocorrer.
+- **Estrita (todos os filtros)** — só dispara com **todos** os filtros ativos alinhados.
+
+Além disso, uma **janela de confluência (velas)** permite que o momentum (reversão de
+RSI) e o rompimento de estrutura se alinhem **dentro de N velas** — antes exigia a
+mesma vela, o que é quase impossível (RSI saindo da sobrevenda × preço rompendo máxima
+raramente coincidem no mesmo candle).
+
+Cada entrada mostra os **fatores que dispararam** (ex.: `T·Ma·V·E (4/5)` = Tendência,
+Macro, Volatilidade e Estrutura, 4 de 5) na tabela e no marcador do gráfico. O painel
+de status tem um **medidor de confluência ao vivo** (CALL e PUT) da última vela.
+
+Legenda dos fatores: `T` Tendência (EMA), `Ma` Macro (EMA200), `Mo` Momentum (RSI),
+`V` Volatilidade (ATR), `E` Estrutura (rompimento).
+
+## 📰 Notícias em tempo real
+
+Painel **Notícias em tempo real (cripto)** que agrega manchetes de RSS
+(Cointelegraph, CoinDesk) e atualiza sozinho a cada 60s:
+
+- **Requer internet.** O RSS é buscado via um proxy CORS keyless
+  (`api.allorigins.win`, sobrescrevível com `?news=`), pois feeds RSS não enviam
+  cabeçalhos CORS. Sem internet, mostra um aviso e o resto do app segue funcionando.
+- **"Só notícias da moeda atual"** filtra pelas manchetes que mencionam o ativo do par
+  selecionado (ex.: BTCUSDT → Bitcoin/BTC).
+- Cada item tem tempo relativo ("há 5 min"), título clicável e a fonte.
+
 ## 📺 Gráfico oficial do TradingView
 
 No topo da página fica embutido o **widget oficial "Advanced Chart" do TradingView**
