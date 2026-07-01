@@ -87,6 +87,12 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
 .diet-icon{font-size:22px}
 .diet-label{font-size:13px;font-weight:700}
 .diet-desc{font-size:11px;color:var(--mu)}
+.prot-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:4px}
+.prot-card{border:1.5px solid var(--bdr);border-radius:12px;padding:10px 6px;cursor:pointer;font-family:inherit;background:var(--bg);text-align:center;display:flex;flex-direction:column;gap:4px;transition:all .18s}
+.prot-card:hover{border-color:var(--s)}
+.prot-card.sel{border-color:var(--s);background:#E8F5EE}
+.prot-icon{font-size:20px}
+.prot-label{font-size:11px;font-weight:600;color:var(--tx);line-height:1.25}
 .intol-row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
 .intol-chip{display:flex;align-items:center;gap:6px;padding:7px 12px;border:1.5px solid var(--bdr);border-radius:20px;cursor:pointer;font-size:12px;font-weight:600;background:var(--bg);transition:all .18s}
 .intol-chip.sel{border-color:var(--s);background:#E8F5EE;color:var(--p)}
@@ -190,6 +196,7 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
   .pref-grid{grid-template-columns:1fr}
   .macro-grid{grid-template-columns:repeat(3,1fr)}
   .diet-row{grid-template-columns:repeat(3,1fr)}
+  .prot-grid{grid-template-columns:repeat(2,1fr)}
 }
 @media print{.hdr,.prog-wrap,.nav-row,.center-row{display:none}.sec{box-shadow:none;border:1px solid #ddd}}
 </style>
@@ -204,6 +211,7 @@ const S = {
   age:'', weight:'', height:'', sex:null, activity:null,
   conditions:[], meds:'', allergies:'',
   diet:null, intolerances:[], budget:null, time:null,
+  proteins:[],
 };
 
 /* ── SAVE TEXT FIELDS before re-render ── */
@@ -425,11 +433,16 @@ const TIMES=[
 ];
 function buildStep4() {
   const dCards = DIETS.map(d=>`
-    <button class="diet-card ${S.diet===d.k?'sel':''}" onclick="S.diet='${d.k}';render()">
+    <button class="diet-card ${S.diet===d.k?'sel':''}" onclick="setDiet('${d.k}')">
       <span class="diet-icon">${d.icon}</span>
       <span class="diet-label">${d.label}</span>
       <span class="diet-desc">${d.desc}</span>
     </button>`).join('');
+  const protCards = S.diet ? PROTEINS[S.diet].map(p=>`
+    <button class="prot-card ${S.proteins.includes(p.k)?'sel':''}" onclick="toggleProtein('${p.k}')">
+      <span class="prot-icon">${p.icon}</span>
+      <span class="prot-label">${p.label}</span>
+    </button>`).join('') : '';
   const iChips = INTOLS.map(i=>`
     <label class="intol-chip ${S.intolerances.includes(i.k)?'sel':''}">
       <input type="checkbox" ${S.intolerances.includes(i.k)?'checked':''} onchange="toggleIntol('${i.k}',this.checked)">
@@ -449,6 +462,11 @@ function buildStep4() {
     <div class="field-full">
       <div class="field"><label>Tipo de dieta</label><div class="diet-row">${dCards}</div></div>
     </div>
+    ${S.diet ? `<div class="field-full">
+      <div class="field"><label>Fontes de proteína para compra <span style="font-weight:400;color:var(--mu)">(selecione ao menos 2)</span></label>
+        <div class="prot-grid">${protCards}</div>
+      </div>
+    </div>` : ''}
     <div class="field-full">
       <div class="field"><label>Intolerâncias / alergias <span style="font-weight:400;color:var(--mu)">(opcional)</span></label>
         <div class="intol-row">${iChips}</div>
@@ -465,6 +483,16 @@ function buildStep4() {
     <p id="r-err" class="err-msg"></p>
   </div></div>`;
 }
+function setDiet(k) {
+  if (S.diet !== k) S.proteins = [];
+  S.diet = k;
+  render();
+}
+function toggleProtein(k) {
+  if (S.proteins.includes(k)) S.proteins = S.proteins.filter(x=>x!==k);
+  else S.proteins.push(k);
+  render();
+}
 function toggleIntol(k,v) {
   if (v) { if (!S.intolerances.includes(k)) S.intolerances.push(k); }
   else     S.intolerances = S.intolerances.filter(i=>i!==k);
@@ -474,6 +502,10 @@ function toggleIntol(k,v) {
 function goResults() {
   if (!S.diet||!S.budget||!S.time) {
     document.getElementById('r-err').textContent='Selecione dieta, orçamento e tempo disponível.';
+    return;
+  }
+  if (S.proteins.length<2) {
+    document.getElementById('r-err').textContent='Selecione pelo menos 2 fontes de proteína para compra.';
     return;
   }
   S.step='results'; render();
@@ -504,52 +536,96 @@ function macros(){
   return {prot,fat,carbs,pKcal,fKcal,cKcal};
 }
 
-/* ── MEAL PLAN DATA ── */
-const PLANS={
+/* ── PROTEIN OPTIONS (selecionáveis pelo usuário) ── */
+const PROTEINS={
+  omni:[
+    {k:'chicken',icon:'🍗',label:'Frango',shopQty:'1 kg',lunch:'150–200g de frango grelhado',dinner:'150g de frango grelhado ou assado'},
+    {k:'beef',   icon:'🥩',label:'Carne bovina magra',shopQty:'800 g',lunch:'150g de carne magra grelhada (patinho)',dinner:'150g de carne magra grelhada'},
+    {k:'fish',   icon:'🐟',label:'Peixe (tilápia/salmão)',shopQty:'600 g',lunch:'150g de peixe grelhado',dinner:'150g de peixe assado (tilápia, salmão ou merluza)'},
+    {k:'eggs',   icon:'🥚',label:'Ovos',shopQty:'1 dúzia',breakfast:'3 ovos mexidos ou cozidos',snack:'2 ovos cozidos'},
+    {k:'tuna',   icon:'🥫',label:'Atum em lata',shopQty:'3 latas',lunch:'1 lata de atum (água ou azeite)'},
+    {k:'yogurt', icon:'🥛',label:'Iogurte grego',shopQty:'4 potes',snack:'Iogurte grego natural (170g)'},
+  ],
+  veg:[
+    {k:'eggs',    icon:'🥚',label:'Ovos',shopQty:'2 dúzias',breakfast:'Omelete de 3 ovos com espinafre e queijo branco',snack:'2 ovos cozidos'},
+    {k:'yogurt',  icon:'🥛',label:'Iogurte grego',shopQty:'4 potes',snack:'Iogurte grego natural (170g) com frutas'},
+    {k:'cottage', icon:'🧀',label:'Queijo cottage/ricota',shopQty:'2 potes',snack:'100g de queijo cottage ou ricota',lunch:'100g de queijo cottage na salada'},
+    {k:'chickpea',icon:'🫘',label:'Grão-de-bico',shopQty:'500 g',lunch:'Grão-de-bico refogado com alho e azeite (100g cozido)'},
+    {k:'lentil',  icon:'🍲',label:'Lentilha',shopQty:'500 g',lunch:'Lentilha cozida (100g)',dinner:'Lentilha refogada com legumes (100g)'},
+    {k:'tofu',    icon:'🧈',label:'Tofu',shopQty:'400 g',lunch:'100–150g de tofu grelhado',dinner:'100g de tofu grelhado com legumes'},
+  ],
+  vegan:[
+    {k:'tofu',    icon:'🧈',label:'Tofu',shopQty:'400 g',lunch:'100–150g de tofu grelhado',dinner:'100g de tofu mexido com cúrcuma e legumes'},
+    {k:'tempeh',  icon:'🍢',label:'Tempeh',shopQty:'200 g',lunch:'100g de tempeh grelhado',dinner:'100g de tempeh salteado'},
+    {k:'chickpea',icon:'🫘',label:'Grão-de-bico',shopQty:'500 g',lunch:'Grão-de-bico ensopado com legumes (100g cozido)',dinner:'Grão-de-bico ensopado (100g)'},
+    {k:'lentil',  icon:'🍲',label:'Lentilha',shopQty:'500 g',lunch:'Lentilha cozida (100g)',dinner:'Lentilha refogada (100g)'},
+    {k:'beans',   icon:'🫘',label:'Feijão',shopQty:'1 kg',lunch:'2 conchas de feijão',dinner:'1 concha de feijão'},
+    {k:'pea',     icon:'🥤',label:'Proteína vegetal em pó (opcional)',shopQty:'1 pote',snack:'1 dose de proteína vegetal em pó no smoothie'},
+  ],
+};
+
+/* ── MEAL PLAN BASE (itens fixos, independentes da proteína escolhida) ── */
+const BASE_MEALS={
   omni:{
-    bf:['3 ovos mexidos ou cozidos','2 fatias de pão integral','1 fruta (banana, maçã ou laranja)','Café ou chá sem açúcar'],
-    al:['150–200g frango grelhado, carne magra ou atum','4–5 col. sopa de arroz integral','1 concha de feijão ou lentilha','Salada verde à vontade','1 col. sopa de azeite'],
-    sn:['Iogurte grego natural (170g)','20g de castanhas ou amêndoas'],
-    jt:['150g de peixe assado (tilápia, salmão ou merluza)','Legumes refogados (brócolis, abobrinha, cenoura)','2–3 col. sopa de arroz integral (opcional)'],
-    sb:['Frango ↔ atum em lata, ovos, carne magra (patinho)','Arroz integral ↔ batata doce, macarrão integral, quinoa','Iogurte grego ↔ cottage, ricota','Peixe ↔ frango, omelete'],
+    bf:['2 fatias de pão integral','1 fruta (banana, maçã ou laranja)','Café ou chá sem açúcar'],
+    al:['4–5 col. sopa de arroz integral','1 concha de feijão ou lentilha','Salada verde à vontade','1 col. sopa de azeite'],
+    sn:['20g de castanhas ou amêndoas'],
+    jt:['Legumes refogados (brócolis, abobrinha, cenoura)','2–3 col. sopa de arroz integral (opcional)'],
   },
   veg:{
-    bf:['Omelete de 3 ovos com espinafre e queijo branco','2 fatias de pão integral','1 fruta','Café ou chá'],
-    al:['Grão-de-bico refogado com alho e azeite (100g cozido)','4 col. sopa de arroz integral','1 concha de feijão','Salada verde à vontade'],
-    sn:['Iogurte grego natural (170g) com frutas e granola (20g)','ou 2 ovos cozidos + 1 fruta'],
-    jt:['Omelete de 3 ovos com legumes variados','Salada farta com azeite','1 fatia de pão integral (opcional)'],
-    sb:['Grão-de-bico ↔ lentilha, tofu firme, feijão branco','Queijo branco ↔ cottage, ricota','Ovo ↔ tofu mexido com cúrcuma'],
+    bf:['2 fatias de pão integral','1 fruta','Café ou chá'],
+    al:['4 col. sopa de arroz integral','1 concha de feijão','Salada verde à vontade'],
+    sn:['20g de castanhas ou granola'],
+    jt:['Salada farta com azeite','1 fatia de pão integral (opcional)'],
   },
   vegan:{
     bf:['Aveia (50g) com leite vegetal (300ml)','1 banana amassada + 20g pasta de amendoim','1 col. sopa de chia ou linhaça moída'],
-    al:['4–5 col. sopa de arroz integral + 2 conchas de feijão','100–150g de tofu grelhado ou tempeh','Salada verde à vontade com azeite'],
-    sn:['Smoothie: leite vegetal (300ml) + banana + proteína vegetal opcional','ou frutas + 30g oleaginosas (castanhas, nozes, amêndoas)'],
-    jt:['Grão-de-bico ensopado com legumes (tomate, abobrinha, pimentão)','Quinoa cozida (3–4 col. sopa) ou pão integral (s/ leite)'],
-    sb:['Tofu ↔ tempeh, grão-de-bico, lentilha','Aveia ↔ quinoa em flocos','Leite vegetal ↔ qualquer alternativa (soja, aveia, amêndoa)'],
-    note:'⚠️ Vitamina B12: suplementação é necessária para veganos (evidência forte). Monitore também ferro, zinco, cálcio e ômega-3 (DHA/EPA). Faça exames a cada 6–12 meses.',
+    al:['4–5 col. sopa de arroz integral','Salada verde à vontade com azeite'],
+    sn:['Frutas variadas + 20g de castanhas ou nozes'],
+    jt:['Quinoa cozida (3–4 col. sopa) ou pão integral (s/ leite)'],
   },
 };
+
+function buildMealPlan(){
+  const opts = PROTEINS[S.diet].filter(p=>S.proteins.includes(p.k));
+  const base = BASE_MEALS[S.diet];
+  const pick = slot => opts.map(p=>p[slot]).filter(Boolean).join(' ou ');
+  const bfP=pick('breakfast'), alP=pick('lunch'), snP=pick('snack'), jtP=pick('dinner');
+  const bf=[...(bfP?[bfP]:[]),...base.bf];
+  const al=[...(alP?[alP]:[]),...base.al];
+  const sn=[...(snP?[snP]:[]),...base.sn];
+  const jt=[...(jtP?[jtP]:[]),...base.jt];
+  const unselected = PROTEINS[S.diet].filter(p=>!S.proteins.includes(p.k));
+  const sb = unselected.length
+    ? unselected.map(p=>`${p.label} — alternativa às proteínas escolhidas`)
+    : ['Ajuste as porções de proteína conforme apetite e disponibilidade.'];
+  const note = S.diet==='vegan'
+    ? '⚠️ Vitamina B12: suplementação é necessária para veganos (evidência forte). Monitore também ferro, zinco, cálcio e ômega-3 (DHA/EPA). Faça exames a cada 6–12 meses.'
+    : null;
+  return {bf,al,sn,jt,sb,note};
+}
+
+function buildProteinShopping(){
+  return PROTEINS[S.diet].filter(p=>S.proteins.includes(p.k)).map(p=>`${p.icon} ${p.label} — ${p.shopQty}`);
+}
+
 const SHOP={
   omni:{
-    'Proteínas':['Frango (filé) — 1 kg','Ovos — 1 dúzia','Peixe (tilápia ou salmão) — 500 g','Atum em lata — 3 und.','Iogurte grego — 4 potes'],
     'Carboidratos':['Arroz integral — 1 kg','Pão integral — 1 pacote','Batata doce — 1 kg','Frutas variadas — 2 kg'],
     'Gorduras':['Azeite extra virgem — 500 ml','Castanhas / amêndoas — 200 g'],
     'Vegetais':['Brócolis — 1 cabeça','Espinafre — 1 maço','Tomate — 500 g','Pepino — 3 und.','Abobrinha — 2 und.'],
     'Leguminosas':['Feijão — 500 g','Lentilha — 500 g'],
   },
   veg:{
-    'Proteínas':['Ovos — 2 dúzias','Iogurte grego — 4 potes','Queijo branco / cottage — 2 potes','Grão-de-bico — 500 g'],
     'Carboidratos':['Arroz integral — 1 kg','Pão integral — 1 pacote','Frutas variadas — 2 kg','Batata doce — 1 kg'],
     'Gorduras':['Azeite extra virgem — 500 ml','Mix de oleaginosas — 200 g'],
     'Vegetais':['Espinafre — 1 maço','Brócolis — 1 cabeça','Tomate — 500 g','Legumes variados — 1 kg'],
-    'Leguminosas':['Feijão — 500 g','Lentilha — 500 g','Grão-de-bico — 500 g'],
+    'Leguminosas':['Feijão — 500 g'],
   },
   vegan:{
-    'Proteínas vegetais':['Tofu firme — 400 g','Tempeh — 200 g','Pasta de amendoim — 1 pote'],
     'Carboidratos':['Aveia em flocos — 500 g','Arroz integral — 1 kg','Pão integral (s/ leite) — 1 pac.','Bananas — 2 pencas','Frutas variadas — 2 kg'],
-    'Gorduras':['Azeite extra virgem — 500 ml','Mix de oleaginosas — 300 g','Chia / linhaça — 200 g'],
+    'Gorduras':['Azeite extra virgem — 500 ml','Mix de oleaginosas — 300 g','Chia / linhaça — 200 g','Pasta de amendoim — 1 pote'],
     'Vegetais':['Espinafre — 1 maço','Brócolis — 1 cabeça','Tomate — 500 g','Pimentão — 4 und.','Legumes variados — 1 kg'],
-    'Leguminosas':['Feijão — 1 kg','Lentilha — 500 g','Grão-de-bico — 500 g'],
     'Leite vegetal':['Leite vegetal (soja ou aveia) — 2 L'],
   },
 };
@@ -597,7 +673,9 @@ function buildResults(){
   const t=Math.round(tmb()), d=Math.round(tdee()), g=goalCal();
   const m=macros();
   const pp=Math.round(m.pKcal/g*100), cp=Math.round(m.cKcal/g*100), fp=Math.round(m.fKcal/g*100);
-  const plan=PLANS[S.diet], sh=SHOP[S.diet];
+  const waterL=((+S.weight*35)/1000).toFixed(1);
+  const plan=buildMealPlan();
+  const sh={'Proteínas':buildProteinShopping(), ...SHOP[S.diet]};
   const tmb_f = S.sex==='M'
     ? `10×${S.weight} + 6.25×${S.height} − 5×${S.age} + 5`
     : `10×${S.weight} + 6.25×${S.height} − 5×${S.age} − 161`;
@@ -627,6 +705,7 @@ function buildResults(){
       <div class="cal-row"><span>TMB — Mifflin-St Jeor (${S.sex==='M'?'♂':'♀'})</span><strong>${tmb_f} = <span style="color:var(--p)">${t} kcal</span></strong></div>
       <div class="cal-row"><span>TDEE (TMB × ${PAL[S.activity]} — ${ALABEL[S.activity]})</span><strong>= ${d} kcal</strong></div>
       <div class="cal-row hl"><span>${GLABEL[S.goal]} (× ${GFAC[S.goal]}):</span><strong>${g} kcal / dia</strong></div>
+      <div class="cal-row"><span>💧 Água recomendada (35ml/kg)</span><strong>${waterL} L / dia</strong></div>
     </div>
 
     <!-- MACROS -->
@@ -739,7 +818,7 @@ function buildStop(){
 /* ── HELPERS ── */
 function restart(){
   Object.assign(S,{step:1,goal:null,age:'',weight:'',height:'',sex:null,activity:null,
-    conditions:[],meds:'',allergies:'',diet:null,intolerances:[],budget:null,time:null});
+    conditions:[],meds:'',allergies:'',diet:null,intolerances:[],budget:null,time:null,proteins:[]});
   render();
 }
 
