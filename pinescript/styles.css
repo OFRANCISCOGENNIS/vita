@@ -232,6 +232,17 @@ body {
     font-size: 16px;
 }
 
+.signal-hint {
+    margin: 12px 0;
+    padding: 10px 12px;
+    background: rgba(243, 156, 18, 0.12);
+    border-left: 3px solid var(--color-warning);
+    border-radius: 4px;
+    font-size: 12px;
+    color: #7d5a12;
+    display: none;
+}
+
 .filters-status {
     margin-top: 20px;
     padding-top: 15px;

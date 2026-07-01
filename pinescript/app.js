@@ -320,6 +320,12 @@ function calcularIndicador(dados) {
 function renderizarGraficos(resultado) {
     const indices = Array.from({ length: dados.length }, (_, i) => i);
 
+    // Marcadores de sinais: arrays alinhados aos índices, preço no sinal e null no resto
+    const markerLong = resultado.closes.map(() => null);
+    const markerShort = resultado.closes.map(() => null);
+    sinaisLong.forEach(s => { markerLong[s.index] = s.preco; });
+    sinaisShort.forEach(s => { markerShort[s.index] = s.preco; });
+
     // Gráfico de Preço + EMAs
     const ctxPreco = document.getElementById('chartPreco').getContext('2d');
     if (chartPreco) chartPreco.destroy();
@@ -372,6 +378,30 @@ function renderizarGraficos(resultado) {
                     pointRadius: 0,
                     borderDash: [2, 2],
                     yAxisID: 'y'
+                },
+                {
+                    label: '▲ Sinal LONG',
+                    data: markerLong,
+                    borderColor: '#27ae60',
+                    backgroundColor: '#27ae60',
+                    showLine: false,
+                    pointStyle: 'triangle',
+                    pointRadius: 9,
+                    pointHoverRadius: 12,
+                    pointRotation: 0,
+                    yAxisID: 'y'
+                },
+                {
+                    label: '▼ Sinal SHORT',
+                    data: markerShort,
+                    borderColor: '#e74c3c',
+                    backgroundColor: '#e74c3c',
+                    showLine: false,
+                    pointStyle: 'triangle',
+                    pointRadius: 9,
+                    pointHoverRadius: 12,
+                    pointRotation: 180,
+                    yAxisID: 'y'
                 }
             ]
         },
@@ -401,8 +431,37 @@ function renderizarGraficos(resultado) {
     const ctxRsi = document.getElementById('chartRsi').getContext('2d');
     if (chartRsi) chartRsi.destroy();
 
+    // Plugin que desenha as linhas de referência do RSI (30 e 70)
+    const rsiRefLines = {
+        id: 'rsiRefLines',
+        afterDatasetsDraw(chart) {
+            const { ctx, scales: { y } } = chart;
+            const yTop = y.getPixelForValue(70);
+            const yBottom = y.getPixelForValue(30);
+
+            ctx.save();
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.2)';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([5, 5]);
+
+            ctx.beginPath();
+            ctx.moveTo(chart.chartArea.left, yTop);
+            ctx.lineTo(chart.chartArea.right, yTop);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(chart.chartArea.left, yBottom);
+            ctx.lineTo(chart.chartArea.right, yBottom);
+            ctx.stroke();
+
+            ctx.setLineDash([]);
+            ctx.restore();
+        }
+    };
+
     chartRsi = new Chart(ctxRsi, {
         type: 'line',
+        plugins: [rsiRefLines],
         data: {
             labels: indices,
             datasets: [
@@ -445,32 +504,6 @@ function renderizarGraficos(resultado) {
             }
         }
     });
-
-    // Adicionar linhas de referência do RSI (30 e 70)
-    const plugin = {
-        afterDatasetsDraw(chart) {
-            const { ctx, scales: { y } } = chart;
-            const yTop = y.getPixelForValue(70);
-            const yBottom = y.getPixelForValue(30);
-
-            ctx.strokeStyle = 'rgba(0, 0, 0, 0.2)';
-            ctx.lineWidth = 1;
-            ctx.setLineDash([5, 5]);
-
-            ctx.beginPath();
-            ctx.moveTo(chart.chartArea.left, yTop);
-            ctx.lineTo(chart.chartArea.right, yTop);
-            ctx.stroke();
-
-            ctx.beginPath();
-            ctx.moveTo(chart.chartArea.left, yBottom);
-            ctx.lineTo(chart.chartArea.right, yBottom);
-            ctx.stroke();
-
-            ctx.setLineDash([]);
-        }
-    };
-    chartRsi.plugins.register(plugin);
 
     // Gráfico de ATR
     const ctxAtr = document.getElementById('chartAtr').getContext('2d');
@@ -544,6 +577,18 @@ function atualizarStatusPanel(resultado) {
         lastSignal = `SHORT em ${sinaisShort[sinaisShort.length - 1].index}`;
     }
     document.getElementById('lastSignal').textContent = lastSignal;
+
+    // Dica quando não há sinais (confluência estrita é rara — isso é esperado)
+    const hint = document.getElementById('signalHint');
+    if (sinaisLong.length === 0 && sinaisShort.length === 0) {
+        const poucasVelas = dados.length < 200 && document.getElementById('useEma200').checked;
+        hint.textContent = poucasVelas
+            ? '💡 Filtro EMA 200 ativo, mas há menos de 200 velas — gere mais velas ou desligue a EMA 200.'
+            : '💡 Nenhum sinal com estes filtros. A confluência estrita é rara por design — afrouxe um filtro (ex.: desligar Estrutura ou Momentum) ou gere novos dados.';
+        hint.style.display = 'block';
+    } else {
+        hint.style.display = 'none';
+    }
 
     // Viés atual
     const lastClose = resultado.closes[resultado.closes.length - 1];
