@@ -192,6 +192,22 @@ body::after{content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;
 .subs-box strong{display:block;margin-bottom:5px;color:var(--mu)}
 .subs-box li{margin-bottom:3px;color:var(--mu)}
 
+/* Weekly plan accordion */
+.day-card{border:1px solid var(--bdr);border-radius:12px;margin-bottom:8px;background:rgba(255,255,255,.03);overflow:hidden;transition:all .2s}
+.day-card[open]{border-color:rgba(52,245,197,.35);box-shadow:0 0 16px rgba(52,245,197,.12)}
+.day-card summary{list-style:none;cursor:pointer;padding:12px 14px;display:flex;align-items:center;gap:8px;user-select:none}
+.day-card summary::-webkit-details-marker{display:none}
+.day-card summary::after{content:'▾';color:var(--mu);font-size:12px;transition:transform .25s;margin-left:2px}
+.day-card[open] summary::after{transform:rotate(180deg);color:var(--neon)}
+.day-name{font-size:14px;font-weight:700;color:var(--tx);flex:1}
+.day-badge{font-size:11px;font-weight:700;padding:4px 11px;border-radius:12px;white-space:nowrap}
+.day-badge.train{background:rgba(52,245,197,.14);color:var(--neon);border:1px solid rgba(52,245,197,.3)}
+.day-badge.rest{background:rgba(129,140,248,.14);color:#A5B4FC;border:1px solid rgba(129,140,248,.3)}
+.day-meals{padding:2px 14px 12px;border-top:1px solid var(--bdr)}
+.dm{font-size:12px;color:var(--tx);padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05);line-height:1.45}
+.dm:last-child{border-bottom:none}
+.dm span{display:inline-block;font-weight:700;color:var(--mu);min-width:78px;margin-right:4px}
+
 /* Tips */
 .tip{border-radius:11px;padding:12px 14px;font-size:12px;line-height:1.55;margin-top:8px;border:1px solid}
 .tip.warn{background:rgba(253,224,71,.08);border-color:rgba(253,224,71,.3);color:#FDE68A}
@@ -235,7 +251,9 @@ body::after{content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;
   .hdr,.prog-wrap,.nav-row,.center-row{display:none}
   .sec,.res-header{box-shadow:none;border:1px solid #ddd;background:#fff;backdrop-filter:none}
   .sec-title,.step-title,.stop-card h2{-webkit-text-fill-color:#1B5E42;color:#1B5E42}
-  .cal-row strong,.meal-item li,.cond-item span,.shop-tag,.res-header h2,.res-header p{color:#17201B}
+  .cal-row strong,.meal-item li,.cond-item span,.shop-tag,.res-header h2,.res-header p,.day-name,.dm{color:#17201B}
+  .day-card .day-meals{display:block!important}
+  .day-card summary::after{display:none}
 }
 </style>
 </head>
@@ -722,6 +740,57 @@ function buildMealPlan(){
   return {bf,al,sn,jt,sb,note};
 }
 
+/* ── WEEKLY PLAN (variação 7 dias + treino/descanso) ── */
+const CARBS=[
+  {name:'Arroz integral',            tr:'4–5 col. sopa',              rest:'2–3 col. sopa'},
+  {name:'Batata doce',               tr:'200 g',                     rest:'120 g'},
+  {name:'Macarrão integral',         tr:'1 prato raso',              rest:'½ prato'},
+  {name:'Quinoa',                    tr:'4 col. sopa',               rest:'2 col. sopa'},
+  {name:'Batata inglesa',            tr:'2 unid. médias',            rest:'1 unid. média'},
+  {name:'Mandioca/aipim cozido',     tr:'150 g',                     rest:'80 g'},
+  {name:'Arroz integral + feijão',   tr:'4 col. arroz + 1 concha',   rest:'2 col. arroz + ½ concha'},
+];
+const VEGS=['brócolis no vapor','abobrinha refogada','cenoura e vagem','couve-flor','espinafre refogado','mix de folhas verdes','legumes assados (berinjela, pimentão)'];
+const BF_ROT={
+  omni: ['Pão integral + fruta','Tapioca com recheio magro + fruta','Aveia + fruta','Panqueca de aveia e banana','Pão integral + fruta','Vitamina de frutas + aveia','Crepioca + fruta'],
+  veg:  ['Pão integral + fruta','Tapioca com queijo branco + fruta','Aveia + fruta','Panqueca de aveia e banana','Pão integral + fruta','Vitamina + aveia','Crepioca + fruta'],
+  vegan:['Aveia com leite vegetal + banana','Tapioca com pasta de amendoim + fruta','Mingau de aveia + frutas','Panqueca de banana e aveia','Pão integral (s/ leite) + fruta','Smoothie de frutas + aveia','Crepioca vegana + fruta'],
+};
+const SNACK_ROT=['Fruta + castanhas','Fruta + pasta de amendoim','Mix de oleaginosas','Smoothie de frutas','Palitos de cenoura + homus','Fruta da estação','Fruta + granola'];
+const DAYS=['Segunda','Terça','Quarta','Quinta','Sexta','Sábado','Domingo'];
+const TRAIN_DAYS={sed:2,light:3,mod:4,active:6,vactive:6};
+const REST_DAYS={2:[1,2,4,5,6],3:[1,3,5,6],4:[2,5,6],5:[3,6],6:[6],7:[]};
+
+function buildWeeklyPlan(){
+  const opts   = PROTEINS[S.diet].filter(p=>S.proteins.includes(p.k));
+  const lunchP = opts.filter(p=>p.lunch);
+  const dinnP  = opts.filter(p=>p.dinner);
+  const bfP    = opts.filter(p=>p.breakfast);
+  const snP    = opts.filter(p=>p.snack);
+  const tDays  = TRAIN_DAYS[S.activity] || 3;
+  const restSet= REST_DAYS[tDays] || [];
+  return DAYS.map((name,i)=>{
+    const rest = restSet.includes(i);
+    const carb = CARBS[i % CARBS.length];
+    const veg  = VEGS[(i+2) % VEGS.length];
+    const bf0  = BF_ROT[S.diet][i % BF_ROT[S.diet].length];
+    const lp   = lunchP.length ? lunchP[i % lunchP.length].lunch : null;
+    let   dp   = dinnP.length ? dinnP[i % dinnP.length].dinner : null;
+    if (dinnP.length>1 && lunchP.length && dinnP[i%dinnP.length]===lunchP[i%lunchP.length])
+      dp = dinnP[(i+1)%dinnP.length].dinner;
+    const bfProt = bfP.length ? bfP[i % bfP.length].breakfast : null;
+    const snItem = snP.length ? snP[i % snP.length].snack : SNACK_ROT[i % SNACK_ROT.length];
+    const cP = rest ? carb.rest : carb.tr;
+    return {
+      name, rest,
+      bf:[bf0, ...(bfProt?[bfProt]:[])],
+      al:[lp, `${carb.name} (${cP})`, `Salada + ${veg}`, '1 fio de azeite'].filter(Boolean),
+      sn:[snItem],
+      jt:[dp, veg, rest?'Sem carbo extra (dia de descanso)':'2 col. sopa de carbo (opcional)'].filter(Boolean),
+    };
+  });
+}
+
 function buildProteinShopping(){
   return PROTEINS[S.diet].filter(p=>S.proteins.includes(p.k)).map(p=>`${p.icon} ${p.label} — ${p.shopQty}`);
 }
@@ -792,6 +861,23 @@ function buildResults(){
   const pp=Math.round(m.pKcal/g*100), cp=Math.round(m.cKcal/g*100), fp=Math.round(m.fKcal/g*100);
   const waterL=((+S.weight*35)/1000).toFixed(1);
   const plan=buildMealPlan();
+  const week=buildWeeklyPlan();
+  const anyTrain=S.trainings.length>0;
+  const trainLabel=anyTrain?'🏋️ Treino':'⚡ Dia ativo';
+  const restLabel =anyTrain?'😴 Descanso':'🌙 Dia leve';
+  const weekHtml=week.map((dd,i)=>`
+    <details class="day-card"${i===0?' open':''}>
+      <summary>
+        <span class="day-name">${dd.name}</span>
+        <span class="day-badge ${dd.rest?'rest':'train'}">${dd.rest?restLabel:trainLabel}</span>
+      </summary>
+      <div class="day-meals">
+        <div class="dm"><span>☀️ Café</span>${dd.bf.join(' · ')}</div>
+        <div class="dm"><span>🌿 Almoço</span>${dd.al.join(' · ')}</div>
+        <div class="dm"><span>🍎 Lanche</span>${dd.sn.join(' · ')}</div>
+        <div class="dm"><span>🌙 Jantar</span>${dd.jt.join(' · ')}</div>
+      </div>
+    </details>`).join('');
   const sh={'Proteínas':buildProteinShopping(), ...SHOP[S.diet]};
   const tmb_f = S.sex==='M'
     ? `10×${S.weight} + 6.25×${S.height} − 5×${S.age} + 5`
@@ -859,15 +945,13 @@ function buildResults(){
       <p style="font-size:11px;color:var(--mu);margin-top:8px">Faixa de proteína baseada em ISSN (2017) e Morton et al. (2018). Evidência: forte.</p>
     </div>
 
-    <!-- CARDÁPIO -->
+    <!-- CARDÁPIO SEMANAL -->
     <div class="sec">
-      <div class="sec-title">🍽️ Cardápio — 1 dia base</div>
-      <p style="font-size:12px;color:var(--mu);margin-bottom:12px">Ajuste as porções para atingir ${g} kcal. ${goalAdj()}</p>
-      <div class="meal-item"><div class="meal-title">☀️ Café da manhã</div><ul>${plan.bf.map(i=>`<li>${i}</li>`).join('')}</ul></div>
-      <div class="meal-item"><div class="meal-title">🌿 Almoço</div><ul>${plan.al.map(i=>`<li>${i}</li>`).join('')}</ul></div>
-      <div class="meal-item"><div class="meal-title">🍎 Lanche</div><ul>${plan.sn.map(i=>`<li>${i}</li>`).join('')}</ul></div>
-      <div class="meal-item"><div class="meal-title">🌙 Jantar</div><ul>${plan.jt.map(i=>`<li>${i}</li>`).join('')}</ul></div>
-      <div class="subs-box"><strong>Substituições:</strong><ul>${plan.sb.map(s=>`<li>${s}</li>`).join('')}</ul></div>
+      <div class="sec-title">🍽️ Cardápio semanal (7 dias)</div>
+      <p style="font-size:12px;color:var(--mu);margin-bottom:10px">Porções para ~${g} kcal/dia. Toque em cada dia para ver as refeições. ${goalAdj()}</p>
+      <div class="tip info" style="margin-top:0;margin-bottom:12px">🔄 <strong>Treino vs. descanso:</strong> em dias de treino os carboidratos ficam mais altos (energia + recuperação); em dias de descanso são reduzidos, mantendo a proteína. Evidência: moderada — o total semanal de calorias e proteína importa mais que o timing exato.</div>
+      ${weekHtml}
+      <div class="subs-box"><strong>Substituições de proteína:</strong><ul>${plan.sb.map(s=>`<li>${s}</li>`).join('')}</ul></div>
       ${plan.note?`<div class="tip warn" style="margin-top:10px">${plan.note}</div>`:''}
       ${bTip?`<div class="tip eco" style="margin-top:8px">${bTip}</div>`:''}
       ${tTip?`<div class="tip info" style="margin-top:8px">${tTip}</div>`:''}
@@ -893,6 +977,7 @@ function buildResults(){
     <div class="sec">
       <div class="sec-title">🛒 Lista de compras — 1 semana</div>
       ${shopHtml}
+      <div class="tip eco" style="margin-top:12px">🔄 O cardápio varia carboidratos e legumes ao longo da semana — compre 2–3 tipos de cada (ex: arroz, batata doce, macarrão integral, quinoa) para ter variedade sem desperdício.</div>
     </div>
 
     <!-- ALERTA -->
