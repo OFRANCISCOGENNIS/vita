@@ -1,0 +1,386 @@
+/* ============================================================================
+   SIMULADOR CONFLUÊNCIA — ESTILOS
+   ============================================================================ */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+:root {
+    --color-primary: #2c3e50;
+    --color-secondary: #34495e;
+    --color-accent: #3498db;
+    --color-success: #27ae60;
+    --color-danger: #e74c3c;
+    --color-warning: #f39c12;
+    --color-light: #ecf0f1;
+    --color-dark: #1c2833;
+    --spacing: 16px;
+    --border-radius: 8px;
+    --transition: all 0.3s ease;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+    color: #333;
+    line-height: 1.6;
+}
+
+.container {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+/* ============================================================================
+   HEADER
+   ============================================================================ */
+
+.header {
+    background: linear-gradient(90deg, #1c2833 0%, #2c3e50 100%);
+    color: white;
+    padding: 30px var(--spacing);
+    text-align: center;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+    border-bottom: 4px solid var(--color-accent);
+}
+
+.header h1 {
+    font-size: 28px;
+    margin-bottom: 8px;
+}
+
+.header .subtitle {
+    font-size: 14px;
+    opacity: 0.9;
+    color: #bdc3c7;
+}
+
+/* ============================================================================
+   MAIN CONTENT (Layout com Sidebar)
+   ============================================================================ */
+
+.main-content {
+    display: flex;
+    flex: 1;
+    gap: var(--spacing);
+    padding: var(--spacing);
+    max-width: 1600px;
+    margin: 0 auto;
+    width: 100%;
+}
+
+/* ============================================================================
+   SIDEBAR
+   ============================================================================ */
+
+.sidebar {
+    width: 280px;
+    background: white;
+    border-radius: var(--border-radius);
+    padding: var(--spacing);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    height: fit-content;
+    position: sticky;
+    top: var(--spacing);
+    overflow-y: auto;
+    max-height: calc(100vh - 250px);
+}
+
+.sidebar h2 {
+    font-size: 18px;
+    margin-bottom: 20px;
+    color: var(--color-primary);
+    border-bottom: 2px solid var(--color-accent);
+    padding-bottom: 10px;
+}
+
+.control-group {
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #ddd;
+}
+
+.control-group h3 {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--color-secondary);
+    margin-bottom: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.control-group label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    font-size: 13px;
+    cursor: pointer;
+    flex-wrap: wrap;
+}
+
+.control-group input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+    accent-color: var(--color-accent);
+}
+
+.control-group input[type="number"] {
+    padding: 6px 8px;
+    border: 1px solid #bdc3c7;
+    border-radius: 4px;
+    font-size: 12px;
+    width: 60px;
+    transition: var(--transition);
+}
+
+.control-group input[type="number"]:focus {
+    outline: none;
+    border-color: var(--color-accent);
+    box-shadow: 0 0 4px rgba(52, 152, 219, 0.3);
+}
+
+/* ============================================================================
+   BOTÕES
+   ============================================================================ */
+
+.btn-primary {
+    background: var(--color-accent);
+    color: white;
+    border: none;
+    padding: 10px 16px;
+    border-radius: 4px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+    width: 100%;
+}
+
+.btn-primary:hover {
+    background: #2980b9;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.btn-primary:active {
+    transform: translateY(0);
+}
+
+/* ============================================================================
+   CHARTS AREA
+   ============================================================================ */
+
+.charts-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing);
+}
+
+.chart-container {
+    background: white;
+    border-radius: var(--border-radius);
+    padding: var(--spacing);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.chart-container h2 {
+    font-size: 16px;
+    margin-bottom: 15px;
+    color: var(--color-primary);
+    border-bottom: 2px solid var(--color-light);
+    padding-bottom: 10px;
+}
+
+.chart-container canvas {
+    max-height: 300px;
+}
+
+/* ============================================================================
+   STATUS PANEL
+   ============================================================================ */
+
+.status-container {
+    background: linear-gradient(135deg, #f8f9fa 0%, #ecf0f1 100%);
+}
+
+.status-panel {
+    font-size: 14px;
+}
+
+.stat-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid #ddd;
+}
+
+.stat-row:last-child {
+    border-bottom: none;
+}
+
+.stat-row strong {
+    color: var(--color-accent);
+    font-weight: 700;
+    font-size: 16px;
+}
+
+.filters-status {
+    margin-top: 20px;
+    padding-top: 15px;
+}
+
+.filters-status h3 {
+    font-size: 13px;
+    color: var(--color-secondary);
+    margin-bottom: 12px;
+    text-transform: uppercase;
+}
+
+.filter-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    font-size: 12px;
+    border-bottom: 1px solid #ddd;
+}
+
+.filter-item:last-child {
+    border-bottom: none;
+}
+
+.filter-status-icon {
+    font-size: 16px;
+    font-weight: 700;
+}
+
+.filter-status-ok {
+    color: var(--color-success);
+}
+
+.filter-status-fail {
+    color: var(--color-danger);
+}
+
+.filter-status-disabled {
+    color: #95a5a6;
+}
+
+/* ============================================================================
+   FOOTER
+   ============================================================================ */
+
+.footer {
+    background: var(--color-dark);
+    color: white;
+    text-align: center;
+    padding: 20px var(--spacing);
+    margin-top: auto;
+    font-size: 12px;
+    border-top: 2px solid var(--color-accent);
+}
+
+.footer p {
+    margin: 8px 0;
+}
+
+.footer code {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 11px;
+}
+
+/* ============================================================================
+   RESPONSIVO
+   ============================================================================ */
+
+@media (max-width: 1200px) {
+    .main-content {
+        flex-direction: column;
+    }
+
+    .sidebar {
+        width: 100%;
+        position: static;
+        max-height: none;
+        overflow-y: visible;
+    }
+
+    .charts-area {
+        order: 2;
+    }
+}
+
+@media (max-width: 768px) {
+    .header h1 {
+        font-size: 20px;
+    }
+
+    .header .subtitle {
+        font-size: 12px;
+    }
+
+    .control-group {
+        margin-bottom: 15px;
+        padding-bottom: 12px;
+    }
+
+    .chart-container {
+        padding: 12px;
+    }
+
+    .chart-container h2 {
+        font-size: 14px;
+        margin-bottom: 10px;
+    }
+}
+
+/* ============================================================================
+   SCROLLBAR CUSTOMIZADO
+   ============================================================================ */
+
+.sidebar::-webkit-scrollbar {
+    width: 8px;
+}
+
+.sidebar::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 10px;
+}
+
+.sidebar::-webkit-scrollbar-thumb {
+    background: var(--color-accent);
+    border-radius: 10px;
+}
+
+.sidebar::-webkit-scrollbar-thumb:hover {
+    background: #2980b9;
+}
+
+/* ============================================================================
+   ANIMAÇÕES
+   ============================================================================ */
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.chart-container {
+    animation: fadeIn 0.5s ease;
+}
