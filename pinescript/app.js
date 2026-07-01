@@ -544,6 +544,64 @@ function recalcularSinaisApenas() {
 }
 
 // ============================================================================
+// BLOCO 9.5 — WIDGET OFICIAL DO TRADINGVIEW (gráfico real, requer internet)
+// ============================================================================
+
+let tvWidget = null;
+
+function tvSymbolTV() { return 'BINANCE:' + symbolAtual(); }   // ex.: BINANCE:BTCUSDT
+function tvIntervalTV() { return String(tfMinutes()); }         // 1,5,15,30,60
+
+function montarWidgetTV(tentativa) {
+    tentativa = tentativa || 0;
+    const wrap = document.getElementById('tvWidget');
+    const msg = document.getElementById('tvWidgetMsg');
+    const tag = document.getElementById('tvSyncTag');
+    if (!wrap) return;
+
+    // A lib tv.js carrega de forma assíncrona; espera até estar disponível.
+    if (typeof TradingView === 'undefined' || !TradingView.widget) {
+        if (tentativa < 8) {
+            if (msg) { msg.textContent = 'Carregando gráfico do TradingView… (requer internet)'; msg.style.display = 'flex'; }
+            setTimeout(() => montarWidgetTV(tentativa + 1), 1200);
+        } else if (msg) {
+            msg.textContent = 'Widget do TradingView indisponível (sem internet ou bloqueado). O gráfico abaixo continua funcionando normalmente.';
+            msg.style.display = 'flex';
+        }
+        return;
+    }
+
+    if (msg) msg.style.display = 'none';
+    if (tag) tag.textContent = symbolAtual() + ' • ' + (tfMinutes() === 60 ? 'H1' : 'M' + tfMinutes());
+    wrap.innerHTML = '';  // limpa antes de recriar (troca de par/timeframe)
+
+    try {
+        tvWidget = new TradingView.widget({
+            container_id: 'tvWidget',
+            autosize: true,
+            symbol: tvSymbolTV(),
+            interval: tvIntervalTV(),
+            timezone: 'Etc/UTC',
+            theme: 'light',
+            style: '1',
+            locale: 'br',
+            hide_side_toolbar: false,
+            allow_symbol_change: true,
+            withdateranges: true,
+            // Estudos que espelham a estratégia de confluência
+            studies: [
+                'MAExp@tv-basicstudies',   // EMA
+                'RSI@tv-basicstudies',     // RSI
+                'ATR@tv-basicstudies'      // ATR
+            ]
+        });
+    } catch (e) {
+        if (msg) { msg.textContent = 'Não foi possível iniciar o widget do TradingView.'; msg.style.display = 'flex'; }
+        console.error('Widget TV:', e);
+    }
+}
+
+// ============================================================================
 // BLOCO 10 — CARREGAR LISTA DE PARES (datalist "todas as moedas")
 // ============================================================================
 
@@ -570,8 +628,12 @@ async function carregarSimbolos() {
 document.getElementById('btnGerar').addEventListener('click', carregar);
 document.getElementById('btnRecalcular').addEventListener('click', recalcularSinaisApenas);
 document.getElementById('fonte').addEventListener('change', carregar);
-document.getElementById('timeframe').addEventListener('change', carregar);
+document.getElementById('timeframe').addEventListener('change', function () {
+    montarWidgetTV();   // sincroniza o widget oficial com o novo timeframe
+    carregar();
+});
 document.getElementById('symbol').addEventListener('change', function () {
+    montarWidgetTV();   // sincroniza o widget oficial com o novo par
     if (fonte() === 'binance') carregar();
 });
 document.getElementById('expiracao').addEventListener('change', function () {
@@ -587,7 +649,15 @@ window.addEventListener('resize', function () {
     if (chartAtr) chartAtr.applyOptions({ width: document.getElementById('chartAtr').clientWidth });
 });
 
-window.addEventListener('load', function () {
+// Inicializa em DOMContentLoaded (NÃO em 'load') para não depender do tv.js:
+// se o widget do TradingView estiver lento/bloqueado, o resto do app não trava.
+function iniciar() {
+    montarWidgetTV();   // gráfico oficial do TradingView no topo (assíncrono, com retry)
     carregarSimbolos();
     carregar();
-});
+}
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', iniciar);
+} else {
+    iniciar();
+}

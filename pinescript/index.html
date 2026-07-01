@@ -6,6 +6,8 @@
     <title>Simulador Confluência Multi-Fator | Candles estilo TradingView</title>
     <!-- TradingView Lightweight Charts vendorizado localmente (100% offline) -->
     <script src="lightweight-charts.standalone.production.js"></script>
+    <!-- Widget oficial do TradingView (gráfico real; requer internet) -->
+    <script src="https://s3.tradingview.com/tv.js" async></script>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -126,9 +128,18 @@
 
             <!-- MAIN CHART AREA -->
             <section class="charts-area">
-                <!-- Gráfico de Velas (Candlestick) + EMAs -->
+                <!-- Widget OFICIAL do TradingView (gráfico real do site) -->
                 <div class="chart-container">
-                    <h2>💹 <span id="chartTitulo">Preço (Velas) & EMAs</span> <span id="liveBadge" class="live-badge">● AO VIVO</span></h2>
+                    <h2>📺 Gráfico oficial TradingView <span class="tv-sync-tag" id="tvSyncTag">—</span></h2>
+                    <div class="tv-widget-wrap">
+                        <div id="tvWidget"></div>
+                        <div id="tvWidgetMsg" class="tv-widget-msg">Carregando gráfico do TradingView… (requer internet)</div>
+                    </div>
+                </div>
+
+                <!-- Gráfico de Velas (Candlestick) + EMAs (com meus sinais) -->
+                <div class="chart-container">
+                    <h2>💹 <span id="chartTitulo">Preço (Velas) & EMAs + sinais</span> <span id="liveBadge" class="live-badge">● AO VIVO</span></h2>
                     <div id="chartPreco" class="tv-chart tv-chart-main"></div>
                     <div class="chart-legend" id="legendPreco"></div>
                 </div>

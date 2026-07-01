@@ -203,6 +203,46 @@ body {
 }
 
 /* ============================================================================
+   WIDGET OFICIAL DO TRADINGVIEW
+   ============================================================================ */
+
+.tv-widget-wrap {
+    position: relative;
+    height: 520px;
+    width: 100%;
+}
+
+#tvWidget {
+    height: 100%;
+    width: 100%;
+}
+
+.tv-widget-msg {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 20px;
+    color: var(--color-secondary);
+    font-size: 14px;
+    background: #f8f9fa;
+    border: 1px dashed #cfd6db;
+    border-radius: 6px;
+}
+
+.tv-sync-tag {
+    font-size: 12px;
+    font-weight: 700;
+    color: #fff;
+    background: var(--color-accent);
+    padding: 2px 8px;
+    border-radius: 10px;
+    vertical-align: middle;
+}
+
+/* ============================================================================
    GRÁFICOS TRADINGVIEW (Lightweight Charts)
    ============================================================================ */
 

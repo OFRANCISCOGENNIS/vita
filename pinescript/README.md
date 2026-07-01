@@ -12,6 +12,18 @@ Abra **`Simulador_Standalone.html`** com duplo-clique — a interface e a lib de
 gráficos estão embutidas. Regenere-o com `node build_standalone.js` após editar
 os fontes.
 
+## 📺 Gráfico oficial do TradingView
+
+No topo da página fica embutido o **widget oficial "Advanced Chart" do TradingView**
+(o gráfico real do site, com todas as ferramentas e indicadores do TradingView).
+Ele **sincroniza automaticamente** com o par e o timeframe escolhidos no painel
+(ex.: `BTCUSDT` M5 → `BINANCE:BTCUSDT`, intervalo 5). Já vem com EMA, RSI e ATR.
+
+- Requer **internet** (carrega de `s3.tradingview.com`). Sem internet, aparece um
+  aviso e o **restante do simulador continua funcionando** normalmente.
+- Logo abaixo fica o **meu gráfico de velas com os sinais CALL/PUT**, RSI/ATR
+  calculados e a tabela de entradas com expiração — os dois convivem na mesma tela.
+
 ## 📡 Tempo real (dados ao vivo da Binance)
 
 Por padrão a fonte é **Binance (ao vivo)**: ao abrir com **internet**, o simulador
