@@ -33,6 +33,14 @@ de status tem um **medidor de confluência ao vivo** (CALL e PUT) da última vel
 Legenda dos fatores: `T` Tendência (EMA), `Ma` Macro (EMA200), `Mo` Momentum (RSI),
 `V` Volatilidade (ATR), `E` Estrutura (rompimento).
 
+### Filtro de notícias (evitar operar no susto)
+
+Com **"Filtro de notícias"** ligado, entradas cujo horário cai dentro de uma
+**janela (min)** em torno de uma notícia da moeda atual são marcadas **⚠ EVITAR**,
+destacadas na tabela e **excluídas do win rate** (contadas como "Evitadas (notícia)").
+Um **banner vermelho** avisa quando a vela mais recente está nessa janela de risco —
+útil para não abrir posição em cima de um evento de alto impacto.
+
 ## 📰 Notícias em tempo real
 
 Painel **Notícias em tempo real (cripto)** que agrega manchetes de RSS

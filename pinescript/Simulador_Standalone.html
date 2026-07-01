@@ -409,6 +409,22 @@ body {
 }
 .entry-table .cell-fatores b { color: var(--color-primary); }
 
+/* Banner de risco de notícia + entradas bloqueadas */
+.news-risk-banner {
+    display: none;
+    padding: 10px 14px;
+    margin-bottom: 12px;
+    background: rgba(231, 76, 60, 0.12);
+    border-left: 4px solid var(--color-danger);
+    border-radius: 4px;
+    font-size: 13px;
+    color: #922b21;
+}
+
+.entry-table tr.row-blocked { background: rgba(231, 76, 60, 0.06); opacity: 0.75; }
+.entry-table .res-block { color: var(--color-danger); font-weight: 700; }
+.entry-summary .sum-block strong { color: var(--color-danger); }
+
 /* ============================================================================
    NOTÍCIAS EM TEMPO REAL
    ============================================================================ */
@@ -873,6 +889,8 @@ body {
                     </label>
                     <label>Mín. de fatores (X) <input type="number" id="minScore" value="3" min="1" max="5"></label>
                     <label>Janela de confluência (velas) <input type="number" id="confJanela" value="3" min="1" max="20"></label>
+                    <label><input type="checkbox" id="useNewsFilter"> <span>Filtro de notícias (evitar entradas perto de notícia)</span></label>
+                    <label>Janela de notícia (min) <input type="number" id="newsJanela" value="15" min="1" max="240"></label>
                 </section>
 
                 <!-- Anti-Ruído -->
@@ -918,6 +936,7 @@ body {
                 <!-- Avisos de Entrada com Expiração -->
                 <div class="chart-container">
                     <h2>🔔 Avisos de Entrada (com expiração)</h2>
+                    <div id="newsRiskBanner" class="news-risk-banner"></div>
                     <div class="entry-summary" id="entrySummary"></div>
                     <div class="entry-table-wrap">
                         <table class="entry-table" id="entryTable">
@@ -1390,6 +1409,7 @@ function atualizarLegenda() {
 // ============================================================================
 
 function atualizarPaineis() {
+    if (!computed || !computed.closes || !computed.closes.length) return;
     document.getElementById('countLong').textContent = sinaisLong.length;
     document.getElementById('countShort').textContent = sinaisShort.length;
 
@@ -1424,32 +1444,53 @@ function atualizarPaineis() {
         fs.appendChild(div);
     });
 
+    // Filtro de notícias: bloqueia/avisa entradas perto de notícia da moeda
+    const useNewsFilter = document.getElementById('useNewsFilter').checked;
+    const newsJanela = parseInt(document.getElementById('newsJanela').value);
+    const bloqueada = e => useNewsFilter && noticiaProxima(e.entryTime, newsJanela);
+
+    // Banner de risco de notícia (sobre a vela mais recente)
+    const banner = document.getElementById('newsRiskBanner');
+    const lastT = dados.length ? dados[dados.length - 1].time : 0;
+    if (useNewsFilter && lastT && noticiaProxima(lastT, newsJanela)) {
+        banner.style.display = 'block';
+        banner.innerHTML = '⚠️ <strong>Notícia recente sobre ' + baseAsset() + '</strong> — evite novas entradas agora (filtro de notícias ativo).';
+    } else {
+        banner.style.display = 'none';
+    }
+
     const tbody = document.getElementById('entryTableBody');
     tbody.innerHTML = '';
     [...entradas].reverse().slice(0, 30).forEach((e, idx) => {
         const tr = document.createElement('tr');
         const dc = e.dir === 'CALL' ? 'dir-call' : 'dir-put';
-        const rc = e.resultado === 'WIN' ? 'res-win' : e.resultado === 'LOSS' ? 'res-loss' : 'res-pend';
+        const bloq = bloqueada(e);
+        const rc = bloq ? 'res-block' : e.resultado === 'WIN' ? 'res-win' : e.resultado === 'LOSS' ? 'res-loss' : 'res-pend';
+        if (bloq) tr.className = 'row-blocked';
         tr.innerHTML =
             `<td>${entradas.length - idx}</td><td>${fmtHora(e.entryTime)}</td>` +
             `<td class="${dc}">${e.dir === 'CALL' ? '▲ CALL' : '▼ PUT'}</td>` +
             `<td>${e.entryPrice}</td>` +
             `<td class="cell-fatores">${e.fatores} <b>(${e.score}/${e.enabled})</b></td>` +
             `<td>${e.expMin} min</td><td>${fmtHora(e.expTime)}</td>` +
-            `<td class="${rc}">${e.resultado}</td>`;
+            `<td class="${rc}">${bloq ? '⚠ EVITAR' : e.resultado}</td>`;
         tbody.appendChild(tr);
     });
 
-    const aval = entradas.filter(e => e.resultado === 'WIN' || e.resultado === 'LOSS');
-    const wins = entradas.filter(e => e.resultado === 'WIN').length;
-    const losses = entradas.filter(e => e.resultado === 'LOSS').length;
-    const pend = entradas.filter(e => e.resultado === 'pendente').length;
+    // Win rate ignora entradas bloqueadas por notícia
+    const validas = entradas.filter(e => !bloqueada(e));
+    const aval = validas.filter(e => e.resultado === 'WIN' || e.resultado === 'LOSS');
+    const wins = validas.filter(e => e.resultado === 'WIN').length;
+    const losses = validas.filter(e => e.resultado === 'LOSS').length;
+    const pend = validas.filter(e => e.resultado === 'pendente').length;
+    const bloqueadas = entradas.length - validas.length;
     const wr = aval.length ? ((wins / aval.length) * 100).toFixed(1) : '–';
     document.getElementById('entrySummary').innerHTML =
         `<span class="sum-item">Total entradas: <strong>${entradas.length}</strong></span>` +
         `<span class="sum-item sum-win">WIN: <strong>${wins}</strong></span>` +
         `<span class="sum-item sum-loss">LOSS: <strong>${losses}</strong></span>` +
         `<span class="sum-item sum-pend">Pendentes: <strong>${pend}</strong></span>` +
+        (bloqueadas ? `<span class="sum-item sum-block">Evitadas (notícia): <strong>${bloqueadas}</strong></span>` : '') +
         `<span class="sum-item sum-rate">Win rate: <strong>${wr}${wr === '–' ? '' : '%'}</strong></span>`;
 
     const hint = document.getElementById('entryHint');
@@ -1719,6 +1760,7 @@ async function carregarNoticias() {
         noticias = todas.slice(0, 30);
         status.textContent = 'Atualizado ' + fmtHora(Math.floor(Date.now() / 1000));
         renderNoticias();
+        atualizarPaineis();   // atualiza banner/flags de risco de notícia com as novas manchetes
     } catch (err) {
         status.textContent = 'Indisponível (requer internet)';
         document.getElementById('newsList').innerHTML =
@@ -1726,17 +1768,29 @@ async function carregarNoticias() {
     }
 }
 
-function renderNoticias() {
-    const soMoeda = document.getElementById('newsSoMoeda').checked;
+// Termos de busca da moeda atual (para filtrar notícias)
+function termosMoeda() {
     const base = baseAsset().toLowerCase();
     const nomes = {
         btc: ['btc', 'bitcoin'], eth: ['eth', 'ethereum'], sol: ['sol', 'solana'], xrp: ['xrp', 'ripple'],
         bnb: ['bnb', 'binance'], doge: ['doge', 'dogecoin'], ada: ['ada', 'cardano'], avax: ['avax', 'avalanche'],
         link: ['chainlink', 'link'], matic: ['polygon', 'matic'], ltc: ['litecoin', 'ltc']
     };
-    const termos = nomes[base] || [base];
+    return nomes[base] || [base];
+}
+function noticiasMoeda() {
+    const termos = termosMoeda();
+    return noticias.filter(n => termos.some(t => n.title.toLowerCase().includes(t)));
+}
+// Existe notícia da moeda dentro de +/- janela (min) do timestamp (seg)?
+function noticiaProxima(tsSec, janelaMin) {
+    return noticiasMoeda().some(n => Math.abs(Math.floor(n.date.getTime() / 1000) - tsSec) <= janelaMin * 60);
+}
+
+function renderNoticias() {
+    const soMoeda = document.getElementById('newsSoMoeda').checked;
     let lista = noticias;
-    if (soMoeda) lista = noticias.filter(n => termos.some(t => n.title.toLowerCase().includes(t)));
+    if (soMoeda) lista = noticiasMoeda();
 
     const el = document.getElementById('newsList');
     if (!lista.length) {
@@ -1769,6 +1823,12 @@ document.getElementById('symbol').addEventListener('change', function () {
 });
 document.getElementById('btnNews').addEventListener('click', carregarNoticias);
 document.getElementById('newsSoMoeda').addEventListener('change', renderNoticias);
+// Confluência: mudar modo/pontuação/janela recalcula os sinais na hora
+['confMode', 'minScore', 'confJanela'].forEach(id =>
+    document.getElementById(id).addEventListener('change', recalcularSinaisApenas));
+// Filtro de notícias: só reavalia o painel (não recarrega dados)
+['useNewsFilter', 'newsJanela'].forEach(id =>
+    document.getElementById(id).addEventListener('change', atualizarPaineis));
 document.getElementById('expiracao').addEventListener('change', function () {
     if (!dados.length) { carregar(); return; }
     recomputarEntradas();

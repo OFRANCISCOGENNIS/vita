@@ -128,6 +128,8 @@
                     </label>
                     <label>Mín. de fatores (X) <input type="number" id="minScore" value="3" min="1" max="5"></label>
                     <label>Janela de confluência (velas) <input type="number" id="confJanela" value="3" min="1" max="20"></label>
+                    <label><input type="checkbox" id="useNewsFilter"> <span>Filtro de notícias (evitar entradas perto de notícia)</span></label>
+                    <label>Janela de notícia (min) <input type="number" id="newsJanela" value="15" min="1" max="240"></label>
                 </section>
 
                 <!-- Anti-Ruído -->
@@ -173,6 +175,7 @@
                 <!-- Avisos de Entrada com Expiração -->
                 <div class="chart-container">
                     <h2>🔔 Avisos de Entrada (com expiração)</h2>
+                    <div id="newsRiskBanner" class="news-risk-banner"></div>
                     <div class="entry-summary" id="entrySummary"></div>
                     <div class="entry-table-wrap">
                         <table class="entry-table" id="entryTable">
