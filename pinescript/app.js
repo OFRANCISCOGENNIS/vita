@@ -513,7 +513,11 @@ function atualizarPaineis() {
 // BLOCO 7.5 — MÉTRICAS DE ANÁLISE (backtest das entradas)
 // ============================================================================
 
+let entradasValidas = [];   // entradas não bloqueadas por notícia (para exportar)
+let metricasAtuais = null;  // resumo das métricas atuais (para exportar)
+
 function calcularMetricas(validas) {
+    entradasValidas = validas;
     const payout = Math.max(0.01, (parseFloat(document.getElementById('payout').value) || 87) / 100);
     const evaluated = validas.filter(e => e.resultado === 'WIN' || e.resultado === 'LOSS');
     const grid = document.getElementById('metricsGrid');
@@ -522,6 +526,7 @@ function calcularMetricas(validas) {
     if (!evaluated.length) {
         grid.innerHTML = '<div class="metric-empty">Sem operações avaliadas ainda — aguardando a expiração das entradas.</div>';
         scoreBody.innerHTML = '';
+        metricasAtuais = null;
         if (serieEquity) serieEquity.setData([]);
         return;
     }
@@ -582,6 +587,69 @@ function calcularMetricas(validas) {
     const eq = chron.map(e => { acc += e.resultado === 'WIN' ? payout : -1; return { time: e.entryTime, value: +acc.toFixed(4) }; });
     if (serieEquity) serieEquity.setData(eq);
     if (chartEquity) chartEquity.timeScale().fitContent();
+
+    // Guarda resumo para exportação
+    metricasAtuais = {
+        payoutPct: (payout * 100).toFixed(0), wr: wr.toFixed(1), beWR: beWR.toFixed(1),
+        pnl: pnl.toFixed(2), expect: expect.toFixed(3), pf: pf === Infinity ? 'inf' : pf.toFixed(2),
+        wrCall: wrDir(call), wrPut: wrDir(put), maxW, maxL, ops: evaluated.length
+    };
+}
+
+// ============================================================================
+// EXPORTAÇÃO CSV (entradas + resumo de métricas)
+// ============================================================================
+
+function csvEscape(v) {
+    const s = String(v);
+    return /[";\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+
+function exportarCSV() {
+    if (!entradasValidas.length && !entradas.length) { alert('Sem entradas para exportar. Gere/carregue dados primeiro.'); return; }
+    const sym = symbolAtual();
+    const tf = tfMinutes() === 60 ? 'H1' : 'M' + tfMinutes();
+    const agora = new Date();
+    const p = n => String(n).padStart(2, '0');
+    const stamp = `${agora.getFullYear()}${p(agora.getMonth() + 1)}${p(agora.getDate())}_${p(agora.getHours())}${p(agora.getMinutes())}`;
+
+    const L = [];
+    L.push('# Simulador Confluencia Multi-Fator - Exportacao');
+    L.push(`# Par: ${sym} | Timeframe: ${tf} | Expiracao: ${expMinutes()}min | Fonte: ${fonte()}`);
+    L.push(`# Gerado: ${agora.toLocaleString()}`);
+    L.push('#');
+    L.push('# METRICAS (sobre entradas nao bloqueadas por noticia)');
+    if (metricasAtuais) {
+        const m = metricasAtuais;
+        L.push(`# Payout: ${m.payoutPct}%`);
+        L.push(`# Win rate geral: ${m.wr}% | Win rate p/ empatar: ${m.beWR}%`);
+        L.push(`# P&L: ${m.pnl}u | Expectativa/op: ${m.expect}u | Profit factor: ${m.pf}`);
+        L.push(`# Win rate CALL: ${m.wrCall} | Win rate PUT: ${m.wrPut}`);
+        L.push(`# Maior seq WIN: ${m.maxW} | Maior seq LOSS: ${m.maxL} | Operacoes avaliadas: ${m.ops}`);
+    } else {
+        L.push('# (sem operacoes avaliadas ainda)');
+    }
+    L.push('#');
+    L.push('# ENTRADAS');
+    L.push(['n', 'hora_vela', 'direcao', 'preco_entrada', 'fatores', 'score', 'total_filtros', 'expiracao_min', 'hora_expiracao', 'resultado'].join(';'));
+
+    entradas.forEach((e, i) => {
+        L.push([
+            i + 1, fmtHora(e.entryTime), e.dir, e.entryPrice, csvEscape(e.fatores),
+            e.score, e.enabled, e.expMin, fmtHora(e.expTime), e.resultado
+        ].join(';'));
+    });
+
+    const csv = '﻿' + L.join('\n');   // BOM p/ Excel reconhecer UTF-8
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `simulador_${sym}_${tf}_${stamp}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
 }
 
 // ============================================================================
@@ -903,6 +971,7 @@ document.getElementById('symbol').addEventListener('change', function () {
     if (fonte() === 'binance') carregar();
 });
 document.getElementById('btnNews').addEventListener('click', carregarNoticias);
+document.getElementById('btnExport').addEventListener('click', exportarCSV);
 document.getElementById('newsSoMoeda').addEventListener('change', renderNoticias);
 // Confluência: mudar modo/pontuação/janela recalcula os sinais na hora
 ['confMode', 'minScore', 'confJanela'].forEach(id =>

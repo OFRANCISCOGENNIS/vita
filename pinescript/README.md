@@ -58,6 +58,10 @@ app calcula, em unidades de aposta (WIN = +payout, LOSS = −1):
 - **Win rate por score de confluência** — tabela que mostra se sinais com mais fatores
   (ex.: 5/5) realmente acertam mais que os fracos (ex.: 3/5), validando a confluência.
 
+O botão **⬇️ Exportar CSV** baixa um arquivo (`simulador_PAR_TF_data.csv`) com o resumo
+das métricas no cabeçalho e a tabela completa de entradas (separador `;` e BOM UTF-8,
+prontos para abrir direto no Excel/Google Sheets) para análise offline.
+
 ## 📰 Notícias em tempo real
 
 Painel **Notícias em tempo real (cripto)** que agrega manchetes de RSS
