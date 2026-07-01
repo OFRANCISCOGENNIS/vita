@@ -1707,6 +1707,13 @@ Private Function ToNum(v As Variant) As Double
     If IsNumeric(v) Then ToNum = CDbl(v) Else ToNum = 0
 End Function
 
+' ADERENCIA (MATERIAL e SERVICO): VALOR_MOEDA e QTD_ENTRADA devem ter o
+' MESMO sinal (ambos positivos, ambos negativos, ou ambos zero).
+' Qualquer combinacao de sinais diferentes -> NAO ADERENTE.
+Private Function EhAderenteValQtd(ByVal val As Double, ByVal qtd As Double) As Boolean
+    EhAderenteValQtd = (val > 0 And qtd > 0) Or (val < 0 And qtd < 0) Or (val = 0 And qtd = 0)
+End Function
+
 
 '==============================================================================
 '  ABA: RAZAO CJ  (base enriquecida com classificacoes usadas nas analises)
@@ -2632,17 +2639,10 @@ PulaConta:
         outp(rr, 11) = MatInfoLinha(fi, 2)   ' CLS2
         ' PRECO_UNITARIO = VALOR_MOEDA / QTD_ENTRADA (somas brutas, 4 casas)
         If q <> 0 Then outp(rr, 12) = Round(dV(k) / dQ(k), 4)
-        ' ADERENCIA por tipo de PEP ANEEL (ODD/ODI/ODM/ODS):
-        '   ODD (.D): QTD_ENTRADA ou VALOR_MOEDA positivo   -> NAO ADERENTE
-        '   ODI/ODM/ODS: QTD_ENTRADA ou VALOR_MOEDA negativo -> NAO ADERENTE
-        '   Qualquer tipo: QTD_ENTRADA=0 com VALOR_MOEDA<>0 -> NAO ADERENTE
-        If q = 0 And val <> 0 Then
-            outp(rr, 13) = "NAO ADERENTE"
-        ElseIf TipoPEPCodigo(pep) = "D" Then
-            outp(rr, 13) = IIf(q > 0 Or val > 0, "NAO ADERENTE", "ADERENTE")
-        Else
-            outp(rr, 13) = IIf(q < 0 Or val < 0, "NAO ADERENTE", "ADERENTE")
-        End If
+        ' ADERENCIA: VALOR_MOEDA e QTD_ENTRADA devem ter o MESMO sinal
+        ' (ambos positivos, ambos negativos, ou ambos zero). Qualquer
+        ' combinacao de sinais diferentes -> NAO ADERENTE.
+        outp(rr, 13) = IIf(EhAderenteValQtd(val, q), "ADERENTE", "NAO ADERENTE")
 PulaLin:
     Next r
     EscreverAba "MATERIAL", outp
@@ -2689,31 +2689,37 @@ Prox:
         If Not (Round(dQ(ks(r)), 2) = 0 And Round(dV(ks(r)), 2) = 0) Then nKeep = nKeep + 1
     Next r
 
-    Dim outp() As Variant: ReDim outp(0 To nKeep, 1 To 13)
+    Dim outp() As Variant: ReDim outp(0 To nKeep, 1 To 14)
     outp(0, 1) = "PEP4NIVEL": outp(0, 2) = "PEP3": outp(0, 3) = "TIPO_PEP"
     outp(0, 4) = "COD_SERVICO": outp(0, 5) = "DESCRICAO_SERVICO"
     outp(0, 6) = "CLASSE_CUSTO"
     outp(0, 7) = "QTD_ENTRADA": outp(0, 8) = "VALOR_MOEDA"
     outp(0, 9) = "CLS1": outp(0, 10) = "CLS2": outp(0, 11) = "CLS3"
     outp(0, 12) = "TIPO_APLICACAO": outp(0, 13) = "GRUPO_PERC"
+    outp(0, 14) = "ADERENCIA"
 
+    Dim qS As Double, vS As Double
     ki = 0
     For r = 0 To dFirst.Count - 1
         k = ks(r): fi = dFirst(k)
-        If Round(dQ(k), 2) = 0 And Round(dV(k), 2) = 0 Then GoTo PulaZero   ' QTD=0 e VALOR=0
+        qS = Round(dQ(k), 2): vS = Round(dV(k), 2)
+        If qS = 0 And vS = 0 Then GoTo PulaZero   ' QTD=0 e VALOR=0
         ki = ki + 1
         pep = Trim$(CStr(dados(fi, cPEP)))
         outp(ki, 1) = pep: outp(ki, 2) = PEP3(pep): outp(ki, 3) = TipoPEPANEEL(pep)
         outp(ki, 4) = NormCod(dados(fi, cMaterial))
         outp(ki, 5) = DescServico(NormCod(dados(fi, cMaterial)))
         outp(ki, 6) = ValorCampo(fi, cClasse)
-        outp(ki, 7) = Round(dQ(k), 2)
-        outp(ki, 8) = Round(dV(k), 2)
+        outp(ki, 7) = qS
+        outp(ki, 8) = vS
         outp(ki, 9) = SrvInfoLinha(fi, 0)    ' CLS1
         outp(ki, 10) = SrvInfoLinha(fi, 1)   ' CLS2
         outp(ki, 11) = SrvInfoLinha(fi, 2)   ' CLS3
         outp(ki, 12) = SrvInfoLinha(fi, 3)   ' TIPO_APLICACAO
         outp(ki, 13) = GrupoPerc(pep)
+        ' ADERENCIA: VALOR_MOEDA e QTD_ENTRADA devem ter o MESMO sinal
+        ' (ambos positivos, ambos negativos, ou ambos zero).
+        outp(ki, 14) = IIf(EhAderenteValQtd(vS, qS), "ADERENTE", "NAO ADERENTE")
 PulaZero:
     Next r
     EscreverAba "SERVICO", outp
@@ -2886,9 +2892,10 @@ SomaPep:
     ' -----------------------------------------------------------------------
     ' SECAO B - MATERIAL COM QTD/VALOR INCOERENTES / NAO ADERENTE
     '   Consolida por PEP4NIVEL + COD_MATERIAL + CLASSIFICACAO (igual aba
-    '   MATERIAL) e lista as linhas NAO ADERENTES pela regra ODD/ODI/ODM/ODS:
-    '     ODD (.D): QTD ou VALOR positivo   -> NAO ADERENTE
-    '     ODI/ODM/ODS: QTD ou VALOR negativo -> NAO ADERENTE
+    '   MATERIAL) e lista as linhas NAO ADERENTES pela regra de sinal:
+    '   VALOR_MOEDA e QTD_ENTRADA devem ter o MESMO sinal (ambos positivos,
+    '   ambos negativos, ou ambos zero); qualquer outra combinacao e
+    '   NAO ADERENTE (EhAderenteValQtd).
     ' -----------------------------------------------------------------------
     row = EscreverCabecalhoAlerta(ws, row, _
         "B  |  MATERIAL NAO ADERENTE  (QTD/VALOR incoerentes - espelha a aba MATERIAL)", _
@@ -2923,22 +2930,19 @@ ProxBcalc:
         If qG = 0 And vG = 0 Then GoTo ProxB
         If InStr(UCase$(CStr(dados(fiG, cClassif))), "FALTA") > 0 _
            And qG = 0 And vG <> 0 Then GoTo ProxB
-        ' Regra ADERENCIA por tipo de PEP (igual aba MATERIAL)
+        ' Regra ADERENCIA por sinal (igual aba MATERIAL)
         tipoG = TipoPEPCodigo(pep)
         tpAneel = TipoPEPANEEL(pep)
         If tipoG = "S" Then tpAneel = "ODS"
-        motG = ""
+        If EhAderenteValQtd(vG, qG) Then GoTo ProxB   ' ADERENTE -> ignora
         If qG = 0 And vG <> 0 Then
             motG = "PENDENCIA DE AJUSTE (QTD=0)"
-        ElseIf tipoG = "D" Then
-            If qG > 0 Then motG = "QTD+"
-            If vG > 0 Then motG = Trim$(motG & " VALOR+")
+        ElseIf vG = 0 And qG <> 0 Then
+            motG = "PENDENCIA DE AJUSTE (VALOR=0)"
         Else
-            If qG < 0 Then motG = "QTD-"
-            If vG < 0 Then motG = Trim$(motG & " VALOR-")
+            motG = "SINAIS DIVERGENTES (QTD x VALOR)"
         End If
-        If motG = "" Then GoTo ProxB   ' ADERENTE -> ignora
-        motG = tpAneel & ": " & Trim$(motG)
+        motG = tpAneel & ": " & motG
         contB = contB + 1
         ws.Cells(row, 1).Value = pep
         ws.Cells(row, 2).Value = tpAneel
@@ -2959,8 +2963,9 @@ ProxBcalc:
         With ws.Cells(row, 2)
             .Font.Color = corB: .Font.Bold = True
         End With
-        If qG < 0 Or (tipoG = "D" And qG > 0) Then ws.Cells(row, 8).Font.Color = corB
-        If vG < 0 Or (tipoG = "D" And vG > 0) Or (qG = 0 And vG <> 0) Then ws.Cells(row, 9).Font.Color = corB
+        ' Toda linha desta secao ja e NAO ADERENTE (aderentes foram descartadas acima)
+        ws.Cells(row, 8).Font.Color = corB
+        ws.Cells(row, 9).Font.Color = corB
         With ws.Cells(row, 10)
             .Interior.Color = corBcl
             .Font.Color = corB: .Font.Bold = True: .Font.Size = 8.5
