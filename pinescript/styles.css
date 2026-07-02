@@ -375,6 +375,12 @@ body {
 .decision-chip.chip-off { opacity: 0.45; }
 .scan-item { cursor: pointer; font-size: 13px; }
 .scan-item:hover { border-color: var(--accent); }
+.reg-list { margin-top: 10px; max-height: 220px; overflow-y: auto; }
+.reg-row { display: flex; align-items: center; gap: 12px; padding: 6px 8px; border-bottom: 1px solid #2c2c2a; font-size: 13px; }
+.reg-hora { color: #8a8a82; font-variant-numeric: tabular-nums; min-width: 42px; }
+.reg-par { flex: 1; font-weight: 600; }
+.btn-ghost { background: transparent; border: 1px solid #383835; color: #c3c2b7; font-size: 12px; padding: 2px 10px; border-radius: 6px; cursor: pointer; }
+.btn-ghost:hover { border-color: var(--accent); }
 
 .decision-context {
     font-size: 12px;

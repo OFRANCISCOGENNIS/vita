@@ -1530,8 +1530,51 @@ async function escanear() {
         montarWidgetTV(); carregar();
     }));
     document.getElementById('scanPanel').style.display = 'block';
+    res.forEach(r => registrarEntrada(PARES_YAHOO[r.s] ? PARES_YAHOO[r.s].label : r.s, r.dir, r.score, r.enabled));
+    if (res.length) renderRegistro();
     if (res.length && document.getElementById('somAtivo').checked) tocarSom(res[0].dir);
     btn.disabled = false; btn.textContent = '🔎 Escanear melhores entradas';
+}
+
+// ============================================================================
+// BLOCO 8.5 — REGISTRO DE ENTRADAS (gráfico timeline: horário + par de moedas)
+// ============================================================================
+
+let registro = JSON.parse(localStorage.getItem('registroEntradas') || '[]');
+let chartRegistro = null, serieRegistro = null;
+
+function registrarEntrada(par, dir, score, enabled) {
+    let t = Math.floor(Date.now() / 1000);
+    if (registro.length && t <= registro[registro.length - 1].t) t = registro[registro.length - 1].t + 1;
+    registro.push({ t, par, dir, score, enabled });
+    if (registro.length > 200) registro = registro.slice(-200);
+    localStorage.setItem('registroEntradas', JSON.stringify(registro));
+}
+
+function renderRegistro() {
+    const panel = document.getElementById('registroPanel');
+    if (!registro.length) { panel.style.display = 'none'; return; }
+    panel.style.display = 'block';
+    if (!chartRegistro) {
+        chartRegistro = LightweightCharts.createChart(document.getElementById('chartRegistro'), { ...opcoesBase(), height: 150 });
+        serieRegistro = chartRegistro.addLineSeries({ color: 'rgba(120,120,120,0.35)', lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
+        chartRegistro.priceScale('right').applyOptions({ visible: false });
+    }
+    serieRegistro.setData(registro.map(r => ({ time: r.t, value: 0 })));
+    serieRegistro.setMarkers(registro.map(r => ({
+        time: r.t,
+        position: r.dir === 1 ? 'aboveBar' : 'belowBar',
+        color: r.dir === 1 ? '#26a69a' : '#ef5350',
+        shape: r.dir === 1 ? 'arrowUp' : 'arrowDown',
+        text: r.par
+    })));
+    chartRegistro.timeScale().fitContent();
+    document.getElementById('registroMeta').textContent = registro.length + ' entrada' + (registro.length > 1 ? 's' : '');
+    document.getElementById('registroBody').innerHTML = registro.slice().reverse().map(r =>
+        `<div class="reg-row"><span class="reg-hora">${fmtHora(r.t)}</span>` +
+        `<span class="reg-par">${r.par}</span>` +
+        `<span class="${r.dir === 1 ? 'chip-dir-up' : 'chip-dir-down'}">${r.dir === 1 ? '▲ CALL' : '▼ PUT'} ${r.score}/${r.enabled}</span></div>`
+    ).join('');
 }
 
 // ============================================================================
@@ -1760,6 +1803,10 @@ document.getElementById('btnTreinoPular').addEventListener('click', () => respon
 document.getElementById('btnTreinoSair').addEventListener('click', () => encerrarTreino(true));
 
 document.getElementById('btnScan').addEventListener('click', escanear);
+document.getElementById('btnLimparReg').addEventListener('click', () => {
+    registro = []; localStorage.removeItem('registroEntradas');
+    document.getElementById('registroPanel').style.display = 'none';
+});
 document.getElementById('btnTestarSom').addEventListener('click', function () {
     tocarSom(1);
     setTimeout(() => tocarSom(-1), 600);   // demonstra os dois tons: CALL e PUT
@@ -1805,6 +1852,7 @@ function iniciar() {
     carregar();
     carregarNoticias(); // notícias em tempo real
     newsTimer = setInterval(carregarNoticias, 60000);  // auto-refresh a cada 60s
+    renderRegistro();   // restaura o registro de entradas salvo
 }
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', iniciar);
