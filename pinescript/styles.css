@@ -381,6 +381,10 @@ body {
 .reg-par { flex: 1; font-weight: 600; }
 .btn-ghost { background: transparent; border: 1px solid #383835; color: #c3c2b7; font-size: 12px; padding: 2px 10px; border-radius: 6px; cursor: pointer; }
 .btn-ghost:hover { border-color: var(--accent); }
+.ia-row { cursor: pointer; }
+.ia-row:hover { background: #23231f; }
+.ia-sel { background: #1e2b1e; }
+.ia-params { color: #8a8a82; font-size: 12px; font-variant-numeric: tabular-nums; }
 
 .decision-context {
     font-size: 12px;

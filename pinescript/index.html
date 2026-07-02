@@ -172,6 +172,7 @@
                     <label><input type="checkbox" id="somAtivo" checked> <span>Som quando o veredito virar CALL/PUT</span></label>
                     <button id="btnTestarSom" class="btn-mini" style="width:100%; margin-top:4px;">🔊 Testar som</button>
                     <button id="btnScan" class="btn-primary" style="margin-top:8px;">🔎 Escanear melhores entradas</button>
+                    <button id="btnIA" class="btn-primary" style="margin-top:6px;">🤖 IA: otimizar parâmetros</button>
                 </section>
 
                 <!-- Fluxo de Volume -->
@@ -222,6 +223,12 @@
                         <button id="btnLimparReg" class="btn-ghost" style="float:right;">Limpar</button></h2>
                     <div id="chartRegistro" style="height:150px;"></div>
                     <div id="registroBody" class="reg-list"></div>
+                </div>
+
+                <div class="chart-container" id="iaPanel" style="display:none;">
+                    <h2>🤖 IA — melhores parâmetros <span id="iaMeta" class="tv-sync-tag"></span></h2>
+                    <div id="iaContext" class="decision-context"></div>
+                    <div id="iaList" class="reg-list"></div>
                 </div>
 
                 <!-- Treino de Leitura (replay: futuro escondido, você decide) -->

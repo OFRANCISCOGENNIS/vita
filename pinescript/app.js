@@ -1578,6 +1578,78 @@ function renderRegistro() {
 }
 
 // ============================================================================
+// BLOCO 8.6 — IA / OTIMIZADOR (busca os parâmetros com maior índice de acerto)
+// ============================================================================
+// Faz uma busca em grade sobre os parâmetros de confluência no histórico já
+// carregado do par atual, avalia a taxa de acerto (WIN/LOSS) de cada combinação
+// e ranqueia as de melhor desempenho. Reaproveita recomputar*/entradas.
+
+const IA_GRID = {
+    minScore: [3, 4, 5],
+    rsi: [[30, 70], [35, 65], [25, 75]],
+    estruturaLookback: [10, 20, 30],
+    cooldownVelas: [3, 5]
+};
+const IA_MIN_OPS = 6;   // amostra mínima p/ a taxa de acerto ter significado
+
+function avaliarTaxaAtual() {
+    recomputarIndicadores(); recomputarSinais(); recomputarEntradas();
+    const av = entradas.filter(e => e.resultado === 'WIN' || e.resultado === 'LOSS');
+    const w = av.filter(e => e.resultado === 'WIN').length;
+    return { ops: av.length, w, wr: av.length ? w / av.length : 0 };
+}
+
+async function otimizarIA() {
+    if (!dados || dados.length < 210) { alert('Carregue um par primeiro (mín. ~210 velas).'); return; }
+    const btn = document.getElementById('btnIA');
+    btn.disabled = true; btn.textContent = 'Analisando…';
+    const el = id => document.getElementById(id);
+    const ids = ['minScore', 'rsiSobrevenda', 'rsiSobrecompra', 'estruturaLookback', 'cooldownVelas', 'confMode'];
+    const save = {}; ids.forEach(i => save[i] = el(i).value);
+    el('confMode').value = 'score';
+    const res = [];
+    for (const ms of IA_GRID.minScore)
+        for (const [sv, sc] of IA_GRID.rsi)
+            for (const lk of IA_GRID.estruturaLookback)
+                for (const cd of IA_GRID.cooldownVelas) {
+                    el('minScore').value = ms; el('rsiSobrevenda').value = sv; el('rsiSobrecompra').value = sc;
+                    el('estruturaLookback').value = lk; el('cooldownVelas').value = cd;
+                    const r = avaliarTaxaAtual();
+                    if (r.ops >= IA_MIN_OPS) res.push({ ms, sv, sc, lk, cd, ...r });
+                    await Promise.resolve();
+                }
+    ids.forEach(i => el(i).value = save[i]);
+    recalcularSinaisApenas();
+    // ranqueia por taxa de acerto e, no empate, por nº de operações (robustez)
+    res.sort((a, b) => b.wr - a.wr || b.ops - a.ops);
+    const top = res.slice(0, 8);
+    const par = PARES_YAHOO[symbolAtual()] ? PARES_YAHOO[symbolAtual()].label : symbolAtual();
+    document.getElementById('iaPanel').style.display = 'block';
+    document.getElementById('iaMeta').textContent = res.length + ' combinações testadas';
+    document.getElementById('iaContext').textContent = res.length
+        ? `Melhores parâmetros para ${par} · ${tfMinutes()}m · expiração ${expMinutes()}m (backtest no histórico atual). Clique em uma linha para aplicar.`
+        : `Nenhuma combinação atingiu ${IA_MIN_OPS} operações neste histórico — carregue mais velas ou troque o timeframe.`;
+    document.getElementById('iaList').innerHTML = top.map((r, i) => {
+        const wr = (r.wr * 100).toFixed(1);
+        const cls = r.wr >= 0.6 ? 'chip-dir-up' : r.wr >= 0.5 ? '' : 'chip-dir-down';
+        return `<div class="reg-row ia-row" data-i="${i}">` +
+            `<span class="reg-hora">#${i + 1}</span>` +
+            `<span class="reg-par"><span class="${cls}">${wr}% acerto</span> · ${r.w}/${r.ops} ops</span>` +
+            `<span class="ia-params">score≥${r.ms} · RSI ${r.sv}/${r.sc} · estrut ${r.lk} · cd ${r.cd}</span></div>`;
+    }).join('');
+    document.getElementById('iaList').querySelectorAll('.ia-row').forEach(row => row.addEventListener('click', () => {
+        const r = top[+row.getAttribute('data-i')];
+        el('confMode').value = 'score'; el('minScore').value = r.ms;
+        el('rsiSobrevenda').value = r.sv; el('rsiSobrecompra').value = r.sc;
+        el('estruturaLookback').value = r.lk; el('cooldownVelas').value = r.cd;
+        recalcularSinaisApenas();
+        row.parentElement.querySelectorAll('.ia-row').forEach(x => x.classList.remove('ia-sel'));
+        row.classList.add('ia-sel');
+    }));
+    btn.disabled = false; btn.textContent = '🤖 IA: otimizar parâmetros';
+}
+
+// ============================================================================
 // BLOCO 9.5 — WIDGET OFICIAL DO TRADINGVIEW (gráfico real, requer internet)
 // ============================================================================
 
@@ -1803,6 +1875,7 @@ document.getElementById('btnTreinoPular').addEventListener('click', () => respon
 document.getElementById('btnTreinoSair').addEventListener('click', () => encerrarTreino(true));
 
 document.getElementById('btnScan').addEventListener('click', escanear);
+document.getElementById('btnIA').addEventListener('click', otimizarIA);
 document.getElementById('btnLimparReg').addEventListener('click', () => {
     registro = []; localStorage.removeItem('registroEntradas');
     document.getElementById('registroPanel').style.display = 'none';
