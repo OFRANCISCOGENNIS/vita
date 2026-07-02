@@ -24,6 +24,11 @@ O topo da página é um **painel de decisão** que responde, na vela atual:
   se o score em vigor perde do breakeven, suba o mínimo de fatores.
 - **Notícia tem prioridade**: com o filtro de notícias ativo, o veredito vira
   **AGUARDAR ⚠** dentro da janela de risco, independentemente da confluência.
+- **Som de alerta**: com "Som quando o veredito virar CALL/PUT" ligado (grupo
+  **Alertas**), o app toca dois tons subindo (CALL) ou descendo (PUT) **na
+  transição** do veredito — não repete enquanto ele se mantém. Gerado via Web
+  Audio (sem arquivos, funciona offline). Navegadores exigem um clique na página
+  antes do primeiro som; use **🔊 Testar som** para conferir o volume.
 
 A interface usa tema escuro de trading com paleta validada para daltonismo e
 contraste (tokens em `styles.css`).
