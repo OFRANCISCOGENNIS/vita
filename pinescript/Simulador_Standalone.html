@@ -1044,10 +1044,16 @@ body {
                         Fonte
                         <select id="fonte">
                             <option value="binance" selected>Binance — Cripto (ao vivo)</option>
-                            <option value="yahoo">Forex/Índices/Ouro — Yahoo (ao vivo)</option>
+                            <option value="twelvedata">Forex/Índices/Ouro — Twelve Data (chave)</option>
+                            <option value="yahoo">Forex/Índices/Ouro — Yahoo (keyless)</option>
                             <option value="sim">Simulado (offline)</option>
                         </select>
                     </label>
+                    <label>
+                        Chave Twelve Data (grátis)
+                        <input type="text" id="tdKey" value="demo" spellcheck="false" autocomplete="off" style="width:100%;">
+                    </label>
+                    <p class="group-note">Twelve Data = Forex/Índices/Ouro estável (CORS próprio, sem proxy). Pegue sua chave grátis em <strong>twelvedata.com</strong> e cole acima. A chave "demo" só funciona no EUR/USD.</p>
                     <label>
                         Par / moeda (cripto)
                         <input type="text" id="symbol" value="BTCUSDT" list="listaSimbolos" autocomplete="off" spellcheck="false">
@@ -1399,21 +1405,22 @@ const YAHOO_PROXIES = YAHOO_PROXY_OVERRIDE
         { nome: 'allorigins-get', montar: u => 'https://api.allorigins.win/get?url=' + encodeURIComponent(u), texto: async r => JSON.parse(await r.text()).contents }
     ];
 const PARES_YAHOO = {
-    EURUSD: { yahoo: 'EURUSD=X', tv: 'FX:EURUSD', label: 'EUR/USD' },
-    USDJPY: { yahoo: 'USDJPY=X', tv: 'FX:USDJPY', label: 'USD/JPY' },
-    GBPUSD: { yahoo: 'GBPUSD=X', tv: 'FX:GBPUSD', label: 'GBP/USD' },
-    AUDUSD: { yahoo: 'AUDUSD=X', tv: 'FX:AUDUSD', label: 'AUD/USD' },
-    USDCAD: { yahoo: 'USDCAD=X', tv: 'FX:USDCAD', label: 'USD/CAD' },
-    USDCHF: { yahoo: 'USDCHF=X', tv: 'FX:USDCHF', label: 'USD/CHF' },
-    EURJPY: { yahoo: 'EURJPY=X', tv: 'FX:EURJPY', label: 'EUR/JPY' },
-    GBPJPY: { yahoo: 'GBPJPY=X', tv: 'FX:GBPJPY', label: 'GBP/JPY' },
-    EURGBP: { yahoo: 'EURGBP=X', tv: 'FX:EURGBP', label: 'EUR/GBP' },
-    NZDUSD: { yahoo: 'NZDUSD=X', tv: 'FX:NZDUSD', label: 'NZD/USD' },
-    XAUUSD: { yahoo: 'XAUUSD=X', tv: 'TVC:GOLD', label: 'XAU/USD (Ouro)' },
-    NAS100: { yahoo: '^NDX', tv: 'TVC:NDX', label: 'NAS100 (Índice Nasdaq)' },
-    US30: { yahoo: '^DJI', tv: 'TVC:DJI', label: 'US30 (Dow Jones)' },
-    GER40: { yahoo: '^GDAXI', tv: 'TVC:DEU40', label: 'GER40 (DAX)' }
+    EURUSD: { yahoo: 'EURUSD=X', td: 'EUR/USD', tv: 'FX:EURUSD', label: 'EUR/USD' },
+    USDJPY: { yahoo: 'USDJPY=X', td: 'USD/JPY', tv: 'FX:USDJPY', label: 'USD/JPY' },
+    GBPUSD: { yahoo: 'GBPUSD=X', td: 'GBP/USD', tv: 'FX:GBPUSD', label: 'GBP/USD' },
+    AUDUSD: { yahoo: 'AUDUSD=X', td: 'AUD/USD', tv: 'FX:AUDUSD', label: 'AUD/USD' },
+    USDCAD: { yahoo: 'USDCAD=X', td: 'USD/CAD', tv: 'FX:USDCAD', label: 'USD/CAD' },
+    USDCHF: { yahoo: 'USDCHF=X', td: 'USD/CHF', tv: 'FX:USDCHF', label: 'USD/CHF' },
+    EURJPY: { yahoo: 'EURJPY=X', td: 'EUR/JPY', tv: 'FX:EURJPY', label: 'EUR/JPY' },
+    GBPJPY: { yahoo: 'GBPJPY=X', td: 'GBP/JPY', tv: 'FX:GBPJPY', label: 'GBP/JPY' },
+    EURGBP: { yahoo: 'EURGBP=X', td: 'EUR/GBP', tv: 'FX:EURGBP', label: 'EUR/GBP' },
+    NZDUSD: { yahoo: 'NZDUSD=X', td: 'NZD/USD', tv: 'FX:NZDUSD', label: 'NZD/USD' },
+    XAUUSD: { yahoo: 'XAUUSD=X', td: 'XAU/USD', tv: 'TVC:GOLD', label: 'XAU/USD (Ouro)' },
+    NAS100: { yahoo: '^NDX', td: 'NDX', tv: 'TVC:NDX', label: 'NAS100 (Índice Nasdaq)' },
+    US30: { yahoo: '^DJI', td: 'DJI', tv: 'TVC:DJI', label: 'US30 (Dow Jones)' },
+    GER40: { yahoo: '^GDAXI', td: 'DAX', tv: 'TVC:DEU40', label: 'GER40 (DAX)' }
 };
+const TWELVEDATA_BASE = _params.get('tdbase') || 'https://api.twelvedata.com';
 let yahooPollTimer = null;
 let fluxoStateAntesYahoo = null;   // guarda os toggles de Fluxo/Correlação ao entrar em Yahoo
 
@@ -2646,14 +2653,49 @@ async function carregarHistoricoYahoo(codigo, intervalMin, limit) {
     return candles.slice(Math.max(0, candles.length - limit));
 }
 
-// Yahoo não oferece WebSocket público: aproximamos "tempo real" reconsultando
-// as últimas velas por polling (REST) a cada 15s.
-function iniciarPollYahoo(codigo, intervalMin) {
+// Fonte "Forex-like" (Forex/índices/ouro): sem volume agressor real
+function ehForex() { const f = fonte(); return f === 'yahoo' || f === 'twelvedata'; }
+
+// ---- Twelve Data (Forex/Índices/Ouro com chave grátis; tem CORS próprio) ----
+function tdIntervalStr(min) { return min === 60 ? '1h' : min + 'min'; }
+function tdKey() { return (document.getElementById('tdKey').value || 'demo').trim(); }
+
+function parseTwelveData(json) {
+    if (!json.values) return [];
+    const out = [];
+    // values vêm do mais recente p/ o mais antigo: percorremos de trás p/ frente
+    for (let i = json.values.length - 1; i >= 0; i--) {
+        const v = json.values[i];
+        const t = Math.floor(Date.parse(v.datetime.replace(' ', 'T') + 'Z') / 1000);
+        if (isNaN(t)) continue;
+        const vol = v.volume != null ? +v.volume : 0;
+        out.push({ time: t, open: +v.open, high: +v.high, low: +v.low, close: +v.close, volume: vol, buyVol: vol / 2 });
+    }
+    return out;
+}
+
+async function carregarHistoricoTwelveData(codigo, intervalMin, limit) {
+    const par = PARES_YAHOO[codigo];
+    if (!par || !par.td) throw new Error('par não suportado nesta fonte: ' + codigo);
+    const url = `${TWELVEDATA_BASE}/time_series?symbol=${encodeURIComponent(par.td)}` +
+        `&interval=${tdIntervalStr(intervalMin)}&outputsize=${Math.min(5000, limit)}&timezone=UTC&apikey=${encodeURIComponent(tdKey())}`;
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const json = await resp.json();
+    if (json.status === 'error' || (json.code && json.code >= 400)) throw new Error(json.message || 'erro Twelve Data');
+    const candles = parseTwelveData(json);
+    if (!candles.length) throw new Error('sem dados para ' + codigo);
+    return candles;
+}
+
+// Nem Yahoo nem Twelve Data (free) têm WebSocket público: aproximamos "tempo
+// real" reconsultando as últimas velas por polling (REST) a cada 15s.
+function iniciarPollForex(codigo, intervalMin, carregador, label) {
     pararPollYahoo();
     yahooPollTimer = setInterval(async () => {
-        if (fonte() !== 'yahoo' || treino) return;
+        if (!ehForex() || treino) return;
         try {
-            const recentes = await carregarHistoricoYahoo(codigo, intervalMin, 3);
+            const recentes = await carregador(codigo, intervalMin, 3);
             recentes.forEach(bar => {
                 const last = dados.length ? dados[dados.length - 1] : null;
                 if (last && bar.time === last.time) {
@@ -2664,20 +2706,20 @@ function iniciarPollYahoo(codigo, intervalMin) {
                     atualizarUltimoCandle(true);
                 }
             });
-            setStatus('on', `AO VIVO (polling 15s) • ${PARES_YAHOO[codigo].label}`);
+            setStatus('on', `AO VIVO (polling 15s) • ${label}`);
         } catch (e) {
-            setStatus('err', 'Falha ao atualizar (Yahoo): ' + (e.message || e));
+            setStatus('err', 'Falha ao atualizar: ' + (e.message || e));
         }
     }, 15000);
 }
 
-// Fluxo/Correlação dependem de volume real (indisponível no Yahoo). Desativa
-// os controles nessa fonte e restaura o estado anterior ao voltar p/ cripto.
+// Fluxo/Correlação dependem de volume real (indisponível em Forex/índices/ouro).
+// Desativa os controles nessas fontes e restaura o estado anterior ao voltar p/ cripto.
 function atualizarDisponibilidadeFluxo() {
-    const isYahoo = fonte() === 'yahoo';
+    const semVol = ehForex();
     const elFluxo = document.getElementById('useFluxo');
     const elCorr = document.getElementById('useCorrelacao');
-    if (isYahoo) {
+    if (semVol) {
         if (fluxoStateAntesYahoo === null) fluxoStateAntesYahoo = { fluxo: elFluxo.checked, corr: elCorr.checked };
         elFluxo.checked = false;
         elCorr.checked = false;
@@ -2686,10 +2728,10 @@ function atualizarDisponibilidadeFluxo() {
         elCorr.checked = fluxoStateAntesYahoo.corr;
         fluxoStateAntesYahoo = null;
     }
-    elFluxo.disabled = isYahoo;
-    elCorr.disabled = isYahoo;
-    document.getElementById('fluxoJanela').disabled = isYahoo;
-    document.getElementById('refPairs').disabled = isYahoo;
+    elFluxo.disabled = semVol;
+    elCorr.disabled = semVol;
+    document.getElementById('fluxoJanela').disabled = semVol;
+    document.getElementById('refPairs').disabled = semVol;
 }
 
 async function carregar() {
@@ -2715,6 +2757,33 @@ async function carregar() {
         return;
     }
 
+    if (fonte() === 'twelvedata') {
+        conexaoAtual = '';
+        const codigo = symbolAtual();
+        if (!PARES_YAHOO[codigo]) {
+            setStatus('err', `Par "${codigo}" não está na lista de Forex/Índices/Ouro`);
+            return;
+        }
+        setStatus('connecting', `Carregando ${PARES_YAHOO[codigo].label} (Twelve Data)…`);
+        const limit = Math.min(1000, Math.max(50, parseInt(document.getElementById('numCandles').value) || 300));
+        try {
+            dados = await carregarHistoricoTwelveData(codigo, tfMinutes(), limit);
+            refPares = [];
+            redesenharTudo(true);
+            const label = PARES_YAHOO[codigo].label + ' · Twelve Data';
+            setStatus('on', `AO VIVO (polling 15s) • ${label}`);
+            iniciarPollForex(codigo, tfMinutes(), carregarHistoricoTwelveData, label);
+        } catch (err) {
+            console.error('Erro Twelve Data:', err);
+            const dica = /api key|apikey|401|limit|grow|plan/i.test(err.message || '') ? ' — confira/atualize sua chave em twelvedata.com' : '';
+            setStatus('err', 'Twelve Data: ' + (err.message || err) + dica);
+            dados = gerarDadosSim(parseInt(document.getElementById('numCandles').value) || 300, 2);
+            refPares = [];
+            redesenharTudo(true);
+        }
+        return;
+    }
+
     if (fonte() === 'yahoo') {
         conexaoAtual = '';
         const codigo = symbolAtual();
@@ -2730,7 +2799,7 @@ async function carregar() {
             refPares = [];   // correlação não se aplica entre fontes distintas
             redesenharTudo(true);
             setStatus('on', `AO VIVO (polling 15s) • ${PARES_YAHOO[codigo].label}`);
-            iniciarPollYahoo(codigo, tfMinutes());
+            iniciarPollForex(codigo, tfMinutes(), carregarHistoricoYahoo, PARES_YAHOO[codigo].label);
         } catch (err) {
             console.error('Erro ao carregar Yahoo:', err);
             // Proxies indisponíveis: mostra SIMULADO (deixando claro) e permite retry
@@ -2796,7 +2865,7 @@ let tvWidget = null;
 
 function tvSymbolTV() {
     const cod = symbolAtual();
-    if (fonte() === 'yahoo' && PARES_YAHOO[cod]) return PARES_YAHOO[cod].tv;   // ex.: FX:EURUSD, TVC:GOLD
+    if (ehForex() && PARES_YAHOO[cod]) return PARES_YAHOO[cod].tv;   // ex.: FX:EURUSD, TVC:GOLD
     return 'BINANCE:' + cod;   // ex.: BINANCE:BTCUSDT
 }
 function tvIntervalTV() { return String(tfMinutes()); }         // 1,5,15,30,60
@@ -2985,15 +3054,20 @@ document.getElementById('timeframe').addEventListener('change', function () {
 document.getElementById('symbol').addEventListener('change', function () {
     montarWidgetTV();   // sincroniza o widget oficial com o novo par
     renderNoticias();   // re-filtra notícias pela nova moeda
-    if (fonte() === 'binance' || fonte() === 'yahoo') carregar();
+    if (fonte() !== 'sim') carregar();
 });
 document.getElementById('parPopular').addEventListener('change', function () {
     const cod = this.value;
     if (!cod) return;
-    document.getElementById('fonte').value = 'yahoo';
+    // Mantém a fonte Forex já escolhida (Twelve Data/Yahoo); senão usa Yahoo (keyless, sem setup)
+    if (!ehForex()) document.getElementById('fonte').value = 'yahoo';
     document.getElementById('symbol').value = cod;
     montarWidgetTV();
     carregar();
+});
+// Trocar a chave do Twelve Data recarrega se essa for a fonte ativa
+document.getElementById('tdKey').addEventListener('change', function () {
+    if (fonte() === 'twelvedata') carregar();
 });
 document.getElementById('btnNews').addEventListener('click', carregarNoticias);
 document.getElementById('btnExport').addEventListener('click', exportarCSV);

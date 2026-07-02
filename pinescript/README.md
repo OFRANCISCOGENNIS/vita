@@ -75,10 +75,24 @@ Legenda dos fatores: `T` Tendência (EMA), `Ma` Macro (EMA200), `Mo` Momentum (R
 `V` Volatilidade (ATR), `E` Estrutura (rompimento), `F` Fluxo (delta compra×venda),
 `C` Correlação (pares de referência).
 
-## 💱 Forex, Ouro e Índices (Yahoo Finance)
+## 💱 Forex, Ouro e Índices — duas fontes
 
-Além de cripto (Binance), o simulador cobre os principais pares de Forex, o ouro
-e três índices, via **Yahoo Finance** (keyless, sem cadastro):
+> **Por que não TradingView?** O TradingView **não tem API pública de dados**: o
+> widget embutido mostra o gráfico real (visual), mas é um iframe fechado e não
+> entrega os números das velas para o app. Por isso os dados de Forex/índices/ouro
+> vêm de uma das duas fontes abaixo (e o widget do TradingView continua ali só como
+> conferência visual).
+
+**Fonte recomendada — Twelve Data (chave grátis):** estável, com CORS próprio (sem
+proxy no meio). Pegue uma chave grátis em **twelvedata.com**, cole no campo
+"Chave Twelve Data" e escolha a fonte *Forex/Índices/Ouro — Twelve Data*. A chave
+`demo` já funciona no EUR/USD para você testar.
+
+**Fonte alternativa — Yahoo (keyless):** não precisa de cadastro, mas depende de um
+proxy CORS público instável; o app tenta vários proxies em sequência e, se todos
+caírem, mostra dados simulados com opção de recarregar.
+
+Ambas cobrem os mesmos pares:
 
 `EUR/USD` `USD/JPY` `GBP/USD` `AUD/USD` `USD/CAD` `USD/CHF` `EUR/JPY` `GBP/JPY`
 `EUR/GBP` `NZD/USD` `XAU/USD (Ouro)` `NAS100 (Nasdaq)` `US30 (Dow Jones)` `GER40 (DAX)`
