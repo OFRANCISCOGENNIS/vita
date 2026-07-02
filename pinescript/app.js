@@ -566,6 +566,9 @@ function atualizarPaineis() {
     }
     document.getElementById('currentBias').textContent = bias;
 
+    // Estudos de Mercado acompanha os recálculos quando já está aberto
+    if (document.getElementById('estudoPanel').style.display === 'block') renderEstudo();
+
     // Medidor de confluência ao vivo (pontuação na última vela)
     const en = confLive.enabled || 1;
     document.getElementById('confBarCall').style.width = Math.round(confLive.long / en * 100) + '%';
@@ -1650,6 +1653,90 @@ async function otimizarIA() {
 }
 
 // ============================================================================
+// BLOCO 8.7 — ESTUDOS DE MERCADO (regime, horário e fatores com mais acerto)
+// ============================================================================
+// Lê as entradas backtestadas do par atual e extrai padrões que ajudam o
+// trader a ESTUDAR o mercado: em que horário o setup mais acerta, qual fator
+// de confluência mais aparece nos WINs, e qual o regime atual (tendência ×
+// lateral, volatilidade alta × baixa).
+
+const FATORES_NOMES = { T: 'Tendência', Ma: 'EMA 200', Mo: 'RSI', V: 'ATR', E: 'Estrutura', F: 'Fluxo', C: 'Correlação' };
+
+function regimeAtual() {
+    const last = dados.length - 1;
+    const e200 = computed.ema200, atrV = computed.atrValues, atrM = computed.atrMedia;
+    const chips = [];
+    if (e200 && e200[last] != null && e200[last - 20] != null) {
+        const slope = (e200[last] - e200[last - 20]) / e200[last - 20];
+        const acima = dados[last].close > e200[last];
+        if (Math.abs(slope) < 0.0005) chips.push({ t: '↔ Mercado LATERAL (EMA200 plana)', c: '' });
+        else if (slope > 0 && acima) chips.push({ t: '📈 TENDÊNCIA DE ALTA (preço acima da EMA200 subindo)', c: 'chip-dir-up' });
+        else if (slope < 0 && !acima) chips.push({ t: '📉 TENDÊNCIA DE BAIXA (preço abaixo da EMA200 caindo)', c: 'chip-dir-down' });
+        else chips.push({ t: '⚠️ TRANSIÇÃO — preço contra a EMA200, cuidado com reversão', c: '' });
+    }
+    if (atrV && atrV[last] != null && atrM && atrM[last] != null) {
+        const razao = atrV[last] / atrM[last];
+        if (razao >= 1.3) chips.push({ t: `🔥 Volatilidade ALTA (ATR ${razao.toFixed(2)}× a média) — movimentos amplos`, c: 'chip-dir-down' });
+        else if (razao <= 0.75) chips.push({ t: `😴 Volatilidade BAIXA (ATR ${razao.toFixed(2)}× a média) — mercado parado`, c: '' });
+        else chips.push({ t: `✅ Volatilidade normal (ATR ${razao.toFixed(2)}× a média)`, c: 'chip-dir-up' });
+    }
+    return chips;
+}
+
+function barraWr(label, w, t) {
+    const wr = t ? w / t * 100 : 0;
+    const cls = wr >= 60 ? 'bar-good' : wr >= 50 ? 'bar-mid' : 'bar-bad';
+    return `<div class="estudo-row"><span class="estudo-lbl">${label}</span>` +
+        `<span class="estudo-bar"><span class="estudo-fill ${cls}" style="width:${Math.round(wr)}%"></span></span>` +
+        `<span class="estudo-num">${wr.toFixed(0)}% (${w}/${t})</span></div>`;
+}
+
+function renderEstudo() {
+    if (!dados.length || !computed.ema200) return;
+    const av = entradas.filter(e => e.resultado === 'WIN' || e.resultado === 'LOSS');
+    document.getElementById('estudoPanel').style.display = 'block';
+    document.getElementById('estudoMeta').textContent = av.length + ' operações analisadas';
+    document.getElementById('estudoRegime').innerHTML = regimeAtual().map(c =>
+        `<span class="decision-chip"><span class="${c.c}">${c.t}</span></span>`).join('');
+
+    // acerto por horário do dia
+    const porHora = {};
+    av.forEach(e => {
+        const h = new Date(e.entryTime * 1000).getHours();
+        (porHora[h] = porHora[h] || { w: 0, t: 0 }).t++;
+        if (e.resultado === 'WIN') porHora[h].w++;
+    });
+    const horas = Object.keys(porHora).map(Number).sort((a, b) => a - b);
+    document.getElementById('estudoHoras').innerHTML = horas.length
+        ? horas.map(h => barraWr(String(h).padStart(2, '0') + 'h', porHora[h].w, porHora[h].t)).join('')
+        : '<div class="metric-empty">Sem operações avaliadas ainda.</div>';
+
+    // acerto por fator presente na entrada
+    const porFat = {};
+    av.forEach(e => (e.fatores || '').split('·').forEach(k => {
+        if (!FATORES_NOMES[k]) return;
+        (porFat[k] = porFat[k] || { w: 0, t: 0 }).t++;
+        if (e.resultado === 'WIN') porFat[k].w++;
+    }));
+    const fks = Object.keys(porFat).sort((a, b) => (porFat[b].w / porFat[b].t) - (porFat[a].w / porFat[a].t));
+    document.getElementById('estudoFatores').innerHTML = fks.length
+        ? fks.map(k => barraWr(FATORES_NOMES[k], porFat[k].w, porFat[k].t)).join('')
+        : '<div class="metric-empty">Sem operações avaliadas ainda.</div>';
+
+    // dica de estudo gerada a partir dos padrões
+    const dicas = [];
+    const melhorH = horas.filter(h => porHora[h].t >= 3).sort((a, b) => porHora[b].w / porHora[b].t - porHora[a].w / porHora[a].t)[0];
+    if (melhorH != null) dicas.push(`melhor horário do setup: ${String(melhorH).padStart(2, '0')}h (${(porHora[melhorH].w / porHora[melhorH].t * 100).toFixed(0)}% de acerto)`);
+    const melhorF = fks.filter(k => porFat[k].t >= 5)[0];
+    if (melhorF) dicas.push(`fator mais confiável: ${FATORES_NOMES[melhorF]} presente em ${(porFat[melhorF].w / porFat[melhorF].t * 100).toFixed(0)}% de acerto`);
+    const piorF = fks.filter(k => porFat[k].t >= 5).slice(-1)[0];
+    if (piorF && piorF !== melhorF && porFat[piorF].w / porFat[piorF].t < 0.5) dicas.push(`atenção: entradas com ${FATORES_NOMES[piorF]} acertaram menos de 50% — estude evitá-las neste par/timeframe`);
+    document.getElementById('estudoDica').textContent = dicas.length
+        ? '💡 ' + dicas.join(' · ') + '.'
+        : '💡 Carregue mais histórico (500+ velas) para padrões mais confiáveis.';
+}
+
+// ============================================================================
 // BLOCO 9.5 — WIDGET OFICIAL DO TRADINGVIEW (gráfico real, requer internet)
 // ============================================================================
 
@@ -1876,6 +1963,7 @@ document.getElementById('btnTreinoSair').addEventListener('click', () => encerra
 
 document.getElementById('btnScan').addEventListener('click', escanear);
 document.getElementById('btnIA').addEventListener('click', otimizarIA);
+document.getElementById('btnEstudo').addEventListener('click', renderEstudo);
 document.getElementById('btnLimparReg').addEventListener('click', () => {
     registro = []; localStorage.removeItem('registroEntradas');
     document.getElementById('registroPanel').style.display = 'none';

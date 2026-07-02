@@ -385,6 +385,17 @@ body {
 .ia-row:hover { background: #23231f; }
 .ia-sel { background: #1e2b1e; }
 .ia-params { color: #8a8a82; font-size: 12px; font-variant-numeric: tabular-nums; }
+.estudo-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 12px; }
+.estudo-grid h4 { margin: 0 0 8px; font-size: 13px; color: #c3c2b7; }
+.estudo-row { display: flex; align-items: center; gap: 8px; padding: 3px 0; font-size: 12px; }
+.estudo-lbl { min-width: 70px; color: #c3c2b7; }
+.estudo-bar { flex: 1; height: 10px; background: #2c2c2a; border-radius: 5px; overflow: hidden; }
+.estudo-fill { display: block; height: 100%; border-radius: 5px; }
+.bar-good { background: #0ca30c; }
+.bar-mid { background: #fab219; }
+.bar-bad { background: #d03b3b; }
+.estudo-num { min-width: 74px; text-align: right; color: #8a8a82; font-variant-numeric: tabular-nums; }
+@media (max-width: 760px) { .estudo-grid { grid-template-columns: 1fr; } }
 
 .decision-context {
     font-size: 12px;
