@@ -144,12 +144,16 @@
 
             <!-- MAIN CHART AREA -->
             <section class="charts-area">
-                <!-- Widget OFICIAL do TradingView (gráfico real do site) -->
-                <div class="chart-container">
-                    <h2>📺 Gráfico oficial TradingView <span class="tv-sync-tag" id="tvSyncTag">—</span></h2>
-                    <div class="tv-widget-wrap">
-                        <div id="tvWidget"></div>
-                        <div id="tvWidgetMsg" class="tv-widget-msg">Carregando gráfico do TradingView… (requer internet)</div>
+                <!-- PAINEL DE DECISÃO (assertividade: entrar ou aguardar, e por quê) -->
+                <div class="chart-container decision-panel">
+                    <div class="decision-main">
+                        <span class="decision-label">Decisão agora</span>
+                        <span id="decisionVerdict" class="decision-verdict verdict-wait">AGUARDAR</span>
+                        <span id="decisionReason" class="decision-reason">Carregando dados…</span>
+                    </div>
+                    <div class="decision-side">
+                        <div class="decision-chips" id="decisionChips"></div>
+                        <div class="decision-context" id="decisionContext">—</div>
                     </div>
                 </div>
 
@@ -160,16 +164,16 @@
                     <div class="chart-legend" id="legendPreco"></div>
                 </div>
 
-                <!-- Gráfico de RSI -->
-                <div class="chart-container">
-                    <h2>📊 RSI (Momentum)</h2>
-                    <div id="chartRsi" class="tv-chart tv-chart-sub"></div>
-                </div>
-
-                <!-- Gráfico de ATR -->
-                <div class="chart-container">
-                    <h2>⚡ ATR (Volatilidade)</h2>
-                    <div id="chartAtr" class="tv-chart tv-chart-sub"></div>
+                <!-- RSI e ATR lado a lado -->
+                <div class="sub-row">
+                    <div class="chart-container">
+                        <h2>📊 RSI (Momentum)</h2>
+                        <div id="chartRsi" class="tv-chart tv-chart-sub"></div>
+                    </div>
+                    <div class="chart-container">
+                        <h2>⚡ ATR (Volatilidade)</h2>
+                        <div id="chartAtr" class="tv-chart tv-chart-sub"></div>
+                    </div>
                 </div>
 
                 <!-- Avisos de Entrada com Expiração -->
@@ -218,6 +222,15 @@
                                 <tbody id="scoreTableBody"></tbody>
                             </table>
                         </div>
+                    </div>
+                </div>
+
+                <!-- Widget OFICIAL do TradingView (gráfico real, para conferência) -->
+                <div class="chart-container">
+                    <h2>📺 Gráfico oficial TradingView <span class="tv-sync-tag" id="tvSyncTag">—</span></h2>
+                    <div class="tv-widget-wrap">
+                        <div id="tvWidget"></div>
+                        <div id="tvWidgetMsg" class="tv-widget-msg">Carregando gráfico do TradingView… (requer internet)</div>
                     </div>
                 </div>
 

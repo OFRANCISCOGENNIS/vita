@@ -12,6 +12,22 @@ Abra **`Simulador_Standalone.html`** com duplo-clique — a interface e a lib de
 gráficos estão embutidas. Regenere-o com `node build_standalone.js` após editar
 os fontes.
 
+## 🧭 Painel de Decisão (assertividade)
+
+O topo da página é um **painel de decisão** que responde, na vela atual:
+**ENTRAR CALL ▲ / ENTRAR PUT ▼ / AGUARDAR** — com o porquê:
+
+- **Chips por fator**: para onde cada filtro aponta agora (▲ alta, ▼ baixa, ✓ ok,
+  — neutro, `off` desligado).
+- **Assertividade medida**: "score 3/5 acertou 38% em 16 operações · empate exige
+  53,5%" — o painel compara o histórico do score atual com o breakeven do payout;
+  se o score em vigor perde do breakeven, suba o mínimo de fatores.
+- **Notícia tem prioridade**: com o filtro de notícias ativo, o veredito vira
+  **AGUARDAR ⚠** dentro da janela de risco, independentemente da confluência.
+
+A interface usa tema escuro de trading com paleta validada para daltonismo e
+contraste (tokens em `styles.css`).
+
 ## 🎯 Confluência (modos e pontuação)
 
 A confluência ganhou dois modos, no grupo **Confluência** do painel:

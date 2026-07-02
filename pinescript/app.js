@@ -227,7 +227,19 @@ function recomputarSinais() {
             barras = 0;
         }
 
-        if (i === closes.length - 1) confLive = { long: longScore, short: shortScore, enabled: enabledCount };
+        if (i === closes.length - 1) {
+            confLive = {
+                long: longScore, short: shortScore, enabled: enabledCount,
+                minScore, confMode,
+                fatores: [
+                    { nome: 'Tendência', on: useTendencia, dir: tL ? 1 : tS ? -1 : 0 },
+                    { nome: 'EMA 200', on: useEma200, dir: maL ? 1 : maS ? -1 : 0 },
+                    { nome: 'RSI', on: useMomentum, dir: moL ? 1 : moS ? -1 : 0 },
+                    { nome: 'ATR', on: useVolatilidade, dir: vo ? 2 : 0 },   // 2 = ok (não direcional)
+                    { nome: 'Estrutura', on: useEstrutura, dir: eL ? 1 : eS ? -1 : 0 }
+                ]
+            };
+        }
     }
 }
 
@@ -269,11 +281,12 @@ function fmtHora(sec) {
 // ============================================================================
 
 function opcoesBase() {
+    // Tema escuro (tokens validados): superfície #1a1a19, grid #2c2c2a, tinta #c3c2b7
     return {
-        layout: { background: { color: '#ffffff' }, textColor: '#2c3e50' },
-        grid: { vertLines: { color: '#eef2f5' }, horzLines: { color: '#eef2f5' } },
-        rightPriceScale: { borderColor: '#d5dbdf' },
-        timeScale: { borderColor: '#d5dbdf', timeVisible: true, secondsVisible: false },
+        layout: { background: { color: '#1a1a19' }, textColor: '#c3c2b7' },
+        grid: { vertLines: { color: '#2c2c2a' }, horzLines: { color: '#2c2c2a' } },
+        rightPriceScale: { borderColor: '#383835' },
+        timeScale: { borderColor: '#383835', timeVisible: true, secondsVisible: false },
         crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
         localization: { timeFormatter: t => fmtHora(t) }
     };
@@ -282,32 +295,33 @@ function opcoesBase() {
 function montarGraficos() {
     if (graficosMontados) return;
 
-    chartPreco = LightweightCharts.createChart(document.getElementById('chartPreco'), { ...opcoesBase(), height: 340 });
+    chartPreco = LightweightCharts.createChart(document.getElementById('chartPreco'), { ...opcoesBase(), height: 360 });
     serieVelas = chartPreco.addCandlestickSeries({
         upColor: '#26a69a', downColor: '#ef5350', borderUpColor: '#26a69a',
         borderDownColor: '#ef5350', wickUpColor: '#26a69a', wickDownColor: '#ef5350'
     });
-    serieEma9 = chartPreco.addLineSeries({ color: '#3498db', lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
-    serieEma21 = chartPreco.addLineSeries({ color: '#f39c12', lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
-    serieEma200 = chartPreco.addLineSeries({ color: '#9b59b6', lineWidth: 2, priceLineVisible: false, lastValueVisible: false });
+    // Séries EMA — paleta escura validada (dataviz): azul, amarelo, violeta
+    serieEma9 = chartPreco.addLineSeries({ color: '#3987e5', lineWidth: 2, priceLineVisible: false, lastValueVisible: false });
+    serieEma21 = chartPreco.addLineSeries({ color: '#c98500', lineWidth: 2, priceLineVisible: false, lastValueVisible: false });
+    serieEma200 = chartPreco.addLineSeries({ color: '#9085e9', lineWidth: 2, priceLineVisible: false, lastValueVisible: false });
 
-    chartRsi = LightweightCharts.createChart(document.getElementById('chartRsi'), { ...opcoesBase(), height: 180 });
-    serieRsi = chartRsi.addLineSeries({ color: '#e74c3c', lineWidth: 2, priceLineVisible: false });
+    chartRsi = LightweightCharts.createChart(document.getElementById('chartRsi'), { ...opcoesBase(), height: 190 });
+    serieRsi = chartRsi.addLineSeries({ color: '#e66767', lineWidth: 2, priceLineVisible: false });
     const sobrec = parseInt(document.getElementById('rsiSobrecompra').value);
     const sobrev = parseInt(document.getElementById('rsiSobrevenda').value);
-    serieRsi.createPriceLine({ price: sobrec, color: 'rgba(0,0,0,0.25)', lineStyle: LightweightCharts.LineStyle.Dashed, lineWidth: 1, axisLabelVisible: true, title: String(sobrec) });
-    serieRsi.createPriceLine({ price: sobrev, color: 'rgba(0,0,0,0.25)', lineStyle: LightweightCharts.LineStyle.Dashed, lineWidth: 1, axisLabelVisible: true, title: String(sobrev) });
+    serieRsi.createPriceLine({ price: sobrec, color: 'rgba(255,255,255,0.25)', lineStyle: LightweightCharts.LineStyle.Dashed, lineWidth: 1, axisLabelVisible: true, title: String(sobrec) });
+    serieRsi.createPriceLine({ price: sobrev, color: 'rgba(255,255,255,0.25)', lineStyle: LightweightCharts.LineStyle.Dashed, lineWidth: 1, axisLabelVisible: true, title: String(sobrev) });
 
-    chartAtr = LightweightCharts.createChart(document.getElementById('chartAtr'), { ...opcoesBase(), height: 180 });
-    serieAtr = chartAtr.addLineSeries({ color: '#27ae60', lineWidth: 2, priceLineVisible: false });
-    serieAtrMedia = chartAtr.addLineSeries({ color: '#16a085', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed, priceLineVisible: false, lastValueVisible: false });
+    chartAtr = LightweightCharts.createChart(document.getElementById('chartAtr'), { ...opcoesBase(), height: 190 });
+    serieAtr = chartAtr.addLineSeries({ color: '#199e70', lineWidth: 2, priceLineVisible: false });
+    serieAtrMedia = chartAtr.addLineSeries({ color: '#86b6ef', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed, priceLineVisible: false, lastValueVisible: false });
 
     // Curva de capital (baseline em 0: verde acima, vermelho abaixo)
     chartEquity = LightweightCharts.createChart(document.getElementById('chartEquity'), { ...opcoesBase(), height: 200 });
     serieEquity = chartEquity.addBaselineSeries({
         baseValue: { type: 'price', price: 0 },
-        topLineColor: '#27ae60', topFillColor1: 'rgba(39,174,96,0.28)', topFillColor2: 'rgba(39,174,96,0.05)',
-        bottomLineColor: '#e74c3c', bottomFillColor1: 'rgba(231,76,60,0.05)', bottomFillColor2: 'rgba(231,76,60,0.28)',
+        topLineColor: '#0ca30c', topFillColor1: 'rgba(12,163,12,0.28)', topFillColor2: 'rgba(12,163,12,0.05)',
+        bottomLineColor: '#d03b3b', bottomFillColor1: 'rgba(208,59,59,0.05)', bottomFillColor2: 'rgba(208,59,59,0.28)',
         priceLineVisible: false
     });
 
@@ -499,6 +513,79 @@ function atualizarPaineis() {
     // Métricas de análise (backtest) sobre as entradas não bloqueadas
     calcularMetricas(validas);
 
+    // Painel de Decisão (depende de confLive + byScoreGlobal recém-calculados)
+    atualizarDecisao();
+}
+
+// ============================================================================
+// PAINEL DE DECISÃO — o veredito de assertividade da vela atual
+// ============================================================================
+
+function atualizarDecisao() {
+    const v = document.getElementById('decisionVerdict');
+    const r = document.getElementById('decisionReason');
+    const chips = document.getElementById('decisionChips');
+    const ctx = document.getElementById('decisionContext');
+    const painel = document.querySelector('.decision-panel');
+    if (!v || !confLive.fatores) return;
+
+    // Chips: para onde cada fator aponta AGORA (▲ CALL, ▼ PUT, ✓ ok, — neutro)
+    chips.innerHTML = confLive.fatores.map(f => {
+        let dirHtml;
+        if (!f.on) dirHtml = '<span class="chip-dir-none">off</span>';
+        else if (f.dir === 1) dirHtml = '<span class="chip-dir-up">▲</span>';
+        else if (f.dir === -1) dirHtml = '<span class="chip-dir-down">▼</span>';
+        else if (f.dir === 2) dirHtml = '<span class="chip-dir-up">✓</span>';
+        else dirHtml = '<span class="chip-dir-none">—</span>';
+        return `<span class="decision-chip${f.on ? '' : ' chip-off'}">${f.nome} ${dirHtml}</span>`;
+    }).join('');
+
+    const { long, short, enabled, minScore, confMode } = confLive;
+    const alvo = confMode === 'estrita' ? enabled : Math.min(minScore, enabled);
+
+    // Risco de notícia tem prioridade sobre qualquer confluência
+    const newsOn = document.getElementById('useNewsFilter').checked;
+    const newsJan = parseInt(document.getElementById('newsJanela').value);
+    const lastT = dados.length ? dados[dados.length - 1].time : 0;
+    const riscoNoticia = newsOn && lastT && noticiaProxima(lastT, newsJan);
+
+    let cor;
+    if (riscoNoticia) {
+        v.textContent = 'AGUARDAR ⚠';
+        v.className = 'decision-verdict verdict-news';
+        r.textContent = `Notícia recente sobre ${baseAsset()} — dentro da janela de risco de ${newsJan} min. Não entrar agora.`;
+        cor = 'var(--warning)';
+    } else if (enabled > 0 && long >= alvo && long > short) {
+        v.textContent = 'ENTRAR CALL ▲';
+        v.className = 'decision-verdict verdict-call';
+        r.textContent = `Confluência de alta ${long}/${enabled} — atingiu o mínimo de ${alvo} fatores.`;
+        cor = 'var(--call)';
+    } else if (enabled > 0 && short >= alvo && short > long) {
+        v.textContent = 'ENTRAR PUT ▼';
+        v.className = 'decision-verdict verdict-put';
+        r.textContent = `Confluência de baixa ${short}/${enabled} — atingiu o mínimo de ${alvo} fatores.`;
+        cor = 'var(--put)';
+    } else {
+        v.textContent = 'AGUARDAR';
+        v.className = 'decision-verdict verdict-wait';
+        r.textContent = `Confluência insuficiente: CALL ${long}/${enabled} · PUT ${short}/${enabled} — mínimo ${alvo}. Espere o alinhamento.`;
+        cor = 'var(--ink-muted)';
+    }
+    if (painel) painel.style.borderLeftColor = cor;
+
+    // Contexto histórico: o score atual costuma acertar quanto? (assertividade medida)
+    const scoreAtivo = Math.max(long, short);
+    const key = scoreAtivo + '/' + enabled;
+    if (byScoreGlobal && byScoreGlobal.scores[key]) {
+        const o = byScoreGlobal.scores[key];
+        const wrK = (o.w / o.t * 100).toFixed(0);
+        ctx.innerHTML = `Histórico neste gráfico: score <strong>${key}</strong> acertou <strong>${wrK}%</strong> em ${o.t} operações · empate exige <strong>${byScoreGlobal.beWR.toFixed(1)}%</strong> (payout atual).`;
+    } else if (byScoreGlobal) {
+        ctx.innerHTML = `Sem histórico avaliado para o score <strong>${key}</strong> neste gráfico ainda · empate exige <strong>${byScoreGlobal.beWR.toFixed(1)}%</strong>.`;
+    } else {
+        ctx.textContent = 'Aguardando operações avaliadas para medir a assertividade por score.';
+    }
+
     const hint = document.getElementById('entryHint');
     if (entradas.length === 0) {
         const poucas = dados.length < 200 && document.getElementById('useEma200').checked;
@@ -515,6 +602,7 @@ function atualizarPaineis() {
 
 let entradasValidas = [];   // entradas não bloqueadas por notícia (para exportar)
 let metricasAtuais = null;  // resumo das métricas atuais (para exportar)
+let byScoreGlobal = null;   // win rate por score (para o Painel de Decisão)
 
 function calcularMetricas(validas) {
     entradasValidas = validas;
@@ -527,6 +615,7 @@ function calcularMetricas(validas) {
         grid.innerHTML = '<div class="metric-empty">Sem operações avaliadas ainda — aguardando a expiração das entradas.</div>';
         scoreBody.innerHTML = '';
         metricasAtuais = null;
+        byScoreGlobal = null;
         if (serieEquity) serieEquity.setData([]);
         return;
     }
@@ -577,6 +666,7 @@ function calcularMetricas(validas) {
         (byScore[k] = byScore[k] || { t: 0, w: 0 });
         byScore[k].t++; if (e.resultado === 'WIN') byScore[k].w++;
     });
+    byScoreGlobal = { scores: byScore, beWR };
     scoreBody.innerHTML = Object.keys(byScore).sort().reverse().map(k => {
         const o = byScore[k], r = o.w / o.t * 100;
         return `<tr><td>${k}</td><td>${o.t}</td><td>${o.w}</td><td class="${r >= beWR ? 'res-win' : 'res-loss'}">${r.toFixed(0)}%</td></tr>`;
@@ -817,7 +907,7 @@ function montarWidgetTV(tentativa) {
             symbol: tvSymbolTV(),
             interval: tvIntervalTV(),
             timezone: 'Etc/UTC',
-            theme: 'light',
+            theme: 'dark',
             style: '1',
             locale: 'br',
             hide_side_toolbar: false,

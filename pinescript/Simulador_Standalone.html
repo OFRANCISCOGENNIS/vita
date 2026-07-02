@@ -18,7 +18,9 @@
     <script src="https://s3.tradingview.com/tv.js" async></script>
     <style>
 /* ============================================================================
-   SIMULADOR CONFLUÊNCIA — ESTILOS
+   SIMULADOR CONFLUÊNCIA — TEMA ESCURO DE TRADING
+   Tokens de cor validados (dataviz): superfície #1a1a19, página #0d0d0d,
+   séries #3987e5/#c98500/#9085e9, status #0ca30c/#fab219/#d03b3b.
    ============================================================================ */
 
 * {
@@ -28,23 +30,40 @@
 }
 
 :root {
-    --color-primary: #2c3e50;
-    --color-secondary: #34495e;
-    --color-accent: #3498db;
-    --color-success: #27ae60;
-    --color-danger: #e74c3c;
-    --color-warning: #f39c12;
-    --color-light: #ecf0f1;
-    --color-dark: #1c2833;
+    /* Superfícies e tinta */
+    --page: #0d0d0d;
+    --surface: #1a1a19;
+    --surface-2: #232322;
+    --ink: #ffffff;
+    --ink-2: #c3c2b7;
+    --ink-muted: #898781;
+    --hairline: rgba(255, 255, 255, 0.10);
+    --grid: #2c2c2a;
+
+    /* Acento e séries */
+    --accent: #3987e5;
+    --serie-ema-r: #3987e5;
+    --serie-ema-l: #c98500;
+    --serie-ema-200: #9085e9;
+
+    /* Status (reservados) */
+    --good: #0ca30c;
+    --warning: #fab219;
+    --critical: #d03b3b;
+
+    /* Direções de trade (padrão candles TV) */
+    --call: #26a69a;
+    --put: #ef5350;
+
+    --radius: 10px;
     --spacing: 16px;
-    --border-radius: 8px;
-    --transition: all 0.3s ease;
+    --transition: all 0.25s ease;
 }
 
 body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
-    color: #333;
+    font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+    background: var(--page);
+    color: var(--ink-2);
     line-height: 1.6;
 }
 
@@ -55,31 +74,30 @@ body {
 }
 
 /* ============================================================================
-   HEADER
+   HEADER (compacto — a decisão é o herói, não o título)
    ============================================================================ */
 
 .header {
-    background: linear-gradient(90deg, #1c2833 0%, #2c3e50 100%);
-    color: white;
-    padding: 30px var(--spacing);
+    background: var(--surface);
+    color: var(--ink);
+    padding: 16px var(--spacing);
     text-align: center;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
-    border-bottom: 4px solid var(--color-accent);
+    border-bottom: 1px solid var(--hairline);
 }
 
 .header h1 {
-    font-size: 28px;
-    margin-bottom: 8px;
+    font-size: 19px;
+    font-weight: 700;
+    margin-bottom: 2px;
 }
 
 .header .subtitle {
-    font-size: 14px;
-    opacity: 0.9;
-    color: #bdc3c7;
+    font-size: 12px;
+    color: var(--ink-muted);
 }
 
 /* ============================================================================
-   MAIN CONTENT (Layout com Sidebar)
+   LAYOUT
    ============================================================================ */
 
 .main-content {
@@ -92,44 +110,41 @@ body {
     width: 100%;
 }
 
-/* ============================================================================
-   SIDEBAR
-   ============================================================================ */
-
 .sidebar {
     width: 280px;
-    background: white;
-    border-radius: var(--border-radius);
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    border-radius: var(--radius);
     padding: var(--spacing);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     height: fit-content;
     position: sticky;
     top: var(--spacing);
     overflow-y: auto;
-    max-height: calc(100vh - 250px);
+    max-height: calc(100vh - 40px);
+    flex-shrink: 0;
 }
 
 .sidebar h2 {
-    font-size: 18px;
-    margin-bottom: 20px;
-    color: var(--color-primary);
-    border-bottom: 2px solid var(--color-accent);
-    padding-bottom: 10px;
+    font-size: 15px;
+    margin-bottom: 16px;
+    color: var(--ink);
+    border-bottom: 2px solid var(--accent);
+    padding-bottom: 8px;
 }
 
 .control-group {
-    margin-bottom: 20px;
-    padding-bottom: 15px;
-    border-bottom: 1px solid #ddd;
+    margin-bottom: 18px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--hairline);
 }
 
 .control-group h3 {
-    font-size: 14px;
-    font-weight: 600;
-    color: var(--color-secondary);
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--ink-muted);
     margin-bottom: 10px;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.8px;
 }
 
 .control-group label {
@@ -137,31 +152,66 @@ body {
     align-items: center;
     gap: 8px;
     margin-bottom: 8px;
-    font-size: 13px;
+    font-size: 12.5px;
+    color: var(--ink-2);
     cursor: pointer;
     flex-wrap: wrap;
 }
 
 .control-group input[type="checkbox"] {
-    width: 16px;
-    height: 16px;
+    width: 15px;
+    height: 15px;
     cursor: pointer;
-    accent-color: var(--color-accent);
+    accent-color: var(--accent);
 }
 
 .control-group input[type="number"] {
     padding: 6px 8px;
-    border: 1px solid #bdc3c7;
-    border-radius: 4px;
+    background: var(--surface-2);
+    border: 1px solid var(--hairline);
+    border-radius: 5px;
     font-size: 12px;
-    width: 60px;
+    width: 62px;
+    color: var(--ink);
     transition: var(--transition);
 }
 
 .control-group input[type="number"]:focus {
     outline: none;
-    border-color: var(--color-accent);
-    box-shadow: 0 0 4px rgba(52, 152, 219, 0.3);
+    border-color: var(--accent);
+}
+
+.control-group select {
+    padding: 7px 8px;
+    background: var(--surface-2);
+    border: 1px solid var(--hairline);
+    border-radius: 5px;
+    font-size: 12px;
+    width: 100%;
+    cursor: pointer;
+    color: var(--ink);
+}
+
+.control-group select:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+#symbol {
+    width: 100%;
+    padding: 7px 8px;
+    background: var(--surface-2);
+    border: 1px solid var(--hairline);
+    border-radius: 5px;
+    font-size: 13px;
+    text-transform: uppercase;
+    font-weight: 700;
+    color: var(--ink);
+}
+
+#symbol:focus {
+    outline: none;
+    border-color: var(--accent);
 }
 
 /* ============================================================================
@@ -169,30 +219,41 @@ body {
    ============================================================================ */
 
 .btn-primary {
-    background: var(--color-accent);
-    color: white;
+    background: var(--accent);
+    color: #fff;
     border: none;
     padding: 10px 16px;
-    border-radius: 4px;
+    border-radius: 6px;
     font-size: 13px;
-    font-weight: 600;
+    font-weight: 700;
     cursor: pointer;
     transition: var(--transition);
     width: 100%;
 }
 
 .btn-primary:hover {
-    background: #2980b9;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    background: #2a78d6;
 }
 
-.btn-primary:active {
-    transform: translateY(0);
+.btn-mini {
+    background: var(--surface-2);
+    color: var(--ink);
+    border: 1px solid var(--hairline);
+    padding: 5px 12px;
+    border-radius: 5px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.btn-mini:hover {
+    border-color: var(--accent);
+    color: var(--accent);
 }
 
 /* ============================================================================
-   CHARTS AREA
+   CARDS / GRÁFICOS
    ============================================================================ */
 
 .charts-area {
@@ -200,83 +261,36 @@ body {
     display: flex;
     flex-direction: column;
     gap: var(--spacing);
+    min-width: 0;
 }
 
 .chart-container {
-    background: white;
-    border-radius: var(--border-radius);
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    border-radius: var(--radius);
     padding: var(--spacing);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .chart-container h2 {
-    font-size: 16px;
-    margin-bottom: 15px;
-    color: var(--color-primary);
-    border-bottom: 2px solid var(--color-light);
-    padding-bottom: 10px;
-}
-
-.chart-container canvas {
-    max-height: 300px;
-}
-
-/* ============================================================================
-   WIDGET OFICIAL DO TRADINGVIEW
-   ============================================================================ */
-
-.tv-widget-wrap {
-    position: relative;
-    height: 520px;
-    width: 100%;
-}
-
-#tvWidget {
-    height: 100%;
-    width: 100%;
-}
-
-.tv-widget-msg {
-    position: absolute;
-    inset: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    padding: 20px;
-    color: var(--color-secondary);
     font-size: 14px;
-    background: #f8f9fa;
-    border: 1px dashed #cfd6db;
-    border-radius: 6px;
-}
-
-.tv-sync-tag {
-    font-size: 12px;
+    margin-bottom: 12px;
+    color: var(--ink);
     font-weight: 700;
-    color: #fff;
-    background: var(--color-accent);
-    padding: 2px 8px;
-    border-radius: 10px;
-    vertical-align: middle;
 }
 
-/* ============================================================================
-   GRÁFICOS TRADINGVIEW (Lightweight Charts)
-   ============================================================================ */
+.sub-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--spacing);
+}
 
 .tv-chart {
     width: 100%;
     position: relative;
 }
 
-.tv-chart-main {
-    height: 340px;
-}
-
-.tv-chart-sub {
-    height: 180px;
-}
+.tv-chart-main { height: 360px; }
+.tv-chart-sub { height: 190px; }
 
 .chart-legend {
     display: flex;
@@ -285,135 +299,116 @@ body {
     margin-top: 10px;
     font-size: 12px;
     font-weight: 600;
+    color: var(--ink-2);
 }
 
-.chart-legend .lg-close { color: #2c3e50; }
-.chart-legend .lg-ema9 { color: #3498db; }
-.chart-legend .lg-ema21 { color: #f39c12; }
-.chart-legend .lg-ema200 { color: #9b59b6; }
+/* Identidade das séries: marcador colorido ao lado, texto em tinta normal */
+.chart-legend .lg::before {
+    content: '';
+    display: inline-block;
+    width: 10px;
+    height: 3px;
+    border-radius: 2px;
+    margin-right: 6px;
+    vertical-align: middle;
+    background: var(--ink-muted);
+}
+.chart-legend .lg-close::before { background: var(--ink); }
+.chart-legend .lg-ema9::before { background: var(--serie-ema-r); }
+.chart-legend .lg-ema21::before { background: var(--serie-ema-l); }
+.chart-legend .lg-ema200::before { background: var(--serie-ema-200); }
 
 /* ============================================================================
-   TABELA DE AVISOS DE ENTRADA
+   PAINEL DE DECISÃO (o herói da assertividade)
    ============================================================================ */
 
-.entry-summary {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 16px;
-    margin-bottom: 14px;
-    font-size: 13px;
-}
-
-.entry-summary .sum-item strong { font-size: 15px; }
-.entry-summary .sum-win strong { color: var(--color-success); }
-.entry-summary .sum-loss strong { color: var(--color-danger); }
-.entry-summary .sum-pend strong { color: #95a5a6; }
-.entry-summary .sum-rate strong { color: var(--color-accent); }
-
-.entry-table-wrap {
-    max-height: 340px;
-    overflow-y: auto;
-    border: 1px solid #e1e6ea;
-    border-radius: 6px;
-}
-
-.entry-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 12px;
-}
-
-.entry-table thead th {
-    position: sticky;
-    top: 0;
-    background: var(--color-primary);
-    color: #fff;
-    padding: 8px 10px;
-    text-align: left;
-    font-weight: 600;
-    z-index: 1;
-}
-
-.entry-table tbody td {
-    padding: 7px 10px;
-    border-bottom: 1px solid #eef2f5;
-}
-
-.entry-table tbody tr:hover { background: #f5f8fa; }
-
-.entry-table .dir-call { color: var(--color-success); font-weight: 700; }
-.entry-table .dir-put { color: var(--color-danger); font-weight: 700; }
-.entry-table .res-win { color: var(--color-success); font-weight: 700; }
-.entry-table .res-loss { color: var(--color-danger); font-weight: 700; }
-.entry-table .res-pend { color: #95a5a6; }
-
-/* ============================================================================
-   MÉTRICAS DE ANÁLISE (backtest)
-   ============================================================================ */
-
-.metrics-toolbar {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    flex-wrap: wrap;
-    margin-bottom: 14px;
-}
-.metrics-toolbar label { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; }
-.metrics-toolbar input {
-    width: 70px; padding: 6px 8px; border: 1px solid #bdc3c7; border-radius: 4px; font-size: 13px;
-}
-.metrics-hint { font-size: 12px; color: #95a5a6; }
-
-.metrics-grid {
+.decision-panel {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-    gap: 10px;
-    margin-bottom: 18px;
+    grid-template-columns: auto 1fr;
+    gap: 24px;
+    align-items: center;
+    border-left: 4px solid var(--ink-muted);
 }
-.metric-card {
+
+.decision-main {
     display: flex;
     flex-direction: column;
+    gap: 2px;
+    min-width: 240px;
+}
+
+.decision-label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--ink-muted);
+}
+
+.decision-verdict {
+    font-size: 34px;
+    font-weight: 800;
+    line-height: 1.15;
+    color: var(--ink);
+}
+
+.decision-verdict.verdict-call { color: var(--call); }
+.decision-verdict.verdict-put { color: var(--put); }
+.decision-verdict.verdict-wait { color: var(--ink-muted); }
+.decision-verdict.verdict-news { color: var(--warning); }
+
+.decision-reason {
+    font-size: 12.5px;
+    color: var(--ink-2);
+}
+
+.decision-side {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 0;
+}
+
+.decision-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.decision-chip {
+    display: inline-flex;
     align-items: center;
-    justify-content: center;
-    padding: 12px 8px;
-    background: #f8f9fa;
-    border: 1px solid #e1e6ea;
-    border-radius: 6px;
-    text-align: center;
+    gap: 6px;
+    padding: 5px 10px;
+    background: var(--surface-2);
+    border: 1px solid var(--hairline);
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ink-2);
 }
-.metric-val { font-size: 20px; font-weight: 800; color: var(--color-primary); line-height: 1.2; }
-.metric-val.good { color: var(--color-success); }
-.metric-val.bad { color: var(--color-danger); }
-.metric-lbl { font-size: 11px; color: var(--color-secondary); margin-top: 4px; }
-.metric-empty { padding: 16px; color: #95a5a6; font-size: 13px; text-align: center; grid-column: 1 / -1; }
 
-.metrics-cols {
-    display: grid;
-    grid-template-columns: 1.4fr 1fr;
-    gap: 18px;
-}
-.metrics-cols h3 { font-size: 13px; color: var(--color-secondary); margin-bottom: 10px; text-transform: uppercase; }
+.decision-chip .chip-dir-up { color: var(--call); font-weight: 800; }
+.decision-chip .chip-dir-down { color: var(--put); font-weight: 800; }
+.decision-chip .chip-dir-none { color: var(--ink-muted); }
+.decision-chip.chip-off { opacity: 0.45; }
 
-.score-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-.score-table thead th {
-    background: var(--color-primary); color: #fff; padding: 7px 10px; text-align: left; font-weight: 600;
+.decision-context {
+    font-size: 12px;
+    color: var(--ink-muted);
 }
-.score-table tbody td { padding: 7px 10px; border-bottom: 1px solid #eef2f5; }
-.score-table tbody tr:hover { background: #f5f8fa; }
 
-@media (max-width: 900px) {
-    .metrics-cols { grid-template-columns: 1fr; }
-}
+.decision-context strong { color: var(--ink-2); }
 
 /* ============================================================================
-   MEDIDOR DE CONFLUÊNCIA (ao vivo)
+   MEDIDOR DE CONFLUÊNCIA
    ============================================================================ */
 
 .conf-meter {
     margin: 14px 0 6px;
     padding: 12px;
-    background: #f8f9fa;
-    border-radius: 6px;
+    background: var(--surface-2);
+    border-radius: 8px;
 }
 
 .conf-meter-row {
@@ -431,25 +426,25 @@ body {
     width: 120px;
     flex-shrink: 0;
 }
-.conf-lbl-call { color: var(--color-success); }
-.conf-lbl-put { color: var(--color-danger); }
+.conf-lbl-call { color: var(--call); }
+.conf-lbl-put { color: var(--put); }
 
 .conf-bar {
     flex: 1;
-    height: 12px;
-    background: #e1e6ea;
-    border-radius: 6px;
+    height: 10px;
+    background: var(--grid);
+    border-radius: 5px;
     overflow: hidden;
 }
 
 .conf-bar-fill {
     height: 100%;
     width: 0%;
-    border-radius: 6px;
+    border-radius: 5px;
     transition: width 0.4s ease;
 }
-.conf-fill-call { background: linear-gradient(90deg, #7bd3a0, #27ae60); }
-.conf-fill-put { background: linear-gradient(90deg, #f0a3a0, #e74c3c); }
+.conf-fill-call { background: var(--call); }
+.conf-fill-put { background: var(--put); }
 
 .conf-score {
     font-size: 12px;
@@ -457,34 +452,198 @@ body {
     width: 34px;
     text-align: right;
     flex-shrink: 0;
-    color: var(--color-secondary);
+    color: var(--ink-2);
+    font-variant-numeric: tabular-nums;
 }
+
+/* ============================================================================
+   TABELA DE ENTRADAS
+   ============================================================================ */
+
+.entry-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-bottom: 14px;
+    font-size: 13px;
+    color: var(--ink-2);
+}
+
+.entry-summary .sum-item strong { font-size: 15px; color: var(--ink); }
+.entry-summary .sum-win strong { color: var(--good); }
+.entry-summary .sum-loss strong { color: var(--critical); }
+.entry-summary .sum-pend strong { color: var(--ink-muted); }
+.entry-summary .sum-block strong { color: var(--warning); }
+.entry-summary .sum-rate strong { color: var(--accent); }
+
+.entry-table-wrap {
+    max-height: 340px;
+    overflow-y: auto;
+    border: 1px solid var(--hairline);
+    border-radius: 8px;
+}
+
+.entry-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+}
+
+.entry-table thead th {
+    position: sticky;
+    top: 0;
+    background: var(--surface-2);
+    color: var(--ink);
+    padding: 8px 10px;
+    text-align: left;
+    font-weight: 700;
+    z-index: 1;
+    border-bottom: 1px solid var(--hairline);
+}
+
+.entry-table tbody td {
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--grid);
+    color: var(--ink-2);
+    font-variant-numeric: tabular-nums;
+}
+
+.entry-table tbody tr:hover { background: var(--surface-2); }
+
+.entry-table .dir-call { color: var(--call); font-weight: 700; }
+.entry-table .dir-put { color: var(--put); font-weight: 700; }
+.entry-table .res-win { color: var(--good); font-weight: 700; }
+.entry-table .res-loss { color: var(--critical); font-weight: 700; }
+.entry-table .res-pend { color: var(--ink-muted); }
+.entry-table .res-block { color: var(--warning); font-weight: 700; }
+.entry-table tr.row-blocked { opacity: 0.55; }
 
 .entry-table .cell-fatores {
     font-size: 11px;
-    color: var(--color-secondary);
-    font-family: 'Consolas', 'Courier New', monospace;
+    color: var(--ink-muted);
+    font-family: ui-monospace, 'Cascadia Mono', 'Consolas', monospace;
 }
-.entry-table .cell-fatores b { color: var(--color-primary); }
+.entry-table .cell-fatores b { color: var(--ink-2); }
 
-/* Banner de risco de notícia + entradas bloqueadas */
+/* ============================================================================
+   MÉTRICAS DE ANÁLISE
+   ============================================================================ */
+
+.metrics-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+}
+.metrics-toolbar label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink-2);
+}
+.metrics-toolbar input {
+    width: 70px;
+    padding: 6px 8px;
+    background: var(--surface-2);
+    border: 1px solid var(--hairline);
+    border-radius: 5px;
+    font-size: 13px;
+    color: var(--ink);
+}
+.metrics-hint { font-size: 12px; color: var(--ink-muted); }
+
+.metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 10px;
+    margin-bottom: 18px;
+}
+
+.metric-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 12px 8px;
+    background: var(--surface-2);
+    border: 1px solid var(--hairline);
+    border-radius: 8px;
+    text-align: center;
+}
+
+.metric-val {
+    font-size: 20px;
+    font-weight: 800;
+    color: var(--ink);
+    line-height: 1.2;
+}
+.metric-val.good { color: var(--good); }
+.metric-val.bad { color: var(--critical); }
+.metric-lbl { font-size: 11px; color: var(--ink-muted); margin-top: 4px; }
+.metric-empty { padding: 16px; color: var(--ink-muted); font-size: 13px; text-align: center; grid-column: 1 / -1; }
+
+.metrics-cols {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: 18px;
+}
+.metrics-cols h3 {
+    font-size: 11px;
+    color: var(--ink-muted);
+    margin-bottom: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+}
+
+.score-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.score-table thead th {
+    background: var(--surface-2);
+    color: var(--ink);
+    padding: 7px 10px;
+    text-align: left;
+    font-weight: 700;
+    border-bottom: 1px solid var(--hairline);
+}
+.score-table tbody td {
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--grid);
+    color: var(--ink-2);
+    font-variant-numeric: tabular-nums;
+}
+.score-table .res-win { color: var(--good); font-weight: 700; }
+.score-table .res-loss { color: var(--critical); font-weight: 700; }
+
+/* ============================================================================
+   BANNER DE NOTÍCIA / AVISOS
+   ============================================================================ */
+
 .news-risk-banner {
     display: none;
     padding: 10px 14px;
     margin-bottom: 12px;
-    background: rgba(231, 76, 60, 0.12);
-    border-left: 4px solid var(--color-danger);
-    border-radius: 4px;
+    background: rgba(250, 178, 25, 0.10);
+    border-left: 4px solid var(--warning);
+    border-radius: 6px;
     font-size: 13px;
-    color: #922b21;
+    color: var(--warning);
 }
 
-.entry-table tr.row-blocked { background: rgba(231, 76, 60, 0.06); opacity: 0.75; }
-.entry-table .res-block { color: var(--color-danger); font-weight: 700; }
-.entry-summary .sum-block strong { color: var(--color-danger); }
+.signal-hint {
+    margin: 12px 0 0;
+    padding: 10px 12px;
+    background: rgba(250, 178, 25, 0.08);
+    border-left: 3px solid var(--warning);
+    border-radius: 5px;
+    font-size: 12px;
+    color: var(--ink-2);
+    display: none;
+}
 
 /* ============================================================================
-   NOTÍCIAS EM TEMPO REAL
+   NOTÍCIAS
    ============================================================================ */
 
 .news-toolbar {
@@ -500,33 +659,18 @@ body {
     align-items: center;
     gap: 6px;
     font-size: 13px;
+    color: var(--ink-2);
     cursor: pointer;
 }
+.news-filter input { accent-color: var(--accent); }
 
-.news-status {
-    font-size: 12px;
-    color: #95a5a6;
-    margin-left: auto;
-}
-
-.btn-mini {
-    background: var(--color-accent);
-    color: #fff;
-    border: none;
-    padding: 5px 12px;
-    border-radius: 4px;
-    font-size: 12px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: var(--transition);
-}
-.btn-mini:hover { background: #2980b9; }
+.news-status { font-size: 12px; color: var(--ink-muted); margin-left: auto; }
 
 .news-list {
-    max-height: 360px;
+    max-height: 320px;
     overflow-y: auto;
-    border: 1px solid #e1e6ea;
-    border-radius: 6px;
+    border: 1px solid var(--hairline);
+    border-radius: 8px;
 }
 
 .news-item {
@@ -535,34 +679,68 @@ body {
     gap: 10px;
     align-items: center;
     padding: 10px 12px;
-    border-bottom: 1px solid #eef2f5;
+    border-bottom: 1px solid var(--grid);
     text-decoration: none;
-    color: var(--color-primary);
+    color: var(--ink-2);
     transition: background 0.15s ease;
 }
 .news-item:last-child { border-bottom: none; }
-.news-item:hover { background: #f5f8fa; }
+.news-item:hover { background: var(--surface-2); }
 
-.news-time { font-size: 11px; color: #95a5a6; white-space: nowrap; }
-.news-title { font-size: 13px; line-height: 1.4; }
+.news-time { font-size: 11px; color: var(--ink-muted); white-space: nowrap; }
+.news-title { font-size: 13px; line-height: 1.4; color: var(--ink-2); }
 .news-src {
     font-size: 10px;
     font-weight: 700;
-    color: var(--color-accent);
+    color: var(--accent);
     text-transform: uppercase;
     white-space: nowrap;
 }
-
-.news-empty {
-    padding: 20px;
-    text-align: center;
-    color: #95a5a6;
-    font-size: 13px;
-}
+.news-empty { padding: 20px; text-align: center; color: var(--ink-muted); font-size: 13px; }
 
 /* ============================================================================
-   STATUS DE CONEXÃO (tempo real)
+   STATUS / CONEXÃO
    ============================================================================ */
+
+.status-container { background: var(--surface); }
+
+.status-panel { font-size: 14px; }
+
+.stat-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--grid);
+    color: var(--ink-2);
+}
+.stat-row:last-child { border-bottom: none; }
+.stat-row strong { color: var(--ink); font-weight: 700; font-size: 15px; }
+
+.filters-status { margin-top: 16px; padding-top: 12px; }
+.filters-status h3 {
+    font-size: 11px;
+    color: var(--ink-muted);
+    margin-bottom: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+}
+
+.filter-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 7px 0;
+    font-size: 12px;
+    border-bottom: 1px solid var(--grid);
+    color: var(--ink-2);
+}
+.filter-item:last-child { border-bottom: none; }
+
+.filter-status-icon { font-size: 15px; font-weight: 700; }
+.filter-status-ok { color: var(--good); }
+.filter-status-fail { color: var(--critical); }
+.filter-status-disabled { color: var(--ink-muted); }
 
 .conn-row {
     display: flex;
@@ -573,19 +751,18 @@ body {
 }
 
 .conn-dot {
-    width: 10px;
-    height: 10px;
+    width: 9px;
+    height: 9px;
     border-radius: 50%;
     display: inline-block;
     flex-shrink: 0;
 }
+.conn-dot.conn-on { background: var(--good); box-shadow: 0 0 6px var(--good); animation: pulse 1.4s infinite; }
+.conn-dot.conn-connecting { background: var(--warning); animation: pulse 1s infinite; }
+.conn-dot.conn-off { background: var(--ink-muted); }
+.conn-dot.conn-err { background: var(--critical); }
 
-.conn-dot.conn-on { background: #27ae60; box-shadow: 0 0 6px #27ae60; animation: pulse 1.4s infinite; }
-.conn-dot.conn-connecting { background: #f39c12; animation: pulse 1s infinite; }
-.conn-dot.conn-off { background: #95a5a6; }
-.conn-dot.conn-err { background: #e74c3c; }
-
-.conn-text { color: var(--color-secondary); font-weight: 600; }
+.conn-text { color: var(--ink-2); font-weight: 600; }
 
 @keyframes pulse {
     0% { opacity: 1; }
@@ -595,125 +772,51 @@ body {
 
 .live-badge {
     display: none;
-    font-size: 12px;
-    font-weight: 700;
+    font-size: 11px;
+    font-weight: 800;
     color: #fff;
-    background: #e74c3c;
+    background: var(--critical);
     padding: 2px 8px;
     border-radius: 10px;
     vertical-align: middle;
     animation: pulse 1.4s infinite;
 }
 
-/* Campo de par/moeda */
-#symbol {
-    width: 100%;
-    padding: 6px 8px;
-    border: 1px solid #bdc3c7;
-    border-radius: 4px;
-    font-size: 13px;
-    text-transform: uppercase;
-    font-weight: 600;
-}
-#symbol:focus { outline: none; border-color: var(--color-accent); }
-
-/* Selects da sidebar */
-.control-group select {
-    padding: 6px 8px;
-    border: 1px solid #bdc3c7;
-    border-radius: 4px;
-    font-size: 12px;
-    width: 100%;
-    cursor: pointer;
-    background: #fff;
-}
-
-.control-group select:focus {
-    outline: none;
-    border-color: var(--color-accent);
-}
-
 /* ============================================================================
-   STATUS PANEL
+   WIDGET TRADINGVIEW
    ============================================================================ */
 
-.status-container {
-    background: linear-gradient(135deg, #f8f9fa 0%, #ecf0f1 100%);
+.tv-widget-wrap {
+    position: relative;
+    height: 480px;
+    width: 100%;
 }
 
-.status-panel {
+#tvWidget { height: 100%; width: 100%; }
+
+.tv-widget-msg {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 20px;
+    color: var(--ink-muted);
     font-size: 14px;
+    background: var(--surface-2);
+    border: 1px dashed var(--hairline);
+    border-radius: 8px;
 }
 
-.stat-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 10px 0;
-    border-bottom: 1px solid #ddd;
-}
-
-.stat-row:last-child {
-    border-bottom: none;
-}
-
-.stat-row strong {
-    color: var(--color-accent);
+.tv-sync-tag {
+    font-size: 11px;
     font-weight: 700;
-    font-size: 16px;
-}
-
-.signal-hint {
-    margin: 12px 0;
-    padding: 10px 12px;
-    background: rgba(243, 156, 18, 0.12);
-    border-left: 3px solid var(--color-warning);
-    border-radius: 4px;
-    font-size: 12px;
-    color: #7d5a12;
-    display: none;
-}
-
-.filters-status {
-    margin-top: 20px;
-    padding-top: 15px;
-}
-
-.filters-status h3 {
-    font-size: 13px;
-    color: var(--color-secondary);
-    margin-bottom: 12px;
-    text-transform: uppercase;
-}
-
-.filter-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 8px 0;
-    font-size: 12px;
-    border-bottom: 1px solid #ddd;
-}
-
-.filter-item:last-child {
-    border-bottom: none;
-}
-
-.filter-status-icon {
-    font-size: 16px;
-    font-weight: 700;
-}
-
-.filter-status-ok {
-    color: var(--color-success);
-}
-
-.filter-status-fail {
-    color: var(--color-danger);
-}
-
-.filter-status-disabled {
-    color: #95a5a6;
+    color: #fff;
+    background: var(--accent);
+    padding: 2px 8px;
+    border-radius: 10px;
+    vertical-align: middle;
 }
 
 /* ============================================================================
@@ -721,110 +824,47 @@ body {
    ============================================================================ */
 
 .footer {
-    background: var(--color-dark);
-    color: white;
+    background: var(--surface);
+    color: var(--ink-muted);
     text-align: center;
-    padding: 20px var(--spacing);
+    padding: 16px var(--spacing);
     margin-top: auto;
     font-size: 12px;
-    border-top: 2px solid var(--color-accent);
+    border-top: 1px solid var(--hairline);
 }
 
-.footer p {
-    margin: 8px 0;
-}
+.footer p { margin: 6px 0; }
 
 .footer code {
-    background: rgba(255, 255, 255, 0.1);
+    background: var(--surface-2);
     padding: 2px 6px;
     border-radius: 3px;
     font-size: 11px;
+    color: var(--ink-2);
 }
+
+/* ============================================================================
+   SCROLLBARS
+   ============================================================================ */
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: var(--surface); }
+::-webkit-scrollbar-thumb { background: var(--grid); border-radius: 8px; }
+::-webkit-scrollbar-thumb:hover { background: var(--ink-muted); }
 
 /* ============================================================================
    RESPONSIVO
    ============================================================================ */
 
 @media (max-width: 1200px) {
-    .main-content {
-        flex-direction: column;
-    }
-
-    .sidebar {
-        width: 100%;
-        position: static;
-        max-height: none;
-        overflow-y: visible;
-    }
-
-    .charts-area {
-        order: 2;
-    }
+    .main-content { flex-direction: column; }
+    .sidebar { width: 100%; position: static; max-height: none; }
 }
 
-@media (max-width: 768px) {
-    .header h1 {
-        font-size: 20px;
-    }
-
-    .header .subtitle {
-        font-size: 12px;
-    }
-
-    .control-group {
-        margin-bottom: 15px;
-        padding-bottom: 12px;
-    }
-
-    .chart-container {
-        padding: 12px;
-    }
-
-    .chart-container h2 {
-        font-size: 14px;
-        margin-bottom: 10px;
-    }
-}
-
-/* ============================================================================
-   SCROLLBAR CUSTOMIZADO
-   ============================================================================ */
-
-.sidebar::-webkit-scrollbar {
-    width: 8px;
-}
-
-.sidebar::-webkit-scrollbar-track {
-    background: #f1f1f1;
-    border-radius: 10px;
-}
-
-.sidebar::-webkit-scrollbar-thumb {
-    background: var(--color-accent);
-    border-radius: 10px;
-}
-
-.sidebar::-webkit-scrollbar-thumb:hover {
-    background: #2980b9;
-}
-
-/* ============================================================================
-   ANIMAÇÕES
-   ============================================================================ */
-
-@keyframes fadeIn {
-    from {
-        opacity: 0;
-        transform: translateY(10px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-.chart-container {
-    animation: fadeIn 0.5s ease;
+@media (max-width: 900px) {
+    .sub-row { grid-template-columns: 1fr; }
+    .metrics-cols { grid-template-columns: 1fr; }
+    .decision-panel { grid-template-columns: 1fr; }
 }
 
 </style>
@@ -963,12 +1003,16 @@ body {
 
             <!-- MAIN CHART AREA -->
             <section class="charts-area">
-                <!-- Widget OFICIAL do TradingView (gráfico real do site) -->
-                <div class="chart-container">
-                    <h2>📺 Gráfico oficial TradingView <span class="tv-sync-tag" id="tvSyncTag">—</span></h2>
-                    <div class="tv-widget-wrap">
-                        <div id="tvWidget"></div>
-                        <div id="tvWidgetMsg" class="tv-widget-msg">Carregando gráfico do TradingView… (requer internet)</div>
+                <!-- PAINEL DE DECISÃO (assertividade: entrar ou aguardar, e por quê) -->
+                <div class="chart-container decision-panel">
+                    <div class="decision-main">
+                        <span class="decision-label">Decisão agora</span>
+                        <span id="decisionVerdict" class="decision-verdict verdict-wait">AGUARDAR</span>
+                        <span id="decisionReason" class="decision-reason">Carregando dados…</span>
+                    </div>
+                    <div class="decision-side">
+                        <div class="decision-chips" id="decisionChips"></div>
+                        <div class="decision-context" id="decisionContext">—</div>
                     </div>
                 </div>
 
@@ -979,16 +1023,16 @@ body {
                     <div class="chart-legend" id="legendPreco"></div>
                 </div>
 
-                <!-- Gráfico de RSI -->
-                <div class="chart-container">
-                    <h2>📊 RSI (Momentum)</h2>
-                    <div id="chartRsi" class="tv-chart tv-chart-sub"></div>
-                </div>
-
-                <!-- Gráfico de ATR -->
-                <div class="chart-container">
-                    <h2>⚡ ATR (Volatilidade)</h2>
-                    <div id="chartAtr" class="tv-chart tv-chart-sub"></div>
+                <!-- RSI e ATR lado a lado -->
+                <div class="sub-row">
+                    <div class="chart-container">
+                        <h2>📊 RSI (Momentum)</h2>
+                        <div id="chartRsi" class="tv-chart tv-chart-sub"></div>
+                    </div>
+                    <div class="chart-container">
+                        <h2>⚡ ATR (Volatilidade)</h2>
+                        <div id="chartAtr" class="tv-chart tv-chart-sub"></div>
+                    </div>
                 </div>
 
                 <!-- Avisos de Entrada com Expiração -->
@@ -1037,6 +1081,15 @@ body {
                                 <tbody id="scoreTableBody"></tbody>
                             </table>
                         </div>
+                    </div>
+                </div>
+
+                <!-- Widget OFICIAL do TradingView (gráfico real, para conferência) -->
+                <div class="chart-container">
+                    <h2>📺 Gráfico oficial TradingView <span class="tv-sync-tag" id="tvSyncTag">—</span></h2>
+                    <div class="tv-widget-wrap">
+                        <div id="tvWidget"></div>
+                        <div id="tvWidgetMsg" class="tv-widget-msg">Carregando gráfico do TradingView… (requer internet)</div>
                     </div>
                 </div>
 
@@ -1316,7 +1369,19 @@ function recomputarSinais() {
             barras = 0;
         }
 
-        if (i === closes.length - 1) confLive = { long: longScore, short: shortScore, enabled: enabledCount };
+        if (i === closes.length - 1) {
+            confLive = {
+                long: longScore, short: shortScore, enabled: enabledCount,
+                minScore, confMode,
+                fatores: [
+                    { nome: 'Tendência', on: useTendencia, dir: tL ? 1 : tS ? -1 : 0 },
+                    { nome: 'EMA 200', on: useEma200, dir: maL ? 1 : maS ? -1 : 0 },
+                    { nome: 'RSI', on: useMomentum, dir: moL ? 1 : moS ? -1 : 0 },
+                    { nome: 'ATR', on: useVolatilidade, dir: vo ? 2 : 0 },   // 2 = ok (não direcional)
+                    { nome: 'Estrutura', on: useEstrutura, dir: eL ? 1 : eS ? -1 : 0 }
+                ]
+            };
+        }
     }
 }
 
@@ -1358,11 +1423,12 @@ function fmtHora(sec) {
 // ============================================================================
 
 function opcoesBase() {
+    // Tema escuro (tokens validados): superfície #1a1a19, grid #2c2c2a, tinta #c3c2b7
     return {
-        layout: { background: { color: '#ffffff' }, textColor: '#2c3e50' },
-        grid: { vertLines: { color: '#eef2f5' }, horzLines: { color: '#eef2f5' } },
-        rightPriceScale: { borderColor: '#d5dbdf' },
-        timeScale: { borderColor: '#d5dbdf', timeVisible: true, secondsVisible: false },
+        layout: { background: { color: '#1a1a19' }, textColor: '#c3c2b7' },
+        grid: { vertLines: { color: '#2c2c2a' }, horzLines: { color: '#2c2c2a' } },
+        rightPriceScale: { borderColor: '#383835' },
+        timeScale: { borderColor: '#383835', timeVisible: true, secondsVisible: false },
         crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
         localization: { timeFormatter: t => fmtHora(t) }
     };
@@ -1371,32 +1437,33 @@ function opcoesBase() {
 function montarGraficos() {
     if (graficosMontados) return;
 
-    chartPreco = LightweightCharts.createChart(document.getElementById('chartPreco'), { ...opcoesBase(), height: 340 });
+    chartPreco = LightweightCharts.createChart(document.getElementById('chartPreco'), { ...opcoesBase(), height: 360 });
     serieVelas = chartPreco.addCandlestickSeries({
         upColor: '#26a69a', downColor: '#ef5350', borderUpColor: '#26a69a',
         borderDownColor: '#ef5350', wickUpColor: '#26a69a', wickDownColor: '#ef5350'
     });
-    serieEma9 = chartPreco.addLineSeries({ color: '#3498db', lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
-    serieEma21 = chartPreco.addLineSeries({ color: '#f39c12', lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
-    serieEma200 = chartPreco.addLineSeries({ color: '#9b59b6', lineWidth: 2, priceLineVisible: false, lastValueVisible: false });
+    // Séries EMA — paleta escura validada (dataviz): azul, amarelo, violeta
+    serieEma9 = chartPreco.addLineSeries({ color: '#3987e5', lineWidth: 2, priceLineVisible: false, lastValueVisible: false });
+    serieEma21 = chartPreco.addLineSeries({ color: '#c98500', lineWidth: 2, priceLineVisible: false, lastValueVisible: false });
+    serieEma200 = chartPreco.addLineSeries({ color: '#9085e9', lineWidth: 2, priceLineVisible: false, lastValueVisible: false });
 
-    chartRsi = LightweightCharts.createChart(document.getElementById('chartRsi'), { ...opcoesBase(), height: 180 });
-    serieRsi = chartRsi.addLineSeries({ color: '#e74c3c', lineWidth: 2, priceLineVisible: false });
+    chartRsi = LightweightCharts.createChart(document.getElementById('chartRsi'), { ...opcoesBase(), height: 190 });
+    serieRsi = chartRsi.addLineSeries({ color: '#e66767', lineWidth: 2, priceLineVisible: false });
     const sobrec = parseInt(document.getElementById('rsiSobrecompra').value);
     const sobrev = parseInt(document.getElementById('rsiSobrevenda').value);
-    serieRsi.createPriceLine({ price: sobrec, color: 'rgba(0,0,0,0.25)', lineStyle: LightweightCharts.LineStyle.Dashed, lineWidth: 1, axisLabelVisible: true, title: String(sobrec) });
-    serieRsi.createPriceLine({ price: sobrev, color: 'rgba(0,0,0,0.25)', lineStyle: LightweightCharts.LineStyle.Dashed, lineWidth: 1, axisLabelVisible: true, title: String(sobrev) });
+    serieRsi.createPriceLine({ price: sobrec, color: 'rgba(255,255,255,0.25)', lineStyle: LightweightCharts.LineStyle.Dashed, lineWidth: 1, axisLabelVisible: true, title: String(sobrec) });
+    serieRsi.createPriceLine({ price: sobrev, color: 'rgba(255,255,255,0.25)', lineStyle: LightweightCharts.LineStyle.Dashed, lineWidth: 1, axisLabelVisible: true, title: String(sobrev) });
 
-    chartAtr = LightweightCharts.createChart(document.getElementById('chartAtr'), { ...opcoesBase(), height: 180 });
-    serieAtr = chartAtr.addLineSeries({ color: '#27ae60', lineWidth: 2, priceLineVisible: false });
-    serieAtrMedia = chartAtr.addLineSeries({ color: '#16a085', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed, priceLineVisible: false, lastValueVisible: false });
+    chartAtr = LightweightCharts.createChart(document.getElementById('chartAtr'), { ...opcoesBase(), height: 190 });
+    serieAtr = chartAtr.addLineSeries({ color: '#199e70', lineWidth: 2, priceLineVisible: false });
+    serieAtrMedia = chartAtr.addLineSeries({ color: '#86b6ef', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed, priceLineVisible: false, lastValueVisible: false });
 
     // Curva de capital (baseline em 0: verde acima, vermelho abaixo)
     chartEquity = LightweightCharts.createChart(document.getElementById('chartEquity'), { ...opcoesBase(), height: 200 });
     serieEquity = chartEquity.addBaselineSeries({
         baseValue: { type: 'price', price: 0 },
-        topLineColor: '#27ae60', topFillColor1: 'rgba(39,174,96,0.28)', topFillColor2: 'rgba(39,174,96,0.05)',
-        bottomLineColor: '#e74c3c', bottomFillColor1: 'rgba(231,76,60,0.05)', bottomFillColor2: 'rgba(231,76,60,0.28)',
+        topLineColor: '#0ca30c', topFillColor1: 'rgba(12,163,12,0.28)', topFillColor2: 'rgba(12,163,12,0.05)',
+        bottomLineColor: '#d03b3b', bottomFillColor1: 'rgba(208,59,59,0.05)', bottomFillColor2: 'rgba(208,59,59,0.28)',
         priceLineVisible: false
     });
 
@@ -1588,6 +1655,79 @@ function atualizarPaineis() {
     // Métricas de análise (backtest) sobre as entradas não bloqueadas
     calcularMetricas(validas);
 
+    // Painel de Decisão (depende de confLive + byScoreGlobal recém-calculados)
+    atualizarDecisao();
+}
+
+// ============================================================================
+// PAINEL DE DECISÃO — o veredito de assertividade da vela atual
+// ============================================================================
+
+function atualizarDecisao() {
+    const v = document.getElementById('decisionVerdict');
+    const r = document.getElementById('decisionReason');
+    const chips = document.getElementById('decisionChips');
+    const ctx = document.getElementById('decisionContext');
+    const painel = document.querySelector('.decision-panel');
+    if (!v || !confLive.fatores) return;
+
+    // Chips: para onde cada fator aponta AGORA (▲ CALL, ▼ PUT, ✓ ok, — neutro)
+    chips.innerHTML = confLive.fatores.map(f => {
+        let dirHtml;
+        if (!f.on) dirHtml = '<span class="chip-dir-none">off</span>';
+        else if (f.dir === 1) dirHtml = '<span class="chip-dir-up">▲</span>';
+        else if (f.dir === -1) dirHtml = '<span class="chip-dir-down">▼</span>';
+        else if (f.dir === 2) dirHtml = '<span class="chip-dir-up">✓</span>';
+        else dirHtml = '<span class="chip-dir-none">—</span>';
+        return `<span class="decision-chip${f.on ? '' : ' chip-off'}">${f.nome} ${dirHtml}</span>`;
+    }).join('');
+
+    const { long, short, enabled, minScore, confMode } = confLive;
+    const alvo = confMode === 'estrita' ? enabled : Math.min(minScore, enabled);
+
+    // Risco de notícia tem prioridade sobre qualquer confluência
+    const newsOn = document.getElementById('useNewsFilter').checked;
+    const newsJan = parseInt(document.getElementById('newsJanela').value);
+    const lastT = dados.length ? dados[dados.length - 1].time : 0;
+    const riscoNoticia = newsOn && lastT && noticiaProxima(lastT, newsJan);
+
+    let cor;
+    if (riscoNoticia) {
+        v.textContent = 'AGUARDAR ⚠';
+        v.className = 'decision-verdict verdict-news';
+        r.textContent = `Notícia recente sobre ${baseAsset()} — dentro da janela de risco de ${newsJan} min. Não entrar agora.`;
+        cor = 'var(--warning)';
+    } else if (enabled > 0 && long >= alvo && long > short) {
+        v.textContent = 'ENTRAR CALL ▲';
+        v.className = 'decision-verdict verdict-call';
+        r.textContent = `Confluência de alta ${long}/${enabled} — atingiu o mínimo de ${alvo} fatores.`;
+        cor = 'var(--call)';
+    } else if (enabled > 0 && short >= alvo && short > long) {
+        v.textContent = 'ENTRAR PUT ▼';
+        v.className = 'decision-verdict verdict-put';
+        r.textContent = `Confluência de baixa ${short}/${enabled} — atingiu o mínimo de ${alvo} fatores.`;
+        cor = 'var(--put)';
+    } else {
+        v.textContent = 'AGUARDAR';
+        v.className = 'decision-verdict verdict-wait';
+        r.textContent = `Confluência insuficiente: CALL ${long}/${enabled} · PUT ${short}/${enabled} — mínimo ${alvo}. Espere o alinhamento.`;
+        cor = 'var(--ink-muted)';
+    }
+    if (painel) painel.style.borderLeftColor = cor;
+
+    // Contexto histórico: o score atual costuma acertar quanto? (assertividade medida)
+    const scoreAtivo = Math.max(long, short);
+    const key = scoreAtivo + '/' + enabled;
+    if (byScoreGlobal && byScoreGlobal.scores[key]) {
+        const o = byScoreGlobal.scores[key];
+        const wrK = (o.w / o.t * 100).toFixed(0);
+        ctx.innerHTML = `Histórico neste gráfico: score <strong>${key}</strong> acertou <strong>${wrK}%</strong> em ${o.t} operações · empate exige <strong>${byScoreGlobal.beWR.toFixed(1)}%</strong> (payout atual).`;
+    } else if (byScoreGlobal) {
+        ctx.innerHTML = `Sem histórico avaliado para o score <strong>${key}</strong> neste gráfico ainda · empate exige <strong>${byScoreGlobal.beWR.toFixed(1)}%</strong>.`;
+    } else {
+        ctx.textContent = 'Aguardando operações avaliadas para medir a assertividade por score.';
+    }
+
     const hint = document.getElementById('entryHint');
     if (entradas.length === 0) {
         const poucas = dados.length < 200 && document.getElementById('useEma200').checked;
@@ -1604,6 +1744,7 @@ function atualizarPaineis() {
 
 let entradasValidas = [];   // entradas não bloqueadas por notícia (para exportar)
 let metricasAtuais = null;  // resumo das métricas atuais (para exportar)
+let byScoreGlobal = null;   // win rate por score (para o Painel de Decisão)
 
 function calcularMetricas(validas) {
     entradasValidas = validas;
@@ -1616,6 +1757,7 @@ function calcularMetricas(validas) {
         grid.innerHTML = '<div class="metric-empty">Sem operações avaliadas ainda — aguardando a expiração das entradas.</div>';
         scoreBody.innerHTML = '';
         metricasAtuais = null;
+        byScoreGlobal = null;
         if (serieEquity) serieEquity.setData([]);
         return;
     }
@@ -1666,6 +1808,7 @@ function calcularMetricas(validas) {
         (byScore[k] = byScore[k] || { t: 0, w: 0 });
         byScore[k].t++; if (e.resultado === 'WIN') byScore[k].w++;
     });
+    byScoreGlobal = { scores: byScore, beWR };
     scoreBody.innerHTML = Object.keys(byScore).sort().reverse().map(k => {
         const o = byScore[k], r = o.w / o.t * 100;
         return `<tr><td>${k}</td><td>${o.t}</td><td>${o.w}</td><td class="${r >= beWR ? 'res-win' : 'res-loss'}">${r.toFixed(0)}%</td></tr>`;
@@ -1906,7 +2049,7 @@ function montarWidgetTV(tentativa) {
             symbol: tvSymbolTV(),
             interval: tvIntervalTV(),
             timezone: 'Etc/UTC',
-            theme: 'light',
+            theme: 'dark',
             style: '1',
             locale: 'br',
             hide_side_toolbar: false,
