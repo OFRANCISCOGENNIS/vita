@@ -1490,6 +1490,50 @@ function recalcularSinaisApenas() {
     atualizarLegenda();
 }
 
+const SCAN_CRIPTO = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'XRPUSDT', 'ADAUSDT', 'DOGEUSDT', 'AVAXUSDT', 'LINKUSDT', 'LTCUSDT', 'DOTUSDT', 'TRXUSDT', 'ATOMUSDT', 'NEARUSDT', 'APTUSDT'];
+
+async function escanear() {
+    const f = fonte();
+    if (f === 'sim') { alert('Troque a fonte para Binance ou Forex para escanear.'); return; }
+    const btn = document.getElementById('btnScan');
+    btn.disabled = true; btn.textContent = 'Escaneando…';
+    const loader = f === 'binance' ? carregarHistoricoBinance : f === 'twelvedata' ? carregarHistoricoTwelveData : carregarHistoricoYahoo;
+    const lista = f === 'binance' ? SCAN_CRIPTO : Object.keys(PARES_YAHOO);
+    const arg = f === 'binance' ? binanceInterval() : tfMinutes();
+    const confMode = document.getElementById('confMode').value;
+    const minScore = parseInt(document.getElementById('minScore').value);
+    const dSave = dados;
+    const res = [];
+    for (const s of lista) {
+        try {
+            const d = await loader(s, arg, 250);
+            if (!d || d.length < 210) continue;
+            dados = d; recomputarIndicadores(); recomputarSinais();
+            const { long, short, enabled } = confLive;
+            const alvo = confMode === 'estrita' ? enabled : Math.min(minScore, enabled);
+            if (long >= alvo && long > short) res.push({ s, dir: 1, score: long, enabled });
+            else if (short >= alvo && short > long) res.push({ s, dir: -1, score: short, enabled });
+        } catch (e) { }
+    }
+    dados = dSave; recomputarIndicadores(); recomputarSinais();
+    res.sort((a, b) => b.score - a.score);
+    document.getElementById('scanMeta').textContent = res.length + '/' + lista.length;
+    const el = document.getElementById('scanList');
+    el.innerHTML = res.length ? res.map(r => {
+        const lbl = PARES_YAHOO[r.s] ? PARES_YAHOO[r.s].label : r.s;
+        return `<span class="decision-chip scan-item" data-s="${r.s}">${lbl} <span class="${r.dir === 1 ? 'chip-dir-up' : 'chip-dir-down'}">${r.dir === 1 ? '▲ CALL' : '▼ PUT'} ${r.score}/${r.enabled}</span></span>`;
+    }).join('') : '<span class="decision-context">Nenhuma moeda com entrada agora — afrouxe a confluência ou troque o timeframe.</span>';
+    el.querySelectorAll('.scan-item').forEach(x => x.addEventListener('click', () => {
+        const s = x.getAttribute('data-s');
+        document.getElementById('fonte').value = PARES_YAHOO[s] ? (ehForex() ? f : 'twelvedata') : 'binance';
+        document.getElementById('symbol').value = s;
+        montarWidgetTV(); carregar();
+    }));
+    document.getElementById('scanPanel').style.display = 'block';
+    if (res.length && document.getElementById('somAtivo').checked) tocarSom(res[0].dir);
+    btn.disabled = false; btn.textContent = '🔎 Escanear melhores entradas';
+}
+
 // ============================================================================
 // BLOCO 9.5 — WIDGET OFICIAL DO TRADINGVIEW (gráfico real, requer internet)
 // ============================================================================
@@ -1715,6 +1759,7 @@ document.getElementById('btnTreinoPut').addEventListener('click', () => responde
 document.getElementById('btnTreinoPular').addEventListener('click', () => responderTreino(0));
 document.getElementById('btnTreinoSair').addEventListener('click', () => encerrarTreino(true));
 
+document.getElementById('btnScan').addEventListener('click', escanear);
 document.getElementById('btnTestarSom').addEventListener('click', function () {
     tocarSom(1);
     setTimeout(() => tocarSom(-1), 600);   // demonstra os dois tons: CALL e PUT

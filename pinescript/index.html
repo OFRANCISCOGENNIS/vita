@@ -171,6 +171,7 @@
                     <h3>🔔 Alertas</h3>
                     <label><input type="checkbox" id="somAtivo" checked> <span>Som quando o veredito virar CALL/PUT</span></label>
                     <button id="btnTestarSom" class="btn-mini" style="width:100%; margin-top:4px;">🔊 Testar som</button>
+                    <button id="btnScan" class="btn-primary" style="margin-top:8px;">🔎 Escanear melhores entradas</button>
                 </section>
 
                 <!-- Fluxo de Volume -->
@@ -209,6 +210,11 @@
                         <div class="decision-chips" id="decisionChips"></div>
                         <div class="decision-context" id="decisionContext">—</div>
                     </div>
+                </div>
+
+                <div class="chart-container" id="scanPanel" style="display:none;">
+                    <h2>🔎 Melhores entradas agora <span id="scanMeta" class="tv-sync-tag"></span></h2>
+                    <div id="scanList" class="decision-chips"></div>
                 </div>
 
                 <!-- Treino de Leitura (replay: futuro escondido, você decide) -->

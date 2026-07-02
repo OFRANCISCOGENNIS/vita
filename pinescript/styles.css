@@ -373,6 +373,8 @@ body {
 .decision-chip .chip-dir-down { color: var(--put); font-weight: 800; }
 .decision-chip .chip-dir-none { color: var(--ink-muted); }
 .decision-chip.chip-off { opacity: 0.45; }
+.scan-item { cursor: pointer; font-size: 13px; }
+.scan-item:hover { border-color: var(--accent); }
 
 .decision-context {
     font-size: 12px;
