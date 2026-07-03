@@ -131,6 +131,7 @@ function intervalPorFonte(f, tfMin) {
     return f === 'binance' ? (tfMin === 60 ? '1h' : tfMin + 'm') : tfMin;
 }
 async function carregarHistoricoTF(symbol, tfMin, limit) {
+    if (symbol === 'CRYPTOIDX') return carregarHistoricoCryptoIDX(intervalPorFonte('binance', tfMin), limit);
     return loaderPorFonte(fonte())(symbol, intervalPorFonte(fonte(), tfMin), limit);
 }
 // TF maior correspondente ao TF de trabalho (para o filtro Multi-Timeframe)
@@ -1388,24 +1389,80 @@ async function carregarHistoricoBinance(symbol, interval, limit) {
 // em base 100 no primeiro fechamento; o índice é a média das velas normalizadas.
 // NÃO reproduz os valores exatos da Binomo — é uma referência de comportamento.
 const CRYPTOIDX_CESTA = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'XRPUSDT'];
-async function carregarHistoricoCryptoIDX(interval, limit) {
-    const series = await Promise.all(CRYPTOIDX_CESTA.map(s => carregarHistoricoBinance(s, interval, limit).catch(() => null)));
-    const ok = series.filter(s => s && s.length);
+// Carrega a cesta e devolve as velas do índice + fatores de normalização e a
+// última vela de cada ativo (para o WebSocket combinar tick a tick ao vivo).
+async function carregarCestaIDX(interval, limit) {
+    const series = await Promise.all(CRYPTOIDX_CESTA.map(s =>
+        carregarHistoricoBinance(s, interval, limit).then(d => ({ s, d })).catch(() => null)));
+    const ok = series.filter(x => x && x.d && x.d.length);
     if (!ok.length) throw new Error('cesta Crypto IDX indisponível');
+    const factors = {}; ok.forEach(x => factors[x.s] = 100 / x.d[0].close);   // base 100 por ativo
     const mapa = new Map();
-    ok.forEach(s => {
-        const f = 100 / s[0].close;   // normaliza cada ativo em base 100
-        s.forEach(c => {
+    ok.forEach(x => {
+        const f = factors[x.s];
+        x.d.forEach(c => {
             let a = mapa.get(c.time);
             if (!a) { a = { o: 0, h: 0, l: 0, cl: 0, v: 0, bv: 0, n: 0 }; mapa.set(c.time, a); }
             a.o += c.open * f; a.h += c.high * f; a.l += c.low * f; a.cl += c.close * f;
             a.v += c.volume || 0; a.bv += c.buyVol || 0; a.n++;
         });
     });
-    const out = [...mapa.keys()].sort((x, y) => x - y)
+    const candles = [...mapa.keys()].sort((x, y) => x - y)
         .filter(t => mapa.get(t).n === ok.length)   // só buckets com toda a cesta
         .map(t => { const a = mapa.get(t); return { time: t, open: a.o / a.n, high: a.h / a.n, low: a.l / a.n, close: a.cl / a.n, volume: a.v, buyVol: a.bv }; });
-    return out.slice(Math.max(0, out.length - limit));
+    const ultimos = {};
+    ok.forEach(x => { const c = x.d[x.d.length - 1]; ultimos[x.s] = { time: c.time, o: c.open, h: c.high, l: c.low, c: c.close, v: c.volume, V: c.buyVol }; });
+    return { candles: candles.slice(Math.max(0, candles.length - limit)), factors, ultimos, syms: ok.map(x => x.s) };
+}
+async function carregarHistoricoCryptoIDX(interval, limit) { return (await carregarCestaIDX(interval, limit)).candles; }
+
+// ---- WebSocket combinado do Crypto IDX (tick a tick, como os pares normais) ----
+let idxWS = null, idxFactors = {}, idxLast = {}, idxSyms = [], idxConn = '';
+function fecharIdxWS() { if (idxWS) { try { idxWS.onclose = null; idxWS.close(); } catch (e) {} idxWS = null; } idxConn = ''; }
+
+// Monta a vela do índice no tempo t exigindo que todos os ativos já tenham
+// reportado esse bucket (senão devolve null e espera os que faltam).
+function idxCombinar(t) {
+    let o = 0, h = 0, l = 0, c = 0, v = 0, bv = 0, n = 0;
+    for (const s of idxSyms) {
+        const b = idxLast[s];
+        if (!b || b.time !== t) return null;
+        const f = idxFactors[s];
+        o += b.o * f; h += b.h * f; l += b.l * f; c += b.c * f; v += b.v || 0; bv += b.V || 0; n++;
+    }
+    return n ? { time: t, open: o / n, high: h / n, low: l / n, close: c / n, volume: v, buyVol: bv } : null;
+}
+
+function onIdxBar(bar, fechou) {
+    const last = dados.length ? dados[dados.length - 1] : null;
+    if (last && bar.time === last.time) { dados[dados.length - 1] = bar; atualizarUltimoCandle(fechou); }
+    else if (!last || bar.time > last.time) { dados.push(bar); atualizarUltimoCandle(fechou); }
+}
+
+function conectarIdxWS(interval) {
+    fecharIdxWS();
+    const streams = idxSyms.map(s => s.toLowerCase() + '@kline_' + interval).join('/');
+    const conn = 'IDX@' + interval; idxConn = conn;
+    const sock = new WebSocket(`${BINANCE_WS}/stream?streams=${streams}`);
+    idxWS = sock;
+    sock.onopen = () => { if (idxConn === conn) setStatus('on', 'AO VIVO (tick a tick) • Crypto IDX ≈ cesta Binance'); };
+    sock.onmessage = (ev) => {
+        if (idxConn !== conn) return;
+        let msg; try { msg = JSON.parse(ev.data); } catch (e) { return; }
+        const k = msg.data && msg.data.k; if (!k) return;
+        const sym = msg.data.s || k.s;
+        if (idxFactors[sym] == null) return;
+        const t = Math.floor(k.t / 1000);
+        idxLast[sym] = { time: t, o: +k.o, h: +k.h, l: +k.l, c: +k.c, v: +k.v, V: +(k.V || 0) };
+        const bar = idxCombinar(t);
+        if (bar) onIdxBar(bar, k.x === true);
+    };
+    sock.onerror = () => { if (idxConn === conn) setStatus('err', 'Erro de conexão (Crypto IDX)'); };
+    sock.onclose = () => {
+        if (idxConn !== conn) return;
+        setStatus('connecting', 'Reconectando Crypto IDX…');
+        setTimeout(() => { if (idxConn === conn && fonte() === 'binance' && symbolAtual() === 'CRYPTOIDX') conectarIdxWS(interval); }, 2000);
+    };
 }
 
 function fecharWS() {
@@ -1413,6 +1470,7 @@ function fecharWS() {
         try { ws.onclose = null; ws.close(); } catch (e) {}
         ws = null;
     }
+    fecharIdxWS();
 }
 
 function conectarWS(symbol, interval) {
@@ -1697,19 +1755,17 @@ async function carregar() {
     const interval = binanceInterval();
     const limit = Math.min(1000, Math.max(50, parseInt(document.getElementById('numCandles').value) || 300));
 
-    // Crypto IDX (proxy): cesta de criptos, sem WS — atualiza via REST a cada 15s
+    // Crypto IDX (proxy): cesta de criptos combinada tick a tick via WebSocket
     if (symbol === 'CRYPTOIDX') {
         setStatus('connecting', 'Montando Crypto IDX (proxy)…');
         try {
-            dados = await carregarHistoricoCryptoIDX(interval, limit);
-            if (!dados.length) throw new Error('cesta vazia');
+            const cesta = await carregarCestaIDX(interval, limit);
+            if (!cesta.candles.length) throw new Error('cesta vazia');
+            dados = cesta.candles;
+            idxFactors = cesta.factors; idxLast = cesta.ultimos; idxSyms = cesta.syms;
             refPares = [];
             redesenharTudo(true);
-            setStatus('on', 'AO VIVO (proxy, 15s) • Crypto IDX ≈ cesta Binance');
-            refTimer = setInterval(async () => {
-                if (fonte() !== 'binance' || symbolAtual() !== 'CRYPTOIDX' || treino) return;
-                try { dados = await carregarHistoricoCryptoIDX(interval, limit); recalcularSinaisApenas(); } catch (e) {}
-            }, 15000);
+            conectarIdxWS(interval);   // stream combinado — atualiza a última vela a cada tick
         } catch (err) {
             setStatus('err', 'Crypto IDX indisponível: ' + (err.message || err));
         }
