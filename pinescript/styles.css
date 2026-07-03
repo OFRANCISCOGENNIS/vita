@@ -386,7 +386,11 @@ body {
 .ia-sel { background: #1e2b1e; }
 .ia-params { color: #8a8a82; font-size: 12px; font-variant-numeric: tabular-nums; }
 .scan-tuned { color: #fab219; font-weight: 700; }
-.estudo-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 12px; }
+.decision-grade { display: inline-flex; align-items: center; gap: 4px; font-weight: 800; font-size: 14px; padding: 3px 12px; border-radius: 8px; letter-spacing: 0.5px; margin: 4px 0; }
+.grade-A { background: rgba(12,163,12,0.18); color: #26c281; border: 1px solid #0ca30c; }
+.grade-B { background: rgba(250,178,25,0.15); color: #fab219; border: 1px solid #fab219; }
+.grade-C { background: rgba(208,59,59,0.15); color: #ef5350; border: 1px solid #d03b3b; }
+.estudo-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 18px; margin-top: 12px; }
 .estudo-grid h4 { margin: 0 0 8px; font-size: 13px; color: #c3c2b7; }
 .estudo-row { display: flex; align-items: center; gap: 8px; padding: 3px 0; font-size: 12px; }
 .estudo-lbl { min-width: 70px; color: #c3c2b7; }

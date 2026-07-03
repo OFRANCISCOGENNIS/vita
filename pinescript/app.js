@@ -265,6 +265,78 @@ function rotuloFatores(fat) {
     return ok.length ? ok.join('·') : '—';
 }
 
+// ---- Padrões de vela (confirmação de preço na vela do sinal) ----
+// Retorna { up, down }: engolfo/martelo confirmam alta; engolfo/estrela cadente, baixa.
+function padraoVela(i) {
+    if (i < 1) return { up: false, down: false };
+    const c = dados[i], p = dados[i - 1];
+    const corpo = Math.abs(c.close - c.open);
+    const range = (c.high - c.low) || 1e-9;
+    const wickUp = c.high - Math.max(c.close, c.open);
+    const wickDn = Math.min(c.close, c.open) - c.low;
+    const engAlta = c.close > c.open && p.close < p.open && c.close >= p.open && c.open <= p.close;
+    const engBaixa = c.close < c.open && p.close > p.open && c.open >= p.close && c.close <= p.open;
+    const martelo = wickDn >= corpo * 2 && wickUp <= corpo && corpo <= range * 0.4;
+    const estrela = wickUp >= corpo * 2 && wickDn <= corpo && corpo <= range * 0.4;
+    return { up: engAlta || martelo, down: engBaixa || estrela };
+}
+
+// ---- Sessões de mercado (por hora UTC) ----
+function sessaoDe(t) {
+    const h = new Date(t * 1000).getUTCHours();
+    if (h >= 13 && h < 16) return 'Londres+NY';
+    if (h >= 7 && h < 13) return 'Londres';
+    if (h >= 16 && h < 22) return 'Nova York';
+    return 'Ásia';
+}
+function sessaoForte(t) { return sessaoDe(t) !== 'Ásia'; }
+
+// ---- Suporte/Resistência: pivôs (topos/fundos locais) da janela SR_W ----
+const SR_W = 5;
+function acharPivotsSR() {
+    const { highs, lows } = computed;
+    const res = [], sup = [];
+    for (let j = SR_W; j < highs.length - SR_W; j++) {
+        let ph = true, pl = true;
+        for (let k = j - SR_W; k <= j + SR_W; k++) {
+            if (highs[k] > highs[j]) ph = false;
+            if (lows[k] < lows[j]) pl = false;
+        }
+        if (ph) res.push({ i: j, price: highs[j] });
+        if (pl) sup.push({ i: j, price: lows[j] });
+    }
+    return { res, sup };
+}
+// Veta long colado numa resistência acima / short colado num suporte abaixo.
+// Só usa pivôs já confirmados (i + SR_W <= barra) — sem olhar o futuro.
+function vetoSR(piv, i, close, atrV, k) {
+    if (!atrV) return { vetoLong: false, vetoShort: false };
+    let resAbove = Infinity, supBelow = -Infinity;
+    for (const p of piv.res) if (p.i + SR_W <= i && p.price > close && p.price < resAbove) resAbove = p.price;
+    for (const p of piv.sup) if (p.i + SR_W <= i && p.price < close && p.price > supBelow) supBelow = p.price;
+    return {
+        vetoLong: resAbove !== Infinity && (resAbove - close) < k * atrV,
+        vetoShort: supBelow !== -Infinity && (close - supBelow) < k * atrV
+    };
+}
+
+// ---- Peso por fator (IA): win rate histórico de cada fator vira peso no score ----
+let pesoFatores = JSON.parse(localStorage.getItem('pesoFatores') || '{}');
+function atualizarPesosFatores() {
+    const av = entradas.filter(e => e.resultado === 'WIN' || e.resultado === 'LOSS');
+    if (av.length < 10) return;
+    const acc = {};
+    av.forEach(e => (e.fatores || '').split('·').forEach(kk => {
+        if (!FATORES_NOMES[kk]) return;
+        (acc[kk] = acc[kk] || { w: 0, t: 0 }).t++;
+        if (e.resultado === 'WIN') acc[kk].w++;
+    }));
+    const m = {};
+    Object.keys(acc).forEach(kk => { if (acc[kk].t >= 5) m[kk] = acc[kk].w / acc[kk].t; });
+    if (Object.keys(m).length) { pesoFatores[symbolAtual()] = m; localStorage.setItem('pesoFatores', JSON.stringify(pesoFatores)); }
+}
+function pesoDe(mapa, k) { const wr = mapa && mapa[k]; return wr == null ? 1 : Math.max(0.3, Math.min(1.8, wr / 0.5)); }
+
 function recomputarSinais() {
     const useTendencia = document.getElementById('useTendencia').checked;
     const useEma200 = document.getElementById('useEma200').checked;
@@ -283,6 +355,13 @@ function recomputarSinais() {
     const fluxoJanela = Math.max(2, parseInt(document.getElementById('fluxoJanela').value));
     // Filtro Multi-Timeframe: htfTrend[i] = 1 (alta) / -1 (baixa) / 0 no TF maior
     const useHtf = document.getElementById('useHtf').checked && htfTrend.length === computed.closes.length;
+    const usePadrao = document.getElementById('usePadrao').checked;
+    const useSessao = document.getElementById('useSessao').checked;
+    const useSR = document.getElementById('useSR').checked;
+    const srK = Math.max(0.1, parseFloat(document.getElementById('srAtr').value) || 0.5);
+    const usePeso = document.getElementById('usePesoIA').checked;
+    const pesos = usePeso ? (pesoFatores[symbolAtual()] || {}) : null;
+    const piv = useSR ? acharPivotsSR() : null;
 
     const { closes, emaR, emaL, ema200, rsiValues, atrValues, atrMedia, highs, lows } = computed;
 
@@ -305,7 +384,7 @@ function recomputarSinais() {
     }
     const recente = (arr, i) => { for (let j = Math.max(0, i - janela + 1); j <= i; j++) if (arr[j]) return true; return false; };
 
-    const enabledCount = [useTendencia, useEma200, useMomentum, useVolatilidade, useEstrutura, useFluxo, useCorrelacao].filter(Boolean).length;
+    const enabledCount = [useTendencia, useEma200, useMomentum, useVolatilidade, useEstrutura, useFluxo, useCorrelacao, usePadrao].filter(Boolean).length;
 
     sinaisLong = []; sinaisShort = [];
     let barras = 999999;
@@ -326,28 +405,47 @@ function recomputarSinais() {
         // Correlação: maioria dos pares de referência na mesma direção
         const corrDir = useCorrelacao ? votoCorrelacao(dados[i].time, fluxoJanela) : 0;
 
+        const pat = usePadrao ? padraoVela(i) : { up: false, down: false };
+
         const fatL = [
             { k: 'T', on: useTendencia, ok: tL }, { k: 'Ma', on: useEma200, ok: maL },
             { k: 'Mo', on: useMomentum, ok: moL }, { k: 'V', on: useVolatilidade, ok: vo },
             { k: 'E', on: useEstrutura, ok: eL },
-            { k: 'F', on: useFluxo, ok: fluxoDir === 1 }, { k: 'C', on: useCorrelacao, ok: corrDir === 1 }
+            { k: 'F', on: useFluxo, ok: fluxoDir === 1 }, { k: 'C', on: useCorrelacao, ok: corrDir === 1 },
+            { k: 'P', on: usePadrao, ok: pat.up }
         ];
         const fatS = [
             { k: 'T', on: useTendencia, ok: tS }, { k: 'Ma', on: useEma200, ok: maS },
             { k: 'Mo', on: useMomentum, ok: moS }, { k: 'V', on: useVolatilidade, ok: vo },
             { k: 'E', on: useEstrutura, ok: eS },
-            { k: 'F', on: useFluxo, ok: fluxoDir === -1 }, { k: 'C', on: useCorrelacao, ok: corrDir === -1 }
+            { k: 'F', on: useFluxo, ok: fluxoDir === -1 }, { k: 'C', on: useCorrelacao, ok: corrDir === -1 },
+            { k: 'P', on: usePadrao, ok: pat.down }
         ];
         const longScore = fatL.filter(f => f.on && f.ok).length;
         const shortScore = fatS.filter(f => f.on && f.ok).length;
+        // Score ponderado pela IA: cada fator vale seu peso (win rate/0.5), não 1
+        const longW = fatL.reduce((s, f) => s + (f.on && f.ok ? pesoDe(pesos, f.k) : 0), 0);
+        const shortW = fatS.reduce((s, f) => s + (f.on && f.ok ? pesoDe(pesos, f.k) : 0), 0);
 
         let longSig, shortSig;
         if (confMode === 'estrita') {
             longSig = enabledCount > 0 && longScore === enabledCount;
             shortSig = enabledCount > 0 && shortScore === enabledCount;
+        } else if (usePeso) {
+            longSig = longW >= minScore && longScore > shortScore;
+            shortSig = shortW >= minScore && shortScore > longScore;
         } else {
             longSig = longScore >= minScore && longScore > shortScore;
             shortSig = shortScore >= minScore && shortScore > longScore;
+        }
+
+        // Gate de sessão: fora das sessões fortes (Ásia) não opera
+        if (useSessao && !sessaoForte(dados[i].time)) { longSig = false; shortSig = false; }
+        // Gate de Suporte/Resistência: veta entrada colada no nível contrário
+        if (useSR && (longSig || shortSig)) {
+            const vs = vetoSR(piv, i, closes[i], atrValues[i], srK);
+            if (vs.vetoLong) longSig = false;
+            if (vs.vetoShort) shortSig = false;
         }
 
         // Multi-Timeframe: só permite entrada a favor da tendência do TF maior
@@ -366,9 +464,14 @@ function recomputarSinais() {
         }
 
         if (i === closes.length - 1) {
+            const vsLast = useSR ? vetoSR(piv, i, closes[i], atrValues[i], srK) : { vetoLong: false, vetoShort: false };
             confLive = {
                 long: longScore, short: shortScore, enabled: enabledCount,
+                longW, shortW, usePeso,
                 minScore, confMode,
+                htfDir: useHtf ? htfTrend[i] : 0, useHtf,
+                srVetoLong: vsLast.vetoLong, srVetoShort: vsLast.vetoShort, useSR,
+                sessao: sessaoDe(dados[i].time), sessaoForte: sessaoForte(dados[i].time), useSessao,
                 fatores: [
                     { nome: 'Tendência', on: useTendencia, dir: tL ? 1 : tS ? -1 : 0 },
                     { nome: 'EMA 200', on: useEma200, dir: maL ? 1 : maS ? -1 : 0 },
@@ -376,7 +479,8 @@ function recomputarSinais() {
                     { nome: 'ATR', on: useVolatilidade, dir: vo ? 2 : 0 },   // 2 = ok (não direcional)
                     { nome: 'Estrutura', on: useEstrutura, dir: eL ? 1 : eS ? -1 : 0 },
                     { nome: 'Fluxo', on: useFluxo, dir: fluxoDir },
-                    { nome: 'Correlação', on: useCorrelacao, dir: corrDir }
+                    { nome: 'Correlação', on: useCorrelacao, dir: corrDir },
+                    { nome: 'Padrão', on: usePadrao, dir: pat.up ? 1 : pat.down ? -1 : 0 }
                 ]
             };
         }
@@ -450,6 +554,7 @@ function recomputarEntradas() {
         }
         return { index: s.index, dir: s.dir, entryTime: c.time, entryPrice, expMin: exp, expTime, resultado, expPrice, score: s.score, enabled: s.enabled, fatores: s.fatores };
     });
+    if (document.getElementById('usePesoIA').checked) atualizarPesosFatores();
 }
 
 function fmtHora(sec) {
@@ -967,6 +1072,31 @@ function responderTreino(dir) {   // dir: 1 CALL, -1 PUT, 0 pular
 // PAINEL DE DECISÃO — o veredito de assertividade da vela atual
 // ============================================================================
 
+// Selo A/B/C: A = todos os filtros de qualidade a favor; B = confluência ok com
+// alguma ressalva; C = evitar. Reúne score, IA (peso + WF do par), HTF, S/R e sessão.
+function calcularGrade(dir) {
+    const cl = confLive, enabled = cl.enabled || 1;
+    const scoreRatio = (dir === 1 ? cl.long : cl.short) / enabled;
+    const htfOk = !cl.useHtf || cl.htfDir === dir;
+    const srOk = dir === 1 ? !cl.srVetoLong : !cl.srVetoShort;
+    const sessOk = cl.sessaoForte;
+    const cache = iaCache[symbolAtual()];
+    const pairWr = cache && cache.wr != null ? cache.wr : null;
+    const forte = scoreRatio >= 0.7;
+    const pairOk = pairWr == null || pairWr >= 0.55;
+    let grade;
+    if (forte && htfOk && srOk && sessOk && pairOk) grade = 'A';
+    else if (scoreRatio >= 0.5 && srOk && htfOk) grade = 'B';
+    else grade = 'C';
+    const motivos = [];
+    if (!forte) motivos.push('score baixo');
+    if (!htfOk) motivos.push('contra o TF maior');
+    if (!srOk) motivos.push('colado em S/R');
+    if (!sessOk) motivos.push('sessão fraca (' + cl.sessao + ')');
+    if (pairWr != null && pairWr < 0.55) motivos.push('par com histórico fraco (' + (pairWr * 100).toFixed(0) + '%)');
+    return { grade, motivos };
+}
+
 function atualizarDecisao() {
     const v = document.getElementById('decisionVerdict');
     const r = document.getElementById('decisionReason');
@@ -1021,6 +1151,19 @@ function atualizarDecisao() {
         cor = 'var(--ink-muted)';
     }
     if (painel) painel.style.borderLeftColor = cor;
+
+    // Selo de qualidade A/B/C — amarra confluência + IA + HTF + S/R + sessão
+    const grEl = document.getElementById('decisionGrade');
+    const usaGrade = document.getElementById('useGrade').checked;
+    if (usaGrade && (verdictKey === 'CALL' || verdictKey === 'PUT')) {
+        const g = calcularGrade(verdictKey === 'CALL' ? 1 : -1);
+        grEl.textContent = g.grade === 'A' ? 'A · ENTRAR' : g.grade === 'B' ? 'B · OBSERVAR' : 'C · EVITAR';
+        grEl.className = 'decision-grade grade-' + g.grade;
+        grEl.style.display = 'inline-flex';
+        if (g.motivos.length) r.textContent += ' Ressalvas: ' + g.motivos.join(', ') + '.';
+    } else {
+        grEl.style.display = 'none';
+    }
 
     // Som apenas na TRANSIÇÃO para CALL/PUT (não repete enquanto o veredito se
     // mantém; silenciado durante o treino de leitura para não apitar no replay)
@@ -1576,9 +1719,10 @@ async function escanear() {
     const dSave = dados;
     // Salva parâmetros e desliga o filtro HTF (não se aplica a outros símbolos no scan)
     const el = id => document.getElementById(id);
-    const pIds = ['minScore', 'rsiSobrevenda', 'rsiSobrecompra', 'estruturaLookback', 'cooldownVelas', 'useHtf'];
+    const pIds = ['minScore', 'rsiSobrevenda', 'rsiSobrecompra', 'estruturaLookback', 'cooldownVelas', 'useHtf', 'usePesoIA'];
     const pSave = {}; pIds.forEach(i => pSave[i] = el(i).type === 'checkbox' ? el(i).checked : el(i).value);
     el('useHtf').checked = false;
+    el('usePesoIA').checked = false;   // peso é por par; no scan usamos os params já afinados
     htfTrend = [];
     const res = [];
     for (const s of lista) {
@@ -1704,10 +1848,11 @@ async function otimizarIA() {
     const el = id => document.getElementById(id);
     const isSim = fonte() === 'sim';
     const symbol = symbolAtual();
-    const ids = ['minScore', 'rsiSobrevenda', 'rsiSobrecompra', 'estruturaLookback', 'cooldownVelas', 'confMode', 'timeframe', 'useHtf'];
+    const ids = ['minScore', 'rsiSobrevenda', 'rsiSobrecompra', 'estruturaLookback', 'cooldownVelas', 'confMode', 'timeframe', 'useHtf', 'usePesoIA'];
     const save = {}; ids.forEach(i => save[i] = el(i).type === 'checkbox' ? el(i).checked : el(i).value);
     el('confMode').value = 'score';
     el('useHtf').checked = false; htfTrend = [];   // HTF não se aplica ao backtest da grade
+    el('usePesoIA').checked = false;               // peso é circular na otimização — desliga
     const dSave = dados;
 
     const tfs = isSim ? [tfMinutes()] : TFS_IA;
@@ -1759,7 +1904,7 @@ async function otimizarIA() {
 
     // memoriza o melhor TF/combo deste par para o scanner
     const rec = porTf[0];
-    iaCache[symbol] = { tf: rec.tf, ms: rec.ms, sv: rec.sv, sc: rec.sc, lk: rec.lk, cd: rec.cd };
+    iaCache[symbol] = { tf: rec.tf, ms: rec.ms, sv: rec.sv, sc: rec.sc, lk: rec.lk, cd: rec.cd, wr: rec.val.wr };
     localStorage.setItem('iaCache', JSON.stringify(iaCache));
 
     document.getElementById('iaContext').textContent = `${par}: melhor timeframe é ${rotTf(rec.tf)} com ${(rec.val.wr * 100).toFixed(0)}% de acerto fora da amostra. Taxas mostradas: VALIDAÇÃO (treino). Clique para aplicar.`;
@@ -1777,7 +1922,7 @@ async function otimizarIA() {
         el('confMode').value = 'score'; el('minScore').value = r.ms;
         el('rsiSobrevenda').value = r.sv; el('rsiSobrecompra').value = r.sc;
         el('estruturaLookback').value = r.lk; el('cooldownVelas').value = r.cd;
-        iaCache[symbol] = { tf: r.tf, ms: r.ms, sv: r.sv, sc: r.sc, lk: r.lk, cd: r.cd };
+        iaCache[symbol] = { tf: r.tf, ms: r.ms, sv: r.sv, sc: r.sc, lk: r.lk, cd: r.cd, wr: r.val.wr };
         localStorage.setItem('iaCache', JSON.stringify(iaCache));
         row.parentElement.querySelectorAll('.ia-row').forEach(x => x.classList.remove('ia-sel'));
         row.classList.add('ia-sel');
@@ -1798,7 +1943,7 @@ function rotTf(m) { return m === 60 ? 'H1' : 'M' + m; }
 // de confluência mais aparece nos WINs, e qual o regime atual (tendência ×
 // lateral, volatilidade alta × baixa).
 
-const FATORES_NOMES = { T: 'Tendência', Ma: 'EMA 200', Mo: 'RSI', V: 'ATR', E: 'Estrutura', F: 'Fluxo', C: 'Correlação' };
+const FATORES_NOMES = { T: 'Tendência', Ma: 'EMA 200', Mo: 'RSI', V: 'ATR', E: 'Estrutura', F: 'Fluxo', C: 'Correlação', P: 'Padrão de vela' };
 
 function regimeAtual() {
     const last = dados.length - 1;
@@ -1861,6 +2006,19 @@ function renderEstudo() {
         ? fks.map(k => barraWr(FATORES_NOMES[k], porFat[k].w, porFat[k].t)).join('')
         : '<div class="metric-empty">Sem operações avaliadas ainda.</div>';
 
+    // acerto por sessão de mercado (Ásia / Londres / NY / sobreposição)
+    const ORDEM_SES = ['Londres+NY', 'Londres', 'Nova York', 'Ásia'];
+    const porSes = {};
+    av.forEach(e => {
+        const s = sessaoDe(e.entryTime);
+        (porSes[s] = porSes[s] || { w: 0, t: 0 }).t++;
+        if (e.resultado === 'WIN') porSes[s].w++;
+    });
+    const sess = ORDEM_SES.filter(s => porSes[s]);
+    document.getElementById('estudoSessoes').innerHTML = sess.length
+        ? sess.map(s => barraWr(s, porSes[s].w, porSes[s].t)).join('')
+        : '<div class="metric-empty">Sem operações avaliadas ainda.</div>';
+
     // dica de estudo gerada a partir dos padrões
     const dicas = [];
     const melhorH = horas.filter(h => porHora[h].t >= 3).sort((a, b) => porHora[b].w / porHora[b].t - porHora[a].w / porHora[a].t)[0];
@@ -1869,6 +2027,8 @@ function renderEstudo() {
     if (melhorF) dicas.push(`fator mais confiável: ${FATORES_NOMES[melhorF]} presente em ${(porFat[melhorF].w / porFat[melhorF].t * 100).toFixed(0)}% de acerto`);
     const piorF = fks.filter(k => porFat[k].t >= 5).slice(-1)[0];
     if (piorF && piorF !== melhorF && porFat[piorF].w / porFat[piorF].t < 0.5) dicas.push(`atenção: entradas com ${FATORES_NOMES[piorF]} acertaram menos de 50% — estude evitá-las neste par/timeframe`);
+    const melhorS = sess.filter(s => porSes[s].t >= 4).sort((a, b) => porSes[b].w / porSes[b].t - porSes[a].w / porSes[a].t)[0];
+    if (melhorS) dicas.push(`melhor sessão: ${melhorS} (${(porSes[melhorS].w / porSes[melhorS].t * 100).toFixed(0)}% de acerto)`);
     document.getElementById('estudoDica').textContent = dicas.length
         ? '💡 ' + dicas.join(' · ') + '.'
         : '💡 Carregue mais histórico (500+ velas) para padrões mais confiáveis.';
@@ -2122,7 +2282,8 @@ document.addEventListener('click', function desbloquear() {
 }, { once: true });
 document.getElementById('newsSoMoeda').addEventListener('change', renderNoticias);
 // Confluência: mudar modo/pontuação/janela recalcula os sinais na hora
-['confMode', 'minScore', 'confJanela', 'useFluxo', 'fluxoJanela'].forEach(id =>
+['confMode', 'minScore', 'confJanela', 'useFluxo', 'fluxoJanela',
+    'usePadrao', 'useSessao', 'useSR', 'srAtr', 'usePesoIA', 'useGrade'].forEach(id =>
     document.getElementById(id).addEventListener('change', recalcularSinaisApenas));
 // Correlação/pares de referência: recarrega os pares e recalcula
 ['useCorrelacao', 'refPairs'].forEach(id =>
