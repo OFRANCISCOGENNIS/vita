@@ -1383,6 +1383,31 @@ async function carregarHistoricoBinance(symbol, interval, limit) {
     }));
 }
 
+// Proxy do "Crypto IDX" da Binomo (índice sintético proprietário, sem feed
+// público). Aproximação: cesta de criptos reais da Binance, cada uma normalizada
+// em base 100 no primeiro fechamento; o índice é a média das velas normalizadas.
+// NÃO reproduz os valores exatos da Binomo — é uma referência de comportamento.
+const CRYPTOIDX_CESTA = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'XRPUSDT'];
+async function carregarHistoricoCryptoIDX(interval, limit) {
+    const series = await Promise.all(CRYPTOIDX_CESTA.map(s => carregarHistoricoBinance(s, interval, limit).catch(() => null)));
+    const ok = series.filter(s => s && s.length);
+    if (!ok.length) throw new Error('cesta Crypto IDX indisponível');
+    const mapa = new Map();
+    ok.forEach(s => {
+        const f = 100 / s[0].close;   // normaliza cada ativo em base 100
+        s.forEach(c => {
+            let a = mapa.get(c.time);
+            if (!a) { a = { o: 0, h: 0, l: 0, cl: 0, v: 0, bv: 0, n: 0 }; mapa.set(c.time, a); }
+            a.o += c.open * f; a.h += c.high * f; a.l += c.low * f; a.cl += c.close * f;
+            a.v += c.volume || 0; a.bv += c.buyVol || 0; a.n++;
+        });
+    });
+    const out = [...mapa.keys()].sort((x, y) => x - y)
+        .filter(t => mapa.get(t).n === ok.length)   // só buckets com toda a cesta
+        .map(t => { const a = mapa.get(t); return { time: t, open: a.o / a.n, high: a.h / a.n, low: a.l / a.n, close: a.cl / a.n, volume: a.v, buyVol: a.bv }; });
+    return out.slice(Math.max(0, out.length - limit));
+}
+
 function fecharWS() {
     if (ws) {
         try { ws.onclose = null; ws.close(); } catch (e) {}
@@ -1671,6 +1696,26 @@ async function carregar() {
     const symbol = symbolAtual();
     const interval = binanceInterval();
     const limit = Math.min(1000, Math.max(50, parseInt(document.getElementById('numCandles').value) || 300));
+
+    // Crypto IDX (proxy): cesta de criptos, sem WS — atualiza via REST a cada 15s
+    if (symbol === 'CRYPTOIDX') {
+        setStatus('connecting', 'Montando Crypto IDX (proxy)…');
+        try {
+            dados = await carregarHistoricoCryptoIDX(interval, limit);
+            if (!dados.length) throw new Error('cesta vazia');
+            refPares = [];
+            redesenharTudo(true);
+            setStatus('on', 'AO VIVO (proxy, 15s) • Crypto IDX ≈ cesta Binance');
+            refTimer = setInterval(async () => {
+                if (fonte() !== 'binance' || symbolAtual() !== 'CRYPTOIDX' || treino) return;
+                try { dados = await carregarHistoricoCryptoIDX(interval, limit); recalcularSinaisApenas(); } catch (e) {}
+            }, 15000);
+        } catch (err) {
+            setStatus('err', 'Crypto IDX indisponível: ' + (err.message || err));
+        }
+        return;
+    }
+
     setStatus('connecting', 'Carregando histórico…');
     try {
         dados = await carregarHistoricoBinance(symbol, interval, limit);
@@ -2062,6 +2107,7 @@ let tvWidget = null;
 
 function tvSymbolTV() {
     const cod = symbolAtual();
+    if (cod === 'CRYPTOIDX') return 'CRYPTOCAP:TOTAL';   // proxy visual: cap. total do mercado cripto
     if (ehForex() && PARES_YAHOO[cod]) return PARES_YAHOO[cod].tv;   // ex.: FX:EURUSD, TVC:GOLD
     return 'BINANCE:' + cod;   // ex.: BINANCE:BTCUSDT
 }
@@ -2200,6 +2246,7 @@ async function carregarNoticias() {
 
 // Termos de busca da moeda atual (para filtrar notícias)
 function termosMoeda() {
+    if (symbolAtual() === 'CRYPTOIDX') return ['bitcoin', 'btc', 'crypto', 'ethereum'];  // índice: notícias gerais de cripto
     const base = baseAsset().toLowerCase();
     const nomes = {
         btc: ['btc', 'bitcoin'], eth: ['eth', 'ethereum'], sol: ['sol', 'solana'], xrp: ['xrp', 'ripple'],
@@ -2283,6 +2330,11 @@ document.getElementById('btnTreinoSair').addEventListener('click', () => encerra
 document.getElementById('btnScan').addEventListener('click', escanear);
 document.getElementById('btnIA').addEventListener('click', otimizarIA);
 document.getElementById('btnEstudo').addEventListener('click', renderEstudo);
+document.getElementById('btnCryptoIdx').addEventListener('click', function () {
+    document.getElementById('fonte').value = 'binance';
+    document.getElementById('symbol').value = 'CRYPTOIDX';
+    montarWidgetTV(); carregar();
+});
 document.getElementById('useHtf').addEventListener('change', async function () {
     if (!dados.length) return;
     await carregarHtf();
