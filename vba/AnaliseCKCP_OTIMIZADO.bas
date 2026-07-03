@@ -131,7 +131,10 @@ Sub GerarRelatorio()
     abasObsoletas = Array("RISCO", "ANOMALIAS", "ANALISE REGIONAL", _
                           "PEND CLASSIFICACAO", "RESUMO POR PEP", "CLASSIFICACAO", _
                           "MAT vs SERV AT", "PREMISSAS", "CLASSE DE CUSTO", _
-                          "PAINEL EXECUTIVO", "PORTFOLIO OBRA")
+                          "PAINEL EXECUTIVO", "PORTFOLIO OBRA", _
+                          "PRECO OUTLIER", "MATERIAL SEM SERVICO", "QUALIDADE CLASSIF", _
+                          "DUPLICADOS", "SCORE PEP", "BENCHMARK PEP", _
+                          "ANALISE TEMPORAL", "ESTORNOS")
     Dim ix As Long
     For ix = 0 To UBound(abasObsoletas)
         On Error Resume Next
@@ -192,6 +195,9 @@ Sub GerarRelatorio()
     gEtapa = "Gerar_NaoClassificados": Gerar_NaoClassificados
     gEtapa = "Gerar_RacionalizacaoCOM": Gerar_RacionalizacaoCOM
     gEtapa = "Gerar_Regras": Gerar_Regras
+
+    ' MELHORIAS v2: analises adicionais (outliers, duplicados, score, etc.)
+    gEtapa = "Gerar_Melhorias": Gerar_Melhorias
 
     ' FASE 5: ordena as guias por fluxo de leitura e ativa o painel
     gEtapa = "OrganizarAbas": OrganizarAbas
@@ -1184,6 +1190,29 @@ Private Sub CarregarDescServico()
     dDescSrv("5054000033") = "EXEC INSTAL ELETR CX CONCENTRACAO DE TP"
     dDescSrv("5054000036") = "FIXACAO E INTERLIGACAO MEDIDOR EM PAINEL"
     dDescSrv("5054100006") = "LANCAMENTO DE CORDAO DE FIBRA OPTICA"
+    ' Base de servicos (planilha base_servi_os.xlsx)
+    dDescSrv("5028000005") = "FABRICACAO E INSTALACAO PLACA DA OBRA"
+    dDescSrv("5040000002") = "SINALIZACAO DE ESTRUTURAS COM PINTURA"
+    dDescSrv("5040000006") = "DISTRIBUICAO DE ESTRUTURA LD LM PDE"
+    dDescSrv("5040000008") = "LOCACAO DE ESTRUTURAS LD LM PDE"
+    dDescSrv("5040100002") = "FUNDACAO TIPO C1"
+    dDescSrv("5040100004") = "FUNDACAO TIPO D2"
+    dDescSrv("5040100005") = "FUNDACAO TIPO D3"
+    dDescSrv("5040100046") = "FUNDACAO TIPO D4"
+    dDescSrv("5040200011") = "IMPL ESTR CONC ACIMA DE 26M LD LM PDE"
+    dDescSrv("5040300014") = "MONT ESTRUT CONC CIR SIMPLES SUSP URB LD"
+    dDescSrv("5040300016") = "MONT ESTRUT CONC CIRC SIMPL ANCOR URB LD"
+    dDescSrv("5042000005") = "LANC/NIV/GRAM CABOS PARA-RAIO LD LM PDE"
+    dDescSrv("5042000020") = "LANC COND CIRC SIMP CAL 927,2 LD LM PDE"
+    dDescSrv("5042100005") = "GRAMP COND CIRC SIMP CAL 927,2 LD LM PDE"
+    dDescSrv("5042300008") = "NIV COND CIRC DUP CAL 927,2 LD LM PDE"
+    dDescSrv("5042400003") = "EXEC DE ATERR RURAL - FASE I LD LM PDE"
+    dDescSrv("5045400001") = "CONSERT DE CALCADA COM CIMENTO LD LM PDE"
+    dDescSrv("5045800006") = "EXECUCAO DOS PROGRAMAS AMBIENTAIS"
+    dDescSrv("5045900007") = "INSTALACAO DE DEFENSA LT"
+    dDescSrv("5050200013") = "PINTURA DE BASE OU POSTE C/ CAL SE PDE"
+    dDescSrv("5054100001") = "INSTALACAO E INTERLIG EQUIP COMUNICACAO"
+    dDescSrv("5054200013") = "EXECUTAR INSTALACAO PAINEL MEDICAO OPER"
 End Sub
 
 Private Function DescServico(ByVal cod As String) As String
@@ -1632,15 +1661,20 @@ Private Function CobertoReligador(ByVal cls2 As String) As Boolean
     CobertoReligador = (s = "COND PROT" Or s = "CABO ISOLADO" Or s = "COND COBRE")
 End Function
 
-' Aderencia com margem de 10% (para mais ou para menos), por magnitude.
+' Aderencia com margem percentual (para mais ou para menos), por magnitude.
+' Margem hibrida: alem do percentual (MARGEM_ADERENCIA), considera-se
+' aderente quando a diferenca absoluta fica dentro de um piso configuravel
+' (MARGEM_ABS_MIN) - evita falso REPROVADO em familias de valor muito baixo.
 Private Function DentroMargem(ByVal a As Double, ByVal b As Double) As Boolean
-    Dim x As Double, y As Double, base As Double
+    Dim x As Double, y As Double, base As Double, dif As Double
     x = Abs(a): y = Abs(b)
     base = x: If y > base Then base = y
+    dif = Abs(x - y)
     If base = 0 Then
         DentroMargem = True            ' ambos zero
     Else
-        DentroMargem = (Abs(x - y) <= (CfgNum("MARGEM_ADERENCIA", 10) / 100) * base)
+        DentroMargem = (dif <= (CfgNum("MARGEM_ADERENCIA", 10) / 100) * base) _
+                       Or (dif <= CfgNum("MARGEM_ABS_MIN", 0))
     End If
 End Function
 
@@ -1682,6 +1716,13 @@ End Function
 
 Private Function ToNum(v As Variant) As Double
     If IsNumeric(v) Then ToNum = CDbl(v) Else ToNum = 0
+End Function
+
+' ADERENCIA (MATERIAL e SERVICO): VALOR_MOEDA e QTD_ENTRADA devem ter o
+' MESMO sinal (ambos positivos, ambos negativos, ou ambos zero).
+' Qualquer combinacao de sinais diferentes -> NAO ADERENTE.
+Private Function EhAderenteValQtd(ByVal val As Double, ByVal qtd As Double) As Boolean
+    EhAderenteValQtd = (val > 0 And qtd > 0) Or (val < 0 And qtd < 0) Or (val = 0 And qtd = 0)
 End Function
 
 
@@ -2609,14 +2650,10 @@ PulaConta:
         outp(rr, 11) = MatInfoLinha(fi, 2)   ' CLS2
         ' PRECO_UNITARIO = VALOR_MOEDA / QTD_ENTRADA (somas brutas, 4 casas)
         If q <> 0 Then outp(rr, 12) = Round(dV(k) / dQ(k), 4)
-        ' ADERENCIA por tipo de PEP ANEEL (ODD/ODI/ODM/ODS):
-        '   ODD (.D): QTD_ENTRADA ou VALOR_MOEDA positivo   -> NAO ADERENTE
-        '   ODI/ODM/ODS: QTD_ENTRADA ou VALOR_MOEDA negativo -> NAO ADERENTE
-        If TipoPEPCodigo(pep) = "D" Then
-            outp(rr, 13) = IIf(q > 0 Or val > 0, "NAO ADERENTE", "ADERENTE")
-        Else
-            outp(rr, 13) = IIf(q < 0 Or val < 0, "NAO ADERENTE", "ADERENTE")
-        End If
+        ' ADERENCIA: VALOR_MOEDA e QTD_ENTRADA devem ter o MESMO sinal
+        ' (ambos positivos, ambos negativos, ou ambos zero). Qualquer
+        ' combinacao de sinais diferentes -> NAO ADERENTE.
+        outp(rr, 13) = IIf(EhAderenteValQtd(val, q), "ADERENTE", "NAO ADERENTE")
 PulaLin:
     Next r
     EscreverAba "MATERIAL", outp
@@ -2663,31 +2700,37 @@ Prox:
         If Not (Round(dQ(ks(r)), 2) = 0 And Round(dV(ks(r)), 2) = 0) Then nKeep = nKeep + 1
     Next r
 
-    Dim outp() As Variant: ReDim outp(0 To nKeep, 1 To 13)
+    Dim outp() As Variant: ReDim outp(0 To nKeep, 1 To 14)
     outp(0, 1) = "PEP4NIVEL": outp(0, 2) = "PEP3": outp(0, 3) = "TIPO_PEP"
     outp(0, 4) = "COD_SERVICO": outp(0, 5) = "DESCRICAO_SERVICO"
     outp(0, 6) = "CLASSE_CUSTO"
     outp(0, 7) = "QTD_ENTRADA": outp(0, 8) = "VALOR_MOEDA"
     outp(0, 9) = "CLS1": outp(0, 10) = "CLS2": outp(0, 11) = "CLS3"
     outp(0, 12) = "TIPO_APLICACAO": outp(0, 13) = "GRUPO_PERC"
+    outp(0, 14) = "ADERENCIA"
 
+    Dim qS As Double, vS As Double
     ki = 0
     For r = 0 To dFirst.Count - 1
         k = ks(r): fi = dFirst(k)
-        If Round(dQ(k), 2) = 0 And Round(dV(k), 2) = 0 Then GoTo PulaZero   ' QTD=0 e VALOR=0
+        qS = Round(dQ(k), 2): vS = Round(dV(k), 2)
+        If qS = 0 And vS = 0 Then GoTo PulaZero   ' QTD=0 e VALOR=0
         ki = ki + 1
         pep = Trim$(CStr(dados(fi, cPEP)))
         outp(ki, 1) = pep: outp(ki, 2) = PEP3(pep): outp(ki, 3) = TipoPEPANEEL(pep)
         outp(ki, 4) = NormCod(dados(fi, cMaterial))
         outp(ki, 5) = DescServico(NormCod(dados(fi, cMaterial)))
         outp(ki, 6) = ValorCampo(fi, cClasse)
-        outp(ki, 7) = Round(dQ(k), 2)
-        outp(ki, 8) = Round(dV(k), 2)
+        outp(ki, 7) = qS
+        outp(ki, 8) = vS
         outp(ki, 9) = SrvInfoLinha(fi, 0)    ' CLS1
         outp(ki, 10) = SrvInfoLinha(fi, 1)   ' CLS2
         outp(ki, 11) = SrvInfoLinha(fi, 2)   ' CLS3
         outp(ki, 12) = SrvInfoLinha(fi, 3)   ' TIPO_APLICACAO
         outp(ki, 13) = GrupoPerc(pep)
+        ' ADERENCIA: VALOR_MOEDA e QTD_ENTRADA devem ter o MESMO sinal
+        ' (ambos positivos, ambos negativos, ou ambos zero).
+        outp(ki, 14) = IIf(EhAderenteValQtd(vS, qS), "ADERENTE", "NAO ADERENTE")
 PulaZero:
     Next r
     EscreverAba "SERVICO", outp
@@ -2860,15 +2903,19 @@ SomaPep:
     ' -----------------------------------------------------------------------
     ' SECAO B - MATERIAL COM QTD/VALOR INCOERENTES / NAO ADERENTE
     '   Consolida por PEP4NIVEL + COD_MATERIAL + CLASSIFICACAO (igual aba
-    '   MATERIAL) e lista as linhas NAO ADERENTES pela regra ODD/ODI/ODM/ODS:
-    '     ODD (.D): QTD ou VALOR positivo   -> NAO ADERENTE
-    '     ODI/ODM/ODS: QTD ou VALOR negativo -> NAO ADERENTE
+    '   MATERIAL) e lista as linhas NAO ADERENTES pela regra de sinal:
+    '   VALOR_MOEDA e QTD_ENTRADA devem ter o MESMO sinal (ambos positivos,
+    '   ambos negativos, ou ambos zero); qualquer outra combinacao e
+    '   NAO ADERENTE (EhAderenteValQtd).
     ' -----------------------------------------------------------------------
     row = EscreverCabecalhoAlerta(ws, row, _
-        "B  |  MATERIAL NAO ADERENTE  (QTD/VALOR incoerentes - espelha a aba MATERIAL)", _
+        "B  |  MATERIAL NAO ADERENTE  (ordenado por materialidade - espelha a aba MATERIAL)", _
         Array("PEP4NIVEL", "TIPO_PEP", "MATERIAL", "TEXTO_MATERIAL", "CLASSIFICACAO", _
-              "CLASSE_CUSTO", "CLS2", "QTD_ENTRADA", "VALOR_MOEDA", "MOTIVO"), _
+              "CLASSE_CUSTO", "CLS2", "QTD_ENTRADA", "VALOR_MOEDA", "MOTIVO", "SEVERIDADE"), _
         corB, corBcl)
+
+    Dim sevAlta As Double: sevAlta = CfgNum("SEV_ALTA_RS", 50000)
+    Dim sevMedia As Double: sevMedia = CfgNum("SEV_MEDIA_RS", 10000)
 
     Dim dGQ As Object, dGV As Object, dGFirst As Object
     Set dGQ = CreateObject("Scripting.Dictionary")
@@ -2887,6 +2934,8 @@ SomaPep:
 ProxBcalc:
     Next i
 
+    ' Buffer das linhas NAO ADERENTES (ordenadas depois por valor absoluto)
+    Dim bufB As Object: Set bufB = New Collection
     Dim kvG As Variant, fiG As Long, qG As Double, vG As Double
     Dim motG As String, tipoG As String, tpAneel As String
     For Each kvG In dGFirst.Keys
@@ -2897,50 +2946,86 @@ ProxBcalc:
         If qG = 0 And vG = 0 Then GoTo ProxB
         If InStr(UCase$(CStr(dados(fiG, cClassif))), "FALTA") > 0 _
            And qG = 0 And vG <> 0 Then GoTo ProxB
-        ' Regra ADERENCIA por tipo de PEP (igual aba MATERIAL)
+        ' Regra ADERENCIA por sinal (igual aba MATERIAL)
         tipoG = TipoPEPCodigo(pep)
         tpAneel = TipoPEPANEEL(pep)
         If tipoG = "S" Then tpAneel = "ODS"
-        motG = ""
-        If tipoG = "D" Then
-            If qG > 0 Then motG = "QTD+"
-            If vG > 0 Then motG = Trim$(motG & " VALOR+")
+        If EhAderenteValQtd(vG, qG) Then GoTo ProxB   ' ADERENTE -> ignora
+        If qG = 0 And vG <> 0 Then
+            motG = "PENDENCIA DE AJUSTE (QTD=0)"
+        ElseIf vG = 0 And qG <> 0 Then
+            motG = "PENDENCIA DE AJUSTE (VALOR=0)"
         Else
-            If qG < 0 Then motG = "QTD-"
-            If vG < 0 Then motG = Trim$(motG & " VALOR-")
+            motG = "SINAIS DIVERGENTES (QTD x VALOR)"
         End If
-        If motG = "" Then GoTo ProxB   ' ADERENTE -> ignora
-        motG = tpAneel & ": " & Trim$(motG)
-        contB = contB + 1
-        ws.Cells(row, 1).Value = pep
-        ws.Cells(row, 2).Value = tpAneel
-        ws.Cells(row, 3).Value = NormCod(dados(fiG, cMaterial))
-        ws.Cells(row, 4).Value = ValorCampo(fiG, cTexto)
-        ws.Cells(row, 5).Value = dados(fiG, cClassif)
-        ws.Cells(row, 6).Value = ValorCampo(fiG, cClasse)
-        ws.Cells(row, 7).Value = MatInfoLinha(fiG, 2)
-        ws.Cells(row, 8).Value = qG
-        ws.Cells(row, 9).Value = vG
-        ws.Cells(row, 10).Value = motG
-        With ws.Range(ws.Cells(row, 1), ws.Cells(row, 10))
-            .Font.Color = corInk
-            If (contB Mod 2) = 0 Then .Interior.Color = corBzb
-        End With
-        ws.Cells(row, 8).NumberFormat = "#,##0.00"
-        ws.Cells(row, 9).NumberFormat = "#,##0.00"
-        With ws.Cells(row, 2)
-            .Font.Color = corB: .Font.Bold = True
-        End With
-        If qG < 0 Or (tipoG = "D" And qG > 0) Then ws.Cells(row, 8).Font.Color = corB
-        If vG < 0 Or (tipoG = "D" And vG > 0) Then ws.Cells(row, 9).Font.Color = corB
-        With ws.Cells(row, 10)
-            .Interior.Color = corBcl
-            .Font.Color = corB: .Font.Bold = True: .Font.Size = 8.5
-        End With
-        row = row + 1
+        motG = tpAneel & ": " & motG
+        bufB.Add Array(pep, tpAneel, NormCod(dados(fiG, cMaterial)), _
+            ValorCampo(fiG, cTexto), dados(fiG, cClassif), ValorCampo(fiG, cClasse), _
+            MatInfoLinha(fiG, 2), qG, vG, motG, Abs(vG))
 ProxB:
     Next kvG
-    If contB = 0 Then
+
+    ' Ordena o buffer por valor absoluto decrescente (materialidade)
+    Dim aB() As Variant, nB As Long, iB As Long, jB As Long
+    nB = bufB.Count
+    contB = nB
+    If nB > 0 Then
+        ReDim aB(1 To nB)
+        For iB = 1 To nB: aB(iB) = bufB(iB): Next iB
+        Dim tmpB As Variant
+        For iB = 2 To nB
+            tmpB = aB(iB): jB = iB - 1
+            Do While jB >= 1
+                If CDbl(aB(jB)(10)) < CDbl(tmpB(10)) Then aB(jB + 1) = aB(jB): jB = jB - 1 Else Exit Do
+            Loop
+            aB(jB + 1) = tmpB
+        Next iB
+
+        Dim sev As String, absV As Double
+        For iB = 1 To nB
+            absV = CDbl(aB(iB)(10))
+            Select Case True
+                Case absV >= sevAlta: sev = "ALTA"
+                Case absV >= sevMedia: sev = "MEDIA"
+                Case Else: sev = "BAIXA"
+            End Select
+            ws.Cells(row, 1).Value = aB(iB)(0)
+            ws.Cells(row, 2).Value = aB(iB)(1)
+            ws.Cells(row, 3).Value = aB(iB)(2)
+            ws.Cells(row, 4).Value = aB(iB)(3)
+            ws.Cells(row, 5).Value = aB(iB)(4)
+            ws.Cells(row, 6).Value = aB(iB)(5)
+            ws.Cells(row, 7).Value = aB(iB)(6)
+            ws.Cells(row, 8).Value = aB(iB)(7)
+            ws.Cells(row, 9).Value = aB(iB)(8)
+            ws.Cells(row, 10).Value = aB(iB)(9)
+            ws.Cells(row, 11).Value = sev
+            With ws.Range(ws.Cells(row, 1), ws.Cells(row, 11))
+                .Font.Color = corInk
+                If (iB Mod 2) = 0 Then .Interior.Color = corBzb
+            End With
+            ws.Cells(row, 8).NumberFormat = "#,##0.00"
+            ws.Cells(row, 9).NumberFormat = "#,##0.00"
+            With ws.Cells(row, 2)
+                .Font.Color = corB: .Font.Bold = True
+            End With
+            ws.Cells(row, 8).Font.Color = corB
+            ws.Cells(row, 9).Font.Color = corB
+            With ws.Cells(row, 10)
+                .Interior.Color = corBcl
+                .Font.Color = corB: .Font.Bold = True: .Font.Size = 8.5
+            End With
+            With ws.Cells(row, 11)
+                .Font.Bold = True: .HorizontalAlignment = xlCenter
+                Select Case sev
+                    Case "ALTA": .Interior.Color = corBcl: .Font.Color = corB
+                    Case "MEDIA": .Interior.Color = corEcl: .Font.Color = corE
+                    Case Else: .Font.Color = corMut
+                End Select
+            End With
+            row = row + 1
+        Next iB
+    Else
         ws.Cells(row, 1).Value = "(nenhuma ocorrencia encontrada)"
         ws.Cells(row, 1).Font.Italic = True: ws.Cells(row, 1).Font.Color = corMut
         row = row + 1
@@ -3042,6 +3127,7 @@ ProxE:
     ws.Columns("H").ColumnWidth = 32
     ws.Columns("I").ColumnWidth = 24
     ws.Columns("J").ColumnWidth = 14
+    ws.Columns("K").ColumnWidth = 12
 
     On Error Resume Next
     ws.Tab.Color = CorAba("ALERTAS CRITICOS")
@@ -3188,6 +3274,615 @@ Private Sub Gerar_Regras()
     ws.Range(ws.Cells(2, 1), ws.Cells(cnt + 1, 3)).VerticalAlignment = xlTop
     ws.Range(ws.Cells(2, 1), ws.Cells(cnt + 1, 3)).EntireRow.AutoFit
 End Sub
+
+'==============================================================================
+'  MELHORIAS DE ANALISE (v2)
+'  Conjunto de analises adicionais orquestradas por Gerar_Melhorias.
+'  Cada sub monta uma colecao de linhas e delega a escrita/formatacao a
+'  EscreverColecaoAba -> EscreverAba (visual padrao das demais abas).
+'==============================================================================
+Private Sub Gerar_Melhorias()
+    gEtapa = "Gerar_PrecoOutlier": Gerar_PrecoOutlier
+    gEtapa = "Gerar_MaterialSemServico": Gerar_MaterialSemServico
+    gEtapa = "Gerar_QualidadeClassif": Gerar_QualidadeClassif
+    gEtapa = "Gerar_Duplicados": Gerar_Duplicados
+    gEtapa = "Gerar_ScorePep": Gerar_ScorePep
+    gEtapa = "Gerar_BenchmarkPep": Gerar_BenchmarkPep
+    gEtapa = "Gerar_AnaliseTemporal": Gerar_AnaliseTemporal
+    gEtapa = "Gerar_Estornos": Gerar_Estornos
+End Sub
+
+' Escreve uma colecao de linhas (cada item = Array 0-based) numa aba nova,
+' usando o mesmo visual padrao (cabecalho verde, zebra, bordas, formatos).
+Private Sub EscreverColecaoAba(ByVal nome As String, ByVal cab As Variant, linhas As Object)
+    Dim nc As Long: nc = UBound(cab) - LBound(cab) + 1
+    Dim outp() As Variant, j As Long, rr As Long
+    If linhas Is Nothing Or linhas.Count = 0 Then
+        ReDim outp(0 To 1, 1 To nc)
+        For j = 1 To nc: outp(0, j) = cab(j - 1): Next j
+        outp(1, 1) = "(nenhuma ocorrencia encontrada)"
+        EscreverAba nome, outp
+        Exit Sub
+    End If
+    ReDim outp(0 To linhas.Count, 1 To nc)
+    For j = 1 To nc: outp(0, j) = cab(j - 1): Next j
+    For rr = 1 To linhas.Count
+        Dim ra As Variant: ra = linhas(rr)
+        For j = 1 To nc: outp(rr, j) = ra(j - 1): Next j
+    Next rr
+    EscreverAba nome, outp
+End Sub
+
+' Mediana de uma colecao de Double (ordena uma copia por insercao).
+Private Function MedianaDeColecao(col As Object) As Double
+    Dim n As Long: n = col.Count
+    If n = 0 Then MedianaDeColecao = 0: Exit Function
+    Dim a() As Double: ReDim a(1 To n)
+    Dim i As Long
+    For i = 1 To n: a(i) = CDbl(col(i)): Next i
+    Dim jj As Long, chave As Double
+    For i = 2 To n
+        chave = a(i): jj = i - 1
+        Do While jj >= 1
+            If a(jj) > chave Then a(jj + 1) = a(jj): jj = jj - 1 Else Exit Do
+        Loop
+        a(jj + 1) = chave
+    Next i
+    If n Mod 2 = 1 Then
+        MedianaDeColecao = a((n + 1) \ 2)
+    Else
+        MedianaDeColecao = (a(n \ 2) + a(n \ 2 + 1)) / 2
+    End If
+End Function
+
+' Converte um valor de data (serial Excel ou texto) para serial Double. 0 = invalido.
+Private Function ToData(ByVal v As Variant) As Double
+    On Error Resume Next
+    If IsDate(v) Then ToData = CDbl(CDate(v)) Else ToData = 0
+    On Error GoTo 0
+End Function
+
+' ---------------------------------------------------------------------------
+' MELHORIA 1: PRECO OUTLIER - preco unitario fora da curva por material.
+'   Consolida QTD/VALOR por PEP+MATERIAL, calcula preco unitario e compara
+'   com a mediana do proprio material (base inteira). Sinaliza desvios acima
+'   de OUTLIER_PCT quando ha amostra minima (>= OUTLIER_MIN_AMOSTRAS).
+' ---------------------------------------------------------------------------
+Private Sub Gerar_PrecoOutlier()
+    Dim pct As Double: pct = CfgNum("OUTLIER_PCT", 50)
+    Dim minAmostra As Long: minAmostra = CLng(CfgNum("OUTLIER_MIN_AMOSTRAS", 4))
+
+    Dim dQ As Object, dV As Object, dFirst As Object
+    Set dQ = CreateObject("Scripting.Dictionary")
+    Set dV = CreateObject("Scripting.Dictionary")
+    Set dFirst = CreateObject("Scripting.Dictionary")
+
+    Dim i As Long, pep As String, cod As String, k As String
+    For i = 1 To UBound(dados, 1)
+        pep = Trim$(CStr(dados(i, cPEP))): If pep = "" Then GoTo Prox
+        If Not EhMaterial(CStr(dados(i, cClassif))) Then GoTo Prox
+        cod = NormCod(dados(i, cMaterial))
+        If cod = "" Or cod = "0" Then GoTo Prox
+        k = pep & "|" & cod
+        If Not dFirst.Exists(k) Then dFirst(k) = i
+        dQ(k) = dQ(k) + ToNum(dados(i, cQtd))
+        dV(k) = dV(k) + ToNum(dados(i, cValor))
+Prox:
+    Next i
+
+    ' Distribuicao de precos unitarios por material
+    Dim dPrecos As Object: Set dPrecos = CreateObject("Scripting.Dictionary")
+    Dim kv As Variant, q As Double, val As Double, pu As Double
+    For Each kv In dFirst.Keys
+        q = dQ(kv): val = dV(kv)
+        If q = 0 Then GoTo ProxPu
+        pu = val / q
+        cod = Mid$(CStr(kv), InStr(CStr(kv), "|") + 1)
+        If Not dPrecos.Exists(cod) Then Set dPrecos(cod) = New Collection
+        dPrecos(cod).Add pu
+ProxPu:
+    Next kv
+
+    ' Mediana por material
+    Dim dMediana As Object: Set dMediana = CreateObject("Scripting.Dictionary")
+    Dim dNamostra As Object: Set dNamostra = CreateObject("Scripting.Dictionary")
+    For Each kv In dPrecos.Keys
+        dMediana(kv) = MedianaDeColecao(dPrecos(kv))
+        dNamostra(kv) = dPrecos(kv).Count
+    Next kv
+
+    Dim linhas As Object: Set linhas = New Collection
+    Dim fi As Long, med As Double, desvio As Double, alerta As String
+    For Each kv In dFirst.Keys
+        q = dQ(kv): val = dV(kv)
+        If q = 0 Then GoTo ProxOut
+        cod = Mid$(CStr(kv), InStr(CStr(kv), "|") + 1)
+        If CLng(dNamostra(cod)) < minAmostra Then GoTo ProxOut
+        med = CDbl(dMediana(cod))
+        If med = 0 Then GoTo ProxOut
+        pu = val / q
+        desvio = (pu - med) / Abs(med) * 100
+        If Abs(desvio) <= pct Then GoTo ProxOut
+        fi = dFirst(kv)
+        pep = Trim$(CStr(dados(fi, cPEP)))
+        alerta = IIf(desvio > 0, "ACIMA DA MEDIANA", "ABAIXO DA MEDIANA")
+        linhas.Add Array(pep, PEP3(pep), TipoPEPANEEL(pep), cod, _
+            TextoCampo(fi, cTexto), Round(q, 2), Round(val, 2), _
+            Round(pu, 4), Round(med, 4), Round(desvio, 1), _
+            CLng(dNamostra(cod)), alerta)
+ProxOut:
+    Next kv
+
+    EscreverColecaoAba "PRECO OUTLIER", Array("PEP4NIVEL", "PEP3", "TIPO_PEP", _
+        "MATERIAL", "TEXTO_MATERIAL", "QTD_ENTRADA", "VALOR_MOEDA", _
+        "PRECO_UNITARIO", "PRECO_MEDIANO", "DESVIO_PCT", "N_AMOSTRAS", "ALERTA"), linhas
+End Sub
+
+' ---------------------------------------------------------------------------
+' MELHORIA 8: MATERIAL SEM SERVICO - material (UC/COM/UAR) lancado num PEP
+'   sem nenhum servico da mesma familia. Espelho de SERVICO SEM MATERIAL.
+' ---------------------------------------------------------------------------
+Private Sub Gerar_MaterialSemServico()
+    Dim dSrv As Object: Set dSrv = CreateObject("Scripting.Dictionary")   ' pep|familia -> QTD servico
+    Dim dQ As Object:   Set dQ   = CreateObject("Scripting.Dictionary")   ' pep|cod -> QTD material
+    Dim dVv As Object:  Set dVv  = CreateObject("Scripting.Dictionary")
+    Dim dLanc As Object: Set dLanc = CreateObject("Scripting.Dictionary")
+    Dim dFam As Object:  Set dFam  = CreateObject("Scripting.Dictionary")
+    Dim dPepK As Object: Set dPepK = CreateObject("Scripting.Dictionary")
+    Dim dTxt As Object:  Set dTxt  = CreateObject("Scripting.Dictionary")
+
+    Dim i As Long, pep As String, fam As String, k As String, cod As String
+
+    ' 1a passada: servico por PEP|familia
+    For i = 1 To UBound(dados, 1)
+        pep = Trim$(CStr(dados(i, cPEP))): If pep = "" Then GoTo P1
+        If EhMaterial(CStr(dados(i, cClassif))) Then GoTo P1
+        fam = FamiliaAlias(SrvInfoLinha(i, 1))
+        If fam = "" Then fam = "(SEM CLS2)"
+        k = pep & "|" & fam
+        dSrv(k) = dSrv(k) + Abs(ToNum(dados(i, cQtd)) * ComboFator(dados(i, cMaterial)))
+P1:
+    Next i
+
+    ' 2a passada: material sem servico da mesma familia
+    Dim kPepCod As String
+    For i = 1 To UBound(dados, 1)
+        pep = Trim$(CStr(dados(i, cPEP))): If pep = "" Then GoTo P2
+        If Not EhMaterial(CStr(dados(i, cClassif))) Then GoTo P2
+        fam = FamiliaAlias(MatInfoLinha(i, 2))
+        If fam = "" Then fam = "(SEM CLS2)"
+        k = pep & "|" & fam
+        If dSrv.Exists(k) Then If dSrv(k) > 0 Then GoTo P2   ' tem servico -> ignora
+        cod = NormCod(dados(i, cMaterial))
+        If cod = "" Or cod = "0" Then GoTo P2
+        kPepCod = pep & "|" & cod
+        dQ(kPepCod) = dQ(kPepCod) + Abs(ToNum(dados(i, cQtd)))
+        dVv(kPepCod) = dVv(kPepCod) + ToNum(dados(i, cValor))
+        dLanc(kPepCod) = dLanc(kPepCod) + 1
+        If Not dFam.Exists(kPepCod) Then dFam(kPepCod) = fam
+        If Not dPepK.Exists(kPepCod) Then dPepK(kPepCod) = pep
+        If Not dTxt.Exists(kPepCod) Then dTxt(kPepCod) = TextoCampo(i, cTexto)
+P2:
+    Next i
+
+    Dim linhas As Object: Set linhas = New Collection
+    Dim kv As Variant, pep4 As String, famX As String, tipo As String, risco As String
+    For Each kv In dQ.Keys
+        If CDbl(dQ(kv)) <= 0 Then GoTo ProxK
+        pep4 = CStr(dPepK(kv))
+        cod = Mid$(CStr(kv), InStrRev(CStr(kv), "|") + 1)
+        famX = CStr(dFam(kv))
+        tipo = TipoDaClassif(famX, CStr(dTxt(kv)))
+        If tipo = "" Then tipo = "MAT"
+        Select Case tipo
+            Case "UC": risco = "ALTO"
+            Case "COM": risco = "MEDIO"
+            Case Else: risco = "BAIXO"
+        End Select
+        linhas.Add Array(PEP3(pep4), pep4, cod, CStr(dTxt(kv)), famX, tipo, _
+            Round(CDbl(dQ(kv)), 2), Round(CDbl(dVv(kv)), 2), CLng(dLanc(kv)), risco)
+ProxK:
+    Next kv
+
+    EscreverColecaoAba "MATERIAL SEM SERVICO", Array("PEP3NIVEL", "PEP4NIVEL", _
+        "COD_MATERIAL", "TEXTO_MATERIAL", "FAMILIA_CLS2", "TIPO_FAMILIA", _
+        "QTD_MATERIAL", "VALOR_MATERIAL", "QTD_LANCAMENTOS", "RISCO"), linhas
+End Sub
+
+' ---------------------------------------------------------------------------
+' MELHORIA 9: QUALIDADE DA CLASSIFICACAO - % do valor com CLS1/2/3 completos
+'   por PEP3. Mede a confiabilidade dos vereditos (um PEP pode ser aprovado
+'   com boa parte do valor sem classificacao).
+' ---------------------------------------------------------------------------
+Private Sub Gerar_QualidadeClassif()
+    Dim dTot As Object: Set dTot = CreateObject("Scripting.Dictionary")
+    Dim dClass As Object: Set dClass = CreateObject("Scripting.Dictionary")
+
+    Dim i As Long, pep As String, p3 As String, val As Double
+    Dim c1 As String, c2 As String, c3 As String
+    For i = 1 To UBound(dados, 1)
+        pep = Trim$(CStr(dados(i, cPEP))): If pep = "" Then GoTo Prox
+        p3 = PEP3(pep)
+        val = Abs(ToNum(dados(i, cValor)))
+        dTot(p3) = dTot(p3) + val
+        If EhMaterial(CStr(dados(i, cClassif))) Then
+            c1 = MatInfoLinha(i, 1): c2 = MatInfoLinha(i, 2): c3 = MatInfoLinha(i, 3)
+        Else
+            c1 = SrvInfoLinha(i, 0): c2 = SrvInfoLinha(i, 1): c3 = SrvInfoLinha(i, 2)
+        End If
+        If Not ClassificacaoPendente(c1, c2, c3) Then dClass(p3) = dClass(p3) + val
+Prox:
+    Next i
+
+    Dim linhas As Object: Set linhas = New Collection
+    Dim kv As Variant, tot As Double, cla As Double, pctc As Double, conf As String
+    For Each kv In dTot.Keys
+        tot = CDbl(dTot(kv))
+        cla = IIf(dClass.Exists(kv), CDbl(dClass(kv)), 0)
+        pctc = IIf(tot <> 0, cla / tot * 100, 0)
+        Select Case True
+            Case pctc >= 90: conf = "ALTA"
+            Case pctc >= 60: conf = "MEDIA"
+            Case Else: conf = "BAIXA"
+        End Select
+        linhas.Add Array(CStr(kv), Round(tot, 2), Round(cla, 2), _
+            Round(tot - cla, 2), Round(pctc, 1), conf)
+    Next kv
+
+    EscreverColecaoAba "QUALIDADE CLASSIF", Array("PEP3NIVEL", "VALOR_TOTAL", _
+        "VALOR_CLASSIFICADO", "VALOR_PENDENTE", "PCT_CLASSIFICADO", "CONFIABILIDADE"), linhas
+End Sub
+
+' ---------------------------------------------------------------------------
+' MELHORIA 10: LANCAMENTOS DUPLICADOS - mesma combinacao PEP+MATERIAL+QTD+
+'   VALOR (+DATA quando disponivel) aparecendo em 2+ lancamentos.
+' ---------------------------------------------------------------------------
+Private Sub Gerar_Duplicados()
+    Dim dCnt As Object: Set dCnt = CreateObject("Scripting.Dictionary")
+    Dim dPep As Object: Set dPep = CreateObject("Scripting.Dictionary")
+    Dim dCod As Object: Set dCod = CreateObject("Scripting.Dictionary")
+    Dim dTxt As Object: Set dTxt = CreateObject("Scripting.Dictionary")
+    Dim dQ As Object: Set dQ = CreateObject("Scripting.Dictionary")
+    Dim dV As Object: Set dV = CreateObject("Scripting.Dictionary")
+    Dim dData As Object: Set dData = CreateObject("Scripting.Dictionary")
+    Dim dDocs As Object: Set dDocs = CreateObject("Scripting.Dictionary")
+
+    Dim i As Long, pep As String, cod As String, k As String
+    Dim qraw As Double, vraw As Double, dtxt2 As String, doc As String
+    For i = 1 To UBound(dados, 1)
+        pep = Trim$(CStr(dados(i, cPEP))): If pep = "" Then GoTo Prox
+        cod = NormCod(dados(i, cMaterial))
+        qraw = ToNum(dados(i, cQtd)): vraw = ToNum(dados(i, cValor))
+        If qraw = 0 And vraw = 0 Then GoTo Prox   ' ignora linhas vazias
+        dtxt2 = ""
+        If cDataLanc > 0 Then dtxt2 = TextoCampo(i, cDataLanc)
+        k = pep & "|" & cod & "|" & Format$(qraw, "0.####") & "|" & _
+            Format$(vraw, "0.####") & "|" & dtxt2
+        dCnt(k) = dCnt(k) + 1
+        If Not dPep.Exists(k) Then
+            dPep(k) = pep: dCod(k) = cod
+            dTxt(k) = TextoCampo(i, cTexto)
+            dQ(k) = qraw: dV(k) = vraw: dData(k) = dtxt2
+        End If
+        If cNumDoc > 0 Then
+            doc = TextoCampo(i, cNumDoc)
+            If doc <> "" Then
+                If Not dDocs.Exists(k) Then dDocs(k) = ""
+                If InStr(dDocs(k), doc) = 0 And Len(dDocs(k)) < 120 Then
+                    dDocs(k) = Trim$(dDocs(k) & " " & doc)
+                End If
+            End If
+        End If
+Prox:
+    Next i
+
+    Dim linhas As Object: Set linhas = New Collection
+    Dim kv As Variant, n As Long
+    For Each kv In dCnt.Keys
+        n = CLng(dCnt(kv))
+        If n < 2 Then GoTo ProxK
+        pep = CStr(dPep(kv))
+        linhas.Add Array(pep, PEP3(pep), TipoPEPANEEL(pep), CStr(dCod(kv)), _
+            CStr(dTxt(kv)), Round(CDbl(dQ(kv)), 2), Round(CDbl(dV(kv)), 2), _
+            CStr(dData(kv)), n, Round(CDbl(dV(kv)) * (n - 1), 2), _
+            IIf(dDocs.Exists(kv), CStr(dDocs(kv)), ""), "DUPLICIDADE")
+ProxK:
+    Next kv
+
+    EscreverColecaoAba "DUPLICADOS", Array("PEP4NIVEL", "PEP3", "TIPO_PEP", _
+        "MATERIAL", "TEXTO_MATERIAL", "QTD_ENTRADA", "VALOR_MOEDA", _
+        "DATA_LANCAMENTO", "N_OCORRENCIAS", "VALOR_DUPLICADO", "DOCS", "ALERTA"), linhas
+End Sub
+
+' ---------------------------------------------------------------------------
+' MELHORIA 3: SCORE PEP - nota consolidada 0-100 por PEP3, penalizando cada
+'   tipo de inconformidade. Reutiliza os vereditos ODI de MATERIAL vs SERVICO.
+' ---------------------------------------------------------------------------
+Private Sub Gerar_ScorePep()
+    Dim dTot As Object: Set dTot = CreateObject("Scripting.Dictionary")
+    Dim dClass As Object: Set dClass = CreateObject("Scripting.Dictionary")
+    Dim dViagem As Object: Set dViagem = CreateObject("Scripting.Dictionary")
+    Dim dNaoAder As Object: Set dNaoAder = CreateObject("Scripting.Dictionary")
+
+    ' Consolida material NAO ADERENTE por PEP3 (mesma regra de sinal das abas)
+    Dim dGQ As Object: Set dGQ = CreateObject("Scripting.Dictionary")
+    Dim dGV As Object: Set dGV = CreateObject("Scripting.Dictionary")
+    Dim dGPep As Object: Set dGPep = CreateObject("Scripting.Dictionary")
+
+    Dim i As Long, pep As String, p3 As String, val As Double, k As String
+    Dim c1 As String, c2 As String, c3 As String, ccv As String
+    For i = 1 To UBound(dados, 1)
+        pep = Trim$(CStr(dados(i, cPEP))): If pep = "" Then GoTo Prox
+        p3 = PEP3(pep)
+        val = ToNum(dados(i, cValor))
+        dTot(p3) = dTot(p3) + Abs(val)
+        If EhMaterial(CStr(dados(i, cClassif))) Then
+            c1 = MatInfoLinha(i, 1): c2 = MatInfoLinha(i, 2): c3 = MatInfoLinha(i, 3)
+            k = pep & "|" & NormCod(dados(i, cMaterial)) & "|" & UCase$(Trim$(CStr(dados(i, cClassif))))
+            If Not dGPep.Exists(k) Then dGPep(k) = p3
+            dGQ(k) = dGQ(k) + ToNum(dados(i, cQtd))
+            dGV(k) = dGV(k) + val
+        Else
+            c1 = SrvInfoLinha(i, 0): c2 = SrvInfoLinha(i, 1): c3 = SrvInfoLinha(i, 2)
+        End If
+        If Not ClassificacaoPendente(c1, c2, c3) Then dClass(p3) = dClass(p3) + Abs(val)
+        ccv = NormCod(ValorCampo(i, cClasse))
+        If EhClasseViagem(ccv) Then dViagem(p3) = dViagem(p3) + val
+Prox:
+    Next i
+
+    Dim kv As Variant, qG As Double, vG As Double
+    For Each kv In dGPep.Keys
+        qG = Round(dGQ(kv), 2): vG = Round(dGV(kv), 2)
+        If qG = 0 And vG = 0 Then GoTo ProxG
+        If EhAderenteValQtd(vG, qG) Then GoTo ProxG
+        p3 = CStr(dGPep(kv))
+        dNaoAder(p3) = dNaoAder(p3) + 1
+ProxG:
+    Next kv
+
+    Dim linhas As Object: Set linhas = New Collection
+    Dim tot As Double, cla As Double, pctc As Double, nAder As Long, vViag As Double
+    Dim verOdi As String, score As Double, faixa As String, penalNC As Double
+    For Each kv In dTot.Keys
+        p3 = CStr(kv)
+        tot = CDbl(dTot(p3))
+        cla = IIf(dClass.Exists(p3), CDbl(dClass(p3)), 0)
+        pctc = IIf(tot <> 0, cla / tot * 100, 100)
+        nAder = IIf(dNaoAder.Exists(p3), CLng(dNaoAder(p3)), 0)
+        vViag = IIf(dViagem.Exists(p3), CDbl(dViagem(p3)), 0)
+        verOdi = ""
+        If Not dMvSVerd Is Nothing Then If dMvSVerd.Exists(p3) Then verOdi = CStr(dMvSVerd(p3))
+
+        score = 100
+        If verOdi = "REPROVADO" Then score = score - 40
+        Dim penAder As Double: penAder = nAder * 5
+        If penAder > 30 Then penAder = 30
+        score = score - penAder
+        If vViag > 0 Then score = score - 10
+        penalNC = (100 - pctc) * 0.3
+        If penalNC > 30 Then penalNC = 30
+        score = score - penalNC
+        If score < 0 Then score = 0
+        If score > 100 Then score = 100
+
+        Select Case True
+            Case score >= 80: faixa = "BOM"
+            Case score >= 50: faixa = "ATENCAO"
+            Case Else: faixa = "CRITICO"
+        End Select
+
+        linhas.Add Array(p3, Round(tot, 2), IIf(verOdi = "", "-", verOdi), nAder, _
+            Round(vViag, 2), Round(pctc, 1), Round(score, 0), faixa)
+    Next kv
+
+    EscreverColecaoAba "SCORE PEP", Array("PEP3NIVEL", "VALOR_TOTAL", "VEREDITO_ODI", _
+        "N_MAT_NAO_ADERENTE", "VLR_VIAGEM", "PCT_CLASSIFICADO", "SCORE", "FAIXA"), linhas
+End Sub
+
+' ---------------------------------------------------------------------------
+' MELHORIA 5: BENCHMARK PEP - composicao de custo (%material/%servico/%viagem)
+'   por PEP3 comparada a mediana do grupo (tipo de PEP ANEEL).
+' ---------------------------------------------------------------------------
+Private Sub Gerar_BenchmarkPep()
+    Dim dTot As Object: Set dTot = CreateObject("Scripting.Dictionary")
+    Dim dMat As Object: Set dMat = CreateObject("Scripting.Dictionary")
+    Dim dViag As Object: Set dViag = CreateObject("Scripting.Dictionary")
+    Dim dGrupo As Object: Set dGrupo = CreateObject("Scripting.Dictionary")
+
+    Dim i As Long, pep As String, p3 As String, val As Double, ccv As String
+    For i = 1 To UBound(dados, 1)
+        pep = Trim$(CStr(dados(i, cPEP))): If pep = "" Then GoTo Prox
+        p3 = PEP3(pep)
+        val = Abs(ToNum(dados(i, cValor)))
+        dTot(p3) = dTot(p3) + val
+        If Not dGrupo.Exists(p3) Then dGrupo(p3) = TipoPEPANEEL(pep)
+        ccv = NormCod(ValorCampo(i, cClasse))
+        If EhClasseViagem(ccv) Then
+            dViag(p3) = dViag(p3) + val
+        ElseIf EhMaterial(CStr(dados(i, cClassif))) Then
+            dMat(p3) = dMat(p3) + val
+        End If
+Prox:
+    Next i
+
+    ' Distribuicao de %material por grupo -> mediana
+    Dim dPctPorGrupo As Object: Set dPctPorGrupo = CreateObject("Scripting.Dictionary")
+    Dim kv As Variant, tot As Double, pm As Double, grp As String
+    For Each kv In dTot.Keys
+        p3 = CStr(kv): tot = CDbl(dTot(p3))
+        If tot = 0 Then GoTo ProxP
+        pm = IIf(dMat.Exists(p3), CDbl(dMat(p3)), 0) / tot * 100
+        grp = CStr(dGrupo(p3))
+        If Not dPctPorGrupo.Exists(grp) Then Set dPctPorGrupo(grp) = New Collection
+        dPctPorGrupo(grp).Add pm
+ProxP:
+    Next kv
+
+    Dim dMedGrupo As Object: Set dMedGrupo = CreateObject("Scripting.Dictionary")
+    For Each kv In dPctPorGrupo.Keys
+        dMedGrupo(kv) = MedianaDeColecao(dPctPorGrupo(kv))
+    Next kv
+
+    Dim linhas As Object: Set linhas = New Collection
+    Dim pctMat As Double, pctViag As Double, pctSrv As Double
+    Dim medG As Double, desvio As Double, alerta As String
+    For Each kv In dTot.Keys
+        p3 = CStr(kv): tot = CDbl(dTot(p3))
+        If tot = 0 Then GoTo ProxL
+        grp = CStr(dGrupo(p3))
+        pctMat = IIf(dMat.Exists(p3), CDbl(dMat(p3)), 0) / tot * 100
+        pctViag = IIf(dViag.Exists(p3), CDbl(dViag(p3)), 0) / tot * 100
+        pctSrv = 100 - pctMat - pctViag
+        If pctSrv < 0 Then pctSrv = 0
+        medG = IIf(dMedGrupo.Exists(grp), CDbl(dMedGrupo(grp)), 0)
+        desvio = pctMat - medG
+        If Abs(desvio) > 20 Then
+            alerta = IIf(desvio > 0, "ACIMA DO GRUPO", "ABAIXO DO GRUPO")
+        Else
+            alerta = "NA MEDIA"
+        End If
+        linhas.Add Array(p3, grp, Round(tot, 2), Round(pctMat, 1), Round(pctSrv, 1), _
+            Round(pctViag, 1), Round(medG, 1), Round(desvio, 1), alerta)
+    Next kv
+
+    EscreverColecaoAba "BENCHMARK PEP", Array("PEP3NIVEL", "GRUPO", "VALOR_TOTAL", _
+        "PCT_MATERIAL", "PCT_SERVICO", "PCT_VIAGEM", "MEDIANA_GRUPO_PCT_MAT", _
+        "DESVIO_PP", "ALERTA"), linhas
+End Sub
+
+' ---------------------------------------------------------------------------
+' MELHORIA 2: ANALISE TEMPORAL - PEP parado (sem lancamento ha N meses com
+'   saldo aberto) e concentracao de lancamentos no fim do mes. Requer a
+'   coluna de data de lancamento (senao a aba sai vazia com aviso).
+' ---------------------------------------------------------------------------
+Private Sub Gerar_AnaliseTemporal()
+    Dim linhas As Object: Set linhas = New Collection
+    If cDataLanc = 0 Then
+        EscreverColecaoAba "ANALISE TEMPORAL", Array("PEP4NIVEL", "PEP3", "TIPO_PEP", _
+            "PRIMEIRA_DATA", "ULTIMA_DATA", "DIAS_SEM_LANC", "N_LANCAMENTOS", _
+            "VALOR_TOTAL", "PCT_FIM_MES", "SITUACAO"), linhas
+        Exit Sub
+    End If
+
+    Dim mesesParado As Double: mesesParado = CfgNum("PEP_PARADO_MESES", 6)
+    Dim dMin As Object: Set dMin = CreateObject("Scripting.Dictionary")
+    Dim dMax As Object: Set dMax = CreateObject("Scripting.Dictionary")
+    Dim dCnt As Object: Set dCnt = CreateObject("Scripting.Dictionary")
+    Dim dFim As Object: Set dFim = CreateObject("Scripting.Dictionary")
+    Dim dVal As Object: Set dVal = CreateObject("Scripting.Dictionary")
+
+    Dim i As Long, pep As String, dt As Double
+    For i = 1 To UBound(dados, 1)
+        pep = Trim$(CStr(dados(i, cPEP))): If pep = "" Then GoTo Prox
+        dVal(pep) = dVal(pep) + ToNum(dados(i, cValor))
+        dCnt(pep) = dCnt(pep) + 1
+        dt = ToData(dados(i, cDataLanc))
+        If dt = 0 Then GoTo Prox
+        If Not dMin.Exists(pep) Then
+            dMin(pep) = dt: dMax(pep) = dt
+        Else
+            If dt < CDbl(dMin(pep)) Then dMin(pep) = dt
+            If dt > CDbl(dMax(pep)) Then dMax(pep) = dt
+        End If
+        If Day(CDate(dt)) >= 25 Then dFim(pep) = dFim(pep) + 1
+Prox:
+    Next i
+
+    Dim kv As Variant, hoje As Double: hoje = CDbl(Date)
+    Dim dias As Double, n As Long, pctFim As Double, sit As String, saldo As Double
+    For Each kv In dCnt.Keys
+        pep = CStr(kv)
+        n = CLng(dCnt(pep))
+        saldo = Round(CDbl(dVal(pep)), 2)
+        If dMax.Exists(pep) Then
+            dias = hoje - CDbl(dMax(pep))
+        Else
+            dias = -1
+        End If
+        pctFim = IIf(n <> 0, CLng(IIf(dFim.Exists(pep), dFim(pep), 0)) / n * 100, 0)
+        If dias >= mesesParado * 30 And saldo <> 0 Then
+            sit = "PEP PARADO"
+        Else
+            sit = "EM DIA"
+        End If
+        linhas.Add Array(pep, PEP3(pep), TipoPEPANEEL(pep), _
+            IIf(dMin.Exists(pep), Format$(CDate(dMin(pep)), "dd/mm/yyyy"), "-"), _
+            IIf(dMax.Exists(pep), Format$(CDate(dMax(pep)), "dd/mm/yyyy"), "-"), _
+            IIf(dias < 0, "-", CLng(dias)), n, saldo, Round(pctFim, 1), sit)
+    Next kv
+
+    EscreverColecaoAba "ANALISE TEMPORAL", Array("PEP4NIVEL", "PEP3", "TIPO_PEP", _
+        "PRIMEIRA_DATA", "ULTIMA_DATA", "DIAS_SEM_LANC", "N_LANCAMENTOS", _
+        "VALOR_TOTAL", "PCT_FIM_MES", "SITUACAO"), linhas
+End Sub
+
+' ---------------------------------------------------------------------------
+' MELHORIA 4: ESTORNOS - % de valor estornado por PEP e estornos sem
+'   documento de referencia. Requer alguma coluna de estorno (senao aviso).
+' ---------------------------------------------------------------------------
+Private Sub Gerar_Estornos()
+    Dim linhas As Object: Set linhas = New Collection
+    Dim cabe As Variant
+    cabe = Array("PEP4NIVEL", "PEP3", "TIPO_PEP", "N_ESTORNOS", "VALOR_ESTORNADO", _
+        "VALOR_TOTAL", "PCT_ESTORNADO", "ESTORNOS_SEM_REF", "ALERTA")
+
+    If cEstorno = 0 And cDocEstorno = 0 Then
+        EscreverColecaoAba "ESTORNOS", cabe, linhas
+        Exit Sub
+    End If
+
+    Dim dTot As Object: Set dTot = CreateObject("Scripting.Dictionary")
+    Dim dNEst As Object: Set dNEst = CreateObject("Scripting.Dictionary")
+    Dim dVEst As Object: Set dVEst = CreateObject("Scripting.Dictionary")
+    Dim dSemRef As Object: Set dSemRef = CreateObject("Scripting.Dictionary")
+
+    Dim i As Long, pep As String, val As Double, ehEst As Boolean, flag As String
+    For i = 1 To UBound(dados, 1)
+        pep = Trim$(CStr(dados(i, cPEP))): If pep = "" Then GoTo Prox
+        val = ToNum(dados(i, cValor))
+        dTot(pep) = dTot(pep) + Abs(val)
+        ehEst = False
+        If cEstorno > 0 Then
+            flag = UCase$(TextoCampo(i, cEstorno))
+            If flag <> "" And flag <> "0" And flag <> "N" And flag <> "NAO" And flag <> "FALSE" Then ehEst = True
+        End If
+        If Not ehEst And cDocEstorno > 0 Then
+            If TextoCampo(i, cDocEstorno) <> "" Then ehEst = True
+        End If
+        If ehEst Then
+            dNEst(pep) = dNEst(pep) + 1
+            dVEst(pep) = dVEst(pep) + Abs(val)
+            If cRefEstorno > 0 Then
+                If TextoCampo(i, cRefEstorno) = "" Then dSemRef(pep) = dSemRef(pep) + 1
+            End If
+        End If
+Prox:
+    Next i
+
+    Dim kv As Variant, tot As Double, vest As Double, pct As Double, alerta As String
+    Dim nEst As Long, semRef As Long
+    For Each kv In dNEst.Keys
+        pep = CStr(kv)
+        nEst = CLng(dNEst(pep))
+        vest = CDbl(dVEst(pep))
+        tot = IIf(dTot.Exists(pep), CDbl(dTot(pep)), 0)
+        pct = IIf(tot <> 0, vest / tot * 100, 0)
+        semRef = IIf(dSemRef.Exists(pep), CLng(dSemRef(pep)), 0)
+        If semRef > 0 Then
+            alerta = "ESTORNO SEM REF"
+        ElseIf pct >= 30 Then
+            alerta = "ALTA TAXA DE ESTORNO"
+        Else
+            alerta = "NORMAL"
+        End If
+        linhas.Add Array(pep, PEP3(pep), TipoPEPANEEL(pep), nEst, Round(vest, 2), _
+            Round(tot, 2), Round(pct, 1), semRef, alerta)
+    Next kv
+
+    EscreverColecaoAba "ESTORNOS", cabe, linhas
+End Sub
+
 
 Private Sub EscreverAba(nome As String, outp() As Variant)
     Dim ws As Worksheet
@@ -4354,8 +5049,14 @@ Private Sub GarantirConfig()
         Array("PERC_ATV_PADRAO", "25", "Percentual ATV PREVISTA para os demais PEPs (%)"), _
         Array("PERC_MOP", "5.483", "Percentual do CALCULO DO MOP sobre o total sem MOP (%)"), _
         Array("MARGEM_ADERENCIA", "10", "Margem da aderencia MAT vs SRV (%)"), _
+        Array("MARGEM_ABS_MIN", "0", "Piso absoluto da aderencia MAT vs SRV (diferenca <= piso = aderente)"), _
         Array("CLASSES_VIAGEM", "8111290000;8210390000;8210550000", "Classes de custo de viagem (Alimentacao;Passagem;Hospedagem)"), _
-        Array("CLASSE_COMBUSTIVEL", "8119980000", "Classe de custo de combustiveis -> categoria OUTROS na ANALISE DE CA"))
+        Array("CLASSE_COMBUSTIVEL", "8119980000", "Classe de custo de combustiveis -> categoria OUTROS na ANALISE DE CA"), _
+        Array("OUTLIER_PCT", "50", "Desvio % do preco unitario vs mediana para sinalizar (aba PRECO OUTLIER)"), _
+        Array("OUTLIER_MIN_AMOSTRAS", "4", "Amostra minima por material para calcular mediana de preco"), _
+        Array("SEV_ALTA_RS", "50000", "Valor absoluto para severidade ALTA nos ALERTAS CRITICOS (R$)"), _
+        Array("SEV_MEDIA_RS", "10000", "Valor absoluto para severidade MEDIA nos ALERTAS CRITICOS (R$)"), _
+        Array("PEP_PARADO_MESES", "6", "Meses sem lancamento para marcar PEP PARADO (aba ANALISE TEMPORAL)"))
 
     ' indexa chaves ja existentes
     Dim ult As Long: ult = ws.Cells(ws.Rows.Count, 1).End(xlUp).Row
@@ -4585,9 +5286,11 @@ End Sub
 ' e deixa o PAINEL EXECUTIVO ativo ao final.
 Private Sub OrganizarAbas()
     Dim ordem As Variant, i As Long, ws As Worksheet, pos As Long
-    ordem = Array("PAINEL EXECUTIVO", "PORTFOLIO OBRA", "ALERTAS CRITICOS", _
+    ordem = Array("PAINEL EXECUTIVO", "PORTFOLIO OBRA", "SCORE PEP", "ALERTAS CRITICOS", _
                   "MATERIAL vs SERVICO", "MATERIAL", "SERVICO", _
-                  "SERVICO SEM MATERIAL", "ANALISE DE CA", _
+                  "SERVICO SEM MATERIAL", "MATERIAL SEM SERVICO", "PRECO OUTLIER", _
+                  "DUPLICADOS", "ANALISE DE CA", "BENCHMARK PEP", "ANALISE TEMPORAL", _
+                  "ESTORNOS", "QUALIDADE CLASSIF", _
                   "NAO CLASSIFICADOS", "RACIONALIZACAO COM", "RAZAO CJ", "REGRAS")
     pos = 0
     For i = 0 To UBound(ordem)

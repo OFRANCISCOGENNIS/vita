@@ -4,7 +4,7 @@ Módulo VBA para Excel que transforma o export bruto do SAP (CKCP) em um conjunt
 
 ## Arquivo fonte
 
-`vba/AnaliseCKCP_OTIMIZADO.bas` — 6.153 linhas, 60 Subs, 71 Functions.
+`vba/AnaliseCKCP_OTIMIZADO.bas` — 6.855 linhas, 70 Subs, 74 Functions.
 
 ## Como usar
 
@@ -40,11 +40,30 @@ GarantirConfig / CarregarConfig
   → Gerar_NaoClassificados
   → Gerar_RacionalizacaoCOM
   → Gerar_Regras
+  → Gerar_Melhorias             (analises v2 — ver bloco abaixo)
   → OrganizarAbas
   → MostrarTelaFuturista        (painel HUD desenhado com Shapes)
 ```
 
-## Abas geradas (21)
+### Gerar_Melhorias (analises v2)
+
+Orquestra 8 análises adicionais, cada uma numa aba própria (escritas via
+`EscreverColecaoAba` → `EscreverAba`, com o mesmo visual das demais abas):
+
+```
+Gerar_PrecoOutlier        → PRECO OUTLIER        (preço unitário fora da mediana do material)
+Gerar_MaterialSemServico  → MATERIAL SEM SERVICO (material sem serviço da mesma família)
+Gerar_QualidadeClassif    → QUALIDADE CLASSIF    (% do valor com CLS1/2/3 completos por PEP3)
+Gerar_Duplicados          → DUPLICADOS           (PEP+MATERIAL+QTD+VALOR+DATA repetidos)
+Gerar_ScorePep            → SCORE PEP            (nota 0–100 consolidada por PEP3)
+Gerar_BenchmarkPep        → BENCHMARK PEP        (%material vs mediana do grupo/tipo de PEP)
+Gerar_AnaliseTemporal     → ANALISE TEMPORAL     (PEP parado / concentração fim de mês; requer data)
+Gerar_Estornos            → ESTORNOS             (% estornado por PEP; requer coluna de estorno)
+```
+
+Helpers: `EscreverColecaoAba`, `MedianaDeColecao`, `ToData`, `EhAderenteValQtd`.
+
+## Abas geradas
 
 | Aba | Descrição |
 |-----|-----------|
@@ -54,9 +73,9 @@ GarantirConfig / CarregarConfig
 | `MAT vs SERV AT` | Módulo AT (alta tensão) — avaliação por grupo/PEP |
 | `ANALISE DE CA` | Análise por Categoria Analítica (CA) |
 | `CLASSE DE CUSTO` | Resumo por classe de custo SAP |
-| `MATERIAL` | Detalhe de materiais |
-| `SERVICO` | Detalhe de serviços |
-| `ALERTAS CRITICOS` | Cards de alertas (regras violadas, inconformidades) |
+| `MATERIAL` | Detalhe de materiais (coluna ADERENCIA por sinal) |
+| `SERVICO` | Detalhe de serviços (coluna ADERENCIA por sinal) |
+| `ALERTAS CRITICOS` | Cards de alertas; Seção B ordenada por materialidade + severidade |
 | `REGRAS` | Tabela de regras aplicadas |
 | `SERVICO SEM MATERIAL` | Serviços lançados sem material correspondente |
 | `PORTFOLIO OBRA` | Portfólio de obras por PEP |
@@ -64,6 +83,25 @@ GarantirConfig / CarregarConfig
 | `RACIONALIZACAO COM` | Racionalização de itens COM |
 | `CONFIG` | Parâmetros centralizados (editável pelo usuário) |
 | `PREMISSAS` | Premissas e regras de negócio documentadas |
+| `PRECO OUTLIER` | Preço unitário fora da mediana do material (melhoria v2) |
+| `MATERIAL SEM SERVICO` | Material sem serviço da mesma família (melhoria v2) |
+| `QUALIDADE CLASSIF` | % do valor com classificação completa por PEP3 (melhoria v2) |
+| `DUPLICADOS` | Lançamentos duplicados (melhoria v2) |
+| `SCORE PEP` | Nota 0–100 consolidada por PEP3 (melhoria v2) |
+| `BENCHMARK PEP` | Composição de custo vs mediana do grupo (melhoria v2) |
+| `ANALISE TEMPORAL` | PEP parado / concentração no fim do mês (melhoria v2) |
+| `ESTORNOS` | % estornado por PEP e estornos sem referência (melhoria v2) |
+
+### Parâmetros da CONFIG adicionados (melhorias v2)
+
+| Chave | Padrão | Uso |
+|-------|--------|-----|
+| `MARGEM_ABS_MIN` | `0` | Piso absoluto da aderência MAT vs SRV (diferença ≤ piso = aderente) |
+| `OUTLIER_PCT` | `50` | Desvio % do preço unitário vs mediana para sinalizar |
+| `OUTLIER_MIN_AMOSTRAS` | `4` | Amostra mínima por material para calcular a mediana |
+| `SEV_ALTA_RS` | `50000` | Valor absoluto para severidade ALTA nos ALERTAS CRITICOS |
+| `SEV_MEDIA_RS` | `10000` | Valor absoluto para severidade MEDIA nos ALERTAS CRITICOS |
+| `PEP_PARADO_MESES` | `6` | Meses sem lançamento para marcar PEP PARADO |
 
 ## Estrutura de dados em memória
 
