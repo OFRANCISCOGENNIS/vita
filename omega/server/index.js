@@ -8,6 +8,10 @@ import { AGENTS } from './agents.js';
 import { availableProviders } from './router.js';
 import { handleTask, tasksToday } from './orchestrator.js';
 import { allFacts, forget } from './memory.js';
+import {
+  CONNECTORS, listFlows, getFlow, createFlow, setActive, deleteFlow,
+  runFlow, listRuns, approveRun, rejectRun, pendingApprovals
+} from './automation.js';
 
 const WEB_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'web');
 const PORT = Number(process.env.PORT || 8420);
@@ -85,6 +89,58 @@ const server = createServer(async (req, res) => {
       }
       emit('done', {});
       return res.end();
+    }
+
+    // ---------- Motor de Automação (Camada 7) ----------
+    if (path === '/api/connectors' && req.method === 'GET') {
+      return json(res, 200, Object.values(CONNECTORS).map(c => ({ name: c.name, external: c.external })));
+    }
+
+    if (path === '/api/flows' && req.method === 'GET') {
+      return json(res, 200, listFlows());
+    }
+
+    if (path === '/api/flows' && req.method === 'POST') {
+      try {
+        return json(res, 201, createFlow(await readBody(req)));
+      } catch (err) { return json(res, 400, { error: err.message }); }
+    }
+
+    const flowMatch = path.match(/^\/api\/flows\/([\w-]+)$/);
+    if (flowMatch && req.method === 'DELETE') {
+      return json(res, deleteFlow(flowMatch[1]) ? 200 : 404, { deleted: flowMatch[1] });
+    }
+
+    const activateMatch = path.match(/^\/api\/flows\/([\w-]+)\/(activate|deactivate)$/);
+    if (activateMatch && req.method === 'POST') {
+      const f = setActive(activateMatch[1], activateMatch[2] === 'activate');
+      return json(res, f ? 200 : 404, f || { error: 'fluxo não encontrado' });
+    }
+
+    const runMatch = path.match(/^\/api\/flows\/([\w-]+)\/run$/);
+    if (runMatch && req.method === 'POST') {
+      if (!getFlow(runMatch[1])) return json(res, 404, { error: 'fluxo não encontrado' });
+      const { input = '', autoApprove = false } = await readBody(req);
+      res.writeHead(200, {
+        'content-type': 'text/event-stream; charset=utf-8',
+        'cache-control': 'no-cache', connection: 'keep-alive'
+      });
+      const emit = (event, data) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+      try {
+        await runFlow(runMatch[1], { input, autoApprove }, emit);
+      } catch (err) { emit('error', { message: err.message }); }
+      emit('done', {});
+      return res.end();
+    }
+
+    if (path === '/api/runs' && req.method === 'GET') {
+      return json(res, 200, { runs: listRuns(url.searchParams.get('flow')), pending: pendingApprovals() });
+    }
+
+    const approveMatch = path.match(/^\/api\/runs\/([\w-]+)\/(approve|reject)$/);
+    if (approveMatch && req.method === 'POST') {
+      const ok = approveMatch[2] === 'approve' ? approveRun(approveMatch[1]) : rejectRun(approveMatch[1]);
+      return json(res, ok ? 200 : 404, { runId: approveMatch[1], decision: approveMatch[2], ok });
     }
 
     if (path.startsWith('/api/')) return json(res, 404, { error: 'rota não encontrada' });
