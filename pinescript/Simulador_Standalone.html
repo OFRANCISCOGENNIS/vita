@@ -1325,6 +1325,14 @@ body {
                         <div id="qoPA" class="qo-kv"></div>
                     </div>
                     <div class="chart-container qo-panel">
+                        <h2>LIQUIDEZ</h2>
+                        <div id="qoLiq" class="qo-kv"></div>
+                    </div>
+                    <div class="chart-container qo-panel">
+                        <h2>SMART MONEY</h2>
+                        <div id="qoSM" class="qo-kv"></div>
+                    </div>
+                    <div class="chart-container qo-panel">
                         <h2>VOLUME / DELTA</h2>
                         <div id="qoVol" class="qo-kv"></div>
                     </div>
@@ -2410,6 +2418,82 @@ function atualizarPaineis() {
 
 function kv(nome, valor, cls) { return `<div class="kv ${cls || ''}"><span>${nome}</span><b>${valor}</b></div>`; }
 
+// ---- LIQUIDITY ENGINE (aproximação via OHLC) ----
+// Pools de liquidez = clusters de topos/fundos quase iguais (equal highs/lows):
+// é onde os stops se acumulam. Sweep = pavio que varre o pool e fecha de volta.
+function analisarLiquidez() {
+    const { highs, lows, closes, atrValues } = computed;
+    const last = closes.length - 1;
+    const atr = atrValues[last] || (highs[last] - lows[last]) || 1e-9;
+    const tol = atr * 0.25;
+    const piv = acharPivotsSR();
+    const cluster = arr => {
+        const pools = []; let cur = [];
+        arr.slice().sort((a, b) => a.price - b.price).forEach(p => {
+            if (!cur.length || Math.abs(p.price - cur[cur.length - 1].price) <= tol) cur.push(p);
+            else { pools.push(cur); cur = [p]; }
+        });
+        if (cur.length) pools.push(cur);
+        return pools.map(c => ({
+            price: c.reduce((s, p) => s + p.price, 0) / c.length,
+            touches: c.length, lastIdx: Math.max(...c.map(p => p.i))
+        })).filter(p => p.touches >= 2);
+    };
+    const poolsHigh = cluster(piv.res), poolsLow = cluster(piv.sup);
+    const preco = closes[last];
+    const acima = poolsHigh.filter(p => p.price > preco);
+    const abaixo = poolsLow.filter(p => p.price < preco);
+    // sweep nas últimas 12 velas: rompe o pool no pavio e fecha de volta
+    let sweep = null;
+    for (let i = Math.max(1, last - 12); i <= last; i++) {
+        for (const p of poolsHigh)
+            if (p.lastIdx + SR_W <= i && highs[i] > p.price + tol * 0.2 && closes[i] < p.price) sweep = { dir: -1, i, price: p.price };
+        for (const p of poolsLow)
+            if (p.lastIdx + SR_W <= i && lows[i] < p.price - tol * 0.2 && closes[i] > p.price) sweep = { dir: 1, i, price: p.price };
+    }
+    let mitig = null;
+    if (sweep) {
+        mitig = 'Pendente';
+        for (let j = sweep.i + 1; j <= last; j++)
+            if ((sweep.dir === 1 && closes[j] > sweep.price + atr * 0.5) ||
+                (sweep.dir === -1 && closes[j] < sweep.price - atr * 0.5)) { mitig = 'Concluída'; break; }
+    }
+    return { acima, abaixo, sweep, mitig };
+}
+
+// ---- SMART MONEY ENGINE (aproximação via OHLC) ----
+// Order Block = última vela contrária antes de um impulso ≥1.2 ATR; ativo
+// enquanto o preço não voltar à zona. FVG = gap de 3 velas ainda não preenchido.
+function analisarSmartMoney() {
+    const { highs, lows, closes, atrValues } = computed;
+    const last = closes.length - 1;
+    const ini = Math.max(3, last - 150);
+    const obs = [], fvgs = [];
+    for (let i = ini; i <= last; i++) {
+        if (i >= 2) {
+            if (lows[i] > highs[i - 2]) fvgs.push({ dir: 1, top: lows[i], bot: highs[i - 2], i });
+            if (highs[i] < lows[i - 2]) fvgs.push({ dir: -1, top: lows[i - 2], bot: highs[i], i });
+        }
+        const atr = atrValues[i];
+        if (atr && i + 3 <= last) {
+            const o = dados[i].open;
+            if (closes[i] < o && Math.max(closes[i + 1], closes[i + 2], closes[i + 3]) - closes[i] > atr * 1.2)
+                obs.push({ dir: 1, top: Math.max(o, closes[i]), bot: lows[i], i });       // OB de demanda
+            if (closes[i] > o && closes[i] - Math.min(closes[i + 1], closes[i + 2], closes[i + 3]) > atr * 1.2)
+                obs.push({ dir: -1, top: highs[i], bot: Math.min(o, closes[i]), i });     // OB de oferta
+        }
+    }
+    const naoMitigado = z => { for (let j = z.i + 4; j <= last; j++) if (lows[j] <= z.top && highs[j] >= z.bot) return false; return true; };
+    const fvgAberto = z => {
+        for (let j = z.i + 1; j <= last; j++) {
+            if (z.dir === 1 && lows[j] <= z.bot) return false;
+            if (z.dir === -1 && highs[j] >= z.top) return false;
+        }
+        return true;
+    };
+    return { obsAtivos: obs.filter(naoMitigado).slice(-8), fvgAbertos: fvgs.filter(fvgAberto).slice(-8) };
+}
+
 // Rotula os últimos swings (HH/HL/LH/LL) a partir dos pivôs confirmados
 function estruturaSwings() {
     const piv = acharPivotsSR();
@@ -2488,6 +2572,33 @@ function atualizarQuantOps() {
         kv('Força da tendência', conf + '%', conf >= 70 ? 'kv-good' : conf >= 50 ? 'kv-warn' : 'kv-bad') +
         kv('Correção', correcao == null ? '—' : correcao + '%') +
         kv('Pullback saudável', correcao == null ? '—' : pullOk ? 'SIM' : 'NÃO', pullOk ? 'kv-good' : '');
+
+    // ---- LIQUIDEZ ----
+    const liq = analisarLiquidez();
+    const fmtP = v => v.toFixed(computed.closes[last] < 10 ? 5 : 2);
+    const proxAcima = liq.acima.length ? liq.acima.sort((a, b) => a.price - b.price)[0] : null;
+    const proxAbaixo = liq.abaixo.length ? liq.abaixo.sort((a, b) => b.price - a.price)[0] : null;
+    document.getElementById('qoLiq').innerHTML =
+        kv('Pools acima (stops de venda)', liq.acima.length + (proxAcima ? ' · próx ' + fmtP(proxAcima.price) : '')) +
+        kv('Pools abaixo (stops de compra)', liq.abaixo.length + (proxAbaixo ? ' · próx ' + fmtP(proxAbaixo.price) : '')) +
+        kv('Sweep detectado', liq.sweep ? (liq.sweep.dir === 1 ? 'SIM · fundo varrido ▲' : 'SIM · topo varrido ▼') : 'Não',
+            liq.sweep ? (liq.sweep.dir === 1 ? 'kv-good' : 'kv-bad') : '') +
+        kv('Mitigação', liq.mitig || '—', liq.mitig === 'Pendente' ? 'kv-warn' : '');
+
+    // ---- SMART MONEY ----
+    const sm = analisarSmartMoney();
+    const obComp = sm.obsAtivos.filter(z => z.dir === 1).length;
+    const obVend = sm.obsAtivos.filter(z => z.dir === -1).length;
+    const fvgComp = sm.fvgAbertos.filter(z => z.dir === 1).length;
+    const fvgVend = sm.fvgAbertos.filter(z => z.dir === -1).length;
+    // direção institucional: voto entre OBs ativos, FVGs abertos e sweep
+    let votos = (obComp - obVend) + (fvgComp - fvgVend) + (liq.sweep ? liq.sweep.dir * 2 : 0);
+    const dirInst = votos > 0 ? 'Compra' : votos < 0 ? 'Venda' : '—';
+    document.getElementById('qoSM').innerHTML =
+        kv('Order Blocks ativos', sm.obsAtivos.length + ' (▲' + obComp + ' · ▼' + obVend + ')') +
+        kv('FVGs abertos', sm.fvgAbertos.length + ' (▲' + fvgComp + ' · ▼' + fvgVend + ')') +
+        kv('Direção Institucional', dirInst, dirInst === 'Compra' ? 'kv-good' : dirInst === 'Venda' ? 'kv-bad' : '') +
+        kv('Confluência', conf + '%', conf >= 70 ? 'kv-good' : '');
 
     // ---- VOLUME / DELTA ----
     const janF = Math.max(2, parseInt(document.getElementById('fluxoJanela').value));
