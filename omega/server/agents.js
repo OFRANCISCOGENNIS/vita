@@ -10,7 +10,7 @@ export const AGENTS = [
   },
   {
     name: 'BETA', domain: 'Criatividade',
-    triggers: /criativ|ideia|brainstorm|nome|slogan|hist[óo]ria|conceito/i,
+    triggers: /criativ|ideia|brainstorm|nome para|nome de|nome do|nome da|slogan|hist[óo]ria|conceito/i,
     persona: 'Você é BETA, agente criativo do OMEGA JARVIS. Gere ideias originais, nomes, conceitos e textos criativos.'
   },
   {
@@ -77,9 +77,20 @@ export const AGENTS = [
 
 export const PRIME = AGENTS[AGENTS.length - 1];
 
-// Seleciona até `max` agentes cujo domínio casa com o texto; ALPHA é o fallback de planejamento.
+// Seleciona até `max` agentes ranqueados pela força do match (quantas
+// alternativas do gatilho casam com o texto), não pela ordem no array;
+// ALPHA é o fallback de planejamento quando nenhum domínio casa.
 export function selectAgents(text, max = 2) {
-  const hits = AGENTS.filter(a => a !== PRIME && a.triggers.test(text));
-  if (hits.length === 0) hits.push(AGENTS[0]); // ALPHA
-  return hits.slice(0, max);
+  const scored = AGENTS
+    .filter(a => a !== PRIME)
+    .map(a => ({
+      a,
+      score: a.triggers.source.split('|')
+        .filter(alt => { try { return new RegExp(alt, 'i').test(text); } catch { return false; } })
+        .length
+    }))
+    .filter(x => x.score > 0)
+    .sort((x, y) => y.score - x.score);
+  if (scored.length === 0) return [AGENTS[0]]; // ALPHA
+  return scored.slice(0, max).map(x => x.a);
 }
