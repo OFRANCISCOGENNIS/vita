@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Simulador Confluência Multi-Fator | Candles estilo TradingView</title>
+    <title>QUANT OPS — Institutional Trading Intelligence</title>
     <!-- TradingView Lightweight Charts vendorizado localmente (100% offline) -->
     <script src="lightweight-charts.standalone.production.js"></script>
     <!-- Widget oficial do TradingView (gráfico real; requer internet) -->
@@ -12,10 +12,23 @@
 </head>
 <body>
     <div class="container">
-        <!-- HEADER -->
-        <header class="header">
-            <h1>📊 Simulador Confluência Multi-Fator — Candles estilo TradingView</h1>
-            <p class="subtitle">Velas japonesas + EMAs + RSI + ATR • Avisos de entrada com expiração (1m/5m/15m/30m/1h)</p>
+        <!-- QUANT OPS — BARRA EXECUTIVA -->
+        <header class="qo-topbar">
+            <div class="qo-brand">
+                <span class="qo-logo">◈</span>
+                <span><strong>QUANT OPS</strong><small>INSTITUTIONAL TRADING INTELLIGENCE</small></span>
+            </div>
+            <div class="qo-stat"><small>Mercado Atual</small><span id="qoMercado" class="qo-big">—</span></div>
+            <div class="qo-stat qo-ring-wrap">
+                <small>Confiança</small>
+                <span class="qo-ring" id="qoRing"><span id="qoConf">—</span></span>
+            </div>
+            <div class="qo-stat"><small>Regime</small><span id="qoRegime">—</span></div>
+            <div class="qo-stat"><small>Volatilidade</small><span id="qoVolat">—</span></div>
+            <div class="qo-stat"><small>Sessão</small><span id="qoSessao">—</span></div>
+            <div class="qo-stat"><small>Operações Aprovadas</small><span id="qoAprov" class="qo-good">—</span></div>
+            <div class="qo-stat"><small>Bloqueadas</small><span id="qoBloq" class="qo-bad">—</span></div>
+            <div class="qo-stat"><small>Expectativa Matemática</small><span id="qoExpect">—</span></div>
         </header>
 
         <main class="main-content">
@@ -223,6 +236,28 @@
                         <div class="decision-chips" id="decisionChips"></div>
                         <div class="decision-context" id="decisionContext">—</div>
                     </div>
+                </div>
+
+                <!-- INTELIGÊNCIA: Price Action | Volume/Delta | Análise da Operação -->
+                <div class="qo-intel">
+                    <div class="chart-container qo-panel">
+                        <h2>PRICE ACTION</h2>
+                        <div id="qoPA" class="qo-kv"></div>
+                    </div>
+                    <div class="chart-container qo-panel">
+                        <h2>VOLUME / DELTA</h2>
+                        <div id="qoVol" class="qo-kv"></div>
+                    </div>
+                    <div class="chart-container qo-panel qo-op">
+                        <h2>ANÁLISE DA OPERAÇÃO</h2>
+                        <div id="qoOp" class="qo-kv"></div>
+                        <div id="qoBanner" class="qo-banner" style="display:none;"></div>
+                    </div>
+                </div>
+
+                <div class="chart-container" id="heatPanel" style="display:none;">
+                    <h2>🗺️ Heatmap de Ativos <span id="heatMeta" class="tv-sync-tag"></span></h2>
+                    <div id="heatList" class="qo-heat"></div>
                 </div>
 
                 <div class="chart-container" id="scanPanel" style="display:none;">

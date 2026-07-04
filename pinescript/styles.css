@@ -11,15 +11,15 @@
 }
 
 :root {
-    /* Superfícies e tinta */
-    --page: #0d0d0d;
-    --surface: #1a1a19;
-    --surface-2: #232322;
+    /* Superfícies e tinta — tema QUANT OPS (navy institucional) */
+    --page: #060a14;
+    --surface: #0b1220;
+    --surface-2: #101a2e;
     --ink: #ffffff;
-    --ink-2: #c3c2b7;
-    --ink-muted: #898781;
-    --hairline: rgba(255, 255, 255, 0.10);
-    --grid: #2c2c2a;
+    --ink-2: #c8d3e8;
+    --ink-muted: #7d8cab;
+    --hairline: rgba(140, 170, 255, 0.12);
+    --grid: #1c2740;
 
     /* Acento e séries */
     --accent: #3987e5;
@@ -376,15 +376,15 @@ body {
 .scan-item { cursor: pointer; font-size: 13px; }
 .scan-item:hover { border-color: var(--accent); }
 .reg-list { margin-top: 10px; max-height: 220px; overflow-y: auto; }
-.reg-row { display: flex; align-items: center; gap: 12px; padding: 6px 8px; border-bottom: 1px solid #2c2c2a; font-size: 13px; }
-.reg-hora { color: #8a8a82; font-variant-numeric: tabular-nums; min-width: 42px; }
+.reg-row { display: flex; align-items: center; gap: 12px; padding: 6px 8px; border-bottom: 1px solid var(--grid); font-size: 13px; }
+.reg-hora { color: var(--ink-muted); font-variant-numeric: tabular-nums; min-width: 42px; }
 .reg-par { flex: 1; font-weight: 600; }
-.btn-ghost { background: transparent; border: 1px solid #383835; color: #c3c2b7; font-size: 12px; padding: 2px 10px; border-radius: 6px; cursor: pointer; }
+.btn-ghost { background: transparent; border: 1px solid var(--grid); color: var(--ink-2); font-size: 12px; padding: 2px 10px; border-radius: 6px; cursor: pointer; }
 .btn-ghost:hover { border-color: var(--accent); }
 .ia-row { cursor: pointer; }
-.ia-row:hover { background: #23231f; }
-.ia-sel { background: #1e2b1e; }
-.ia-params { color: #8a8a82; font-size: 12px; font-variant-numeric: tabular-nums; }
+.ia-row:hover { background: var(--surface-2); }
+.ia-sel { background: rgba(38,166,154,0.12); }
+.ia-params { color: var(--ink-muted); font-size: 12px; font-variant-numeric: tabular-nums; }
 .scan-tuned { color: #fab219; font-weight: 700; }
 .decision-grade { display: inline-flex; align-items: center; gap: 4px; font-weight: 800; font-size: 14px; padding: 3px 12px; border-radius: 8px; letter-spacing: 0.5px; margin: 4px 0; }
 .grade-A { background: rgba(12,163,12,0.18); color: #26c281; border: 1px solid #0ca30c; }
@@ -392,16 +392,52 @@ body {
 .grade-C { background: rgba(208,59,59,0.15); color: #ef5350; border: 1px solid #d03b3b; }
 .reg-tag { font-size: 10px; font-weight: 700; color: #3987e5; border: 1px solid #3987e5; border-radius: 4px; padding: 0 5px; margin-left: 6px; letter-spacing: 0.4px; }
 .reg-grade { font-weight: 800; font-size: 12px; padding: 1px 8px; border-radius: 6px; }
+
+/* ============================================================================
+   QUANT OPS — barra executiva, painéis de inteligência e heatmap
+   ============================================================================ */
+.qo-topbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; background: var(--surface); border-bottom: 1px solid var(--hairline); padding: 10px var(--spacing); }
+.qo-brand { display: flex; align-items: center; gap: 10px; margin-right: 12px; color: var(--ink); }
+.qo-logo { font-size: 26px; color: var(--accent); }
+.qo-brand strong { display: block; font-size: 16px; letter-spacing: 1px; }
+.qo-brand small { display: block; font-size: 8.5px; color: var(--ink-muted); letter-spacing: 1.6px; }
+.qo-stat { background: var(--surface-2); border: 1px solid var(--hairline); border-radius: 8px; padding: 6px 14px; min-width: 110px; }
+.qo-stat small { display: block; font-size: 10px; color: var(--ink-muted); letter-spacing: 0.4px; }
+.qo-stat span { font-size: 15px; font-weight: 800; color: var(--ink); }
+.qo-big { font-size: 18px !important; }
+.qo-good { color: var(--call) !important; }
+.qo-bad { color: var(--put) !important; }
+.qo-ring-wrap { display: flex; align-items: center; gap: 10px; }
+.qo-ring { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 50%; background: conic-gradient(var(--call) 0deg, var(--grid) 0deg); }
+.qo-ring > span { display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 50%; background: var(--surface-2); font-size: 11px; font-weight: 800; color: var(--ink); }
+.qo-intel { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: var(--spacing); }
+.qo-panel h2 { font-size: 11px; letter-spacing: 1.2px; color: var(--ink-muted); border-bottom: 1px solid var(--hairline); padding-bottom: 6px; }
+.qo-kv { font-size: 12.5px; }
+.qo-kv .kv { display: flex; justify-content: space-between; gap: 10px; padding: 4px 0; border-bottom: 1px dashed var(--hairline); }
+.qo-kv .kv:last-child { border-bottom: none; }
+.qo-kv .kv b { color: var(--ink); font-weight: 700; }
+.kv-good b { color: var(--call) !important; }
+.kv-bad b { color: var(--put) !important; }
+.kv-warn b { color: var(--warning) !important; }
+.qo-banner { margin-top: 10px; text-align: center; font-weight: 800; font-size: 14px; letter-spacing: 0.6px; padding: 10px; border-radius: 8px; }
+.qo-banner.ok { background: rgba(38,166,154,0.15); color: var(--call); border: 1px solid var(--call); }
+.qo-banner.no { background: rgba(239,83,80,0.12); color: var(--put); border: 1px solid var(--put); }
+.qo-heat { display: flex; flex-direction: column; gap: 4px; }
+.qo-heat .hrow { display: grid; grid-template-columns: 130px 1fr 44px 24px; align-items: center; gap: 10px; padding: 4px 8px; border-radius: 6px; cursor: pointer; font-size: 12.5px; }
+.qo-heat .hrow:hover { background: var(--surface-2); }
+.qo-heat .hbar { height: 10px; border-radius: 5px; background: var(--grid); overflow: hidden; }
+.qo-heat .hfill { display: block; height: 100%; border-radius: 5px; }
+.qo-heat .hnum { text-align: right; font-weight: 800; color: var(--ink); font-variant-numeric: tabular-nums; }
 .estudo-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 18px; margin-top: 12px; }
-.estudo-grid h4 { margin: 0 0 8px; font-size: 13px; color: #c3c2b7; }
+.estudo-grid h4 { margin: 0 0 8px; font-size: 13px; color: var(--ink-2); }
 .estudo-row { display: flex; align-items: center; gap: 8px; padding: 3px 0; font-size: 12px; }
-.estudo-lbl { min-width: 70px; color: #c3c2b7; }
-.estudo-bar { flex: 1; height: 10px; background: #2c2c2a; border-radius: 5px; overflow: hidden; }
+.estudo-lbl { min-width: 70px; color: var(--ink-2); }
+.estudo-bar { flex: 1; height: 10px; background: var(--grid); border-radius: 5px; overflow: hidden; }
 .estudo-fill { display: block; height: 100%; border-radius: 5px; }
 .bar-good { background: #0ca30c; }
 .bar-mid { background: #fab219; }
 .bar-bad { background: #d03b3b; }
-.estudo-num { min-width: 74px; text-align: right; color: #8a8a82; font-variant-numeric: tabular-nums; }
+.estudo-num { min-width: 74px; text-align: right; color: var(--ink-muted); font-variant-numeric: tabular-nums; }
 @media (max-width: 760px) { .estudo-grid { grid-template-columns: 1fr; } }
 
 .decision-context {

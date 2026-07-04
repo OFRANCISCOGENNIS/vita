@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Simulador Confluência Multi-Fator | Candles estilo TradingView</title>
+    <title>QUANT OPS — Institutional Trading Intelligence</title>
     <script>
 /*!
  * @license
@@ -30,15 +30,15 @@
 }
 
 :root {
-    /* Superfícies e tinta */
-    --page: #0d0d0d;
-    --surface: #1a1a19;
-    --surface-2: #232322;
+    /* Superfícies e tinta — tema QUANT OPS (navy institucional) */
+    --page: #060a14;
+    --surface: #0b1220;
+    --surface-2: #101a2e;
     --ink: #ffffff;
-    --ink-2: #c3c2b7;
-    --ink-muted: #898781;
-    --hairline: rgba(255, 255, 255, 0.10);
-    --grid: #2c2c2a;
+    --ink-2: #c8d3e8;
+    --ink-muted: #7d8cab;
+    --hairline: rgba(140, 170, 255, 0.12);
+    --grid: #1c2740;
 
     /* Acento e séries */
     --accent: #3987e5;
@@ -395,15 +395,15 @@ body {
 .scan-item { cursor: pointer; font-size: 13px; }
 .scan-item:hover { border-color: var(--accent); }
 .reg-list { margin-top: 10px; max-height: 220px; overflow-y: auto; }
-.reg-row { display: flex; align-items: center; gap: 12px; padding: 6px 8px; border-bottom: 1px solid #2c2c2a; font-size: 13px; }
-.reg-hora { color: #8a8a82; font-variant-numeric: tabular-nums; min-width: 42px; }
+.reg-row { display: flex; align-items: center; gap: 12px; padding: 6px 8px; border-bottom: 1px solid var(--grid); font-size: 13px; }
+.reg-hora { color: var(--ink-muted); font-variant-numeric: tabular-nums; min-width: 42px; }
 .reg-par { flex: 1; font-weight: 600; }
-.btn-ghost { background: transparent; border: 1px solid #383835; color: #c3c2b7; font-size: 12px; padding: 2px 10px; border-radius: 6px; cursor: pointer; }
+.btn-ghost { background: transparent; border: 1px solid var(--grid); color: var(--ink-2); font-size: 12px; padding: 2px 10px; border-radius: 6px; cursor: pointer; }
 .btn-ghost:hover { border-color: var(--accent); }
 .ia-row { cursor: pointer; }
-.ia-row:hover { background: #23231f; }
-.ia-sel { background: #1e2b1e; }
-.ia-params { color: #8a8a82; font-size: 12px; font-variant-numeric: tabular-nums; }
+.ia-row:hover { background: var(--surface-2); }
+.ia-sel { background: rgba(38,166,154,0.12); }
+.ia-params { color: var(--ink-muted); font-size: 12px; font-variant-numeric: tabular-nums; }
 .scan-tuned { color: #fab219; font-weight: 700; }
 .decision-grade { display: inline-flex; align-items: center; gap: 4px; font-weight: 800; font-size: 14px; padding: 3px 12px; border-radius: 8px; letter-spacing: 0.5px; margin: 4px 0; }
 .grade-A { background: rgba(12,163,12,0.18); color: #26c281; border: 1px solid #0ca30c; }
@@ -411,16 +411,52 @@ body {
 .grade-C { background: rgba(208,59,59,0.15); color: #ef5350; border: 1px solid #d03b3b; }
 .reg-tag { font-size: 10px; font-weight: 700; color: #3987e5; border: 1px solid #3987e5; border-radius: 4px; padding: 0 5px; margin-left: 6px; letter-spacing: 0.4px; }
 .reg-grade { font-weight: 800; font-size: 12px; padding: 1px 8px; border-radius: 6px; }
+
+/* ============================================================================
+   QUANT OPS — barra executiva, painéis de inteligência e heatmap
+   ============================================================================ */
+.qo-topbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; background: var(--surface); border-bottom: 1px solid var(--hairline); padding: 10px var(--spacing); }
+.qo-brand { display: flex; align-items: center; gap: 10px; margin-right: 12px; color: var(--ink); }
+.qo-logo { font-size: 26px; color: var(--accent); }
+.qo-brand strong { display: block; font-size: 16px; letter-spacing: 1px; }
+.qo-brand small { display: block; font-size: 8.5px; color: var(--ink-muted); letter-spacing: 1.6px; }
+.qo-stat { background: var(--surface-2); border: 1px solid var(--hairline); border-radius: 8px; padding: 6px 14px; min-width: 110px; }
+.qo-stat small { display: block; font-size: 10px; color: var(--ink-muted); letter-spacing: 0.4px; }
+.qo-stat span { font-size: 15px; font-weight: 800; color: var(--ink); }
+.qo-big { font-size: 18px !important; }
+.qo-good { color: var(--call) !important; }
+.qo-bad { color: var(--put) !important; }
+.qo-ring-wrap { display: flex; align-items: center; gap: 10px; }
+.qo-ring { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 50%; background: conic-gradient(var(--call) 0deg, var(--grid) 0deg); }
+.qo-ring > span { display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 50%; background: var(--surface-2); font-size: 11px; font-weight: 800; color: var(--ink); }
+.qo-intel { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: var(--spacing); }
+.qo-panel h2 { font-size: 11px; letter-spacing: 1.2px; color: var(--ink-muted); border-bottom: 1px solid var(--hairline); padding-bottom: 6px; }
+.qo-kv { font-size: 12.5px; }
+.qo-kv .kv { display: flex; justify-content: space-between; gap: 10px; padding: 4px 0; border-bottom: 1px dashed var(--hairline); }
+.qo-kv .kv:last-child { border-bottom: none; }
+.qo-kv .kv b { color: var(--ink); font-weight: 700; }
+.kv-good b { color: var(--call) !important; }
+.kv-bad b { color: var(--put) !important; }
+.kv-warn b { color: var(--warning) !important; }
+.qo-banner { margin-top: 10px; text-align: center; font-weight: 800; font-size: 14px; letter-spacing: 0.6px; padding: 10px; border-radius: 8px; }
+.qo-banner.ok { background: rgba(38,166,154,0.15); color: var(--call); border: 1px solid var(--call); }
+.qo-banner.no { background: rgba(239,83,80,0.12); color: var(--put); border: 1px solid var(--put); }
+.qo-heat { display: flex; flex-direction: column; gap: 4px; }
+.qo-heat .hrow { display: grid; grid-template-columns: 130px 1fr 44px 24px; align-items: center; gap: 10px; padding: 4px 8px; border-radius: 6px; cursor: pointer; font-size: 12.5px; }
+.qo-heat .hrow:hover { background: var(--surface-2); }
+.qo-heat .hbar { height: 10px; border-radius: 5px; background: var(--grid); overflow: hidden; }
+.qo-heat .hfill { display: block; height: 100%; border-radius: 5px; }
+.qo-heat .hnum { text-align: right; font-weight: 800; color: var(--ink); font-variant-numeric: tabular-nums; }
 .estudo-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 18px; margin-top: 12px; }
-.estudo-grid h4 { margin: 0 0 8px; font-size: 13px; color: #c3c2b7; }
+.estudo-grid h4 { margin: 0 0 8px; font-size: 13px; color: var(--ink-2); }
 .estudo-row { display: flex; align-items: center; gap: 8px; padding: 3px 0; font-size: 12px; }
-.estudo-lbl { min-width: 70px; color: #c3c2b7; }
-.estudo-bar { flex: 1; height: 10px; background: #2c2c2a; border-radius: 5px; overflow: hidden; }
+.estudo-lbl { min-width: 70px; color: var(--ink-2); }
+.estudo-bar { flex: 1; height: 10px; background: var(--grid); border-radius: 5px; overflow: hidden; }
 .estudo-fill { display: block; height: 100%; border-radius: 5px; }
 .bar-good { background: #0ca30c; }
 .bar-mid { background: #fab219; }
 .bar-bad { background: #d03b3b; }
-.estudo-num { min-width: 74px; text-align: right; color: #8a8a82; font-variant-numeric: tabular-nums; }
+.estudo-num { min-width: 74px; text-align: right; color: var(--ink-muted); font-variant-numeric: tabular-nums; }
 @media (max-width: 760px) { .estudo-grid { grid-template-columns: 1fr; } }
 
 .decision-context {
@@ -1056,10 +1092,23 @@ body {
 </head>
 <body>
     <div class="container">
-        <!-- HEADER -->
-        <header class="header">
-            <h1>📊 Simulador Confluência Multi-Fator — Candles estilo TradingView</h1>
-            <p class="subtitle">Velas japonesas + EMAs + RSI + ATR • Avisos de entrada com expiração (1m/5m/15m/30m/1h)</p>
+        <!-- QUANT OPS — BARRA EXECUTIVA -->
+        <header class="qo-topbar">
+            <div class="qo-brand">
+                <span class="qo-logo">◈</span>
+                <span><strong>QUANT OPS</strong><small>INSTITUTIONAL TRADING INTELLIGENCE</small></span>
+            </div>
+            <div class="qo-stat"><small>Mercado Atual</small><span id="qoMercado" class="qo-big">—</span></div>
+            <div class="qo-stat qo-ring-wrap">
+                <small>Confiança</small>
+                <span class="qo-ring" id="qoRing"><span id="qoConf">—</span></span>
+            </div>
+            <div class="qo-stat"><small>Regime</small><span id="qoRegime">—</span></div>
+            <div class="qo-stat"><small>Volatilidade</small><span id="qoVolat">—</span></div>
+            <div class="qo-stat"><small>Sessão</small><span id="qoSessao">—</span></div>
+            <div class="qo-stat"><small>Operações Aprovadas</small><span id="qoAprov" class="qo-good">—</span></div>
+            <div class="qo-stat"><small>Bloqueadas</small><span id="qoBloq" class="qo-bad">—</span></div>
+            <div class="qo-stat"><small>Expectativa Matemática</small><span id="qoExpect">—</span></div>
         </header>
 
         <main class="main-content">
@@ -1267,6 +1316,28 @@ body {
                         <div class="decision-chips" id="decisionChips"></div>
                         <div class="decision-context" id="decisionContext">—</div>
                     </div>
+                </div>
+
+                <!-- INTELIGÊNCIA: Price Action | Volume/Delta | Análise da Operação -->
+                <div class="qo-intel">
+                    <div class="chart-container qo-panel">
+                        <h2>PRICE ACTION</h2>
+                        <div id="qoPA" class="qo-kv"></div>
+                    </div>
+                    <div class="chart-container qo-panel">
+                        <h2>VOLUME / DELTA</h2>
+                        <div id="qoVol" class="qo-kv"></div>
+                    </div>
+                    <div class="chart-container qo-panel qo-op">
+                        <h2>ANÁLISE DA OPERAÇÃO</h2>
+                        <div id="qoOp" class="qo-kv"></div>
+                        <div id="qoBanner" class="qo-banner" style="display:none;"></div>
+                    </div>
+                </div>
+
+                <div class="chart-container" id="heatPanel" style="display:none;">
+                    <h2>🗺️ Heatmap de Ativos <span id="heatMeta" class="tv-sync-tag"></span></h2>
+                    <div id="heatList" class="qo-heat"></div>
                 </div>
 
                 <div class="chart-container" id="scanPanel" style="display:none;">
@@ -2074,12 +2145,12 @@ function fmtHora(sec) {
 // ============================================================================
 
 function opcoesBase() {
-    // Tema escuro (tokens validados): superfície #1a1a19, grid #2c2c2a, tinta #c3c2b7
+    // Tema QUANT OPS (navy): superfície #0b1220, grid #1c2740, tinta #c8d3e8
     return {
-        layout: { background: { color: '#1a1a19' }, textColor: '#c3c2b7' },
-        grid: { vertLines: { color: '#2c2c2a' }, horzLines: { color: '#2c2c2a' } },
-        rightPriceScale: { borderColor: '#383835' },
-        timeScale: { borderColor: '#383835', timeVisible: true, secondsVisible: false, tickMarkFormatter: t => fmtHora(t) },
+        layout: { background: { color: '#0b1220' }, textColor: '#c8d3e8' },
+        grid: { vertLines: { color: '#1c2740' }, horzLines: { color: '#1c2740' } },
+        rightPriceScale: { borderColor: '#22304e' },
+        timeScale: { borderColor: '#22304e', timeVisible: true, secondsVisible: false, tickMarkFormatter: t => fmtHora(t) },
         crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
         localization: { timeFormatter: t => fmtHora(t) }
     };
@@ -2326,8 +2397,164 @@ function atualizarPaineis() {
     // Painel de Decisão (depende de confLive + byScoreGlobal recém-calculados)
     atualizarDecisao();
 
+    // QUANT OPS: barra executiva + painéis de inteligência
+    atualizarQuantOps();
+
     // Pressão de compra×venda por par (janela do fluxo)
     atualizarPressaoPares();
+}
+
+// ============================================================================
+// QUANT OPS — barra executiva + Price Action + Volume/Delta + Análise da Operação
+// ============================================================================
+
+function kv(nome, valor, cls) { return `<div class="kv ${cls || ''}"><span>${nome}</span><b>${valor}</b></div>`; }
+
+// Rotula os últimos swings (HH/HL/LH/LL) a partir dos pivôs confirmados
+function estruturaSwings() {
+    const piv = acharPivotsSR();
+    const todos = [
+        ...piv.res.map(p => ({ i: p.i, price: p.price, tipo: 'H' })),
+        ...piv.sup.map(p => ({ i: p.i, price: p.price, tipo: 'L' }))
+    ].sort((a, b) => a.i - b.i).slice(-6);
+    const rotulos = [];
+    let prevH = null, prevL = null;
+    todos.forEach(p => {
+        if (p.tipo === 'H') { rotulos.push(prevH == null ? 'H' : p.price > prevH ? 'HH' : 'LH'); prevH = p.price; }
+        else { rotulos.push(prevL == null ? 'L' : p.price > prevL ? 'HL' : 'LL'); prevL = p.price; }
+    });
+    return { rotulos: rotulos.slice(-4), todos };
+}
+
+function atualizarQuantOps() {
+    if (!computed || !computed.closes || !computed.closes.length) return;
+    const last = computed.closes.length - 1;
+    const cl = confLive, en = cl.enabled || 1;
+    const dom = Math.max(cl.long, cl.short);
+    const dirDom = cl.long >= cl.short ? 1 : -1;
+    const conf = Math.round(dom / en * 100);
+
+    // ---- topbar ----
+    const mercado = document.getElementById('qoMercado');
+    const biasTxt = cl.long > cl.short ? 'BULLISH' : cl.short > cl.long ? 'BEARISH' : 'NEUTRO';
+    mercado.textContent = biasTxt;
+    mercado.className = 'qo-big ' + (biasTxt === 'BULLISH' ? 'qo-good' : biasTxt === 'BEARISH' ? 'qo-bad' : '');
+    document.getElementById('qoConf').textContent = conf + '%';
+    document.getElementById('qoRing').style.background =
+        `conic-gradient(${dirDom === 1 ? 'var(--call)' : 'var(--put)'} ${conf * 3.6}deg, var(--grid) 0deg)`;
+    const regs = regimePorBarra();
+    document.getElementById('qoRegime').textContent = REGIME_ROTULO[regs[last]] || '—';
+    const atrR = (computed.atrValues[last] != null && computed.atrMedia[last] != null)
+        ? computed.atrValues[last] / computed.atrMedia[last] : null;
+    document.getElementById('qoVolat').textContent = atrR == null ? '—' : atrR >= 1.3 ? 'Alta' : atrR <= 0.75 ? 'Baixa' : 'Média';
+    document.getElementById('qoSessao').textContent = dados.length ? sessaoDe(dados[last].time) : '—';
+    // aprovadas/bloqueadas: entradas do histórico fora/dentro da janela de notícia
+    const newsOn = document.getElementById('useNewsFilter').checked;
+    const newsJan = parseInt(document.getElementById('newsJanela').value);
+    const bloqueadas = newsOn ? entradas.filter(e => noticiaProxima(e.entryTime, newsJan)).length : 0;
+    document.getElementById('qoAprov').textContent = entradas.length - bloqueadas;
+    document.getElementById('qoBloq').textContent = bloqueadas;
+    const exEl = document.getElementById('qoExpect');
+    if (metricasAtuais) {
+        const v = parseFloat(metricasAtuais.expect);
+        exEl.textContent = (v >= 0 ? '+' : '') + v.toFixed(2) + 'R';
+        exEl.className = v >= 0 ? 'qo-good' : 'qo-bad';
+    } else { exEl.textContent = '—'; exEl.className = ''; }
+
+    // ---- PRICE ACTION ----
+    const sw = estruturaSwings();
+    const seq = sw.rotulos.join(' · ') || '—';
+    const altaSeq = sw.rotulos.filter(r => r === 'HH' || r === 'HL').length;
+    const baixaSeq = sw.rotulos.filter(r => r === 'LH' || r === 'LL').length;
+    const estrut = altaSeq > baixaSeq ? 'Altista' : baixaSeq > altaSeq ? 'Baixista' : 'Indefinida';
+    // BOS: rompimento de estrutura nas últimas 5 velas (sinal E presente)
+    const bosRecente = [...sinaisLong, ...sinaisShort].some(s => s.index >= last - 5 && /E/.test(s.fatores));
+    // correção: retração desde o último extremo relevante
+    let correcao = null;
+    const ultH = sw.todos.filter(p => p.tipo === 'H').slice(-1)[0];
+    const ultL = sw.todos.filter(p => p.tipo === 'L').slice(-1)[0];
+    if (ultH && ultL && ultH.price !== ultL.price) {
+        const c = computed.closes[last];
+        correcao = estrut === 'Altista'
+            ? Math.round((ultH.price - c) / (ultH.price - ultL.price) * 100)
+            : Math.round((c - ultL.price) / (ultH.price - ultL.price) * 100);
+        correcao = Math.max(0, Math.min(100, correcao));
+    }
+    const pullOk = correcao != null && correcao >= 20 && correcao <= 62;
+    document.getElementById('qoPA').innerHTML =
+        kv('Estrutura', estrut, estrut === 'Altista' ? 'kv-good' : estrut === 'Baixista' ? 'kv-bad' : '') +
+        kv('Últimos swings', seq) +
+        kv('BOS', bosRecente ? 'Confirmado' : '—', bosRecente ? 'kv-good' : '') +
+        kv('Força da tendência', conf + '%', conf >= 70 ? 'kv-good' : conf >= 50 ? 'kv-warn' : 'kv-bad') +
+        kv('Correção', correcao == null ? '—' : correcao + '%') +
+        kv('Pullback saudável', correcao == null ? '—' : pullOk ? 'SIM' : 'NÃO', pullOk ? 'kv-good' : '');
+
+    // ---- VOLUME / DELTA ----
+    const janF = Math.max(2, parseInt(document.getElementById('fluxoJanela').value));
+    const dj = deltaNaJanela(dados, last, janF);
+    const temVol = dj.tot > 0;
+    const volMed = dados.slice(Math.max(0, last - 20), last).reduce((s, d) => s + (d.volume || 0), 0) / Math.min(20, last || 1);
+    const volNivel = !temVol ? '—' : (dados[last].volume || 0) > volMed * 1.3 ? 'Alto' : (dados[last].volume || 0) < volMed * 0.7 ? 'Baixo' : 'Normal';
+    const forcaCompra = temVol ? Math.round(dj.buy / dj.tot * 100) : null;
+    const pat = padraoVela(last);
+    document.getElementById('qoVol').innerHTML =
+        kv('Volume', volNivel, volNivel === 'Alto' ? 'kv-good' : '') +
+        kv('Delta', !temVol ? '—' : dj.dir === 1 ? 'Comprador' : dj.dir === -1 ? 'Vendedor' : 'Equilibrado', dj.dir === 1 ? 'kv-good' : dj.dir === -1 ? 'kv-bad' : '') +
+        kv('Força compradora', forcaCompra == null ? '—' : forcaCompra + '%', forcaCompra >= 55 ? 'kv-good' : forcaCompra <= 45 && forcaCompra != null ? 'kv-bad' : '') +
+        kv('Padrão de vela', pat.up ? 'Reversão de ALTA' : pat.down ? 'Reversão de BAIXA' : pat.inside ? 'Inside (compressão)' : '—',
+            pat.up ? 'kv-good' : pat.down ? 'kv-bad' : pat.inside ? 'kv-warn' : '') +
+        kv('Convicção do padrão', pat.forca === 2 ? 'Alta' : pat.forca === 1 ? 'Média' : '—');
+
+    // ---- ANÁLISE DA OPERAÇÃO ----
+    const alvo = cl.confMode === 'estrita' ? en : Math.min(cl.minScore, en);
+    const temSinal = dom >= alvo && cl.long !== cl.short;
+    const banner = document.getElementById('qoBanner');
+    if (temSinal) {
+        const g = calcularGrade(dirDom);
+        const payout = Math.max(0.01, (parseFloat(document.getElementById('payout').value) || 87) / 100);
+        const expectOp = g.pEst != null ? g.pEst * payout - (1 - g.pEst) : null;
+        document.getElementById('qoOp').innerHTML =
+            kv('Direção', dirDom === 1 ? '▲ COMPRA (CALL)' : '▼ VENDA (PUT)', dirDom === 1 ? 'kv-good' : 'kv-bad') +
+            kv('Score', g.score + '/100 ' + '⭐'.repeat(g.estrelas)) +
+            kv('Probabilidade', g.pEst == null ? '—' : Math.round(g.pEst * 100) + '%', g.pEst != null && g.pEst >= 0.55 ? 'kv-good' : '') +
+            kv('Expectancy', expectOp == null ? '—' : (expectOp >= 0 ? '+' : '') + expectOp.toFixed(2) + 'R', expectOp >= 0 ? 'kv-good' : 'kv-bad') +
+            kv('Risco sugerido (½ Kelly)', g.kelly == null ? '—' : (g.kelly * 100).toFixed(2) + '%') +
+            kv('Expiração', expMinutes() + 'm');
+        const aprovada = g.grade !== 'C' && (expectOp == null || expectOp >= 0);
+        banner.style.display = 'block';
+        banner.className = 'qo-banner ' + (aprovada ? 'ok' : 'no');
+        banner.textContent = aprovada ? '✓ OPERAÇÃO APROVADA' : '✕ OPERAÇÃO BLOQUEADA';
+    } else {
+        document.getElementById('qoOp').innerHTML =
+            kv('Direção', '— aguardando confluência') +
+            kv('CALL', cl.long + '/' + en) + kv('PUT', cl.short + '/' + en) +
+            kv('Mínimo p/ sinal', alvo + ' fatores');
+        banner.style.display = 'none';
+    }
+}
+
+// ---- HEATMAP DE ATIVOS (alimentado pelo scanner) ----
+let heatData = [];
+function renderHeat() {
+    const panel = document.getElementById('heatPanel');
+    if (!heatData.length) { panel.style.display = 'none'; return; }
+    panel.style.display = 'block';
+    document.getElementById('heatMeta').textContent = heatData.length + ' ativos · ' + fmtHora(Math.floor(Date.now() / 1000));
+    const corDe = s => s >= 70 ? 'var(--call)' : s >= 50 ? 'var(--warning)' : 'var(--put)';
+    document.getElementById('heatList').innerHTML = heatData
+        .slice().sort((a, b) => b.score - a.score)
+        .map(h => `<div class="hrow" data-s="${h.s}">` +
+            `<span>${h.label}</span>` +
+            `<span class="hbar"><span class="hfill" style="width:${h.score}%;background:${corDe(h.score)}"></span></span>` +
+            `<span class="hnum">${h.score}</span>` +
+            `<span class="${h.dir === 1 ? 'chip-dir-up' : h.dir === -1 ? 'chip-dir-down' : ''}">${h.dir === 1 ? '▲' : h.dir === -1 ? '▼' : '—'}</span></div>`)
+        .join('');
+    document.getElementById('heatList').querySelectorAll('.hrow').forEach(x => x.addEventListener('click', () => {
+        const s = x.getAttribute('data-s');
+        document.getElementById('fonte').value = PARES_YAHOO[s] ? (ehForex() ? fonte() : 'twelvedata') : 'binance';
+        document.getElementById('symbol').value = s;
+        montarWidgetTV(); carregar();
+    }));
 }
 
 // ============================================================================
@@ -3385,6 +3612,7 @@ async function escanear() {
     el('usePesoIA').checked = false;   // peso é por par; no scan usamos os params já afinados
     htfTrend = [];
     const res = [];
+    heatData = [];   // heatmap é reconstruído a cada varredura
     for (const s of lista) {
         try {
             const d = await loader(s, arg, 250);
@@ -3398,10 +3626,17 @@ async function escanear() {
             dados = d; recomputarIndicadores(); recomputarSinais();
             const { long, short, enabled } = confLive;
             const alvo = confMode === 'estrita' ? enabled : Math.min(minScore, enabled);
+            const domScore = Math.max(long, short);
+            heatData.push({
+                s, label: PARES_YAHOO[s] ? PARES_YAHOO[s].label : s,
+                score: Math.round(domScore / (enabled || 1) * 100),
+                dir: long > short ? 1 : short > long ? -1 : 0
+            });
             if (long >= alvo && long > short) res.push({ s, dir: 1, score: long, enabled, tuned });
             else if (short >= alvo && short > long) res.push({ s, dir: -1, score: short, enabled, tuned });
         } catch (e) { }
     }
+    renderHeat();
     pIds.forEach(i => { if (el(i).type === 'checkbox') el(i).checked = pSave[i]; else el(i).value = pSave[i]; });
     dados = dSave; recomputarIndicadores();
     if (el('useHtf').checked) { await carregarHtf(); }

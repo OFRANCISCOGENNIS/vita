@@ -612,12 +612,12 @@ function fmtHora(sec) {
 // ============================================================================
 
 function opcoesBase() {
-    // Tema escuro (tokens validados): superfície #1a1a19, grid #2c2c2a, tinta #c3c2b7
+    // Tema QUANT OPS (navy): superfície #0b1220, grid #1c2740, tinta #c8d3e8
     return {
-        layout: { background: { color: '#1a1a19' }, textColor: '#c3c2b7' },
-        grid: { vertLines: { color: '#2c2c2a' }, horzLines: { color: '#2c2c2a' } },
-        rightPriceScale: { borderColor: '#383835' },
-        timeScale: { borderColor: '#383835', timeVisible: true, secondsVisible: false, tickMarkFormatter: t => fmtHora(t) },
+        layout: { background: { color: '#0b1220' }, textColor: '#c8d3e8' },
+        grid: { vertLines: { color: '#1c2740' }, horzLines: { color: '#1c2740' } },
+        rightPriceScale: { borderColor: '#22304e' },
+        timeScale: { borderColor: '#22304e', timeVisible: true, secondsVisible: false, tickMarkFormatter: t => fmtHora(t) },
         crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
         localization: { timeFormatter: t => fmtHora(t) }
     };
@@ -864,8 +864,164 @@ function atualizarPaineis() {
     // Painel de Decisão (depende de confLive + byScoreGlobal recém-calculados)
     atualizarDecisao();
 
+    // QUANT OPS: barra executiva + painéis de inteligência
+    atualizarQuantOps();
+
     // Pressão de compra×venda por par (janela do fluxo)
     atualizarPressaoPares();
+}
+
+// ============================================================================
+// QUANT OPS — barra executiva + Price Action + Volume/Delta + Análise da Operação
+// ============================================================================
+
+function kv(nome, valor, cls) { return `<div class="kv ${cls || ''}"><span>${nome}</span><b>${valor}</b></div>`; }
+
+// Rotula os últimos swings (HH/HL/LH/LL) a partir dos pivôs confirmados
+function estruturaSwings() {
+    const piv = acharPivotsSR();
+    const todos = [
+        ...piv.res.map(p => ({ i: p.i, price: p.price, tipo: 'H' })),
+        ...piv.sup.map(p => ({ i: p.i, price: p.price, tipo: 'L' }))
+    ].sort((a, b) => a.i - b.i).slice(-6);
+    const rotulos = [];
+    let prevH = null, prevL = null;
+    todos.forEach(p => {
+        if (p.tipo === 'H') { rotulos.push(prevH == null ? 'H' : p.price > prevH ? 'HH' : 'LH'); prevH = p.price; }
+        else { rotulos.push(prevL == null ? 'L' : p.price > prevL ? 'HL' : 'LL'); prevL = p.price; }
+    });
+    return { rotulos: rotulos.slice(-4), todos };
+}
+
+function atualizarQuantOps() {
+    if (!computed || !computed.closes || !computed.closes.length) return;
+    const last = computed.closes.length - 1;
+    const cl = confLive, en = cl.enabled || 1;
+    const dom = Math.max(cl.long, cl.short);
+    const dirDom = cl.long >= cl.short ? 1 : -1;
+    const conf = Math.round(dom / en * 100);
+
+    // ---- topbar ----
+    const mercado = document.getElementById('qoMercado');
+    const biasTxt = cl.long > cl.short ? 'BULLISH' : cl.short > cl.long ? 'BEARISH' : 'NEUTRO';
+    mercado.textContent = biasTxt;
+    mercado.className = 'qo-big ' + (biasTxt === 'BULLISH' ? 'qo-good' : biasTxt === 'BEARISH' ? 'qo-bad' : '');
+    document.getElementById('qoConf').textContent = conf + '%';
+    document.getElementById('qoRing').style.background =
+        `conic-gradient(${dirDom === 1 ? 'var(--call)' : 'var(--put)'} ${conf * 3.6}deg, var(--grid) 0deg)`;
+    const regs = regimePorBarra();
+    document.getElementById('qoRegime').textContent = REGIME_ROTULO[regs[last]] || '—';
+    const atrR = (computed.atrValues[last] != null && computed.atrMedia[last] != null)
+        ? computed.atrValues[last] / computed.atrMedia[last] : null;
+    document.getElementById('qoVolat').textContent = atrR == null ? '—' : atrR >= 1.3 ? 'Alta' : atrR <= 0.75 ? 'Baixa' : 'Média';
+    document.getElementById('qoSessao').textContent = dados.length ? sessaoDe(dados[last].time) : '—';
+    // aprovadas/bloqueadas: entradas do histórico fora/dentro da janela de notícia
+    const newsOn = document.getElementById('useNewsFilter').checked;
+    const newsJan = parseInt(document.getElementById('newsJanela').value);
+    const bloqueadas = newsOn ? entradas.filter(e => noticiaProxima(e.entryTime, newsJan)).length : 0;
+    document.getElementById('qoAprov').textContent = entradas.length - bloqueadas;
+    document.getElementById('qoBloq').textContent = bloqueadas;
+    const exEl = document.getElementById('qoExpect');
+    if (metricasAtuais) {
+        const v = parseFloat(metricasAtuais.expect);
+        exEl.textContent = (v >= 0 ? '+' : '') + v.toFixed(2) + 'R';
+        exEl.className = v >= 0 ? 'qo-good' : 'qo-bad';
+    } else { exEl.textContent = '—'; exEl.className = ''; }
+
+    // ---- PRICE ACTION ----
+    const sw = estruturaSwings();
+    const seq = sw.rotulos.join(' · ') || '—';
+    const altaSeq = sw.rotulos.filter(r => r === 'HH' || r === 'HL').length;
+    const baixaSeq = sw.rotulos.filter(r => r === 'LH' || r === 'LL').length;
+    const estrut = altaSeq > baixaSeq ? 'Altista' : baixaSeq > altaSeq ? 'Baixista' : 'Indefinida';
+    // BOS: rompimento de estrutura nas últimas 5 velas (sinal E presente)
+    const bosRecente = [...sinaisLong, ...sinaisShort].some(s => s.index >= last - 5 && /E/.test(s.fatores));
+    // correção: retração desde o último extremo relevante
+    let correcao = null;
+    const ultH = sw.todos.filter(p => p.tipo === 'H').slice(-1)[0];
+    const ultL = sw.todos.filter(p => p.tipo === 'L').slice(-1)[0];
+    if (ultH && ultL && ultH.price !== ultL.price) {
+        const c = computed.closes[last];
+        correcao = estrut === 'Altista'
+            ? Math.round((ultH.price - c) / (ultH.price - ultL.price) * 100)
+            : Math.round((c - ultL.price) / (ultH.price - ultL.price) * 100);
+        correcao = Math.max(0, Math.min(100, correcao));
+    }
+    const pullOk = correcao != null && correcao >= 20 && correcao <= 62;
+    document.getElementById('qoPA').innerHTML =
+        kv('Estrutura', estrut, estrut === 'Altista' ? 'kv-good' : estrut === 'Baixista' ? 'kv-bad' : '') +
+        kv('Últimos swings', seq) +
+        kv('BOS', bosRecente ? 'Confirmado' : '—', bosRecente ? 'kv-good' : '') +
+        kv('Força da tendência', conf + '%', conf >= 70 ? 'kv-good' : conf >= 50 ? 'kv-warn' : 'kv-bad') +
+        kv('Correção', correcao == null ? '—' : correcao + '%') +
+        kv('Pullback saudável', correcao == null ? '—' : pullOk ? 'SIM' : 'NÃO', pullOk ? 'kv-good' : '');
+
+    // ---- VOLUME / DELTA ----
+    const janF = Math.max(2, parseInt(document.getElementById('fluxoJanela').value));
+    const dj = deltaNaJanela(dados, last, janF);
+    const temVol = dj.tot > 0;
+    const volMed = dados.slice(Math.max(0, last - 20), last).reduce((s, d) => s + (d.volume || 0), 0) / Math.min(20, last || 1);
+    const volNivel = !temVol ? '—' : (dados[last].volume || 0) > volMed * 1.3 ? 'Alto' : (dados[last].volume || 0) < volMed * 0.7 ? 'Baixo' : 'Normal';
+    const forcaCompra = temVol ? Math.round(dj.buy / dj.tot * 100) : null;
+    const pat = padraoVela(last);
+    document.getElementById('qoVol').innerHTML =
+        kv('Volume', volNivel, volNivel === 'Alto' ? 'kv-good' : '') +
+        kv('Delta', !temVol ? '—' : dj.dir === 1 ? 'Comprador' : dj.dir === -1 ? 'Vendedor' : 'Equilibrado', dj.dir === 1 ? 'kv-good' : dj.dir === -1 ? 'kv-bad' : '') +
+        kv('Força compradora', forcaCompra == null ? '—' : forcaCompra + '%', forcaCompra >= 55 ? 'kv-good' : forcaCompra <= 45 && forcaCompra != null ? 'kv-bad' : '') +
+        kv('Padrão de vela', pat.up ? 'Reversão de ALTA' : pat.down ? 'Reversão de BAIXA' : pat.inside ? 'Inside (compressão)' : '—',
+            pat.up ? 'kv-good' : pat.down ? 'kv-bad' : pat.inside ? 'kv-warn' : '') +
+        kv('Convicção do padrão', pat.forca === 2 ? 'Alta' : pat.forca === 1 ? 'Média' : '—');
+
+    // ---- ANÁLISE DA OPERAÇÃO ----
+    const alvo = cl.confMode === 'estrita' ? en : Math.min(cl.minScore, en);
+    const temSinal = dom >= alvo && cl.long !== cl.short;
+    const banner = document.getElementById('qoBanner');
+    if (temSinal) {
+        const g = calcularGrade(dirDom);
+        const payout = Math.max(0.01, (parseFloat(document.getElementById('payout').value) || 87) / 100);
+        const expectOp = g.pEst != null ? g.pEst * payout - (1 - g.pEst) : null;
+        document.getElementById('qoOp').innerHTML =
+            kv('Direção', dirDom === 1 ? '▲ COMPRA (CALL)' : '▼ VENDA (PUT)', dirDom === 1 ? 'kv-good' : 'kv-bad') +
+            kv('Score', g.score + '/100 ' + '⭐'.repeat(g.estrelas)) +
+            kv('Probabilidade', g.pEst == null ? '—' : Math.round(g.pEst * 100) + '%', g.pEst != null && g.pEst >= 0.55 ? 'kv-good' : '') +
+            kv('Expectancy', expectOp == null ? '—' : (expectOp >= 0 ? '+' : '') + expectOp.toFixed(2) + 'R', expectOp >= 0 ? 'kv-good' : 'kv-bad') +
+            kv('Risco sugerido (½ Kelly)', g.kelly == null ? '—' : (g.kelly * 100).toFixed(2) + '%') +
+            kv('Expiração', expMinutes() + 'm');
+        const aprovada = g.grade !== 'C' && (expectOp == null || expectOp >= 0);
+        banner.style.display = 'block';
+        banner.className = 'qo-banner ' + (aprovada ? 'ok' : 'no');
+        banner.textContent = aprovada ? '✓ OPERAÇÃO APROVADA' : '✕ OPERAÇÃO BLOQUEADA';
+    } else {
+        document.getElementById('qoOp').innerHTML =
+            kv('Direção', '— aguardando confluência') +
+            kv('CALL', cl.long + '/' + en) + kv('PUT', cl.short + '/' + en) +
+            kv('Mínimo p/ sinal', alvo + ' fatores');
+        banner.style.display = 'none';
+    }
+}
+
+// ---- HEATMAP DE ATIVOS (alimentado pelo scanner) ----
+let heatData = [];
+function renderHeat() {
+    const panel = document.getElementById('heatPanel');
+    if (!heatData.length) { panel.style.display = 'none'; return; }
+    panel.style.display = 'block';
+    document.getElementById('heatMeta').textContent = heatData.length + ' ativos · ' + fmtHora(Math.floor(Date.now() / 1000));
+    const corDe = s => s >= 70 ? 'var(--call)' : s >= 50 ? 'var(--warning)' : 'var(--put)';
+    document.getElementById('heatList').innerHTML = heatData
+        .slice().sort((a, b) => b.score - a.score)
+        .map(h => `<div class="hrow" data-s="${h.s}">` +
+            `<span>${h.label}</span>` +
+            `<span class="hbar"><span class="hfill" style="width:${h.score}%;background:${corDe(h.score)}"></span></span>` +
+            `<span class="hnum">${h.score}</span>` +
+            `<span class="${h.dir === 1 ? 'chip-dir-up' : h.dir === -1 ? 'chip-dir-down' : ''}">${h.dir === 1 ? '▲' : h.dir === -1 ? '▼' : '—'}</span></div>`)
+        .join('');
+    document.getElementById('heatList').querySelectorAll('.hrow').forEach(x => x.addEventListener('click', () => {
+        const s = x.getAttribute('data-s');
+        document.getElementById('fonte').value = PARES_YAHOO[s] ? (ehForex() ? fonte() : 'twelvedata') : 'binance';
+        document.getElementById('symbol').value = s;
+        montarWidgetTV(); carregar();
+    }));
 }
 
 // ============================================================================
@@ -1923,6 +2079,7 @@ async function escanear() {
     el('usePesoIA').checked = false;   // peso é por par; no scan usamos os params já afinados
     htfTrend = [];
     const res = [];
+    heatData = [];   // heatmap é reconstruído a cada varredura
     for (const s of lista) {
         try {
             const d = await loader(s, arg, 250);
@@ -1936,10 +2093,17 @@ async function escanear() {
             dados = d; recomputarIndicadores(); recomputarSinais();
             const { long, short, enabled } = confLive;
             const alvo = confMode === 'estrita' ? enabled : Math.min(minScore, enabled);
+            const domScore = Math.max(long, short);
+            heatData.push({
+                s, label: PARES_YAHOO[s] ? PARES_YAHOO[s].label : s,
+                score: Math.round(domScore / (enabled || 1) * 100),
+                dir: long > short ? 1 : short > long ? -1 : 0
+            });
             if (long >= alvo && long > short) res.push({ s, dir: 1, score: long, enabled, tuned });
             else if (short >= alvo && short > long) res.push({ s, dir: -1, score: short, enabled, tuned });
         } catch (e) { }
     }
+    renderHeat();
     pIds.forEach(i => { if (el(i).type === 'checkbox') el(i).checked = pSave[i]; else el(i).value = pSave[i]; });
     dados = dSave; recomputarIndicadores();
     if (el('useHtf').checked) { await carregarHtf(); }
