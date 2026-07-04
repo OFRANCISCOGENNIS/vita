@@ -117,7 +117,8 @@ function crossunder(cur, prev, nivel) { return prev !== null && cur !== null && 
 // ============================================================================
 
 function tfMinutes() { return parseInt(document.getElementById('timeframe').value); }
-function expMinutes() { return parseInt(document.getElementById('expiracao').value); }
+let expOverride = null;   // usado pela IA para backtestar horizontes de expiração
+function expMinutes() { return expOverride || parseInt(document.getElementById('expiracao').value); }
 function fonte() { return document.getElementById('fonte').value; }
 function symbolAtual() { return (document.getElementById('symbol').value || 'BTCUSDT').trim().toUpperCase(); }
 function binanceInterval() { const v = tfMinutes(); return v === 60 ? '1h' : v + 'm'; }
@@ -266,21 +267,58 @@ function rotuloFatores(fat) {
     return ok.length ? ok.join('·') : '—';
 }
 
-// ---- Padrões de vela (confirmação de preço na vela do sinal) ----
-// Retorna { up, down }: engolfo/martelo confirmam alta; engolfo/estrela cadente, baixa.
+// ---- CANDLE ANALYZER 2.0 (confirmação de preço na vela do sinal) ----
+// Mede anatomia (corpo %, pavios %) e detecta padrões com nível de convicção:
+// engolfo/marubozu = alta convicção (2), martelo/estrela = média (1),
+// inside bar = compressão (indecisão → não confirma nenhum lado).
 function padraoVela(i) {
-    if (i < 1) return { up: false, down: false };
+    if (i < 1) return { up: false, down: false, forca: 0, inside: false };
     const c = dados[i], p = dados[i - 1];
     const corpo = Math.abs(c.close - c.open);
     const range = (c.high - c.low) || 1e-9;
+    const bodyPct = corpo / range;
     const wickUp = c.high - Math.max(c.close, c.open);
     const wickDn = Math.min(c.close, c.open) - c.low;
+    const inside = c.high <= p.high && c.low >= p.low;              // compressão
     const engAlta = c.close > c.open && p.close < p.open && c.close >= p.open && c.open <= p.close;
     const engBaixa = c.close < c.open && p.close > p.open && c.open >= p.close && c.close <= p.open;
-    const martelo = wickDn >= corpo * 2 && wickUp <= corpo && corpo <= range * 0.4;
-    const estrela = wickUp >= corpo * 2 && wickDn <= corpo && corpo <= range * 0.4;
-    return { up: engAlta || martelo, down: engBaixa || estrela };
+    const maruAlta = c.close > c.open && bodyPct >= 0.85;           // marubozu
+    const maruBaixa = c.close < c.open && bodyPct >= 0.85;
+    const martelo = wickDn >= corpo * 2 && wickUp <= corpo && bodyPct <= 0.4;
+    const estrela = wickUp >= corpo * 2 && wickDn <= corpo && bodyPct <= 0.4;
+    const up = !inside && (engAlta || maruAlta || martelo);
+    const down = !inside && (engBaixa || maruBaixa || estrela);
+    const forca = (engAlta || engBaixa || maruAlta || maruBaixa) ? 2 : (martelo || estrela) ? 1 : 0;
+    return { up, down, forca, inside };
 }
+
+// ---- MARKET REGIME ENGINE ----
+// Classifica cada vela em um regime: 'trend' (tendencial), 'vol' (expansão de
+// volatilidade) ou 'range' (lateral/compressão). Cada regime redistribui os
+// pesos dos fatores na pontuação dinâmica.
+function regimePorBarra() {
+    const { closes, emaR, emaL, ema200, atrValues, atrMedia } = computed;
+    const out = new Array(closes.length).fill('range');
+    for (let i = 0; i < closes.length; i++) {
+        const atrOk = atrValues[i] != null && atrMedia[i] != null;
+        if (atrOk && atrValues[i] > atrMedia[i] * 1.3) { out[i] = 'vol'; continue; }
+        if (emaR[i] != null && emaL[i] != null && ema200[i] != null && atrOk) {
+            const sep = Math.abs(emaR[i] - emaL[i]);
+            const dist = Math.abs(closes[i] - ema200[i]);
+            if (sep > atrValues[i] * 0.15 && dist > atrValues[i] * 0.5) out[i] = 'trend';
+        }
+    }
+    return out;
+}
+const REGIME_ROTULO = { trend: '📈 Tendencial', vol: '🔥 Volátil', range: '↔ Lateral' };
+// Pesos-base por regime (Engine de Pontuação Dinâmica). Média ≈ 1 para manter
+// a semântica do "mín. de fatores": tendencial premia Estrutura/Tendência,
+// lateral premia reversão (RSI/Padrão/Fluxo), volátil premia ATR/Fluxo.
+const PESOS_REGIME = {
+    trend: { T: 1.4, Ma: 1.3, Mo: 0.7, V: 1.0, E: 1.4, F: 1.1, C: 1.0, P: 0.9 },
+    range: { T: 0.7, Ma: 0.7, Mo: 1.4, V: 0.8, E: 0.8, F: 1.2, C: 1.0, P: 1.4 },
+    vol:   { T: 1.0, Ma: 1.0, Mo: 0.9, V: 1.4, E: 1.1, F: 1.3, C: 1.0, P: 1.1 }
+};
 
 // ---- Sessões de mercado (por hora UTC) ----
 function sessaoDe(t) {
@@ -363,6 +401,7 @@ function recomputarSinais() {
     const usePeso = document.getElementById('usePesoIA').checked;
     const pesos = usePeso ? (pesoFatores[symbolAtual()] || {}) : null;
     const piv = useSR ? acharPivotsSR() : null;
+    const regimes = usePeso ? regimePorBarra() : null;   // pesos dinâmicos por regime
 
     const { closes, emaR, emaL, ema200, rsiValues, atrValues, atrMedia, highs, lows } = computed;
 
@@ -398,8 +437,9 @@ function recomputarSinais() {
         const moL = recente(momLongBar, i);
         const moS = recente(momShortBar, i);
         const vo = atrValues[i] !== null && atrMedia[i] !== null && atrValues[i] > atrMedia[i];
-        const eL = closes[i] > maxRec[i - 1];
-        const eS = closes[i] < minRec[i - 1];
+        // maxRec[i]/minRec[i] já excluem a própria vela i (janela [i-lookback, i-1])
+        const eL = closes[i] > maxRec[i];
+        const eS = closes[i] < minRec[i];
 
         // Fluxo de volume: delta compra×venda do par na janela
         const fluxoDir = useFluxo ? deltaNaJanela(dados, i, fluxoJanela).dir : 0;
@@ -424,9 +464,12 @@ function recomputarSinais() {
         ];
         const longScore = fatL.filter(f => f.on && f.ok).length;
         const shortScore = fatS.filter(f => f.on && f.ok).length;
-        // Score ponderado pela IA: cada fator vale seu peso (win rate/0.5), não 1
-        const longW = fatL.reduce((s, f) => s + (f.on && f.ok ? pesoDe(pesos, f.k) : 0), 0);
-        const shortW = fatS.reduce((s, f) => s + (f.on && f.ok ? pesoDe(pesos, f.k) : 0), 0);
+        // Pontuação dinâmica: peso do fator = (acerto histórico IA) × (peso do
+        // regime de mercado da vela) — aprendizado contínuo + contexto.
+        const wReg = regimes ? PESOS_REGIME[regimes[i]] : null;
+        const pesoTotal = f => pesoDe(pesos, f.k) * (wReg ? wReg[f.k] : 1);
+        const longW = fatL.reduce((s, f) => s + (f.on && f.ok ? pesoTotal(f) : 0), 0);
+        const shortW = fatS.reduce((s, f) => s + (f.on && f.ok ? pesoTotal(f) : 0), 0);
 
         let longSig, shortSig;
         if (confMode === 'estrita') {
@@ -469,6 +512,7 @@ function recomputarSinais() {
             confLive = {
                 long: longScore, short: shortScore, enabled: enabledCount,
                 longW, shortW, usePeso,
+                regime: regimes ? regimes[i] : null,
                 minScore, confMode,
                 htfDir: useHtf ? htfTrend[i] : 0, useHtf,
                 srVetoLong: vsLast.vetoLong, srVetoShort: vsLast.vetoShort, useSR,
@@ -1073,8 +1117,10 @@ function responderTreino(dir) {   // dir: 1 CALL, -1 PUT, 0 pular
 // PAINEL DE DECISÃO — o veredito de assertividade da vela atual
 // ============================================================================
 
-// Selo A/B/C: A = todos os filtros de qualidade a favor; B = confluência ok com
-// alguma ressalva; C = evitar. Reúne score, IA (peso + WF do par), HTF, S/R e sessão.
+// SCORE INSTITUCIONAL — qualidade da operação em 0–100, agregando os módulos:
+// confluência (40), assertividade histórica do score vs break-even (20),
+// alinhamento com TF maior (10), distância de S/R (10), sessão (10) e
+// histórico walk-forward do par (10). Deriva selo A/B/C, estrelas e Kelly.
 function calcularGrade(dir) {
     const cl = confLive, enabled = cl.enabled || 1;
     const scoreRatio = (dir === 1 ? cl.long : cl.short) / enabled;
@@ -1085,6 +1131,29 @@ function calcularGrade(dir) {
     const pairWr = cache && cache.wr != null ? cache.wr : null;
     const forte = scoreRatio >= 0.7;
     const pairOk = pairWr == null || pairWr >= 0.55;
+
+    // probabilidade estimada: histórico do score atual neste gráfico > WF do par
+    const payout = Math.max(0.01, (parseFloat(document.getElementById('payout').value) || 87) / 100);
+    const beWR = 1 / (1 + payout);
+    let pEst = null;
+    const key = Math.max(cl.long, cl.short) + '/' + enabled;
+    if (byScoreGlobal && byScoreGlobal.scores[key] && byScoreGlobal.scores[key].t >= 5)
+        pEst = byScoreGlobal.scores[key].w / byScoreGlobal.scores[key].t;
+    else if (pairWr != null) pEst = pairWr;
+
+    let score = Math.round(scoreRatio * 40);
+    if (pEst != null) score += Math.round(Math.max(0, Math.min(1, (pEst - beWR) / 0.15)) * 20);
+    else score += 10;   // sem histórico: meio-termo
+    if (htfOk) score += 10;
+    if (srOk) score += 10;
+    if (sessOk) score += 10;
+    if (pairOk && pairWr != null) score += 10; else if (pairWr == null) score += 5;
+    score = Math.max(0, Math.min(100, score));
+
+    // Kelly fracionário (½) p/ binária: f* = (p(1+b) − 1)/b; sugere risco por operação
+    let kelly = null;
+    if (pEst != null) kelly = Math.max(0, Math.min(0.05, ((pEst * (1 + payout) - 1) / payout) / 2));
+
     let grade;
     if (forte && htfOk && srOk && sessOk && pairOk) grade = 'A';
     else if (scoreRatio >= 0.5 && srOk && htfOk) grade = 'B';
@@ -1095,7 +1164,8 @@ function calcularGrade(dir) {
     if (!srOk) motivos.push('colado em S/R');
     if (!sessOk) motivos.push('sessão fraca (' + cl.sessao + ')');
     if (pairWr != null && pairWr < 0.55) motivos.push('par com histórico fraco (' + (pairWr * 100).toFixed(0) + '%)');
-    return { grade, motivos };
+    if (pEst != null && pEst < beWR) motivos.push('expectativa negativa no payout atual');
+    return { grade, motivos, score, estrelas: Math.max(1, Math.round(score / 20)), pEst, kelly, regime: cl.regime };
 }
 
 function atualizarDecisao() {
@@ -1158,9 +1228,15 @@ function atualizarDecisao() {
     const usaGrade = document.getElementById('useGrade').checked;
     if (usaGrade && (verdictKey === 'CALL' || verdictKey === 'PUT')) {
         const g = calcularGrade(verdictKey === 'CALL' ? 1 : -1);
-        grEl.textContent = g.grade === 'A' ? 'A · ENTRAR' : g.grade === 'B' ? 'B · OBSERVAR' : 'C · EVITAR';
+        const stars = '⭐'.repeat(g.estrelas);
+        grEl.textContent = `${g.grade === 'A' ? 'A · ENTRAR' : g.grade === 'B' ? 'B · OBSERVAR' : 'C · EVITAR'} · ${g.score}/100 ${stars}`;
         grEl.className = 'decision-grade grade-' + g.grade;
         grEl.style.display = 'inline-flex';
+        const extras = [];
+        if (g.regime) extras.push('regime ' + REGIME_ROTULO[g.regime]);
+        if (g.pEst != null) extras.push('WR estimado ' + (g.pEst * 100).toFixed(0) + '%');
+        if (g.kelly != null) extras.push('risco sugerido (½ Kelly) ' + (g.kelly * 100).toFixed(2) + '%');
+        if (extras.length) r.textContent += ' ' + extras.join(' · ') + '.';
         if (g.motivos.length) r.textContent += ' Ressalvas: ' + g.motivos.join(', ') + '.';
     } else {
         grEl.style.display = 'none';
@@ -1255,9 +1331,21 @@ function calcularMetricas(validas) {
         else { curL++; curW = 0; maxL = Math.max(maxL, curL); }
     });
 
+    // Janelas recentes: o desempenho ATUAL importa mais que o histórico completo
+    const wrJanela = n => {
+        const j = chron.slice(-n);
+        if (j.length < Math.min(n, 10)) return null;
+        return j.filter(e => e.resultado === 'WIN').length / j.length * 100;
+    };
+    const cardsRecentes = [20, 50, 100].map(n => {
+        const v = wrJanela(n);
+        return v == null ? null : ['WR últimos ' + n, v.toFixed(0) + '%', v >= beWR ? 'good' : 'bad'];
+    }).filter(Boolean);
+
     const cards = [
         ['Win rate geral', wr.toFixed(1) + '%', wr >= beWR ? 'good' : 'bad'],
         ['Win rate p/ empatar', beWR.toFixed(1) + '%', ''],
+        ...cardsRecentes,
         ['P&L acumulado', (pnl >= 0 ? '+' : '') + pnl.toFixed(2) + 'u', pnl >= 0 ? 'good' : 'bad'],
         ['Expectativa/op', (expect >= 0 ? '+' : '') + expect.toFixed(3) + 'u', expect >= 0 ? 'good' : 'bad'],
         ['Profit factor', pf === Infinity ? '∞' : pf.toFixed(2), pf >= 1 ? 'good' : 'bad'],
@@ -1976,8 +2064,14 @@ async function otimizarIA() {
     el('usePesoIA').checked = false;               // peso é circular na otimização — desliga
     const dSave = dados;
 
+    // Break-even do payout: a IA otimiza o edge LÍQUIDO (acerto − break-even),
+    // não o acerto bruto — 52% a payout 87% ainda é prejuízo.
+    const payout = Math.max(0.01, (parseFloat(el('payout').value) || 87) / 100);
+    const beWR = 1 / (1 + payout);
+    const EXP_OPCOES = [1, 5, 15, 30, 60];   // valores do seletor de expiração
+
     const tfs = isSim ? [tfMinutes()] : TFS_IA;
-    const porTf = [];   // melhor combo por timeframe
+    const porTf = [];   // melhor combo por timeframe (inclui expiração ideal)
     let totalCombos = 0;
     for (const tf of tfs) {
         let dTf = dSave;
@@ -1986,22 +2080,26 @@ async function otimizarIA() {
             if (!dTf || dTf.length < 210) continue;
         }
         dados = dTf; el('timeframe').value = tf;
+        const exps = EXP_OPCOES.filter(e => e >= tf && e % tf === 0 && e / tf <= 12);
         let best = null;
-        for (const ms of IA_GRID.minScore)
-            for (const [sv, sc] of IA_GRID.rsi)
-                for (const lk of IA_GRID.estruturaLookback)
-                    for (const cd of IA_GRID.cooldownVelas) {
-                        el('minScore').value = ms; el('rsiSobrevenda').value = sv; el('rsiSobrecompra').value = sc;
-                        el('estruturaLookback').value = lk; el('cooldownVelas').value = cd;
-                        const wf = avaliarWalkForward();
-                        totalCombos++;
-                        if (wf.treino.ops < IA_MIN_OPS || wf.val.ops < IA_MIN_VAL) continue;
-                        // robustez = pior das duas janelas (penaliza overfit no treino)
-                        const robust = Math.min(wf.treino.wr, wf.val.wr);
-                        if (!best || robust > best.robust || (robust === best.robust && wf.val.ops > best.val.ops))
-                            best = { tf, ms, sv, sc, lk, cd, robust, treino: wf.treino, val: wf.val };
-                        await Promise.resolve();
-                    }
+        for (const exp of exps)
+            for (const ms of IA_GRID.minScore)
+                for (const [sv, sc] of IA_GRID.rsi)
+                    for (const lk of IA_GRID.estruturaLookback)
+                        for (const cd of IA_GRID.cooldownVelas) {
+                            el('minScore').value = ms; el('rsiSobrevenda').value = sv; el('rsiSobrecompra').value = sc;
+                            el('estruturaLookback').value = lk; el('cooldownVelas').value = cd;
+                            expOverride = exp;
+                            const wf = avaliarWalkForward();
+                            expOverride = null;
+                            totalCombos++;
+                            if (wf.treino.ops < IA_MIN_OPS || wf.val.ops < IA_MIN_VAL) continue;
+                            // robustez = pior das duas janelas (penaliza overfit no treino)
+                            const robust = Math.min(wf.treino.wr, wf.val.wr);
+                            if (!best || robust > best.robust || (robust === best.robust && wf.val.ops > best.val.ops))
+                                best = { tf, exp, ms, sv, sc, lk, cd, robust, treino: wf.treino, val: wf.val };
+                        }
+        await Promise.resolve();
         if (best) porTf.push(best);
     }
     // restaura estado do usuário
@@ -2010,11 +2108,12 @@ async function otimizarIA() {
     if (el('useHtf').checked) await carregarHtf();
     recomputarSinais();
 
-    // ranqueia TFs pela taxa fora da amostra (validação) — o que mais importa
-    porTf.sort((a, b) => b.val.wr - a.val.wr || b.robust - a.robust);
+    // ranqueia pelo EDGE LÍQUIDO fora da amostra (acerto − break-even do payout)
+    porTf.forEach(r => r.edge = r.val.wr - beWR);
+    porTf.sort((a, b) => b.edge - a.edge || b.robust - a.robust);
     const par = PARES_YAHOO[symbol] ? PARES_YAHOO[symbol].label : symbol;
     document.getElementById('iaPanel').style.display = 'block';
-    document.getElementById('iaMeta').textContent = totalCombos + ' combinações · ' + tfs.length + ' timeframes';
+    document.getElementById('iaMeta').textContent = totalCombos + ' combinações · ' + tfs.length + ' timeframes · break-even ' + (beWR * 100).toFixed(1) + '%';
 
     if (!porTf.length) {
         document.getElementById('iaContext').textContent = `Nenhuma combinação passou na validação fora da amostra para ${par}. Carregue mais velas (300+) ou troque o par.`;
@@ -2025,17 +2124,19 @@ async function otimizarIA() {
 
     // memoriza o melhor TF/combo deste par para o scanner
     const rec = porTf[0];
-    iaCache[symbol] = { tf: rec.tf, ms: rec.ms, sv: rec.sv, sc: rec.sc, lk: rec.lk, cd: rec.cd, wr: rec.val.wr };
+    iaCache[symbol] = { tf: rec.tf, exp: rec.exp, ms: rec.ms, sv: rec.sv, sc: rec.sc, lk: rec.lk, cd: rec.cd, wr: rec.val.wr };
     localStorage.setItem('iaCache', JSON.stringify(iaCache));
 
-    document.getElementById('iaContext').textContent = `${par}: melhor timeframe é ${rotTf(rec.tf)} com ${(rec.val.wr * 100).toFixed(0)}% de acerto fora da amostra. Taxas mostradas: VALIDAÇÃO (treino). Clique para aplicar.`;
+    const edgeTxt = e => (e >= 0 ? '+' : '') + (e * 100).toFixed(1) + ' pp';
+    document.getElementById('iaContext').textContent =
+        `${par}: melhor setup é ${rotTf(rec.tf)} com expiração ${rec.exp}m — ${(rec.val.wr * 100).toFixed(0)}% fora da amostra (edge líquido ${edgeTxt(rec.edge)} vs break-even). Clique para aplicar.`;
     document.getElementById('iaList').innerHTML = porTf.map((r, i) => {
         const vwr = (r.val.wr * 100).toFixed(0), twr = (r.treino.wr * 100).toFixed(0);
-        const cls = r.val.wr >= 0.6 ? 'chip-dir-up' : r.val.wr >= 0.5 ? '' : 'chip-dir-down';
+        const cls = r.edge >= 0.05 ? 'chip-dir-up' : r.edge >= 0 ? '' : 'chip-dir-down';
         const star = i === 0 ? '<span class="scan-tuned">✦</span> ' : '';
         return `<div class="reg-row ia-row" data-i="${i}">` +
-            `<span class="reg-hora">${star}${rotTf(r.tf)}</span>` +
-            `<span class="reg-par"><span class="${cls}">${vwr}% val</span> <span class="ia-params">(${twr}% treino · ${r.val.w}/${r.val.ops} ops)</span></span>` +
+            `<span class="reg-hora">${star}${rotTf(r.tf)}·${r.exp}m</span>` +
+            `<span class="reg-par"><span class="${cls}">${vwr}% val · ${edgeTxt(r.edge)}</span> <span class="ia-params">(${twr}% treino · ${r.val.w}/${r.val.ops} ops)</span></span>` +
             `<span class="ia-params">score≥${r.ms} · RSI ${r.sv}/${r.sc} · estrut ${r.lk} · cd ${r.cd}</span></div>`;
     }).join('');
     document.getElementById('iaList').querySelectorAll('.ia-row').forEach(row => row.addEventListener('click', () => {
@@ -2043,7 +2144,8 @@ async function otimizarIA() {
         el('confMode').value = 'score'; el('minScore').value = r.ms;
         el('rsiSobrevenda').value = r.sv; el('rsiSobrecompra').value = r.sc;
         el('estruturaLookback').value = r.lk; el('cooldownVelas').value = r.cd;
-        iaCache[symbol] = { tf: r.tf, ms: r.ms, sv: r.sv, sc: r.sc, lk: r.lk, cd: r.cd, wr: r.val.wr };
+        el('expiracao').value = r.exp;
+        iaCache[symbol] = { tf: r.tf, exp: r.exp, ms: r.ms, sv: r.sv, sc: r.sc, lk: r.lk, cd: r.cd, wr: r.val.wr };
         localStorage.setItem('iaCache', JSON.stringify(iaCache));
         row.parentElement.querySelectorAll('.ia-row').forEach(x => x.classList.remove('ia-sel'));
         row.classList.add('ia-sel');
