@@ -1,0 +1,666 @@
+From 45e30654dfcc248365d18cad66d2bd83fc853811 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 4 Jul 2026 12:13:26 +0000
+Subject: [PATCH 1/3] fix: eliminate cache race condition and config re-read on
+ every getter
+
+- cache.py: guard read-modify-write cycles with a cross-process lock file
+  and write JSON atomically (temp file + os.replace), so concurrent runs
+  (e.g. two cron jobs) can no longer lose writes or corrupt the cache
+- config.py: parse config.json once and cache it in memory, invalidating
+  by (mtime, size), instead of re-reading the file on every getter call
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+---
+ src/cache.py  | 203 ++++++++++++++++++++++++++++++++++++--------------
+ src/config.py | 148 +++++++++++++++++++-----------------
+ 2 files changed, 227 insertions(+), 124 deletions(-)
+
+diff --git a/src/cache.py b/src/cache.py
+index 74973eb..74cdeb8 100644
+--- a/src/cache.py
++++ b/src/cache.py
+@@ -1,9 +1,19 @@
+ import os
+ import json
++import time
++import errno
++import tempfile
+ 
+ from typing import List
++from contextlib import contextmanager
+ from config import ROOT_DIR
+ 
++# How long to wait for a lock before giving up, and how long to sleep between
++# attempts. The lock only guards the brief read-modify-write on small JSON
++# files, so contention is short-lived in practice.
++_LOCK_TIMEOUT_SECONDS = 10.0
++_LOCK_POLL_SECONDS = 0.05
++
+ def get_cache_path() -> str:
+     """
+     Gets the path to the cache file.
+@@ -60,6 +70,105 @@ def get_provider_cache_path(provider: str) -> str:
+ 
+     raise ValueError(f"Unsupported provider '{provider}'. Expected 'twitter' or 'youtube'.")
+ 
++@contextmanager
++def _file_lock(target_path: str):
++    """
++    Acquires a cross-process advisory lock for a cache file.
++
++    Uses an exclusive lock file created with ``O_CREAT | O_EXCL`` so that only
++    one process can hold it at a time. This is portable across POSIX and
++    Windows and does not depend on ``fcntl``/``msvcrt``. The lock is released
++    (the lock file removed) when the context exits, even on error.
++
++    Args:
++        target_path (str): The cache file being protected. The lock file is
++            created alongside it as ``<target_path>.lock``.
++
++    Raises:
++        TimeoutError: If the lock cannot be acquired within the timeout.
++    """
++    lock_path = target_path + ".lock"
++    os.makedirs(os.path.dirname(lock_path), exist_ok=True)
++
++    deadline = time.monotonic() + _LOCK_TIMEOUT_SECONDS
++    fd = None
++    while True:
++        try:
++            fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
++            break
++        except FileExistsError:
++            if time.monotonic() >= deadline:
++                raise TimeoutError(
++                    f"Timed out waiting for cache lock on '{target_path}'."
++                )
++            time.sleep(_LOCK_POLL_SECONDS)
++
++    try:
++        yield
++    finally:
++        os.close(fd)
++        try:
++            os.remove(lock_path)
++        except OSError as e:
++            # If the lock file is already gone, that's fine.
++            if e.errno != errno.ENOENT:
++                raise
++
++def _atomic_write_json(path: str, data) -> None:
++    """
++    Writes JSON to ``path`` atomically.
++
++    Serializes to a temporary file in the same directory and then
++    ``os.replace``s it into place, so a reader never observes a half-written
++    file and a crash mid-write cannot corrupt the existing cache.
++
++    Args:
++        path (str): Destination file path
++        data: JSON-serializable object to write
++
++    Returns:
++        None
++    """
++    directory = os.path.dirname(path)
++    os.makedirs(directory, exist_ok=True)
++
++    fd, tmp_path = tempfile.mkstemp(dir=directory, suffix=".tmp")
++    try:
++        with os.fdopen(fd, "w") as file:
++            json.dump(data, file, indent=4)
++            file.flush()
++            os.fsync(file.fileno())
++        os.replace(tmp_path, path)
++    except BaseException:
++        # Clean up the temp file if the replace never happened.
++        try:
++            os.remove(tmp_path)
++        except OSError:
++            pass
++        raise
++
++def _read_json(path: str, default):
++    """
++    Reads and parses a JSON file, returning ``default`` if it does not exist.
++
++    Args:
++        path (str): The file to read
++        default: Value to return when the file is missing
++
++    Returns:
++        The parsed JSON, or ``default`` when the file does not exist.
++    """
++    if not os.path.exists(path):
++        return default
++
++    with open(path, 'r') as file:
++        parsed = json.load(file)
++
++    if parsed is None:
++        return default
++
++    return parsed
++
+ def get_accounts(provider: str) -> List[dict]:
+     """
+     Gets the accounts from the cache.
+@@ -73,28 +182,25 @@ def get_accounts(provider: str) -> List[dict]:
+     cache_path = get_provider_cache_path(provider)
+ 
+     if not os.path.exists(cache_path):
+-        # Create the cache file
+-        with open(cache_path, 'w') as file:
+-            json.dump({
+-                "accounts": []
+-            }, file, indent=4)
++        # Create the cache file atomically so concurrent readers never see a
++        # partial write.
++        _atomic_write_json(cache_path, {"accounts": []})
+ 
+-    with open(cache_path, 'r') as file:
+-        parsed = json.load(file)
++    parsed = _read_json(cache_path, {"accounts": []})
+ 
+-        if parsed is None:
+-            return []
+-        
+-        if 'accounts' not in parsed:
+-            return []
++    if not isinstance(parsed, dict) or 'accounts' not in parsed:
++        return []
+ 
+-        # Get accounts dictionary
+-        return parsed['accounts']
++    return parsed['accounts']
+ 
+ def add_account(provider: str, account: dict) -> None:
+     """
+     Adds an account to the cache.
+ 
++    The read-modify-write is performed while holding a cross-process lock so
++    that two concurrent runs (e.g. two scheduled jobs firing at once) cannot
++    clobber each other's changes.
++
+     Args:
+         provider (str): The provider to add the account to ("twitter" or "youtube")
+         account (dict): The account to add
+@@ -104,17 +210,13 @@ def add_account(provider: str, account: dict) -> None:
+     """
+     cache_path = get_provider_cache_path(provider)
+ 
+-    # Get the current accounts
+-    accounts = get_accounts(provider)
++    with _file_lock(cache_path):
++        parsed = _read_json(cache_path, {"accounts": []})
++        accounts = parsed.get('accounts', []) if isinstance(parsed, dict) else []
+ 
+-    # Add the new account
+-    accounts.append(account)
++        accounts.append(account)
+ 
+-    # Write the new accounts to the cache
+-    with open(cache_path, 'w') as file:
+-        json.dump({
+-            "accounts": accounts
+-        }, file, indent=4)
++        _atomic_write_json(cache_path, {"accounts": accounts})
+ 
+ def remove_account(provider: str, account_id: str) -> None:
+     """
+@@ -127,19 +229,15 @@ def remove_account(provider: str, account_id: str) -> None:
+     Returns:
+         None
+     """
+-    # Get the current accounts
+-    accounts = get_accounts(provider)
++    cache_path = get_provider_cache_path(provider)
+ 
+-    # Remove the account
+-    accounts = [account for account in accounts if account['id'] != account_id]
++    with _file_lock(cache_path):
++        parsed = _read_json(cache_path, {"accounts": []})
++        accounts = parsed.get('accounts', []) if isinstance(parsed, dict) else []
+ 
+-    # Write the new accounts to the cache
+-    cache_path = get_provider_cache_path(provider)
++        accounts = [account for account in accounts if account['id'] != account_id]
+ 
+-    with open(cache_path, 'w') as file:
+-        json.dump({
+-            "accounts": accounts
+-        }, file, indent=4)
++        _atomic_write_json(cache_path, {"accounts": accounts})
+ 
+ def get_products() -> List[dict]:
+     """
+@@ -148,19 +246,18 @@ def get_products() -> List[dict]:
+     Returns:
+         products (List[dict]): The products
+     """
+-    if not os.path.exists(get_afm_cache_path()):
+-        # Create the cache file
+-        with open(get_afm_cache_path(), 'w') as file:
+-            json.dump({
+-                "products": []
+-            }, file, indent=4)
++    afm_path = get_afm_cache_path()
+ 
+-    with open(get_afm_cache_path(), 'r') as file:
+-        parsed = json.load(file)
++    if not os.path.exists(afm_path):
++        _atomic_write_json(afm_path, {"products": []})
++
++    parsed = _read_json(afm_path, {"products": []})
++
++    if not isinstance(parsed, dict) or 'products' not in parsed:
++        return []
++
++    return parsed["products"]
+ 
+-        # Get the products
+-        return parsed["products"]
+-    
+ def add_product(product: dict) -> None:
+     """
+     Adds a product to the cache.
+@@ -171,18 +268,16 @@ def add_product(product: dict) -> None:
+     Returns:
+         None
+     """
+-    # Get the current products
+-    products = get_products()
++    afm_path = get_afm_cache_path()
++
++    with _file_lock(afm_path):
++        parsed = _read_json(afm_path, {"products": []})
++        products = parsed.get('products', []) if isinstance(parsed, dict) else []
++
++        products.append(product)
+ 
+-    # Add the new product
+-    products.append(product)
++        _atomic_write_json(afm_path, {"products": products})
+ 
+-    # Write the new products to the cache
+-    with open(get_afm_cache_path(), 'w') as file:
+-        json.dump({
+-            "products": products
+-        }, file, indent=4)
+-    
+ def get_results_cache_path() -> str:
+     """
+     Gets the path to the results cache file.
+diff --git a/src/config.py b/src/config.py
+index fb26d8d..2f761f6 100644
+--- a/src/config.py
++++ b/src/config.py
+@@ -7,6 +7,43 @@ from termcolor import colored
+ 
+ ROOT_DIR = os.path.dirname(sys.path[0])
+ 
++# In-memory cache of the parsed config.json, keyed by the file's
++# (mtime, size) signature. The file is only re-read from disk when it actually
++# changes on disk, so the 30+ getters below stop hitting the filesystem on
++# every single call while still picking up edits to config.json.
++_config_cache = None
++_config_signature = None
++
++def _config_path() -> str:
++    """
++    Returns the absolute path to config.json.
++    """
++    return os.path.join(ROOT_DIR, "config.json")
++
++def _read_config() -> dict:
++    """
++    Reads and parses config.json, caching the result until the file changes.
++
++    The cache is invalidated whenever the file's modification time or size
++    changes, so callers always observe the latest on-disk config without
++    re-parsing the file on every access.
++
++    Returns:
++        config (dict): The parsed configuration
++    """
++    global _config_cache, _config_signature
++
++    path = _config_path()
++    stat = os.stat(path)
++    signature = (stat.st_mtime_ns, stat.st_size)
++
++    if _config_cache is None or signature != _config_signature:
++        with open(path, "r") as file:
++            _config_cache = json.load(file)
++        _config_signature = signature
++
++    return _config_cache
++
+ def assert_folder_structure() -> None:
+     """
+     Make sure that the nessecary folder structure is present.
+@@ -36,8 +73,7 @@ def get_email_credentials() -> dict:
+     Returns:
+         credentials (dict): The email credentials
+     """
+-    with open(os.path.join(ROOT_DIR, "config.json"), "r") as file:
+-        return json.load(file)["email"]
++    return _read_config()["email"]
+ 
+ def get_verbose() -> bool:
+     """
+@@ -46,8 +82,7 @@ def get_verbose() -> bool:
+     Returns:
+         verbose (bool): The verbose flag
+     """
+-    with open(os.path.join(ROOT_DIR, "config.json"), "r") as file:
+-        return json.load(file)["verbose"]
++    return _read_config()["verbose"]
+ 
+ def get_firefox_profile_path() -> str:
+     """
+@@ -56,8 +91,7 @@ def get_firefox_profile_path() -> str:
+     Returns:
+         path (str): The path to the Firefox profile
+     """
+-    with open(os.path.join(ROOT_DIR, "config.json"), "r") as file:
+-        return json.load(file)["firefox_profile"]
++    return _read_config()["firefox_profile"]
+ 
+ def get_headless() -> bool:
+     """
+@@ -66,8 +100,7 @@ def get_headless() -> bool:
+     Returns:
+         headless (bool): The headless flag
+     """
+-    with open(os.path.join(ROOT_DIR, "config.json"), "r") as file:
+-        return json.load(file)["headless"]
++    return _read_config()["headless"]
+ 
+ def get_ollama_base_url() -> str:
+     """
+@@ -76,8 +109,7 @@ def get_ollama_base_url() -> str:
+     Returns:
+         url (str): The Ollama base URL
+     """
+-    with open(os.path.join(ROOT_DIR, "config.json"), "r") as file:
+-        return json.load(file).get("ollama_base_url", "http://127.0.0.1:11434")
++    return _read_config().get("ollama_base_url", "http://127.0.0.1:11434")
+ 
+ def get_ollama_model() -> str:
+     """
+@@ -86,8 +118,7 @@ def get_ollama_model() -> str:
+     Returns:
+         model (str): The Ollama model name, or empty string if not set.
+     """
+-    with open(os.path.join(ROOT_DIR, "config.json"), "r") as file:
+-        return json.load(file).get("ollama_model", "")
++    return _read_config().get("ollama_model", "")
+ 
+ def get_twitter_language() -> str:
+     """
+@@ -96,8 +127,7 @@ def get_twitter_language() -> str:
+     Returns:
+         language (str): The Twitter language
+     """
+-    with open(os.path.join(ROOT_DIR, "config.json"), "r") as file:
+-        return json.load(file)["twitter_language"]
++    return _read_config()["twitter_language"]
+ 
+ def get_nanobanana2_api_base_url() -> str:
+     """
+@@ -106,11 +136,10 @@ def get_nanobanana2_api_base_url() -> str:
+     Returns:
+         url (str): API base URL
+     """
+-    with open(os.path.join(ROOT_DIR, "config.json"), "r") as file:
+-        return json.load(file).get(
+-            "nanobanana2_api_base_url",
+-            "https://generativelanguage.googleapis.com/v1beta",
+-        )
++    return _read_config().get(
++        "nanobanana2_api_base_url",
++        "https://generativelanguage.googleapis.com/v1beta",
++    )
+ 
+ def get_nanobanana2_api_key() -> str:
+     """
+@@ -119,9 +148,8 @@ def get_nanobanana2_api_key() -> str:
+     Returns:
+         key (str): API key
+     """
+-    with open(os.path.join(ROOT_DIR, "config.json"), "r") as file:
+-        configured = json.load(file).get("nanobanana2_api_key", "")
+-        return configured or os.environ.get("GEMINI_API_KEY", "")
++    configured = _read_config().get("nanobanana2_api_key", "")
++    return configured or os.environ.get("GEMINI_API_KEY", "")
+ 
+ def get_nanobanana2_model() -> str:
+     """
+@@ -130,8 +158,7 @@ def get_nanobanana2_model() -> str:
+     Returns:
+         model (str): Model name
+     """
+-    with open(os.path.join(ROOT_DIR, "config.json"), "r") as file:
+-        return json.load(file).get("nanobanana2_model", "gemini-3.1-flash-image-preview")
++    return _read_config().get("nanobanana2_model", "gemini-3.1-flash-image-preview")
+ 
+ def get_nanobanana2_aspect_ratio() -> str:
+     """
+@@ -140,8 +167,7 @@ def get_nanobanana2_aspect_ratio() -> str:
+     Returns:
+         ratio (str): Aspect ratio
+     """
+-    with open(os.path.join(ROOT_DIR, "config.json"), "r") as file:
+-        return json.load(file).get("nanobanana2_aspect_ratio", "9:16")
++    return _read_config().get("nanobanana2_aspect_ratio", "9:16")
+ 
+ def get_threads() -> int:
+     """
+@@ -150,9 +176,8 @@ def get_threads() -> int:
+     Returns:
+         threads (int): Amount of threads
+     """
+-    with open(os.path.join(ROOT_DIR, "config.json"), "r") as file:
+-        return json.load(file)["threads"]
+-    
++    return _read_config()["threads"]
++
+ def get_zip_url() -> str:
+     """
+     Gets the URL to the zip file containing the songs.
+@@ -160,8 +185,7 @@ def get_zip_url() -> str:
+     Returns:
+         url (str): The URL to the zip file
+     """
+-    with open(os.path.join(ROOT_DIR, "config.json"), "r") as file:
+-        return json.load(file)["zip_url"]
++    return _read_config()["zip_url"]
+ 
+ def get_is_for_kids() -> bool:
+     """
+@@ -170,8 +194,7 @@ def get_is_for_kids() -> bool:
+     Returns:
+         is_for_kids (bool): The is for kids flag
+     """
+-    with open(os.path.join(ROOT_DIR, "config.json"), "r") as file:
+-        return json.load(file)["is_for_kids"]
++    return _read_config()["is_for_kids"]
+ 
+ def get_google_maps_scraper_zip_url() -> str:
+     """
+@@ -180,8 +203,7 @@ def get_google_maps_scraper_zip_url() -> str:
+     Returns:
+         url (str): The URL to the zip file
+     """
+-    with open(os.path.join(ROOT_DIR, "config.json"), "r") as file:
+-        return json.load(file)["google_maps_scraper"]
++    return _read_config()["google_maps_scraper"]
+ 
+ def get_google_maps_scraper_niche() -> str:
+     """
+@@ -190,8 +212,7 @@ def get_google_maps_scraper_niche() -> str:
+     Returns:
+         niche (str): The niche
+     """
+-    with open(os.path.join(ROOT_DIR, "config.json"), "r") as file:
+-        return json.load(file)["google_maps_scraper_niche"]
++    return _read_config()["google_maps_scraper_niche"]
+ 
+ def get_scraper_timeout() -> int:
+     """
+@@ -200,8 +221,7 @@ def get_scraper_timeout() -> int:
+     Returns:
+         timeout (int): The timeout
+     """
+-    with open(os.path.join(ROOT_DIR, "config.json"), "r") as file:
+-        return json.load(file)["scraper_timeout"] or 300
++    return _read_config()["scraper_timeout"] or 300
+ 
+ def get_outreach_message_subject() -> str:
+     """
+@@ -210,9 +230,8 @@ def get_outreach_message_subject() -> str:
+     Returns:
+         subject (str): The outreach message subject
+     """
+-    with open(os.path.join(ROOT_DIR, "config.json"), "r") as file:
+-        return json.load(file)["outreach_message_subject"]
+-    
++    return _read_config()["outreach_message_subject"]
++
+ def get_outreach_message_body_file() -> str:
+     """
+     Gets the outreach message body file.
+@@ -220,8 +239,7 @@ def get_outreach_message_body_file() -> str:
+     Returns:
+         file (str): The outreach message body file
+     """
+-    with open(os.path.join(ROOT_DIR, "config.json"), "r") as file:
+-        return json.load(file)["outreach_message_body_file"]
++    return _read_config()["outreach_message_body_file"]
+ 
+ def get_tts_voice() -> str:
+     """
+@@ -230,8 +248,7 @@ def get_tts_voice() -> str:
+     Returns:
+         voice (str): The TTS voice
+     """
+-    with open(os.path.join(ROOT_DIR, "config.json"), "r") as file:
+-        return json.load(file).get("tts_voice", "Jasper")
++    return _read_config().get("tts_voice", "Jasper")
+ 
+ def get_assemblyai_api_key() -> str:
+     """
+@@ -240,8 +257,7 @@ def get_assemblyai_api_key() -> str:
+     Returns:
+         key (str): The AssemblyAI API key
+     """
+-    with open(os.path.join(ROOT_DIR, "config.json"), "r") as file:
+-        return json.load(file)["assembly_ai_api_key"]
++    return _read_config()["assembly_ai_api_key"]
+ 
+ def get_stt_provider() -> str:
+     """
+@@ -250,8 +266,7 @@ def get_stt_provider() -> str:
+     Returns:
+         provider (str): The STT provider
+     """
+-    with open(os.path.join(ROOT_DIR, "config.json"), "r") as file:
+-        return json.load(file).get("stt_provider", "local_whisper")
++    return _read_config().get("stt_provider", "local_whisper")
+ 
+ def get_whisper_model() -> str:
+     """
+@@ -260,8 +275,7 @@ def get_whisper_model() -> str:
+     Returns:
+         model (str): Whisper model name
+     """
+-    with open(os.path.join(ROOT_DIR, "config.json"), "r") as file:
+-        return json.load(file).get("whisper_model", "base")
++    return _read_config().get("whisper_model", "base")
+ 
+ def get_whisper_device() -> str:
+     """
+@@ -270,8 +284,7 @@ def get_whisper_device() -> str:
+     Returns:
+         device (str): Whisper device
+     """
+-    with open(os.path.join(ROOT_DIR, "config.json"), "r") as file:
+-        return json.load(file).get("whisper_device", "auto")
++    return _read_config().get("whisper_device", "auto")
+ 
+ def get_whisper_compute_type() -> str:
+     """
+@@ -280,9 +293,8 @@ def get_whisper_compute_type() -> str:
+     Returns:
+         compute_type (str): Whisper compute type
+     """
+-    with open(os.path.join(ROOT_DIR, "config.json"), "r") as file:
+-        return json.load(file).get("whisper_compute_type", "int8")
+-    
++    return _read_config().get("whisper_compute_type", "int8")
++
+ def equalize_subtitles(srt_path: str, max_chars: int = 10) -> None:
+     """
+     Equalizes the subtitles in a SRT file.
+@@ -295,7 +307,7 @@ def equalize_subtitles(srt_path: str, max_chars: int = 10) -> None:
+         None
+     """
+     srt_equalizer.equalize_srt_file(srt_path, srt_path, max_chars)
+-    
++
+ def get_font() -> str:
+     """
+     Gets the font from the config file.
+@@ -303,8 +315,7 @@ def get_font() -> str:
+     Returns:
+         font (str): The font
+     """
+-    with open(os.path.join(ROOT_DIR, "config.json"), "r") as file:
+-        return json.load(file)["font"]
++    return _read_config()["font"]
+ 
+ def get_fonts_dir() -> str:
+     """
+@@ -322,8 +333,7 @@ def get_imagemagick_path() -> str:
+     Returns:
+         path (str): The path to ImageMagick
+     """
+-    with open(os.path.join(ROOT_DIR, "config.json"), "r") as file:
+-        return json.load(file)["imagemagick_path"]
++    return _read_config()["imagemagick_path"]
+ 
+ def get_script_sentence_length() -> int:
+     """
+@@ -333,12 +343,11 @@ def get_script_sentence_length() -> int:
+     Returns:
+         length (int): Length of script's sentence
+     """
+-    with open(os.path.join(ROOT_DIR, "config.json"), "r") as file:
+-        config_json = json.load(file)
+-        if (config_json.get("script_sentence_length") is not None):
+-            return config_json["script_sentence_length"]
+-        else:
+-            return 4
++    config_json = _read_config()
++    if (config_json.get("script_sentence_length") is not None):
++        return config_json["script_sentence_length"]
++    else:
++        return 4
+ 
+ def get_post_bridge_config() -> dict:
+     """
+@@ -356,8 +365,7 @@ def get_post_bridge_config() -> dict:
+     }
+     supported_platforms = {"tiktok", "instagram"}
+ 
+-    with open(os.path.join(ROOT_DIR, "config.json"), "r") as file:
+-        config_json = json.load(file)
++    config_json = _read_config()
+ 
+     raw_config = config_json.get("post_bridge", {})
+     if not isinstance(raw_config, dict):
+-- 
+2.43.0
+

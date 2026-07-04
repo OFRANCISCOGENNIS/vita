@@ -1,0 +1,352 @@
+From 4feb4924b8ab41f5fc4d34c879fed97ff20d25ea Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 4 Jul 2026 15:12:25 +0000
+Subject: [PATCH 3/3] feat(web): track generation jobs with status and captured
+ logs
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+- web/jobs.py: in-process JobManager — worker threads with a concurrency
+  cap, queued/running/succeeded/failed lifecycle, per-job log files under
+  .mp/jobs/ with tail retrieval, bounded in-memory history
+- server.py: POST /api/jobs/{provider}/{account_id} now returns a tracked
+  job record; new GET /api/jobs and GET /api/jobs/{id} (with log tail)
+- frontend: Jobs tab with status pills, auto-refresh and inline log view;
+  per-account 'gerar' button on the YouTube/Twitter tabs
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+---
+ web/jobs.py           | 134 ++++++++++++++++++++++++++++++++++++++++++
+ web/server.py         |  25 ++++++--
+ web/static/index.html |  74 ++++++++++++++++++++---
+ 3 files changed, 221 insertions(+), 12 deletions(-)
+ create mode 100644 web/jobs.py
+
+diff --git a/web/jobs.py b/web/jobs.py
+new file mode 100644
+index 0000000..b2a1d02
+--- /dev/null
++++ b/web/jobs.py
+@@ -0,0 +1,134 @@
++"""
++In-process job manager for the web dashboard.
++
++Runs generation jobs (src/cron.py) in worker threads, tracks their lifecycle
++(queued → running → succeeded/failed) and captures their output to log files
++under .mp/jobs/. Single-node by design: the public surface (enqueue / list /
++get) is the same contract a distributed queue would offer later.
++"""
++
++from __future__ import annotations
++
++import os
++import shlex
++import threading
++import subprocess
++from uuid import uuid4
++from datetime import datetime, timezone
++
++_LOG_TAIL_BYTES = 4000
++_MAX_JOBS_KEPT = 200
++
++
++class JobManager:
++    def __init__(self, log_dir: str, max_workers: int = 2):
++        self._log_dir = log_dir
++        self._jobs: dict[str, dict] = {}
++        self._order: list[str] = []
++        self._lock = threading.Lock()
++        self._semaphore = threading.Semaphore(max_workers)
++        os.makedirs(log_dir, exist_ok=True)
++
++    def enqueue(self, argv: list[str], cwd: str, meta: dict) -> dict:
++        """
++        Registers a job and starts it as soon as a worker slot is free.
++
++        Args:
++            argv: Command to run.
++            cwd: Working directory for the subprocess.
++            meta: Caller-provided fields echoed back on the job record
++                (e.g. provider, account_id, model).
++
++        Returns:
++            The public job record (snapshot at enqueue time).
++        """
++        job_id = str(uuid4())
++        job = {
++            "id": job_id,
++            "command": shlex.join(argv),
++            "status": "queued",
++            "created_at": self._now(),
++            "started_at": None,
++            "finished_at": None,
++            "returncode": None,
++            **meta,
++        }
++        with self._lock:
++            self._jobs[job_id] = job
++            self._order.append(job_id)
++            self._evict_old()
++
++        thread = threading.Thread(
++            target=self._run, args=(job_id, argv, cwd), daemon=True
++        )
++        thread.start()
++        return dict(job)
++
++    def list(self) -> list[dict]:
++        """Returns all tracked jobs, newest first."""
++        with self._lock:
++            return [dict(self._jobs[jid]) for jid in reversed(self._order)]
++
++    def get(self, job_id: str) -> dict | None:
++        """Returns one job with the tail of its log, or None if unknown."""
++        with self._lock:
++            job = self._jobs.get(job_id)
++            if job is None:
++                return None
++            job = dict(job)
++        job["log_tail"] = self._read_log_tail(job_id)
++        return job
++
++    def _run(self, job_id: str, argv: list[str], cwd: str) -> None:
++        with self._semaphore:
++            log_path = self._log_path(job_id)
++            with self._lock:
++                job = self._jobs[job_id]
++                job["status"] = "running"
++                job["started_at"] = self._now()
++            try:
++                with open(log_path, "wb") as log_file:
++                    process = subprocess.run(
++                        argv, cwd=cwd, stdout=log_file, stderr=subprocess.STDOUT
++                    )
++                returncode = process.returncode
++            except Exception as e:
++                with open(log_path, "ab") as log_file:
++                    log_file.write(f"\n[job runner] {e}\n".encode())
++                returncode = -1
++            with self._lock:
++                job = self._jobs[job_id]
++                job["status"] = "succeeded" if returncode == 0 else "failed"
++                job["returncode"] = returncode
++                job["finished_at"] = self._now()
++
++    def _log_path(self, job_id: str) -> str:
++        return os.path.join(self._log_dir, f"{job_id}.log")
++
++    def _read_log_tail(self, job_id: str) -> str:
++        path = self._log_path(job_id)
++        if not os.path.exists(path):
++            return ""
++        with open(path, "rb") as file:
++            file.seek(0, os.SEEK_END)
++            size = file.tell()
++            file.seek(max(0, size - _LOG_TAIL_BYTES))
++            return file.read().decode(errors="replace")
++
++    def _evict_old(self) -> None:
++        # Called with the lock held. Finished jobs beyond the cap are dropped
++        # from memory; their log files are removed too.
++        while len(self._order) > _MAX_JOBS_KEPT:
++            oldest = self._order[0]
++            if self._jobs[oldest]["status"] in ("queued", "running"):
++                break
++            self._order.pop(0)
++            self._jobs.pop(oldest, None)
++            try:
++                os.remove(self._log_path(oldest))
++            except OSError:
++                pass
++
++    @staticmethod
++    def _now() -> str:
++        return datetime.now(timezone.utc).isoformat(timespec="seconds")
+diff --git a/web/server.py b/web/server.py
+index 0c76f24..955b5bb 100644
+--- a/web/server.py
++++ b/web/server.py
+@@ -11,7 +11,6 @@ import os
+ import sys
+ import json
+ import shutil
+-import subprocess
+ from uuid import uuid4
+ 
+ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+@@ -45,8 +44,12 @@ from fastapi.responses import FileResponse
+ from fastapi.staticfiles import StaticFiles
+ from pydantic import BaseModel, Field
+ 
++from web.jobs import JobManager
++
+ app = FastAPI(title="MoneyPrinterV2", docs_url="/api/docs", openapi_url="/api/openapi.json")
+ 
++jobs = JobManager(log_dir=os.path.join(PROJECT_ROOT, ".mp", "jobs"))
++
+ PROVIDERS = {"youtube", "twitter"}
+ 
+ SECRET_MARKERS = ("api_key", "password", "smtp", "token", "secret")
+@@ -198,7 +201,8 @@ def read_config():
+ def run_job(provider: str, account_id: str):
+     """
+     Fires a one-off generation job (same entry point the CLI scheduler uses).
+-    Requires a reachable Ollama server with at least one model.
++    Requires a reachable Ollama server with at least one model. The job runs
++    in the background; track it via GET /api/jobs/{job_id}.
+     """
+     _require_provider(provider)
+     if not any(a["id"] == account_id for a in get_accounts(provider)):
+@@ -215,11 +219,24 @@ def run_job(provider: str, account_id: str):
+ 
+     model = mp_config.get_ollama_model() or models[0]
+     cron_path = os.path.join(SRC_DIR, "cron.py")
+-    process = subprocess.Popen(
++    return jobs.enqueue(
+         [sys.executable, cron_path, provider, account_id, model],
+         cwd=PROJECT_ROOT,
++        meta={"provider": provider, "account_id": account_id, "model": model},
+     )
+-    return {"pid": process.pid, "provider": provider, "account_id": account_id, "model": model}
++
++
++@app.get("/api/jobs")
++def list_jobs():
++    return jobs.list()
++
++
++@app.get("/api/jobs/{job_id}")
++def get_job(job_id: str):
++    job = jobs.get(job_id)
++    if job is None:
++        raise HTTPException(status_code=404, detail="Job not found.")
++    return job
+ 
+ 
+ STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
+diff --git a/web/static/index.html b/web/static/index.html
+index 47304db..8b783e1 100644
+--- a/web/static/index.html
++++ b/web/static/index.html
+@@ -53,6 +53,11 @@
+   .pill{ font-family:var(--mono); font-size:.7rem; padding:.15rem .55rem; border-radius:999px; }
+   .pill.ok{ background:color-mix(in srgb, var(--good) 16%, transparent); color:var(--good); }
+   .pill.err{ background:color-mix(in srgb, var(--bad) 16%, transparent); color:var(--bad); }
++  .pill.run{ background:color-mix(in srgb, var(--cyan) 16%, transparent); color:var(--cyan-ink); }
++  .pill.wait{ background:color-mix(in srgb, var(--yellow) 20%, transparent); color:var(--ink); }
++  button.go{ font-family:var(--mono); font-size:.68rem; background:none; border:1px solid var(--rule2);
++    color:var(--cyan-ink); border-radius:3px; padding:.2rem .5rem; cursor:pointer; margin-right:.3rem; }
++  button.go:hover{ border-color:var(--cyan-ink); }
+ 
+   h2{ font-family:var(--display); font-size:1.25rem; margin:0 0 .8rem; }
+   h3{ font-size:.95rem; margin:1.4rem 0 .6rem; }
+@@ -108,6 +113,7 @@
+     <button role="tab" aria-selected="false" data-tab="youtube">YouTube</button>
+     <button role="tab" aria-selected="false" data-tab="twitter">Twitter</button>
+     <button role="tab" aria-selected="false" data-tab="afm">Afiliados</button>
++    <button role="tab" aria-selected="false" data-tab="jobs">Jobs</button>
+     <button role="tab" aria-selected="false" data-tab="config">Config</button>
+   </nav>
+ 
+@@ -161,6 +167,19 @@
+     </form>
+   </section>
+ 
++  <section class="panel" id="p-jobs">
++    <h2>Jobs de geração</h2>
++    <p style="color:var(--soft); font-size:.85rem; max-width:62ch">
++      Dispare pelo botão <b>▶ gerar</b> nas abas de contas. Cada job roda
++      <code>src/cron.py</code> em segundo plano; clique em <b>log</b> para ver a saída.
++    </p>
++    <div class="twrap"><table>
++      <thead><tr><th>Status</th><th>Plataforma</th><th>Modelo</th><th>Criado</th><th>Código</th><th></th></tr></thead>
++      <tbody id="job-rows"></tbody>
++    </table></div>
++    <pre class="cfg" id="job-log" hidden></pre>
++  </section>
++
+   <section class="panel" id="p-config">
+     <h2>Configuração <span style="font-family:var(--mono);font-size:.7rem;color:var(--soft)">(segredos mascarados)</span></h2>
+     <pre class="cfg" id="cfg-view">carregando…</pre>
+@@ -211,7 +230,7 @@ async function loadYouTube(){
+   $('#yt-rows').innerHTML = list.length ? list.map(a=>`<tr>
+     <td>${esc(a.nickname)}</td><td>${esc(a.niche)}</td><td>${esc(a.language)}</td>
+     <td>${(a.videos||[]).length}</td><td class="mono">${a.id}</td>
+-    <td><button class="del" data-prov="youtube" data-id="${a.id}">remover</button></td></tr>`).join('')
++    <td><button class="go" data-prov="youtube" data-id="${a.id}">▶ gerar</button><button class="del" data-prov="youtube" data-id="${a.id}">remover</button></td></tr>`).join('')
+     : '<tr><td colspan="6" class="empty">Nenhuma conta ainda — crie a primeira abaixo.</td></tr>';
+ }
+ 
+@@ -220,7 +239,7 @@ async function loadTwitter(){
+   $('#tw-rows').innerHTML = list.length ? list.map(a=>`<tr>
+     <td>${esc(a.nickname)}</td><td>${esc(a.topic)}</td>
+     <td>${(a.posts||[]).length}</td><td class="mono">${a.id}</td>
+-    <td><button class="del" data-prov="twitter" data-id="${a.id}">remover</button></td></tr>`).join('')
++    <td><button class="go" data-prov="twitter" data-id="${a.id}">▶ gerar</button><button class="del" data-prov="twitter" data-id="${a.id}">remover</button></td></tr>`).join('')
+     : '<tr><td colspan="5" class="empty">Nenhuma conta ainda — crie a primeira abaixo.</td></tr>';
+ }
+ 
+@@ -248,14 +267,53 @@ bindForm('#tw-form','/accounts/twitter', loadTwitter);
+ bindForm('#afm-form','/products', loadAfm);
+ 
+ document.addEventListener('click', async e=>{
+-  const b = e.target.closest('button.del'); if(!b) return;
+-  if(!confirm('Remover esta conta?')) return;
+-  try{ await api(`/accounts/${b.dataset.prov}/${b.dataset.id}`, {method:'DELETE'});
+-    toast('Removida.'); loadYouTube(); loadTwitter(); loadStatus(); }
+-  catch(err){ toast('Erro: '+err.message); }
++  const del = e.target.closest('button.del');
++  if (del){
++    if(!confirm('Remover esta conta?')) return;
++    try{ await api(`/accounts/${del.dataset.prov}/${del.dataset.id}`, {method:'DELETE'});
++      toast('Removida.'); loadYouTube(); loadTwitter(); loadStatus(); }
++    catch(err){ toast('Erro: '+err.message); }
++    return;
++  }
++  const lg = e.target.closest('button.logbtn');
++  const go = !lg && e.target.closest('button.go');
++  if (go){
++    try{ await api(`/jobs/${go.dataset.prov}/${go.dataset.id}`, {method:'POST'});
++      toast('Job enfileirado — acompanhe na aba Jobs.'); loadJobs(); }
++    catch(err){ toast('Erro: '+err.message); }
++    return;
++  }
++  if (lg){
++    try{
++      const j = await api(`/jobs/${lg.dataset.id}`);
++      const pre = $('#job-log');
++      pre.hidden = false;
++      pre.textContent = `# job ${j.id} — ${j.status}\n# ${j.command}\n\n` + (j.log_tail || '(log vazio)');
++      pre.scrollIntoView({behavior:'smooth', block:'nearest'});
++    }catch(err){ toast('Erro: '+err.message); }
++  }
+ });
+ 
+-loadStatus(); loadYouTube(); loadTwitter(); loadAfm(); loadConfig();
++const STATUS_PT = {queued:['na fila','wait'], running:['rodando','run'], succeeded:['concluído','ok'], failed:['falhou','err']};
++
++async function loadJobs(){
++  const list = await api('/jobs');
++  $('#job-rows').innerHTML = list.length ? list.map(j=>{
++    const [label, cls] = STATUS_PT[j.status] || [j.status,'wait'];
++    return `<tr>
++      <td><span class="pill ${cls}">${label}</span></td>
++      <td>${esc(j.provider||'')}</td><td class="mono">${esc(j.model||'')}</td>
++      <td class="mono">${esc((j.created_at||'').replace('T',' ').replace('+00:00',' UTC'))}</td>
++      <td class="mono">${j.returncode ?? '—'}</td>
++      <td><button class="logbtn go" data-id="${j.id}">log</button></td></tr>`;
++  }).join('') : '<tr><td colspan="6" class="empty">Nenhum job ainda — use ▶ gerar nas abas de contas.</td></tr>';
++}
++
++setInterval(()=>{
++  if ($('#p-jobs').classList.contains('on')) loadJobs();
++}, 5000);
++
++loadStatus(); loadYouTube(); loadTwitter(); loadAfm(); loadConfig(); loadJobs();
+ </script>
+ </body>
+ </html>
+-- 
+2.43.0
+
