@@ -858,8 +858,21 @@ Private Function ClassificarDesc(descNorm As String, ByRef tm As tMaterial) As B
     tm.RazaoMin = 0 : tm.RazaoMax = 0 : tm.DescrRegra = ""
     ClassificarDesc = True
 
+    ' ---- PINO ISOLADOR: checado ANTES de CRUZETA/CONECTOR pois a descricao do
+    ' pino costuma citar a cruzeta ("PINO,ISOL,CRUZETA MAD...") e a palavra
+    ' "PINO" tambem aparece em conectores tipo pino de compressao (excluidos aqui). ----
+    If TemPalavra(descNorm, "PINO") And InStr(descNorm, "CONECTOR") = 0 And InStr(descNorm, "TERM") = 0 Then
+        tm.Familia = "PINO" : tm.AncoraDep = "CRUZETA" : tm.RazaoMin = 1 : tm.RazaoMax = 3.5
+        tm.CodNT006 = "F-36" : tm.DescrRegra = "1-3 pinos por cruzeta (1 por isolador pilar)"
+
+    ' ---- PLACA (identificacao/sinalizacao): checado ANTES de POSTE pois a
+    ' descricao da placa costuma citar "POSTE" (onde ela e fixada). ----
+    ElseIf InStr(descNorm, "PLACA") > 0 Then
+        tm.Familia = "PLACA IDENTIFICACAO" : tm.EhAncora = True : tm.AncoraDep = "" : tm.CodNT006 = "PL"
+        tm.DescrRegra = "Placa de identificacao/sinalizacao (neutro)"
+
     ' ---- ANCORAS ----
-    If InStr(descNorm, "CRUZETA") > 0 Then
+    ElseIf InStr(descNorm, "CRUZETA") > 0 Then
         tm.Familia = "CRUZETA" : tm.EhAncora = True : tm.AncoraDep = "" : tm.CodNT006 = "R-02"
     ElseIf InStr(descNorm, "ISOLADOR") > 0 And (InStr(descNorm, "DISCO") > 0 Or InStr(descNorm, "SUSPENS") > 0) Then
         tm.Familia = "ISOL SUSPENSAO" : tm.EhAncora = True : tm.AncoraDep = "" : tm.CodNT006 = "I-06"
@@ -893,9 +906,6 @@ Private Function ClassificarDesc(descNorm As String, ByRef tm As tMaterial) As B
     ElseIf InStr(descNorm, "PORCA") > 0 Then
         tm.Familia = "PORCA" : tm.AncoraDep = "CRUZETA" : tm.RazaoMin = 2 : tm.RazaoMax = 6.5
         tm.CodNT006 = "A-21" : tm.DescrRegra = "2-6 porcas por cruzeta"
-    ElseIf TemPalavra(descNorm, "PINO") Then
-        tm.Familia = "PINO" : tm.AncoraDep = "CRUZETA" : tm.RazaoMin = 1 : tm.RazaoMax = 3.5
-        tm.DescrRegra = "1-3 pinos por cruzeta (1 por isolador pilar)"
     ElseIf InStr(descNorm, "PARAFUSO") > 0 And InStr(descNorm, "OLHAL") > 0 Then
         tm.Familia = "PARAFUSO OLHAL" : tm.AncoraDep = "GANCHO OLHAL" : tm.RazaoMin = 0.8 : tm.RazaoMax = 1.2
         tm.CodNT006 = "F-34" : tm.DescrRegra = "1 parafuso olhal por ponto de suspensao"
@@ -928,8 +938,10 @@ Private Function ClassificarDesc(descNorm As String, ByRef tm As tMaterial) As B
         tm.Familia = "DPS" : tm.EhAncora = True : tm.AncoraDep = "" : tm.CodNT006 = "DPS"
         tm.DescrRegra = "Protetor de surto BT (neutro)"
 
-    ' ---- CONDUTORES / CABOS / FIOS (medidos em metros - referencia por vao) ----
-    ElseIf InStr(descNorm, "CABO") > 0 Or InStr(descNorm, "CONDUTOR") > 0 Or TemPalavra(descNorm, "FIO") Or TemPalavra(descNorm, "CAA") Or TemPalavra(descNorm, "CAZ") Then
+    ' ---- CONDUTORES / CABOS / FIOS (medidos em metros - referencia por vao;
+    ' exclui ALCA, que e acessorio de amarracao de cabo, nao o cabo em si) ----
+    ElseIf (InStr(descNorm, "CABO") > 0 Or InStr(descNorm, "CONDUTOR") > 0 Or TemPalavra(descNorm, "FIO") Or TemPalavra(descNorm, "CAA") Or TemPalavra(descNorm, "CAZ")) _
+        And InStr(descNorm, "ALCA") = 0 Then
         tm.Familia = "CABO/CONDUTOR" : tm.EhAncora = True : tm.AncoraDep = "" : tm.CodNT006 = "COND"
         tm.DescrRegra = "Condutor - medido em metros (referencia por vao)"
 
@@ -982,8 +994,10 @@ Private Function ClassificarDesc(descNorm As String, ByRef tm As tMaterial) As B
         tm.Familia = "GRAMPO" : tm.EhAncora = True : tm.AncoraDep = "" : tm.CodNT006 = "F-20"
         tm.DescrRegra = "Grampo de ancoragem/suspensao"
 
-    ' ---- CONECTOR (perfurante / cunha / derivacao - neutro) ----
-    ElseIf InStr(descNorm, "CONECTOR") > 0 Or InStr(descNorm, "CONEX") > 0 Then
+    ' ---- CONECTOR (perfurante / cunha / derivacao - neutro; cobre tambem as
+    ' abreviacoes de catalogo "CONEC" e "CON PER" p/ conector perfurante) ----
+    ElseIf InStr(descNorm, "CONECTOR") > 0 Or InStr(descNorm, "CONEX") > 0 _
+        Or InStr(descNorm, "CONEC") > 0 Or InStr(descNorm, "CON PER") > 0 Then
         tm.Familia = "CONECTOR" : tm.EhAncora = True : tm.AncoraDep = "" : tm.CodNT006 = "M-01"
         tm.DescrRegra = "Conector eletrico (neutro)"
 
@@ -1021,9 +1035,9 @@ Private Function ClassificarDesc(descNorm As String, ByRef tm As tMaterial) As B
     ElseIf InStr(descNorm, "ESPACADOR") > 0 Or InStr(descNorm, "BRACO") > 0 Or InStr(descNorm, "LOSANGULAR") > 0 Then
         tm.Familia = "REDE COMPACTA" : tm.EhAncora = True : tm.AncoraDep = "" : tm.CodNT006 = "NT018"
         tm.DescrRegra = "Rede compacta - referencia por vao (3-5 espacadores/vao)"
-    ElseIf InStr(descNorm, "ALCA") > 0 And InStr(descNorm, "PREFORM") > 0 Then
+    ElseIf InStr(descNorm, "ALCA") > 0 And (InStr(descNorm, "PREFORM") > 0 Or InStr(descNorm, "PREF") > 0) Then
         tm.Familia = "ALCA PREFORMADA" : tm.EhAncora = True : tm.AncoraDep = "" : tm.CodNT006 = "F-04"
-        tm.DescrRegra = "Alca preformada (amarracao de condutor)"
+        tm.DescrRegra = "Alca preformada (amarracao de condutor; PREF = abreviacao de preformada)"
     ElseIf TemPalavra(descNorm, "ANEL") Or TemPalavra(descNorm, "LACO") Or TemPalavra(descNorm, "ALCA") Then
         tm.Familia = "REDE COMPACTA" : tm.EhAncora = True : tm.AncoraDep = "" : tm.CodNT006 = "NT018"
         tm.DescrRegra = "Acessorio rede compacta (anel/laco/alca)"
@@ -1042,6 +1056,10 @@ Private Function ClassificarDesc(descNorm As String, ByRef tm As tMaterial) As B
     ElseIf InStr(descNorm, "SUPORTE") > 0 Then
         tm.Familia = "SUPORTE" : tm.EhAncora = True : tm.AncoraDep = "" : tm.CodNT006 = "SUP"
         tm.DescrRegra = "Suporte generico (neutro)"
+    ElseIf TemPalavra(descNorm, "SUP") And (InStr(descNorm, "CH FACA") > 0 Or InStr(descNorm, "CHAVE FACA") > 0 _
+        Or InStr(descNorm, "BYPASS") > 0 Or InStr(descNorm, "BY PASS") > 0) Then
+        tm.Familia = "SUPORTE" : tm.EhAncora = True : tm.AncoraDep = "" : tm.CodNT006 = "SUP"
+        tm.DescrRegra = "Suporte p/ equipamento (chave faca/by-pass) - abreviacao SUP"
 
     Else
         ClassificarDesc = False
