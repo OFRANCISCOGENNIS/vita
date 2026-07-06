@@ -1,0 +1,372 @@
+<!--
+  OMEGA HUD — protótipo de interface de orquestração multiagente ("JARVIS")
+  Página única, sem dependências externas. Toda a lógica de comportamento
+  (roteador BRAINS, telemetria, console, boot) foi preservada como no protótipo
+  original; o HTML/CSS e o bootstrap dos agentes foram reconstruídos ao redor dela.
+-->
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OMEGA · Núcleo de Orquestração</title>
+
+<style>
+  :root{
+    --bg:#070b14; --bg2:#0b1120; --panel:#0e1626; --panel2:#101b2e;
+    --line:#1b2a44; --line2:#25395c;
+    --ink:#dbe7f7; --mut:#7f93b3; --dim:#516184;
+    --cy:#5fd4f4; --cy2:#bff0ff; --nav:#1f497d;
+    --ok:#4fd18b; --bad:#ff6b7d; --warn:#ffb454;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; background:
+      radial-gradient(1200px 600px at 80% -10%, rgba(95,212,244,.08), transparent 60%),
+      radial-gradient(900px 500px at -10% 110%, rgba(31,73,125,.18), transparent 55%),
+      var(--bg);
+    color:var(--ink);
+    font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Ubuntu,Arial,sans-serif;
+    letter-spacing:.2px;
+  }
+  a{color:var(--cy)}
+  .wrap{max-width:1240px; margin:0 auto; padding:22px 20px 40px}
+
+  /* ---------- header ---------- */
+  header{
+    display:flex; align-items:center; gap:18px; flex-wrap:wrap;
+    padding:14px 18px; margin-bottom:20px;
+    background:linear-gradient(180deg,var(--panel2),var(--panel));
+    border:1px solid var(--line); border-radius:16px;
+  }
+  .brand{display:flex; align-items:center; gap:12px}
+  .mark{
+    width:38px; height:38px; border-radius:11px; position:relative; flex:0 0 auto;
+    background:radial-gradient(circle at 30% 30%, #123, #061019);
+    border:1px solid var(--line2); box-shadow:0 0 0 3px rgba(95,212,244,.06);
+  }
+  .mark::before{
+    content:"Ω"; position:absolute; inset:0; display:grid; place-items:center;
+    color:var(--cy2); font-size:20px; font-weight:700; text-shadow:0 0 12px rgba(95,212,244,.6);
+  }
+  .brand h1{font-size:16px; margin:0; letter-spacing:2px}
+  .brand small{color:var(--mut); display:block; font-size:11px; letter-spacing:2px; text-transform:uppercase}
+  .pills{display:flex; gap:8px; margin-left:auto; flex-wrap:wrap}
+  .pill{
+    display:flex; align-items:center; gap:7px; font-size:12px; color:var(--mut);
+    background:var(--bg2); border:1px solid var(--line); padding:6px 11px; border-radius:999px;
+  }
+  .pill b{color:var(--ink); font-weight:600}
+  .led{width:8px; height:8px; border-radius:50%; background:var(--ok); box-shadow:0 0 8px var(--ok)}
+
+  /* ---------- grid ---------- */
+  .grid{display:grid; grid-template-columns:1.05fr .95fr; gap:18px}
+  @media (max-width:900px){ .grid{grid-template-columns:1fr} }
+
+  .card{
+    background:linear-gradient(180deg,var(--panel2),var(--panel));
+    border:1px solid var(--line); border-radius:16px; padding:16px;
+  }
+  .card h2{
+    margin:0 0 12px; font-size:11px; letter-spacing:2.5px; text-transform:uppercase;
+    color:var(--dim); display:flex; align-items:center; gap:8px;
+  }
+  .card h2::before{content:""; width:6px; height:6px; border-radius:50%; background:var(--cy); box-shadow:0 0 8px var(--cy)}
+  .stack{display:flex; flex-direction:column; gap:18px}
+
+  /* ---------- núcleo OMEGA PRIME ---------- */
+  .core{
+    display:flex; align-items:center; gap:16px; padding:16px 18px; border-radius:14px;
+    background:radial-gradient(600px 200px at 20% 0%, rgba(95,212,244,.10), transparent 60%), var(--bg2);
+    border:1px solid var(--line2); transition:border-color .4s, box-shadow .4s;
+  }
+  .core .orb{
+    width:64px; height:64px; border-radius:50%; flex:0 0 auto; position:relative;
+    background:radial-gradient(circle at 35% 30%, #1a6f8c, #0a2430 70%);
+    box-shadow:0 0 0 4px rgba(95,212,244,.08), inset 0 0 18px rgba(95,212,244,.25);
+  }
+  .core .orb::after{
+    content:""; position:absolute; inset:-6px; border-radius:50%;
+    border:1px solid rgba(95,212,244,.35); animation:ring 3.2s linear infinite;
+  }
+  @keyframes ring{0%{transform:scale(.92);opacity:.7}100%{transform:scale(1.28);opacity:0}}
+  .core .ct{flex:1 1 auto; min-width:0}
+  .core .ct b{font-size:15px; letter-spacing:1.5px}
+  .core .ct p{margin:3px 0 0; color:var(--mut); font-size:12px}
+  .core .cs{font-size:11px; text-transform:uppercase; letter-spacing:1.5px; color:var(--ok)}
+  .core.busy{border-color:var(--cy); box-shadow:0 0 24px rgba(95,212,244,.18)}
+  .core.busy .cs{color:var(--cy2)}
+  .core.busy .cs::after{content:" · processando"}
+
+  /* ---------- malha de agentes ---------- */
+  .agents{display:grid; grid-template-columns:repeat(auto-fill,minmax(128px,1fr)); gap:9px}
+  .agent{
+    position:relative; padding:11px 12px; border-radius:12px; overflow:hidden;
+    background:var(--bg2); border:1px solid var(--line);
+    transition:border-color .35s, background .35s, transform .2s;
+  }
+  .agent:hover{transform:translateY(-2px)}
+  .agent .dot{width:7px; height:7px; border-radius:50%; background:var(--dim); display:inline-block; margin-right:6px; transition:.3s}
+  .agent .an{font-weight:700; font-size:12px; letter-spacing:1.2px}
+  .agent .ar{display:block; margin-top:5px; color:var(--dim); font-size:11px}
+  .agent.run{border-color:var(--line2)}
+  .agent.run .dot{background:var(--ok); box-shadow:0 0 8px var(--ok)}
+  .agent.busy{border-color:var(--cy); background:linear-gradient(180deg, rgba(95,212,244,.10), var(--bg2))}
+  .agent.busy .dot{background:var(--cy2); box-shadow:0 0 10px var(--cy)}
+  .agent.busy::after{
+    content:""; position:absolute; left:-40%; top:0; bottom:0; width:40%;
+    background:linear-gradient(90deg, transparent, rgba(95,212,244,.18), transparent);
+    animation:sweep 1.1s linear infinite;
+  }
+  @keyframes sweep{to{left:120%}}
+
+  /* ---------- telemetria ---------- */
+  .spark-wrap{background:var(--bg2); border:1px solid var(--line); border-radius:12px; padding:10px}
+  #spark{width:100%; height:120px; display:block}
+  .kpis{display:grid; grid-template-columns:repeat(3,1fr); gap:9px; margin-top:12px}
+  .kpi{background:var(--bg2); border:1px solid var(--line); border-radius:12px; padding:11px 12px}
+  .kpi .kv{font-size:20px; font-weight:700; color:var(--cy2); font-variant-numeric:tabular-nums}
+  .kpi .kl{font-size:10.5px; text-transform:uppercase; letter-spacing:1.5px; color:var(--dim); margin-top:3px}
+
+  /* ---------- console ---------- */
+  .console{display:flex; flex-direction:column; height:420px}
+  #feed{
+    flex:1 1 auto; overflow:auto; padding:6px 4px; display:flex; flex-direction:column; gap:10px;
+    scrollbar-width:thin; scrollbar-color:var(--line2) transparent;
+  }
+  #feed::-webkit-scrollbar{width:8px}
+  #feed::-webkit-scrollbar-thumb{background:var(--line2); border-radius:8px}
+  .msg{max-width:88%; padding:10px 12px; border-radius:12px; font-size:13px; line-height:1.55}
+  .msg .tag{display:block; font-size:10px; letter-spacing:2px; text-transform:uppercase; margin-bottom:4px; color:var(--dim)}
+  .msg.user{align-self:flex-end; background:linear-gradient(180deg,#173a63,#12294a); border:1px solid var(--line2)}
+  .msg.user .tag{color:var(--cy2)}
+  .msg.jarvis{align-self:flex-start; background:var(--bg2); border:1px solid var(--line)}
+  .msg.jarvis .tag{color:var(--cy)}
+  .route{align-self:flex-start; font-size:11px; color:var(--dim); letter-spacing:.5px; padding-left:4px}
+  .route b{color:var(--mut)}
+  .cursor{display:inline-block; width:7px; height:14px; margin-left:1px; vertical-align:-2px; background:var(--cy2); animation:blink 1s steps(2) infinite}
+  @keyframes blink{50%{opacity:0}}
+
+  .chips{display:flex; gap:7px; flex-wrap:wrap; margin:12px 0}
+  .chips button{
+    background:var(--bg2); color:var(--mut); border:1px solid var(--line); cursor:pointer;
+    font-size:11.5px; padding:6px 11px; border-radius:999px; transition:.2s;
+  }
+  .chips button:hover{color:var(--ink); border-color:var(--cy); background:rgba(95,212,244,.08)}
+  .composer{display:flex; gap:8px}
+  #inp{
+    flex:1 1 auto; background:var(--bg2); border:1px solid var(--line2); color:var(--ink);
+    border-radius:11px; padding:11px 13px; font-size:13px; outline:none;
+  }
+  #inp:focus{border-color:var(--cy); box-shadow:0 0 0 3px rgba(95,212,244,.12)}
+  #send{
+    flex:0 0 auto; background:linear-gradient(180deg,var(--cy),#37a9cf); color:#04121a; font-weight:700;
+    border:none; border-radius:11px; padding:0 18px; cursor:pointer; letter-spacing:.5px; transition:.2s;
+  }
+  #send:hover{filter:brightness(1.08)}
+
+  footer{margin-top:22px; color:var(--dim); font-size:11px; text-align:center; letter-spacing:.5px}
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <div class="mark" aria-hidden="true"></div>
+      <div>
+        <h1>OMEGA</h1>
+        <small>Núcleo de Orquestração Multiagente</small>
+      </div>
+    </div>
+    <div class="pills">
+      <span class="pill"><span class="led"></span> <b>Online</b></span>
+      <span class="pill">Uptime <b>99,98%</b></span>
+      <span class="pill">Tarefas <b id="stTask">0</b></span>
+      <span class="pill">6 modelos · roteador ativo</span>
+    </div>
+  </header>
+
+  <div class="grid">
+    <!-- coluna A: agentes -->
+    <div class="stack">
+      <section class="card">
+        <h2>Executor · OMEGA Core</h2>
+        <div class="core run" data-name="OMEGA PRIME">
+          <div class="orb" aria-hidden="true"></div>
+          <div class="ct">
+            <b>OMEGA PRIME</b>
+            <p>Orquestrador central · plano → roteamento → aprovação humana</p>
+          </div>
+          <div class="cs">nominal</div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Agentes permanentes</h2>
+        <div class="agents" id="agents"><!-- preenchido via JS --></div>
+      </section>
+    </div>
+
+    <!-- coluna B: telemetria + console -->
+    <div class="stack">
+      <section class="card">
+        <h2>Telemetria em tempo real</h2>
+        <div class="spark-wrap">
+          <canvas id="spark" width="560" height="120"></canvas>
+        </div>
+        <div class="kpis">
+          <div class="kpi"><div class="kv" id="kCost">$ 0.42</div><div class="kl">Custo / consulta</div></div>
+          <div class="kpi"><div class="kv" id="kQ">0</div><div class="kl">Fila</div></div>
+          <div class="kpi"><div class="kv" id="stLat">— ms</div><div class="kl">Latência</div></div>
+        </div>
+      </section>
+
+      <section class="card console">
+        <h2>Console · JARVIS</h2>
+        <div id="feed" aria-live="polite"></div>
+        <div class="chips">
+          <button data-q="Analisar meus custos do mês">💰 Custos do mês</button>
+          <button data-q="Automatizar o envio de faturas no Slack">⚙️ Automatizar faturas</button>
+          <button data-q="Quais as tendências de IA para 2027?">🔎 Tendências 2027</button>
+          <button data-q="Gerar uma API de clientes">🧩 Gerar API</button>
+          <button data-q="Status do sistema">🛰️ Status</button>
+        </div>
+        <div class="composer">
+          <input id="inp" type="text" placeholder="Fale com o OMEGA…" autocomplete="off">
+          <button id="send">Enviar</button>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <footer>Protótipo de interface — nenhuma ação externa é executada. As respostas são simuladas.</footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var reduced = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+
+  /* ---------- roster de agentes ---------- */
+  var wrap = document.getElementById("agents");
+  var AGENTS = [
+    ["ALPHA","Planejamento"],   ["BETA","Orquestração"],
+    ["GAMMA","Extração"],       ["DELTA","Geração de código"],
+    ["EPSILON","Integrações"],  ["ZETA","Memória vetorial"],
+    ["ETA","Pesquisa"],         ["THETA","Segurança"],
+    ["IOTA","Financeiro"],      ["KAPPA","Automação"],
+    ["LAMBDA","Roteamento"],    ["MU","Observabilidade"],
+    ["NU","Grafo de conhec."],  ["SIGMA","Síntese"]
+  ];
+  AGENTS.forEach(function(a){
+    var d = document.createElement("div");
+    d.className = "agent run";
+    d.setAttribute("data-name", a[0]);
+    d.innerHTML = '<span class="dot"></span><span class="an">'+a[0]+'</span><span class="ar">'+a[1]+'</span>';
+    wrap.appendChild(d);
+  });
+
+  function setAgent(name, state){ // state: run | busy
+    var el = wrap.querySelector('[data-name="'+name+'"]') || document.querySelector('[data-name="'+name+'"]');
+    if(el){ el.className = el.className.replace(/ (run|busy)/g,"") + " " + state; }
+  }
+  // vida ambiente: um agente pisca ocupado de vez em quando
+  if(!reduced) setInterval(function(){
+    var a = AGENTS[Math.floor(Math.random()*13)][0];
+    setAgent(a,"busy"); setTimeout(function(){ setAgent(a,"run"); }, 1800+Math.random()*2000);
+  }, 4200);
+
+  /* ---------- telemetria ---------- */
+  var cv = document.getElementById("spark"), cx = cv.getContext("2d");
+  var pts = []; for(var i=0;i<60;i++) pts.push(35+Math.sin(i/6)*12+Math.random()*10);
+  function draw(){
+    var w=cv.width, h=cv.height;
+    cx.clearRect(0,0,w,h);
+    cx.strokeStyle="rgba(27,42,68,.9)"; cx.lineWidth=1;
+    [0.25,0.5,0.75].forEach(function(f){ cx.beginPath(); cx.moveTo(0,h*f); cx.lineTo(w,h*f); cx.stroke(); });
+    var step=w/(pts.length-1);
+    cx.beginPath();
+    pts.forEach(function(p,i){ var y=h-(p/100)*h; i?cx.lineTo(i*step,y):cx.moveTo(0,y); });
+    cx.strokeStyle="#5FD4F4"; cx.lineWidth=2; cx.stroke();
+    cx.lineTo(w,h); cx.lineTo(0,h); cx.closePath();
+    var g=cx.createLinearGradient(0,0,0,h);
+    g.addColorStop(0,"rgba(95,212,244,.22)"); g.addColorStop(1,"rgba(95,212,244,0)");
+    cx.fillStyle=g; cx.fill();
+    var lastY=h-(pts[pts.length-1]/100)*h;
+    cx.beginPath(); cx.arc(w-3,lastY,3.5,0,7); cx.fillStyle="#BFF0FF"; cx.fill();
+  }
+  draw();
+
+  var lat = document.getElementById("stLat");
+  function tick(){
+    pts.shift(); pts.push(Math.max(8,Math.min(92, pts[pts.length-1]+(Math.random()-0.5)*14)));
+    draw();
+    lat.textContent = Math.round(320+Math.random()*280)+" ms";
+    document.getElementById("kCost").textContent = "$ 0."+(38+Math.floor(Math.random()*12));
+    document.getElementById("kQ").textContent = Math.floor(Math.random()*6);
+  }
+  tick();
+  if(!reduced) setInterval(tick, 2000);
+
+  /* ---------- console ---------- */
+  var feed = document.getElementById("feed"),
+      inp  = document.getElementById("inp"),
+      btn  = document.getElementById("send"),
+      tasks = 0, tEl = document.getElementById("stTask");
+  function el(cls, html){ var d=document.createElement("div"); d.className=cls; d.innerHTML=html; feed.appendChild(d); feed.scrollTop=feed.scrollHeight; return d; }
+  function typeInto(node, text, done){
+    if(reduced){ node.textContent=text; done&&done(); return; }
+    var i=0, cur=document.createElement("span"); cur.className="cursor";
+    node.textContent=""; node.appendChild(cur);
+    (function step(){
+      if(i<text.length){
+        cur.insertAdjacentText("beforebegin", text.slice(i, i+2)); i+=2;
+        feed.scrollTop=feed.scrollHeight;
+        setTimeout(step, 12);
+      } else { cur.remove(); done&&done(); }
+    })();
+  }
+  function jarvis(text, route){
+    if(route){ el("route","⇢ roteando → <b>"+route+"</b>"); }
+    var m = el("msg jarvis",'<span class="tag">JARVIS</span><span class="body"></span>');
+    setTimeout(function(){ typeInto(m.querySelector(".body"), text); }, reduced?0:350);
+  }
+  var BRAINS = [
+    { k:/custo|financ|gasto|fatura|or[çc]amento/i, r:"IOTA · GAMMA → OMEGA PRIME",
+      a:"Análise concluída. Seus custos do mês somam R$ 12.480 — 8% abaixo do orçamento. Maior variação: infraestrutura de nuvem (+14%), compensada pela queda em ferramentas (−22%). Detectei 2 assinaturas sem uso há 60 dias; posso cancelá-las mediante sua aprovação. Relatório completo disponível no Centro Financeiro.",
+      busy:["IOTA","GAMMA"] },
+    { k:/automa|fluxo|slack|e-?mail|gatilho/i, r:"KAPPA → THETA (revisão) → OMEGA PRIME",
+      a:"Fluxo desenhado: [Gatilho] novo e-mail com fatura ➝ [GAMMA] extração de valores ➝ [resumo] ➝ [Slack #financeiro]. THETA validou as permissões: somente leitura no Gmail, escrita restrita ao canal escolhido. O fluxo está em modo rascunho aguardando sua ativação na Central de Automações.",
+      busy:["KAPPA","THETA"] },
+    { k:/pesquis|tend[êe]ncia|artigo|estudo|mercado/i, r:"ETA · GAMMA → OMEGA PRIME",
+      a:"Varredura em 42 fontes concluída. Três tendências dominantes para 2027: (1) agentes autônomos com supervisão humana como padrão corporativo; (2) inferência local em dispositivos para dados sensíveis; (3) consolidação de plataformas multi-modelo. Sínteses com as fontes citadas foram salvas no Centro de Pesquisa — nenhuma afirmação sem rastreabilidade.",
+      busy:["ETA","GAMMA"] },
+    { k:/api|c[óo]digo|sistema|app|gerar|criar.*(site|painel|dashboard)/i, r:"DELTA → sandbox → THETA → OMEGA PRIME",
+      a:"Especificação gerada: API REST de clientes (CRUD + busca), PostgreSQL, autenticação JWT, OpenAPI 3.1. Executei os 24 testes no sandbox — todos verdes; scan de segurança do THETA sem apontamentos. O artefato está pronto para revisão: nada será publicado sem sua aprovação explícita.",
+      busy:["DELTA","THETA"] },
+    { k:/status|sa[úu]de|sistema|online/i, r:"OMEGA CORE",
+      a:"Todos os sistemas nominais. 14 agentes permanentes ativos, roteador multi-modelo com 6 provedores disponíveis, memória universal sincronizada (temporária, persistente, vetorial e grafo). Uptime 99,98%. Nenhum alerta de segurança nas últimas 24 h.",
+      busy:[] },
+    { k:/.*/, r:"ALPHA (planejamento) → OMEGA PRIME",
+      a:"Entendido. Decompus sua solicitação em um plano de tarefas e selecionei os agentes adequados. Este é um protótipo de interface — na plataforma completa, o OMEGA Core executaria o plano de verdade: recuperando sua memória, roteando para o melhor modelo e pedindo sua aprovação antes de qualquer ação externa. Experimente os atalhos abaixo do console.",
+      busy:["ALPHA"] }
+  ];
+  function respond(q){
+    var b = BRAINS.find(function(x){ return x.k.test(q); });
+    b.busy.forEach(function(n){ setAgent(n,"busy"); setTimeout(function(){ setAgent(n,"run"); }, 5000); });
+    setAgent("OMEGA PRIME","busy"); setTimeout(function(){ setAgent("OMEGA PRIME","run"); }, 6000);
+    tasks++; tEl.textContent = tasks;
+    setTimeout(function(){ jarvis(b.a, b.r); }, reduced?0:400);
+  }
+  function send(){
+    var q = inp.value.trim(); if(!q) return;
+    el("msg user",'<span class="tag">Você</span>'+q.replace(/[<>&]/g,function(c){return{"<":"&lt;",">":"&gt;","&":"&amp;"}[c];}));
+    inp.value=""; respond(q);
+  }
+  btn.addEventListener("click", send);
+  inp.addEventListener("keydown", function(e){ if(e.key==="Enter") send(); });
+  document.querySelectorAll(".chips button").forEach(function(c){
+    c.addEventListener("click", function(){ inp.value=c.dataset.q; send(); });
+  });
+
+  /* ---------- boot ---------- */
+  jarvis("Bom dia. Núcleo OMEGA inicializado: 14 agentes permanentes online, memória universal sincronizada, canais seguros estabelecidos. Em que posso ajudar?");
+})();
+</script>
