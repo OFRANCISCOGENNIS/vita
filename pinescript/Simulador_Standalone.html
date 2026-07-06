@@ -1114,6 +1114,27 @@ body {
 .scan-fil-actions { display: flex; gap: 8px; }
 .scan-fil-actions .btn-mini { flex: 1; }
 
+/* ---- Botão "⚙️ Controles": recolhe/expande a barra de configurações ---- */
+.qo-toggle {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--surface-2);
+    color: var(--ink);
+    border: 1px solid var(--hairline);
+    border-radius: 8px;
+    padding: 7px 12px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: var(--transition);
+}
+.qo-toggle:hover { border-color: var(--accent); color: var(--accent); }
+.qo-toggle.is-off { background: transparent; color: var(--ink-muted); }
+.sidebar.oculta { display: none; }
+
 </style>
 </head>
 <body>
@@ -1135,6 +1156,7 @@ body {
             <div class="qo-stat"><small>Operações Aprovadas</small><span id="qoAprov" class="qo-good">—</span></div>
             <div class="qo-stat"><small>Bloqueadas</small><span id="qoBloq" class="qo-bad">—</span></div>
             <div class="qo-stat"><small>Expectativa Matemática</small><span id="qoExpect">—</span></div>
+            <button id="btnControles" class="qo-toggle" type="button" aria-expanded="true" title="Mostrar/ocultar as configurações (tela minimalista)">⚙️ Controles</button>
         </header>
 
         <main class="main-content">
@@ -4405,6 +4427,23 @@ document.getElementById('scanFilTodas').addEventListener('click', function () {
 document.getElementById('scanFilLimpar').addEventListener('click', function () {
     scanUniverse().forEach(s => scanSel[s] = false); salvarScanSel(); renderScanFiltro();
 });
+
+// ---- Botão "⚙️ Controles": recolhe/expande a barra de configurações ----
+function aplicarControles(mostrar) {
+    const sb = document.querySelector('.sidebar');
+    const btn = document.getElementById('btnControles');
+    if (!sb || !btn) return;
+    sb.classList.toggle('oculta', !mostrar);
+    btn.classList.toggle('is-off', !mostrar);
+    btn.setAttribute('aria-expanded', mostrar ? 'true' : 'false');
+    btn.textContent = mostrar ? '⚙️ Controles' : '⚙️ Mostrar controles';
+}
+document.getElementById('btnControles').addEventListener('click', function () {
+    // se está oculta, o clique deve MOSTRAR; senão, ocultar
+    const mostrar = document.querySelector('.sidebar').classList.contains('oculta');
+    localStorage.setItem('ctrlVisivel', mostrar ? '1' : '0');
+    aplicarControles(mostrar);
+});
 document.getElementById('timeframe').addEventListener('change', function () {
     montarWidgetTV();   // sincroniza o widget oficial com o novo timeframe
     carregar();
@@ -4501,6 +4540,7 @@ function iniciar() {
     montarWidgetTV();   // gráfico oficial do TradingView no topo (assíncrono, com retry)
     carregarSimbolos();
     renderScanFiltro(); // checklist de moedas do scanner
+    aplicarControles(localStorage.getItem('ctrlVisivel') !== '0'); // restaura visibilidade da barra
     carregar();
     carregarNoticias(); // notícias em tempo real
     newsTimer = setInterval(carregarNoticias, 60000);  // auto-refresh a cada 60s

@@ -2826,6 +2826,23 @@ document.getElementById('scanFilTodas').addEventListener('click', function () {
 document.getElementById('scanFilLimpar').addEventListener('click', function () {
     scanUniverse().forEach(s => scanSel[s] = false); salvarScanSel(); renderScanFiltro();
 });
+
+// ---- Botão "⚙️ Controles": recolhe/expande a barra de configurações ----
+function aplicarControles(mostrar) {
+    const sb = document.querySelector('.sidebar');
+    const btn = document.getElementById('btnControles');
+    if (!sb || !btn) return;
+    sb.classList.toggle('oculta', !mostrar);
+    btn.classList.toggle('is-off', !mostrar);
+    btn.setAttribute('aria-expanded', mostrar ? 'true' : 'false');
+    btn.textContent = mostrar ? '⚙️ Controles' : '⚙️ Mostrar controles';
+}
+document.getElementById('btnControles').addEventListener('click', function () {
+    // se está oculta, o clique deve MOSTRAR; senão, ocultar
+    const mostrar = document.querySelector('.sidebar').classList.contains('oculta');
+    localStorage.setItem('ctrlVisivel', mostrar ? '1' : '0');
+    aplicarControles(mostrar);
+});
 document.getElementById('timeframe').addEventListener('change', function () {
     montarWidgetTV();   // sincroniza o widget oficial com o novo timeframe
     carregar();
@@ -2922,6 +2939,7 @@ function iniciar() {
     montarWidgetTV();   // gráfico oficial do TradingView no topo (assíncrono, com retry)
     carregarSimbolos();
     renderScanFiltro(); // checklist de moedas do scanner
+    aplicarControles(localStorage.getItem('ctrlVisivel') !== '0'); // restaura visibilidade da barra
     carregar();
     carregarNoticias(); // notícias em tempo real
     newsTimer = setInterval(carregarNoticias, 60000);  // auto-refresh a cada 60s

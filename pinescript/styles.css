@@ -1094,3 +1094,24 @@ body {
 .scan-fil span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .scan-fil-actions { display: flex; gap: 8px; }
 .scan-fil-actions .btn-mini { flex: 1; }
+
+/* ---- Botão "⚙️ Controles": recolhe/expande a barra de configurações ---- */
+.qo-toggle {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--surface-2);
+    color: var(--ink);
+    border: 1px solid var(--hairline);
+    border-radius: 8px;
+    padding: 7px 12px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: var(--transition);
+}
+.qo-toggle:hover { border-color: var(--accent); color: var(--accent); }
+.qo-toggle.is-off { background: transparent; color: var(--ink-muted); }
+.sidebar.oculta { display: none; }
