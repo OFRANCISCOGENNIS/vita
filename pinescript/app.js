@@ -2346,31 +2346,15 @@ function avaliarWalkForward() {
     return { treino: statsEnt(entradas.filter(e => e.index < nCut)), val: statsEnt(entradas.filter(e => e.index >= nCut)) };
 }
 
-async function otimizarIA() {
-    if (!dados || dados.length < 210) { alert('Carregue um par primeiro (mín. ~210 velas).'); return; }
-    const btn = document.getElementById('btnIA');
-    btn.disabled = true; btn.textContent = 'Analisando TFs…';
-    const el = id => document.getElementById(id);
-    const isSim = fonte() === 'sim';
-    const symbol = symbolAtual();
-    const ids = ['minScore', 'rsiSobrevenda', 'rsiSobrecompra', 'estruturaLookback', 'cooldownVelas', 'confMode', 'timeframe', 'useHtf', 'usePesoIA'];
-    const save = {}; ids.forEach(i => save[i] = el(i).type === 'checkbox' ? el(i).checked : el(i).value);
-    el('confMode').value = 'score';
-    el('useHtf').checked = false; htfTrend = [];   // HTF não se aplica ao backtest da grade
-    el('usePesoIA').checked = false;               // peso é circular na otimização — desliga
-    const dSave = dados;
-
-    // Break-even do payout: a IA otimiza o edge LÍQUIDO (acerto − break-even),
-    // não o acerto bruto — 52% a payout 87% ainda é prejuízo.
-    const payout = Math.max(0.01, (parseFloat(el('payout').value) || 87) / 100);
-    const beWR = 1 / (1 + payout);
-    const EXP_OPCOES = [1, 5, 15, 30, 60];   // valores do seletor de expiração
-
+// Otimiza UM símbolo: varre a grade × timeframes e devolve o melhor combo por TF
+// (ordenado por edge líquido), já gravando o campeão em iaCache[symbol].
+// Muda `dados`/inputs temporariamente — quem chama é responsável por restaurar.
+async function _iaOtimizarSimbolo(symbol, isSim, dSimBase, beWR, EXP_OPCOES, el) {
     const tfs = isSim ? [tfMinutes()] : TFS_IA;
-    const porTf = [];   // melhor combo por timeframe (inclui expiração ideal)
+    const porTf = [];
     let totalCombos = 0;
     for (const tf of tfs) {
-        let dTf = dSave;
+        let dTf = dSimBase;
         if (!isSim) {
             try { dTf = await carregarHistoricoTF(symbol, tf, 300); } catch (e) { continue; }
             if (!dTf || dTf.length < 210) continue;
@@ -2398,41 +2382,131 @@ async function otimizarIA() {
         await Promise.resolve();
         if (best) porTf.push(best);
     }
+    // ranqueia pelo EDGE LÍQUIDO fora da amostra (acerto − break-even do payout)
+    porTf.forEach(r => r.edge = r.val.wr - beWR);
+    porTf.sort((a, b) => b.edge - a.edge || b.robust - a.robust);
+    if (porTf.length) {
+        const rec = porTf[0];
+        iaCache[symbol] = { tf: rec.tf, exp: rec.exp, ms: rec.ms, sv: rec.sv, sc: rec.sc, lk: rec.lk, cd: rec.cd, wr: rec.val.wr };
+    }
+    return { porTf, totalCombos };
+}
+
+const edgeTxtIA = e => (e >= 0 ? '+' : '') + (e * 100).toFixed(1) + ' pp';
+
+async function otimizarIA() {
+    const isSim = fonte() === 'sim';
+    if (isSim && (!dados || dados.length < 210)) { alert('Carregue um par primeiro (mín. ~210 velas).'); return; }
+    const btn = document.getElementById('btnIA');
+    const el = id => document.getElementById(id);
+
+    // No modo Simulado não há dados por símbolo — otimiza só o par atual.
+    // Nas fontes ao vivo, otimiza as moedas marcadas no checklist "🎯 Moedas p/ análise".
+    let symbols;
+    if (isSim) symbols = [symbolAtual()];
+    else {
+        symbols = scanUniverse().filter(scanChecked);
+        if (!symbols.length) {
+            alert('Marque ao menos uma moeda em "🎯 Moedas p/ análise" (ou troque a Fonte para Simulado para otimizar o par atual).');
+            return;
+        }
+    }
+
+    btn.disabled = true; btn.textContent = 'Analisando…';
+    const ids = ['minScore', 'rsiSobrevenda', 'rsiSobrecompra', 'estruturaLookback', 'cooldownVelas', 'confMode', 'timeframe', 'useHtf', 'usePesoIA', 'symbol', 'fonte'];
+    const save = {}; ids.forEach(i => save[i] = el(i).type === 'checkbox' ? el(i).checked : el(i).value);
+    el('confMode').value = 'score';
+    el('useHtf').checked = false; htfTrend = [];   // HTF não se aplica ao backtest da grade
+    el('usePesoIA').checked = false;               // peso é circular na otimização — desliga
+    const dSave = dados;
+
+    // Break-even do payout: a IA otimiza o edge LÍQUIDO (acerto − break-even),
+    // não o acerto bruto — 52% a payout 87% ainda é prejuízo.
+    const payout = Math.max(0.01, (parseFloat(el('payout').value) || 87) / 100);
+    const beWR = 1 / (1 + payout);
+    const EXP_OPCOES = [1, 5, 15, 30, 60];   // valores do seletor de expiração
+
+    document.getElementById('iaPanel').style.display = 'block';
+    const resultados = [];   // { symbol, label, porTf, totalCombos }
+    let totalCombosGeral = 0;
+    for (let k = 0; k < symbols.length; k++) {
+        const s = symbols[k];
+        btn.textContent = `Analisando ${scanLabel(s)} (${k + 1}/${symbols.length})…`;
+        document.getElementById('iaMeta').textContent = `Otimizando ${k + 1}/${symbols.length} moeda(s)…`;
+        const { porTf, totalCombos } = await _iaOtimizarSimbolo(s, isSim, dSave, beWR, EXP_OPCOES, el);
+        totalCombosGeral += totalCombos;
+        resultados.push({ symbol: s, label: scanLabel(s), porTf, totalCombos });
+    }
+    localStorage.setItem('iaCache', JSON.stringify(iaCache));
+
     // restaura estado do usuário
     ids.forEach(i => { if (el(i).type === 'checkbox') el(i).checked = save[i]; else el(i).value = save[i]; });
     dados = dSave; recomputarIndicadores();
     if (el('useHtf').checked) await carregarHtf();
     recomputarSinais();
 
-    // ranqueia pelo EDGE LÍQUIDO fora da amostra (acerto − break-even do payout)
-    porTf.forEach(r => r.edge = r.val.wr - beWR);
-    porTf.sort((a, b) => b.edge - a.edge || b.robust - a.robust);
-    const par = PARES_YAHOO[symbol] ? PARES_YAHOO[symbol].label : symbol;
-    document.getElementById('iaPanel').style.display = 'block';
-    document.getElementById('iaMeta').textContent = totalCombos + ' combinações · ' + tfs.length + ' timeframes · break-even ' + (beWR * 100).toFixed(1) + '%';
+    document.getElementById('iaMeta').textContent = totalCombosGeral + ' combinações · ' + symbols.length + ' moeda(s) · break-even ' + (beWR * 100).toFixed(1) + '%';
 
+    if (symbols.length === 1) { renderIAUmPar(resultados[0], isSim, el); btn.disabled = false; btn.textContent = '🤖 IA: otimizar parâmetros'; return; }
+
+    // ---- VISÃO MULTI-MOEDA: um resultado por moeda (o melhor combo de cada) ----
+    const comOk = resultados.filter(r => r.porTf.length);
+    const semOk = resultados.filter(r => !r.porTf.length);
+    comOk.sort((a, b) => b.porTf[0].edge - a.porTf[0].edge);
+    if (!comOk.length) {
+        document.getElementById('iaContext').textContent = `Nenhuma das ${symbols.length} moedas passou na validação fora da amostra. Aumente as velas (300+) ou reduza a seleção.`;
+        document.getElementById('iaList').innerHTML = '';
+        btn.disabled = false; btn.textContent = '🤖 IA: otimizar parâmetros'; return;
+    }
+    document.getElementById('iaContext').textContent =
+        `${comOk.length}/${symbols.length} moedas afinadas — o Scanner (🔎) já usa esses parâmetros. Melhor: ${comOk[0].label} (${(comOk[0].porTf[0].val.wr * 100).toFixed(0)}% val, edge ${edgeTxtIA(comOk[0].porTf[0].edge)}). Clique numa moeda para abri-la já otimizada.`;
+    const rows = comOk.map((r, i) => {
+        const b = r.porTf[0];
+        const vwr = (b.val.wr * 100).toFixed(0), twr = (b.treino.wr * 100).toFixed(0);
+        const cls = b.edge >= 0.05 ? 'chip-dir-up' : b.edge >= 0 ? '' : 'chip-dir-down';
+        const star = i === 0 ? '<span class="scan-tuned">✦</span> ' : '';
+        return `<div class="reg-row ia-row" data-sym="${r.symbol}" data-tf="${b.tf}" data-exp="${b.exp}" data-ms="${b.ms}" data-sv="${b.sv}" data-sc="${b.sc}" data-lk="${b.lk}" data-cd="${b.cd}">` +
+            `<span class="reg-hora">${star}${r.label}</span>` +
+            `<span class="reg-par"><span class="${cls}">${vwr}% val · ${edgeTxtIA(b.edge)}</span> <span class="ia-params">(${twr}% treino · ${b.val.w}/${b.val.ops} ops · ${rotTf(b.tf)}·${b.exp}m)</span></span>` +
+            `<span class="ia-params">score≥${b.ms} · RSI ${b.sv}/${b.sc} · estrut ${b.lk} · cd ${b.cd}</span></div>`;
+    });
+    if (semOk.length) rows.push(`<div class="reg-row"><span class="ia-params" style="opacity:.7">Sem edge válido: ${semOk.map(r => r.label).join(', ')}</span></div>`);
+    document.getElementById('iaList').innerHTML = rows.join('');
+    document.getElementById('iaList').querySelectorAll('.ia-row').forEach(row => row.addEventListener('click', () => {
+        const d = row.dataset;
+        el('confMode').value = 'score';
+        el('minScore').value = d.ms; el('rsiSobrevenda').value = d.sv; el('rsiSobrecompra').value = d.sc;
+        el('estruturaLookback').value = d.lk; el('cooldownVelas').value = d.cd; el('expiracao').value = d.exp;
+        el('timeframe').value = d.tf;
+        el('fonte').value = PARES_YAHOO[d.sym] ? (ehForex() ? fonte() : 'twelvedata') : 'binance';
+        el('symbol').value = d.sym;
+        row.parentElement.querySelectorAll('.ia-row').forEach(x => x.classList.remove('ia-sel'));
+        row.classList.add('ia-sel');
+        montarWidgetTV(); carregar();
+    }));
+    btn.disabled = false; btn.textContent = '🤖 IA: otimizar parâmetros';
+}
+
+// Visão detalhada de UMA moeda (comportamento clássico: melhor combo por timeframe).
+function renderIAUmPar(resultado, isSim, el) {
+    const symbol = resultado.symbol;
+    const porTf = resultado.porTf;
+    const par = PARES_YAHOO[symbol] ? PARES_YAHOO[symbol].label : symbol;
     if (!porTf.length) {
         document.getElementById('iaContext').textContent = `Nenhuma combinação passou na validação fora da amostra para ${par}. Carregue mais velas (300+) ou troque o par.`;
         document.getElementById('iaList').innerHTML = '';
-        btn.disabled = false; btn.textContent = '🤖 IA: otimizar parâmetros';
         return;
     }
-
-    // memoriza o melhor TF/combo deste par para o scanner
     const rec = porTf[0];
-    iaCache[symbol] = { tf: rec.tf, exp: rec.exp, ms: rec.ms, sv: rec.sv, sc: rec.sc, lk: rec.lk, cd: rec.cd, wr: rec.val.wr };
-    localStorage.setItem('iaCache', JSON.stringify(iaCache));
-
-    const edgeTxt = e => (e >= 0 ? '+' : '') + (e * 100).toFixed(1) + ' pp';
     document.getElementById('iaContext').textContent =
-        `${par}: melhor setup é ${rotTf(rec.tf)} com expiração ${rec.exp}m — ${(rec.val.wr * 100).toFixed(0)}% fora da amostra (edge líquido ${edgeTxt(rec.edge)} vs break-even). Clique para aplicar.`;
+        `${par}: melhor setup é ${rotTf(rec.tf)} com expiração ${rec.exp}m — ${(rec.val.wr * 100).toFixed(0)}% fora da amostra (edge líquido ${edgeTxtIA(rec.edge)} vs break-even). Clique para aplicar.`;
     document.getElementById('iaList').innerHTML = porTf.map((r, i) => {
         const vwr = (r.val.wr * 100).toFixed(0), twr = (r.treino.wr * 100).toFixed(0);
         const cls = r.edge >= 0.05 ? 'chip-dir-up' : r.edge >= 0 ? '' : 'chip-dir-down';
         const star = i === 0 ? '<span class="scan-tuned">✦</span> ' : '';
         return `<div class="reg-row ia-row" data-i="${i}">` +
             `<span class="reg-hora">${star}${rotTf(r.tf)}·${r.exp}m</span>` +
-            `<span class="reg-par"><span class="${cls}">${vwr}% val · ${edgeTxt(r.edge)}</span> <span class="ia-params">(${twr}% treino · ${r.val.w}/${r.val.ops} ops)</span></span>` +
+            `<span class="reg-par"><span class="${cls}">${vwr}% val · ${edgeTxtIA(r.edge)}</span> <span class="ia-params">(${twr}% treino · ${r.val.w}/${r.val.ops} ops)</span></span>` +
             `<span class="ia-params">score≥${r.ms} · RSI ${r.sv}/${r.sc} · estrut ${r.lk} · cd ${r.cd}</span></div>`;
     }).join('');
     document.getElementById('iaList').querySelectorAll('.ia-row').forEach(row => row.addEventListener('click', () => {
@@ -2449,7 +2523,6 @@ async function otimizarIA() {
         if (!isSim && String(r.tf) !== String(tfMinutes())) { el('timeframe').value = r.tf; carregar(); }
         else recalcularSinaisApenas();
     }));
-    btn.disabled = false; btn.textContent = '🤖 IA: otimizar parâmetros';
 }
 
 function rotTf(m) { return m === 60 ? 'H1' : 'M' + m; }
