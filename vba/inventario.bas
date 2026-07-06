@@ -265,7 +265,6 @@ Public Sub GerarInventario()
     wb.Worksheets("ALERTA PEPS SEM UC").Delete
     wb.Worksheets("ALERTA CRITICO").Delete
     wb.Worksheets("SUBSTITUICOES").Delete
-    wb.Worksheets("PRECO UNITARIO").Delete
     wb.Worksheets("RANKING DE RISCO").Delete
     wb.Worksheets("AUDITORIA CLASSIF").Delete
     wb.Worksheets("TENDENCIA").Delete
@@ -276,9 +275,6 @@ Public Sub GerarInventario()
     wsDet.Name = "ANALISE SAP x PRJ"
     Set wsCom = wb.Worksheets.Add(After:=wb.Worksheets(wb.Worksheets.Count))
     wsCom.Name = "RACIONALIZACAO COM"
-    Dim wsPU As Worksheet
-    Set wsPU = wb.Worksheets.Add(After:=wb.Worksheets(wb.Worksheets.Count))
-    wsPU.Name = "PRECO UNITARIO"
     Set wsAlertaC = wb.Worksheets.Add(After:=wb.Worksheets(wb.Worksheets.Count))
     wsAlertaC.Name = "ALERTA CRITICO"
 
@@ -299,16 +295,12 @@ Public Sub GerarInventario()
     Call ProcessarCOMInventario(wsBase, wsCom)
     FimEtapa Err.Number, Err.Description, mStep, tt : On Error GoTo ErrHandler
 
-    mStep = "PRECO UNITARIO" : tt = Timer : On Error Resume Next : Err.Clear
-    Call ProcessarPrecoUnitario(wsBase, wsPU)
-    FimEtapa Err.Number, Err.Description, mStep, tt : On Error GoTo ErrHandler
-
     mStep = "ALERTA CRITICO" : tt = Timer : On Error Resume Next : Err.Clear
     Call ProcessarAlertaCritico(wsBase, wsAlertaC)
     FimEtapa Err.Number, Err.Description, mStep, tt : On Error GoTo ErrHandler
 
     mStep = "RANKING DE RISCO" : tt = Timer : On Error Resume Next : Err.Clear
-    Call ProcessarRankingRisco(wb, wsDet, wsCom, wsPU, wsAlertaC)
+    Call ProcessarRankingRisco(wb, wsDet, wsCom, wsAlertaC)
     FimEtapa Err.Number, Err.Description, mStep, tt : On Error GoTo ErrHandler
 
     mStep = "AUDITORIA CLASSIF" : tt = Timer : On Error Resume Next : Err.Clear
@@ -316,7 +308,7 @@ Public Sub GerarInventario()
     FimEtapa Err.Number, Err.Description, mStep, tt : On Error GoTo ErrHandler
 
     mStep = "PAINEL DO GESTOR" : tt = Timer : On Error Resume Next : Err.Clear
-    Set wsGestor = ProcessarPainelGestor(wb, wsBase, wsDet, wsPU, wsAlertaC)
+    Set wsGestor = ProcessarPainelGestor(wb, wsBase, wsDet, wsAlertaC)
     FimEtapa Err.Number, Err.Description, mStep, tt : On Error GoTo ErrHandler
 
     mStep = "DESIGN GLOBAL" : tt = Timer : On Error Resume Next : Err.Clear
@@ -353,7 +345,6 @@ Public Sub GerarInventario()
            "  - ANALISE SAP x PRJ" & vbCrLf & _
            "  - RESUMO SAP x PRJ (1 linha por obra)" & vbCrLf & _
            "  - RACIONALIZACAO COM (NT.006)" & vbCrLf & _
-           "  - PRECO UNITARIO (faixa MIN/MAX)" & vbCrLf & _
            "  - ALERTA CRITICO" & vbCrLf & _
            "  - RANKING DE RISCO (score por obra)" & vbCrLf & _
            "  - AUDITORIA CLASSIF (qualidade da classificacao + confianca)" & vbCrLf & _
@@ -1844,37 +1835,6 @@ ProxLinha2:
         End If
     Next kLac
 
-    ' --- Importa discrepancias de PRECO UNITARIO ---
-    Dim wsPU As Worksheet
-    On Error Resume Next
-    Set wsPU = ws.Parent.Worksheets("PRECO UNITARIO")
-    On Error GoTo 0
-    If Not wsPU Is Nothing Then
-        Dim lastRowP As Long : lastRowP = wsPU.Cells(wsPU.Rows.Count, 1).End(xlUp).Row
-        If lastRowP >= 2 Then
-            ' 1 PEP3|2 PEP4|3 TIPO|4 COD|5 DESC|6 UND|7 QTD|8 VALOR|9 PU|10 MIN|11 MAX|12 STATUS|13 OBS
-            Dim pD As Variant : pD = wsPU.Range(wsPU.Cells(2, 1), wsPU.Cells(lastRowP, 13)).Value
-            Dim rp As Long, stP As String
-            For rp = 1 To UBound(pD, 1)
-                stP = Trim(CStr(pD(rp, 12)))
-                If stP = "ABAIXO DO MINIMO" Or stP = "ACIMA DO MAXIMO" Then
-                    ws.Cells(outRow, 1).Value = IIf(stP = "ABAIXO DO MINIMO", "PU ABAIXO MIN", "PU ACIMA MAX")
-                    ws.Cells(outRow, 2).Value = pD(rp, 1)   ' PEP3
-                    ws.Cells(outRow, 3).Value = pD(rp, 2)   ' PEP4
-                    ws.Cells(outRow, 4).Value = pD(rp, 4)   ' COD
-                    ws.Cells(outRow, 5).Value = pD(rp, 5)   ' DESC
-                    ws.Cells(outRow, 6).Value = pD(rp, 3)   ' TIPO (na col familia)
-                    ws.Cells(outRow, 7).Value = pD(rp, 8)   ' VALOR
-                    ws.Cells(outRow, 8).Value = pD(rp, 7)   ' QTD
-                    ws.Cells(outRow, 9).Value = pD(rp, 9)   ' PU
-                    ws.Cells(outRow, 10).Value = IIf(stP = "ABAIXO DO MINIMO", pD(rp, 10), pD(rp, 11)) ' ref
-                    ws.Cells(outRow, 11).Value = pD(rp, 13) ' MOTIVO (obs)
-                    outRow = outRow + 1
-                End If
-            Next rp
-        End If
-    End If
-
     ' --- PU ANOMALO (ESTATISTICO): materiais SEM faixa de referencia com 5+
     ' lancamentos; flag PU fora de [Q1-1,5*IQR ; Q3+1,5*IQR] (deteccao de
     ' anomalia robusta a outliers), com materialidade minima da CONFIG ---
@@ -2205,206 +2165,21 @@ Private Function CarregarFaixaPrecos(wb As Workbook) As Object
     Set CarregarFaixaPrecos = fx
 End Function
 
-' ===========================================================================
-'  ABA PRECO UNITARIO: PU = VALOR/QTD x faixa MIN/MAX (BASE PRECOS)
-' ===========================================================================
-Private Sub ProcessarPrecoUnitario(wsBase As Worksheet, ws As Worksheet)
-
-    Dim fx As Object : Set fx = CarregarFaixaPrecos(wsBase.Parent)
-
-    Dim lastC As Long : lastC = wsBase.Cells(1, wsBase.Columns.Count).End(xlToLeft).Column
-    Dim iPep3 As Long, iPep4 As Long, iCod As Long, iDesc As Long
-    Dim iFam As Long, iTipo As Long, iVal As Long, iQtd As Long, iUml As Long
-    Dim iTipoPep As Long
-    Dim c As Long, h As String
-    For c = 1 To lastC
-        h = NormStr(CStr(wsBase.Cells(1, c).Value))
-        Select Case h
-            Case "PEP3NIVEL":   iPep3 = c
-            Case "PEP4NIVEL":   iPep4 = c
-            Case "COD MAT":     iCod = c
-            Case "DESC MAT":    iDesc = c
-            Case "FAMILIA":     iFam = c
-            Case "TIPO":        iTipo = c
-            Case "VALOR":       iVal = c
-            Case "MAT LIB SAP": iQtd = c
-            Case "UND":         iUml = c
-            Case "TIPO PEP":    iTipoPep = c
-        End Select
-    Next c
-
-    ' Cabecalho
-    Dim hdrs As Variant
-    hdrs = Array("PEP3NIVEL", "PEP4NIVEL", "TIPO", "COD MAT", "DESC MAT", "UND", _
-                 "QTD", "VALOR", "PU (VALOR/QTD)", "MIN PU", "MAX PU", "STATUS", "OBSERVACAO", "TIPO OD")
-    For c = 1 To 14
-        With ws.Cells(1, c)
-            .Value = hdrs(c - 1)
-            .Font.Name = "Segoe UI Semibold" : .Font.Bold = True : .Font.Size = 10
-            .Font.Color = RGB(235, 240, 248) : .Interior.Color = RGB(17, 24, 39)
-            .HorizontalAlignment = xlCenter : .VerticalAlignment = xlCenter
-            .Borders.LineStyle = xlContinuous : .Borders.Color = RGB(60, 70, 90)
-        End With
-    Next c
-    ws.Rows(1).RowHeight = 28
-
-    Dim refCol As Long : refCol = iCod : If refCol = 0 Then refCol = 1
-    Dim lastR As Long : lastR = wsBase.Cells(wsBase.Rows.Count, refCol).End(xlUp).Row
-    Dim outRow As Long : outRow = 2
-    Dim nOut As Long : nOut = 0
-    Dim stArr() As String
-    If lastR >= 2 Then
-        Dim d As Variant : d = wsBase.Range(wsBase.Cells(2, 1), wsBase.Cells(lastR, lastC)).Value
-        ' Saida bufferizada: monta as linhas em array e escreve UMA vez no final
-        Dim outA() As Variant : ReDim outA(1 To UBound(d, 1), 1 To 14)
-        ReDim stArr(1 To UBound(d, 1))
-        Dim i As Long
-        For i = 1 To UBound(d, 1)
-            Dim cod As String : cod = "" : If iCod > 0 Then cod = NormCod(d(i, iCod))
-            Dim qtd As Double : qtd = 0 : If iQtd > 0 Then qtd = Val0(d(i, iQtd))
-            Dim vlrPU As Double : vlrPU = 0 : If iVal > 0 Then vlrPU = Val0(d(i, iVal))
-            If cod = "" Or qtd = 0 Or vlrPU = 0 Then GoTo Prox
-            Dim pu As Double : pu = vlrPU / qtd
-            Dim mn As Double : mn = 0 : Dim mx As Double : mx = 0
-            Dim temFx As Boolean : temFx = fx.Exists(cod)
-            Dim st As String, obs As String
-            If temFx Then
-                Dim p() As String : p = Split(CStr(fx(cod)), "|")
-                mn = Val0(p(0)) : mx = Val0(p(1))
-                If pu < mn Then
-                    st = "ABAIXO DO MINIMO"
-                    obs = "PU " & Format(pu, "#,##0.00") & " < min " & Format(mn, "#,##0.00")
-                ElseIf pu > mx Then
-                    st = "ACIMA DO MAXIMO"
-                    obs = "PU " & Format(pu, "#,##0.00") & " > max " & Format(mx, "#,##0.00")
-                Else
-                    st = "DENTRO"
-                    obs = "Dentro da faixa (" & Format(mn, "#,##0.00") & " a " & Format(mx, "#,##0.00") & ")"
-                End If
-            Else
-                st = "SEM REFERENCIA"
-                obs = "Material sem faixa na BASE PRECOS"
-            End If
-
-            nOut = nOut + 1
-            outA(nOut, 1) = IIf(iPep3 > 0, d(i, iPep3), "")
-            outA(nOut, 2) = IIf(iPep4 > 0, d(i, iPep4), "")
-            outA(nOut, 3) = IIf(iTipo > 0, d(i, iTipo), "")
-            outA(nOut, 4) = cod
-            outA(nOut, 5) = IIf(iDesc > 0, d(i, iDesc), "")
-            outA(nOut, 6) = IIf(iUml > 0, d(i, iUml), "")
-            outA(nOut, 7) = qtd
-            outA(nOut, 8) = vlrPU
-            outA(nOut, 9) = pu
-            outA(nOut, 10) = IIf(temFx, mn, "")
-            outA(nOut, 11) = IIf(temFx, mx, "")
-            ' CORRECAO: STATUS vai na coluna 12 (antes era escrito na 11 por cima
-            ' do MAX PU, deixando a coluna STATUS vazia - o que quebrava as cores
-            ' da aba, a importacao de alertas de PU, o ranking e o painel)
-            outA(nOut, 12) = st
-            outA(nOut, 13) = obs
-            stArr(nOut) = st
-
-            ' TIPO OD: classifica o PEP pelo sufixo do PEP4 (.I/.M/.S/.D) ou pela coluna TIPO PEP
-            Dim pep4OD As String : pep4OD = "" : If iPep4 > 0 Then pep4OD = UCase(Trim(CStr(d(i, iPep4))))
-            Dim tpRaw As String : tpRaw = "" : If iTipoPep > 0 Then tpRaw = UCase(Trim(CStr(d(i, iTipoPep))))
-            Dim tipoOD As String
-            If Right(pep4OD, 2) = ".I" Then
-                tipoOD = "ODI"
-            ElseIf Right(pep4OD, 2) = ".M" Then
-                tipoOD = "ODM"
-            ElseIf Right(pep4OD, 2) = ".S" Then
-                tipoOD = "ODS"
-            ElseIf Right(pep4OD, 2) = ".D" Then
-                tipoOD = "ODD"
-            ElseIf tpRaw = "I" Then
-                tipoOD = "ODI"
-            ElseIf tpRaw = "M" Then
-                tipoOD = "ODM"
-            ElseIf tpRaw = "S" Then
-                tipoOD = "ODS"
-            ElseIf tpRaw = "D" Then
-                tipoOD = "ODD"
-            Else
-                tipoOD = "-"
-            End If
-            outA(nOut, 14) = tipoOD
-Prox:
-        Next i
-        If nOut > 0 Then ws.Range(ws.Cells(2, 1), ws.Cells(1 + nOut, 14)).Value = outA
-    End If
-    outRow = 2 + nOut
-
-    ' Formatacao
-    Dim wds As Variant : wds = Array(24, 26, 8, 13, 46, 6, 10, 12, 14, 11, 11, 18, 40, 9)
-    For c = 1 To 14 : ws.Columns(c).ColumnWidth = wds(c - 1) : Next c
-
-    ' Formatacao das linhas em LOTE: base numa chamada so; cores por BLOCOS de
-    ' linhas consecutivas com o mesmo status, lendo do array (sem reler celulas)
-    If nOut > 0 Then
-        With ws.Range(ws.Cells(2, 1), ws.Cells(1 + nOut, 14))
-            .Font.Name = "Segoe UI" : .Font.Size = 9 : .Font.Color = RGB(45, 52, 64)
-            .VerticalAlignment = xlCenter
-            .Borders(xlInsideHorizontal).LineStyle = xlContinuous
-            .Borders(xlInsideHorizontal).Color = RGB(255, 255, 255)
-            .Borders(xlEdgeBottom).LineStyle = xlContinuous
-            .Borders(xlEdgeBottom).Color = RGB(255, 255, 255)
-        End With
-        ws.Range(ws.Cells(2, 7), ws.Cells(1 + nOut, 11)).NumberFormat = "#,##0.00"
-        With ws.Range(ws.Cells(2, 14), ws.Cells(1 + nOut, 14))
-            .Font.Bold = True : .HorizontalAlignment = xlCenter : .Font.Color = RGB(31, 41, 59)
-        End With
-
-        Dim rr As Long, rIni As Long, stB As String, bg As Long, chip As Long
-        rr = 1
-        Do While rr <= nOut
-            stB = stArr(rr) : rIni = rr
-            Do While rr < nOut
-                If stArr(rr + 1) <> stB Then Exit Do
-                rr = rr + 1
-            Loop
-            Select Case stB
-                Case "DENTRO":           bg = RGB(231, 244, 234) : chip = RGB(33, 130, 70)
-                Case "ABAIXO DO MINIMO": bg = RGB(255, 244, 214) : chip = RGB(176, 124, 0)
-                Case "ACIMA DO MAXIMO":  bg = RGB(252, 226, 228) : chip = RGB(192, 0, 0)
-                Case Else:               bg = RGB(238, 238, 238) : chip = RGB(110, 110, 110)
-            End Select
-            ws.Range(ws.Cells(1 + rIni, 1), ws.Cells(1 + rr, 14)).Interior.Color = bg
-            With ws.Range(ws.Cells(1 + rIni, 12), ws.Cells(1 + rr, 12))
-                .Interior.Color = chip : .Font.Color = RGB(255, 255, 255) : .Font.Bold = True
-                .HorizontalAlignment = xlCenter
-            End With
-            rr = rr + 1
-        Loop
-    End If
-
-    If outRow > 2 Then ws.Range("A1:N1").AutoFilter
-    On Error Resume Next
-    ws.Activate
-    ActiveWindow.DisplayGridlines = False
-    ws.Range("A2").Select
-    ActiveWindow.FreezePanes = True
-    On Error GoTo 0
-    ws.Range("A1").Select
-End Sub
-
 
 ' ===========================================================================
 '  RANKING DE RISCO POR OBRA (PEP3)
 '  Consolida TODOS os sinais de auditoria ja gerados (reprovacao SAP x PRJ,
-'  alertas criticos, divergencias de preco unitario e racionalizacao NT.006)
-'  num SCORE 0-100 por obra, ordenado do maior risco para o menor.
+'  alertas criticos e racionalizacao NT.006) num SCORE 0-100 por obra,
+'  ordenado do maior risco para o menor.
 '  Responde a pergunta do auditor: "qual obra eu olho primeiro?"
 ' ===========================================================================
 Private Sub ProcessarRankingRisco(wb As Workbook, wsDet As Worksheet, _
-        wsCom As Worksheet, wsPU As Worksheet, wsAlertaC As Worksheet)
+        wsCom As Worksheet, wsAlertaC As Worksheet)
 
     ' Pesos do score (ajustaveis na aba CONFIG; soma maxima = 100)
     Dim PESO_REPROV As Double : PESO_REPROV = CfgD("PESO_REPROV", 40)  ' obra reprovada
     Dim PESO_ALERTA As Double : PESO_ALERTA = CfgD("PESO_ALERTA", 4)   ' por alerta critico
     Dim CAP_ALERTA As Double : CAP_ALERTA = CfgD("CAP_ALERTA", 24)     ' teto alertas
-    Dim PESO_PU As Double : PESO_PU = CfgD("PESO_PU", 3)               ' por diverg. de PU
-    Dim CAP_PU As Double : CAP_PU = CfgD("CAP_PU", 18)                 ' teto PU
     Dim PESO_COM As Double : PESO_COM = CfgD("PESO_COM", 2)            ' por COM fora NT.006
     Dim CAP_COM As Double : CAP_COM = CfgD("CAP_COM", 18)             ' teto COM
 
@@ -2416,8 +2191,6 @@ Private Sub ProcessarRankingRisco(wb As Workbook, wsDet As Worksheet, _
     Dim valOb As Object : Set valOb = CreateObject("Scripting.Dictionary")  ' valor total
     Dim repOb As Object : Set repOb = CreateObject("Scripting.Dictionary")  ' reprovado?
     Dim alOb  As Object : Set alOb  = CreateObject("Scripting.Dictionary")  ' n alertas
-    Dim puOb  As Object : Set puOb  = CreateObject("Scripting.Dictionary")  ' n diverg PU
-    Dim sobOb As Object : Set sobOb = CreateObject("Scripting.Dictionary")  ' sobrepreco R$
     Dim comOb As Object : Set comOb = CreateObject("Scripting.Dictionary")  ' n COM fora
 
     Dim r As Long, p3 As String
@@ -2446,29 +2219,6 @@ Private Sub ProcessarRankingRisco(wb As Workbook, wsDet As Worksheet, _
             If p3 <> "" Then
                 If alOb.Exists(p3) Then alOb(p3) = alOb(p3) + 1 Else alOb.Add p3, 1
                 If Not valOb.Exists(p3) Then valOb.Add p3, 0#
-            End If
-        Next r
-    End If
-
-    ' 3) PRECO UNITARIO (linha 2+): diverg + sobrepreco potencial
-    Dim lastP As Long : lastP = wsPU.Cells(wsPU.Rows.Count, 1).End(xlUp).Row
-    If lastP >= 2 Then
-        Dim pp As Variant : pp = wsPU.Range(wsPU.Cells(2, 1), wsPU.Cells(lastP, 13)).Value
-        For r = 1 To UBound(pp, 1)
-            p3 = Trim(CStr(pp(r, 1)))
-            Dim stP As String : stP = UCase(Trim(CStr(pp(r, 12))))
-            If p3 <> "" And (stP = "ABAIXO DO MINIMO" Or stP = "ACIMA DO MAXIMO") Then
-                If puOb.Exists(p3) Then puOb(p3) = puOb(p3) + 1 Else puOb.Add p3, 1
-                If Not valOb.Exists(p3) Then valOb.Add p3, 0#
-                If stP = "ACIMA DO MAXIMO" Then
-                    Dim qq As Double : qq = Val0(pp(r, 7))
-                    Dim puu As Double : puu = Val0(pp(r, 9))
-                    Dim mxx As Double : mxx = Val0(pp(r, 11))
-                    If puu > mxx And qq > 0 Then
-                        If Not sobOb.Exists(p3) Then sobOb.Add p3, 0#
-                        sobOb(p3) = sobOb(p3) + (puu - mxx) * qq
-                    End If
-                End If
             End If
         Next r
     End If
@@ -2503,13 +2253,10 @@ Private Sub ProcessarRankingRisco(wb As Workbook, wsDet As Worksheet, _
             Dim pAl As Double : pAl = 0
             If alOb.Exists(k) Then pAl = alOb(k) * PESO_ALERTA
             If pAl > CAP_ALERTA Then pAl = CAP_ALERTA
-            Dim pPu As Double : pPu = 0
-            If puOb.Exists(k) Then pPu = puOb(k) * PESO_PU
-            If pPu > CAP_PU Then pPu = CAP_PU
             Dim pCo As Double : pCo = 0
             If comOb.Exists(k) Then pCo = comOb(k) * PESO_COM
             If pCo > CAP_COM Then pCo = CAP_COM
-            s = s + pAl + pPu + pCo
+            s = s + pAl + pCo
             If s > 100 Then s = 100
             ks(ix) = CStr(k) : sc(ix) = s : ix = ix + 1
         Next k
@@ -2533,7 +2280,7 @@ Private Sub ProcessarRankingRisco(wb As Workbook, wsDet As Worksheet, _
     End If
 
     ' ---------------- saida ----------------
-    With ws.Range("A1:K2")
+    With ws.Range("A1:I2")
         .Merge
         .Value = "RANKING DE RISCO POR OBRA  -  por onde comecar a auditoria"
         .Font.Name = "Segoe UI Semibold" : .Font.Size = 16 : .Font.Bold = True
@@ -2544,9 +2291,9 @@ Private Sub ProcessarRankingRisco(wb As Workbook, wsDet As Worksheet, _
 
     Dim hdrs As Variant
     hdrs = Array("#", "PEP3NIVEL", "VALOR OBRA", "SITUACAO", "ALERTAS", _
-                 "DIVERG PRECO", "SOBREPRECO R$", "COM FORA NT.006", "SCORE", "RISCO", "DIAGNOSTICO")
+                 "COM FORA NT.006", "SCORE", "RISCO", "DIAGNOSTICO")
     Dim c As Long
-    For c = 1 To 11
+    For c = 1 To 9
         With ws.Cells(3, c)
             .Value = hdrs(c - 1)
             .Font.Name = "Segoe UI Semibold" : .Font.Bold = True : .Font.Size = 10
@@ -2563,14 +2310,12 @@ Private Sub ProcessarRankingRisco(wb As Workbook, wsDet As Worksheet, _
         ws.Cells(4, 1).Font.Italic = True
     Else
         ' Saida bufferizada: monta as linhas em array e escreve UMA vez
-        Dim outA() As Variant : ReDim outA(1 To nOb, 1 To 11)
+        Dim outA() As Variant : ReDim outA(1 To nOb, 1 To 9)
         Dim rkArr() As String : ReDim rkArr(1 To nOb)
         For ix = 0 To nOb - 1
             p3 = ks(ix)
             Dim nAl As Long : nAl = 0 : If alOb.Exists(p3) Then nAl = alOb(p3)
-            Dim nPu As Long : nPu = 0 : If puOb.Exists(p3) Then nPu = puOb(p3)
             Dim nCo As Long : nCo = 0 : If comOb.Exists(p3) Then nCo = comOb(p3)
-            Dim vSo As Double : vSo = 0 : If sobOb.Exists(p3) Then vSo = sobOb(p3)
             Dim ehRep As Boolean : ehRep = False
             If repOb.Exists(p3) Then ehRep = CBool(repOb(p3))
 
@@ -2589,10 +2334,6 @@ Private Sub ProcessarRankingRisco(wb As Workbook, wsDet As Worksheet, _
             Dim diag As String : diag = ""
             If ehRep Then diag = "REPROVADO na analise SAP x PRJ"
             If nAl > 0 Then diag = diag & IIf(diag <> "", " | ", "") & nAl & " alerta(s) critico(s)"
-            If nPu > 0 Then
-                diag = diag & IIf(diag <> "", " | ", "") & nPu & " diverg. de preco"
-                If vSo > 0 Then diag = diag & " (sobrepreco " & FmtKPI(vSo) & ")"
-            End If
             If nCo > 0 Then diag = diag & IIf(diag <> "", " | ", "") & nCo & " COM fora do previsto"
             If diag = "" Then diag = "Sem apontamentos"
 
@@ -2601,27 +2342,25 @@ Private Sub ProcessarRankingRisco(wb As Workbook, wsDet As Worksheet, _
             outA(ix + 1, 3) = valOb(p3)
             outA(ix + 1, 4) = IIf(ehRep, "REPROVADO", "APROVADO")
             outA(ix + 1, 5) = nAl
-            outA(ix + 1, 6) = nPu
-            outA(ix + 1, 7) = vSo
-            outA(ix + 1, 8) = nCo
-            outA(ix + 1, 9) = sc(ix)
-            outA(ix + 1, 10) = risco
-            outA(ix + 1, 11) = diag
+            outA(ix + 1, 6) = nCo
+            outA(ix + 1, 7) = sc(ix)
+            outA(ix + 1, 8) = risco
+            outA(ix + 1, 9) = diag
             rkArr(ix + 1) = risco
             outRow = outRow + 1
         Next ix
         ' escreve tudo de uma vez
-        ws.Range(ws.Cells(4, 1), ws.Cells(3 + nOb, 11)).Value = outA
+        ws.Range(ws.Cells(4, 1), ws.Cells(3 + nOb, 9)).Value = outA
     End If
 
     ' ---------------- formatacao ----------------
-    Dim wds As Variant : wds = Array(5, 26, 14, 13, 9, 13, 14, 15, 8, 9, 70)
-    For c = 1 To 11 : ws.Columns(c).ColumnWidth = wds(c - 1) : Next c
+    Dim wds As Variant : wds = Array(5, 26, 14, 13, 9, 15, 8, 9, 70)
+    For c = 1 To 9 : ws.Columns(c).ColumnWidth = wds(c - 1) : Next c
 
     ' Formatacao em LOTE: base numa chamada so; cores por BLOCOS de risco
     ' (a lista ja vem ordenada por score, entao os niveis formam blocos contiguos)
     If nOb > 0 Then
-        With ws.Range(ws.Cells(4, 1), ws.Cells(3 + nOb, 11))
+        With ws.Range(ws.Cells(4, 1), ws.Cells(3 + nOb, 9))
             .Font.Name = "Segoe UI" : .Font.Size = 9 : .Font.Color = RGB(45, 52, 64)
             .VerticalAlignment = xlCenter
             .Borders(xlInsideHorizontal).LineStyle = xlContinuous
@@ -2630,11 +2369,10 @@ Private Sub ProcessarRankingRisco(wb As Workbook, wsDet As Worksheet, _
             .Borders(xlEdgeBottom).Color = RGB(255, 255, 255)
         End With
         ws.Range(ws.Cells(4, 1), ws.Cells(3 + nOb, 1)).HorizontalAlignment = xlCenter
-        ws.Range(ws.Cells(4, 4), ws.Cells(3 + nOb, 6)).HorizontalAlignment = xlCenter
-        ws.Range(ws.Cells(4, 8), ws.Cells(3 + nOb, 10)).HorizontalAlignment = xlCenter
-        ws.Range(ws.Cells(4, 9), ws.Cells(3 + nOb, 9)).Font.Bold = True
+        ws.Range(ws.Cells(4, 4), ws.Cells(3 + nOb, 5)).HorizontalAlignment = xlCenter
+        ws.Range(ws.Cells(4, 6), ws.Cells(3 + nOb, 8)).HorizontalAlignment = xlCenter
+        ws.Range(ws.Cells(4, 7), ws.Cells(3 + nOb, 7)).Font.Bold = True
         ws.Range(ws.Cells(4, 3), ws.Cells(3 + nOb, 3)).NumberFormat = "#,##0.00"
-        ws.Range(ws.Cells(4, 7), ws.Cells(3 + nOb, 7)).NumberFormat = "#,##0.00"
 
         Dim rr As Long, rIni As Long, rsk As String, bg As Long, chip As Long
         rr = 1
@@ -2650,11 +2388,11 @@ Private Sub ProcessarRankingRisco(wb As Workbook, wsDet As Worksheet, _
                 Case "BAIXO": bg = RGB(234, 242, 250) : chip = RGB(31, 78, 121)
                 Case Else:    bg = RGB(231, 244, 234) : chip = RGB(33, 130, 70)
             End Select
-            ws.Range(ws.Cells(3 + rIni, 1), ws.Cells(3 + rr, 11)).Interior.Color = bg
-            With ws.Range(ws.Cells(3 + rIni, 10), ws.Cells(3 + rr, 10))
+            ws.Range(ws.Cells(3 + rIni, 1), ws.Cells(3 + rr, 9)).Interior.Color = bg
+            With ws.Range(ws.Cells(3 + rIni, 8), ws.Cells(3 + rr, 8))
                 .Interior.Color = chip : .Font.Color = RGB(255, 255, 255) : .Font.Bold = True
             End With
-            ws.Range(ws.Cells(3 + rIni, 9), ws.Cells(3 + rr, 9)).Font.Color = chip
+            ws.Range(ws.Cells(3 + rIni, 7), ws.Cells(3 + rr, 7)).Font.Color = chip
             rr = rr + 1
         Loop
 
@@ -2668,7 +2406,7 @@ Private Sub ProcessarRankingRisco(wb As Workbook, wsDet As Worksheet, _
         Next rr
     End If
 
-    If outRow > 4 Then ws.Range(ws.Cells(3, 1), ws.Cells(3, 11)).AutoFilter
+    If outRow > 4 Then ws.Range(ws.Cells(3, 1), ws.Cells(3, 9)).AutoFilter
 
     On Error Resume Next
     ws.Activate
@@ -2686,15 +2424,13 @@ End Sub
 '    1. Cor da guia (Tab) por aba - paleta propria de cada relatorio
 '    2. Barra de navegacao clicavel no topo de TODAS as abas
 '    3. Contadores dinamicos nos titulos (apontamentos, obras, divergencias)
-'    4. PRECO UNITARIO ganha banda de titulo (nao tinha)
-'    5. Drill-down: cards do PAINEL viram atalhos para a aba de origem
+'    4. Drill-down: cards do PAINEL viram atalhos para a aba de origem
 ' ===========================================================================
 Private Function CorAcento(nome As String) As Long
     Select Case nome
         Case "PAINEL DO GESTOR":   CorAcento = RGB(17, 24, 39)     ' navy
         Case "ANALISE SAP x PRJ":  CorAcento = RGB(31, 78, 121)    ' azul
         Case "RACIONALIZACAO COM": CorAcento = RGB(94, 84, 158)    ' indigo
-        Case "PRECO UNITARIO":     CorAcento = RGB(21, 96, 130)    ' petroleo
         Case "ALERTA CRITICO":     CorAcento = RGB(176, 0, 0)      ' vermelho
         Case "RANKING DE RISCO":   CorAcento = RGB(176, 124, 0)    ' ambar
         Case Else:                 CorAcento = RGB(90, 98, 110)
@@ -2799,49 +2535,12 @@ End Sub
 Private Sub AplicarDesignGlobal(wb As Workbook)
     Dim nomes As Variant, rots As Variant
     nomes = Array("PAINEL DO GESTOR", "ANALISE SAP x PRJ", "RACIONALIZACAO COM", _
-                  "PRECO UNITARIO", "ALERTA CRITICO", "RANKING DE RISCO")
-    rots = Array("PAINEL", "ANALISE", "RACIONALIZACAO", "PRECOS", "ALERTAS", "RANKING")
+                  "ALERTA CRITICO", "RANKING DE RISCO")
+    rots = Array("PAINEL", "ANALISE", "RACIONALIZACAO", "ALERTAS", "RANKING")
 
     Dim ws As Worksheet, r As Long, i As Long, j As Long
 
-    ' ---- 1) PRECO UNITARIO ganha banda de titulo com contadores ----
-    Set ws = Nothing
-    On Error Resume Next
-    Set ws = wb.Worksheets("PRECO UNITARIO")
-    On Error GoTo 0
-    If Not ws Is Nothing Then
-        ws.Activate
-        On Error Resume Next
-        ActiveWindow.FreezePanes = False
-        On Error GoTo 0
-        ws.Rows("1:2").Insert
-        Dim lastP As Long : lastP = ws.Cells(ws.Rows.Count, 1).End(xlUp).Row
-        Dim nIt As Long, nDv As Long
-        If lastP >= 4 Then
-            Dim dP As Variant : dP = ws.Range(ws.Cells(4, 1), ws.Cells(lastP, 12)).Value
-            For r = 1 To UBound(dP, 1)
-                nIt = nIt + 1
-                Dim stP As String : stP = UCase(Trim(CStr(dP(r, 12))))
-                If stP = "ABAIXO DO MINIMO" Or stP = "ACIMA DO MAXIMO" Then nDv = nDv + 1
-            Next r
-        End If
-        With ws.Range("A1:N2")
-            .Merge
-            .Value = "PRECO UNITARIO  -  " & Format(nIt, "#,##0") & " itens  |  " & _
-                     Format(nDv, "#,##0") & " divergencia(s) de faixa"
-            .Font.Name = "Segoe UI Semibold" : .Font.Size = 13 : .Font.Bold = True
-            .Font.Color = RGB(235, 240, 248) : .Interior.Color = RGB(17, 24, 39)
-            .HorizontalAlignment = xlCenter : .VerticalAlignment = xlCenter
-        End With
-        ws.Rows(1).RowHeight = 20 : ws.Rows(2).RowHeight = 20
-        On Error Resume Next
-        ws.Range("A4").Select
-        ActiveWindow.FreezePanes = True
-        On Error GoTo 0
-        ws.Range("A1").Select
-    End If
-
-    ' ---- 2) contadores dinamicos nos titulos ----
+    ' ---- 1) contadores dinamicos nos titulos ----
     AppendContagem wb, "ALERTA CRITICO", 4, " apontamento(s)"
     AppendContagem wb, "RANKING DE RISCO", 4, " obra(s)"
 
@@ -2884,9 +2583,7 @@ Private Sub AplicarDesignGlobal(wb As Workbook)
         LinkCard ws, 4, 5, "ANALISE SAP x PRJ"    ' PEPs aprovados
         LinkCard ws, 4, 7, "ANALISE SAP x PRJ"    ' PEPs reprovados
         LinkCard ws, 8, 1, "ALERTA CRITICO"       ' Alertas criticos
-        LinkCard ws, 8, 3, "PRECO UNITARIO"       ' Divergencias de preco
-        LinkCard ws, 8, 5, "PRECO UNITARIO"       ' Sobrepreco potencial
-        LinkCard ws, 8, 7, "RANKING DE RISCO"     ' Valor em risco
+        LinkCard ws, 8, 3, "RANKING DE RISCO"     ' Valor em risco
     End If
 
     ' ---- 5) barra de navegacao no TOPO (linha 1) de cada aba ----
@@ -2902,7 +2599,7 @@ Private Sub AplicarDesignGlobal(wb As Workbook)
                 Case "PAINEL DO GESTOR":   congRow = 0    ' sem congelamento
                 Case "ANALISE SAP x PRJ":  congRow = 11   ' dados comecam na 11
                 Case "RACIONALIZACAO COM": congRow = 4
-                Case Else:                 congRow = 5    ' PRECOS, ALERTAS, RANKING
+                Case Else:                 congRow = 5    ' ALERTAS, RANKING
             End Select
             InserirBarraNav ws, nomes, rots, CStr(nomes(i)), congRow
         End If
@@ -2919,7 +2616,7 @@ Private Function AcharBaseInventario(wb As Workbook) As Worksheet
 
     For Each ws In wb.Worksheets
         Select Case ws.Name
-            Case "PAINEL DO GESTOR", "ANALISE SAP x PRJ", "RESUMO SAP x PRJ", "RACIONALIZACAO COM", "ALERTA CRITICO", "PRECO UNITARIO", "RANKING DE RISCO", "CONFIG", "HISTORICO", "LOG EXECUCAO", "TESTES", "AUDITORIA CLASSIF", "TENDENCIA", "REGRAS CLASSIF"
+            Case "PAINEL DO GESTOR", "ANALISE SAP x PRJ", "RESUMO SAP x PRJ", "RACIONALIZACAO COM", "ALERTA CRITICO", "RANKING DE RISCO", "CONFIG", "HISTORICO", "LOG EXECUCAO", "TESTES", "AUDITORIA CLASSIF", "TENDENCIA", "REGRAS CLASSIF"
                 ' aba de saida / apoio - ignora
             Case Else
                 If ws.UsedRange.Rows.Count > 1 Then
@@ -2943,10 +2640,10 @@ End Function
 
 ' ===========================================================================
 '  PAINEL DO GESTOR: visao executiva com KPIs em cartoes + ranking de alertas
-'  Le os resultados ja gerados (ANALISE SAP x PRJ, PRECO UNITARIO, ALERTA CRITICO)
+'  Le os resultados ja gerados (ANALISE SAP x PRJ, ALERTA CRITICO)
 ' ===========================================================================
 Private Function ProcessarPainelGestor(wb As Workbook, wsBase As Worksheet, _
-        wsDet As Worksheet, wsPU As Worksheet, wsAlertaC As Worksheet) As Worksheet
+        wsDet As Worksheet, wsAlertaC As Worksheet) As Worksheet
 
     Dim ws As Worksheet
     Set ws = wb.Worksheets.Add(Before:=wb.Worksheets(1))
@@ -2955,7 +2652,7 @@ Private Function ProcessarPainelGestor(wb As Workbook, wsBase As Worksheet, _
     ' ---------------- COLETA DE KPIs ----------------
     Dim valTot As Double, valRisk As Double
     Dim nPep3 As Long, nReprov As Long, nAprov As Long
-    Dim nAlertas As Long, nDiverg As Long, sobrepreco As Double
+    Dim nAlertas As Long
 
     ' PEPs + valor + reprovacao (le ANALISE SAP x PRJ, dados a partir da linha 10)
     Dim pep3St As Object : Set pep3St = CreateObject("Scripting.Dictionary")  ' pep3 -> reprovado?
@@ -3001,22 +2698,6 @@ Private Function ProcessarPainelGestor(wb As Workbook, wsBase As Worksheet, _
         Next r
     End If
 
-    ' Divergencias de preco + sobrepreco potencial (le PRECO UNITARIO, dados linha 2+)
-    Dim lastP As Long : lastP = wsPU.Cells(wsPU.Rows.Count, 1).End(xlUp).Row
-    If lastP >= 2 Then
-        Dim pp As Variant : pp = wsPU.Range(wsPU.Cells(2, 1), wsPU.Cells(lastP, 13)).Value
-        For r = 1 To UBound(pp, 1)
-            Dim stP As String : stP = UCase(Trim(CStr(pp(r, 12))))
-            If stP = "ABAIXO DO MINIMO" Or stP = "ACIMA DO MAXIMO" Then nDiverg = nDiverg + 1
-            If stP = "ACIMA DO MAXIMO" Then
-                Dim qq As Double : qq = Val0(pp(r, 7))
-                Dim puu As Double : puu = Val0(pp(r, 9))
-                Dim mxx As Double : mxx = Val0(pp(r, 11))
-                If puu > mxx And qq > 0 Then sobrepreco = sobrepreco + (puu - mxx) * qq
-            End If
-        Next r
-    End If
-
     Dim pctAprov As Double
     If nPep3 > 0 Then pctAprov = nAprov / nPep3 * 100
 
@@ -3049,9 +2730,7 @@ Private Function ProcessarPainelGestor(wb As Workbook, wsBase As Worksheet, _
     CardGestor ws, 4, 7, "PEPs reprovados", Format(nReprov, "#,##0"), RGB(252, 232, 233), RGB(192, 0, 0)
     ' --- KPI cards (linha 2 de cards: 4) ---
     CardGestor ws, 8, 1, "Alertas criticos", Format(nAlertas, "#,##0"), RGB(255, 248, 230), RGB(176, 124, 0)
-    CardGestor ws, 8, 3, "Divergencias de preco", Format(nDiverg, "#,##0"), RGB(234, 242, 250), RGB(31, 78, 121)
-    CardGestor ws, 8, 5, "Sobrepreco potencial", FmtKPI(sobrepreco), RGB(252, 232, 233), RGB(192, 0, 0)
-    CardGestor ws, 8, 7, "Valor em risco (reprov.)", FmtKPI(valRisk), RGB(252, 232, 233), RGB(192, 0, 0)
+    CardGestor ws, 8, 3, "Valor em risco (reprov.)", FmtKPI(valRisk), RGB(252, 232, 233), RGB(192, 0, 0)
 
     ' --- Ranking de alertas por tipo (com mini-barras) ---
     Dim secRow As Long : secRow = 13
@@ -3206,8 +2885,6 @@ Private Sub GarantirConfig(wb As Workbook)
             Array("PESO_REPROV", 40, "Ranking: peso de obra reprovada na SAP x PRJ"), _
             Array("PESO_ALERTA", 4, "Ranking: peso por alerta critico"), _
             Array("CAP_ALERTA", 24, "Ranking: teto da parcela de alertas"), _
-            Array("PESO_PU", 3, "Ranking: peso por divergencia de preco unitario"), _
-            Array("CAP_PU", 18, "Ranking: teto da parcela de PU"), _
             Array("PESO_COM", 2, "Ranking: peso por COM fora do previsto NT.006"), _
             Array("CAP_COM", 18, "Ranking: teto da parcela de COM"), _
             Array("COM_CRITICO", "CH FUS; PARA RAIO", "Familias COM criticas (separadas por ;) que reprovam o PEP3") _
@@ -3587,8 +3264,7 @@ End Sub
 ' --------- Nomes definidos: referencia estavel para formulas do usuario ---------
 Private Sub CriarNomesDefinidos(wb As Workbook)
     DefinirNome wb, "ANALISE SAP x PRJ", "dadosAnalise", "PEP3NIVEL", 1, 16
-    DefinirNome wb, "PRECO UNITARIO", "dadosPrecoUnitario", "PEP3NIVEL", 1, 14
-    DefinirNome wb, "RANKING DE RISCO", "dadosRanking", "PEP3NIVEL", 2, 11
+    DefinirNome wb, "RANKING DE RISCO", "dadosRanking", "PEP3NIVEL", 2, 9
 End Sub
 
 Private Sub DefinirNome(wb As Workbook, sheetName As String, nome As String, _
