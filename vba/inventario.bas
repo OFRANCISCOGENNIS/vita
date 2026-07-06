@@ -3713,14 +3713,20 @@ End Sub
 '  MODO: P = palavra inteira | S = substring | C = combo (todos os tokens com +)
 ' ===========================================================================
 Private Function RegrasScoreEmbutidas() As Variant
-    RegrasScoreEmbutidas = Array( _
+    ' Dividido em blocos menores (limite do VBA: 24 continuacoes de linha por statement)
+    Dim b1 As Variant, b2 As Variant, b3 As Variant, b4 As Variant, b5 As Variant
+    Dim i As Long, n As Long, total() As String
+
+    b1 = Array( _
         "S|CONECTOR|CONECTOR|60", "S|CONEC|CONECTOR|35", "P|TERM|CONECTOR|25", _
         "S|CON PER|CONECTOR|45", "S|CONEX|CONECTOR|40", _
         "C|CONEC+HASTE|CONEC HASTE|75", "C|CONEC+ATERR|CONEC HASTE|75", "C|CONEC+CUNHA|CONEC HASTE|70", _
         "P|LUVA|LUVA EMENDA|50", "P|EME|LUVA EMENDA|20", "S|EMENDA|LUVA EMENDA|30", _
         "S|CABO IS|CABO ISOLADO|55", "C|CABO+PVC|CABO ISOLADO|60", "C|FIO+PVC|CABO ISOLADO|60", _
         "S|CABO|CABO/CONDUTOR|30", "S|CONDUTOR|CABO/CONDUTOR|40", "P|FIO|CABO/CONDUTOR|35", _
-        "P|CAA|CABO/CONDUTOR|20", "P|CAZ|CABO/CONDUTOR|20", _
+        "P|CAA|CABO/CONDUTOR|20", "P|CAZ|CABO/CONDUTOR|20")
+
+    b2 = Array( _
         "S|TRAFO|TRAFO|60", "S|TRANSFORMADOR|TRAFO|60", "P|TD|TRAFO|30", "S|KVA|TRAFO|25", _
         "P|TP|TP|45", _
         "S|POSTE|POSTE|35", "S|DAN|POSTE|20", _
@@ -3729,7 +3735,9 @@ Private Function RegrasScoreEmbutidas() As Variant
         "S|CRUZETA|CRUZETA|40", _
         "P|SUP|SUPORTE|30", "S|SUPORTE|SUPORTE|40", "C|SUP+CH FACA|SUPORTE|20", _
         "S|BYPASS|SUPORTE|15", "S|BY PASS|SUPORTE|15", _
-        "C|SUP+PARARAIO|SUP PARA-RAIO|70", "C|SUPORTE+PARARAIO|SUP PARA-RAIO|70", _
+        "C|SUP+PARARAIO|SUP PARA-RAIO|70", "C|SUPORTE+PARARAIO|SUP PARA-RAIO|70")
+
+    b3 = Array( _
         "S|PARARAIO|PARA-RAIO|60", "S|PARA RAIO|PARA-RAIO|60", _
         "C|CHAVE+FUS|CHAVE FUSIVEL|70", "S|CH FUS|CHAVE FUSIVEL|60", _
         "S|CHAVE|CHAVE FACA/SECC|30", "C|CHAVE+SECCION|CHAVE FACA/SECC|70", _
@@ -3738,7 +3746,10 @@ Private Function RegrasScoreEmbutidas() As Variant
         "C|HASTE+TERRA|HASTE TERRA|70", "C|HASTE+ATERR|HASTE TERRA|70", "C|HASTE+COBR|HASTE TERRA|60", _
         "S|CORDOALHA|ESTAI|50", "S|ESTICADOR|ESTAI|50", "S|SAPATA|ESTAI|50", "C|HASTE+ANCORA|ESTAI|60", _
         "C|PARAFUSO+OLHAL|PARAFUSO OLHAL|70", "S|PARAFUSO|PARAFUSO|45", _
-        "C|GANCHO+OLHAL|GANCHO OLHAL|70", "S|OLHAL|OLHAL|35", "S|MANILHA|MANILHA|50", _
+        "C|GANCHO+OLHAL|GANCHO OLHAL|70", "S|OLHAL|OLHAL|35")
+
+    b4 = Array( _
+        "S|MANILHA|MANILHA|50", _
         "S|ARRUELA|ARRUELA|50", "S|PORCA|PORCA|50", "P|SELA|SELA CRUZETA|55", _
         "S|MAO FRANCESA|MAO FRANCESA|70", _
         "P|ELO|ELO FUSIVEL|50", "S|FUSIVEL|ELO FUSIVEL|25", _
@@ -3747,7 +3758,9 @@ Private Function RegrasScoreEmbutidas() As Variant
         "P|DPS|DPS|55", "C|PROTETOR+SURTO|DPS|60", _
         "C|CAIXA+MEDI|CAIXA MEDICAO|60", "C|CAIXA+POLICARB|CAIXA MEDICAO|55", "S|CAIXA|CAIXA|30", _
         "S|MEDIDOR|MEDIDOR|50", "S|LACRE|LACRE|55", _
-        "S|RELIGADOR|EQUIP MANOBRA|55", "S|SECCIONA|EQUIP MANOBRA|45", _
+        "S|RELIGADOR|EQUIP MANOBRA|55", "S|SECCIONA|EQUIP MANOBRA|45")
+
+    b5 = Array( _
         "S|DISJUNTOR|EQUIP MANOBRA|55", "S|REGULADOR|EQUIP MANOBRA|55", _
         "P|BUCHA|BUCHA|50", _
         "S|ESPACADOR|REDE COMPACTA|55", "S|LOSANGULAR|REDE COMPACTA|55", "S|BRACO|REDE COMPACTA|40", _
@@ -3757,6 +3770,19 @@ Private Function RegrasScoreEmbutidas() As Variant
         "S|ELETRODUTO|ELETRODUTO|55", _
         "S|ABRACADEIRA|FERRAGEM|45", "S|CANTONEIRA|FERRAGEM|45", "S|PERFIL|FERRAGEM|40", "S|CHAPA|FERRAGEM|40", _
         "P|ARAME|ARAME|50", "P|FITA|FITA/FECHO|45", "S|FECHO|FITA/FECHO|40", "S|FIVELA|FITA/FECHO|45")
+
+    n = (UBound(b1) - LBound(b1) + 1) + (UBound(b2) - LBound(b2) + 1) + _
+        (UBound(b3) - LBound(b3) + 1) + (UBound(b4) - LBound(b4) + 1) + _
+        (UBound(b5) - LBound(b5) + 1)
+    ReDim total(0 To n - 1)
+    n = 0
+    For i = LBound(b1) To UBound(b1) : total(n) = b1(i) : n = n + 1 : Next i
+    For i = LBound(b2) To UBound(b2) : total(n) = b2(i) : n = n + 1 : Next i
+    For i = LBound(b3) To UBound(b3) : total(n) = b3(i) : n = n + 1 : Next i
+    For i = LBound(b4) To UBound(b4) : total(n) = b4(i) : n = n + 1 : Next i
+    For i = LBound(b5) To UBound(b5) : total(n) = b5(i) : n = n + 1 : Next i
+
+    RegrasScoreEmbutidas = total
 End Function
 
 Private Sub CarregarRegrasEmbutidas()
