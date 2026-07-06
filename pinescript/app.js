@@ -2281,7 +2281,7 @@ function renderRegistro() {
     if (!registro.length) { panel.style.display = 'none'; return; }
     panel.style.display = 'block';
     if (!chartRegistro) {
-        chartRegistro = LightweightCharts.createChart(document.getElementById('chartRegistro'), { ...opcoesBase(), height: 150 });
+        chartRegistro = LightweightCharts.createChart(document.getElementById('chartRegistro'), { ...opcoesBase(), height: 84 });
         serieRegistro = chartRegistro.addLineSeries({ color: 'rgba(120,120,120,0.35)', lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
         chartRegistro.priceScale('right').applyOptions({ visible: false });
     }

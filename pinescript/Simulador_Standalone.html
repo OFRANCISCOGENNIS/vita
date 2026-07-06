@@ -1143,6 +1143,18 @@ body {
     box-shadow: 0 10px 28px rgba(0, 0, 0, 0.38);
 }
 
+/* ---- Registro compacto: card menor, alinhado à direita, para dar destaque ao gráfico ---- */
+#registroPanel {
+    max-width: 440px;
+    margin-left: auto;      /* empurra pra direita: vira um card, não ocupa a tela toda */
+    padding: 10px 12px;
+}
+#registroPanel h2 { font-size: 13px; margin-bottom: 8px; }
+#registroPanel #chartRegistro { height: 84px; }
+#registroPanel .reg-list { max-height: 120px; margin-top: 6px; }
+#registroPanel .reg-row { padding: 3px 6px; font-size: 12px; gap: 8px; }
+#registroPanel .reg-hora { min-width: 38px; }
+
 </style>
 </head>
 <body>
@@ -1424,7 +1436,7 @@ body {
                 <div class="chart-container" id="registroPanel" style="display:none;">
                     <h2>🗓️ Registro de entradas <span id="registroMeta" class="tv-sync-tag"></span>
                         <button id="btnLimparReg" class="btn-ghost" style="float:right;">Limpar</button></h2>
-                    <div id="chartRegistro" style="height:150px;"></div>
+                    <div id="chartRegistro" style="height:84px;"></div>
                     <div id="registroBody" class="reg-list"></div>
                 </div>
 
@@ -3890,7 +3902,7 @@ function renderRegistro() {
     if (!registro.length) { panel.style.display = 'none'; return; }
     panel.style.display = 'block';
     if (!chartRegistro) {
-        chartRegistro = LightweightCharts.createChart(document.getElementById('chartRegistro'), { ...opcoesBase(), height: 150 });
+        chartRegistro = LightweightCharts.createChart(document.getElementById('chartRegistro'), { ...opcoesBase(), height: 84 });
         serieRegistro = chartRegistro.addLineSeries({ color: 'rgba(120,120,120,0.35)', lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
         chartRegistro.priceScale('right').applyOptions({ visible: false });
     }

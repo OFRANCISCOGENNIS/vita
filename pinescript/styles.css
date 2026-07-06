@@ -1123,3 +1123,15 @@ body {
     z-index: 6;
     box-shadow: 0 10px 28px rgba(0, 0, 0, 0.38);
 }
+
+/* ---- Registro compacto: card menor, alinhado à direita, para dar destaque ao gráfico ---- */
+#registroPanel {
+    max-width: 440px;
+    margin-left: auto;      /* empurra pra direita: vira um card, não ocupa a tela toda */
+    padding: 10px 12px;
+}
+#registroPanel h2 { font-size: 13px; margin-bottom: 8px; }
+#registroPanel #chartRegistro { height: 84px; }
+#registroPanel .reg-list { max-height: 120px; margin-top: 6px; }
+#registroPanel .reg-row { padding: 3px 6px; font-size: 12px; gap: 8px; }
+#registroPanel .reg-hora { min-width: 38px; }
