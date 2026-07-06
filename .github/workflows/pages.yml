@@ -1,0 +1,45 @@
+name: Deploy GitHub Pages
+
+# Publica o protótipo OMEGA (omega/index.html) no GitHub Pages.
+# A pasta omega/ vira a raiz do site: https://ofranciscogennis.github.io/anonymousKS/
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "omega/**"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - name: Upload site (pasta omega/ como raiz)
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./omega
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
