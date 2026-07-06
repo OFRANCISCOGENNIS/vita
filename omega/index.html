@@ -193,6 +193,16 @@
   .src-i{display:flex; align-items:center; justify-content:space-between; font-size:12px; padding:3px 0; color:var(--mut)}
   .src-i .st{color:var(--warn); letter-spacing:2px; font-size:11px}
 
+  /* ---------- comandos do console ---------- */
+  .msg.sys{align-self:stretch; max-width:100%; background:rgba(95,212,244,.05); border:1px dashed var(--line2)}
+  .msg.sys .tag{color:var(--warn)}
+  .cmd-list{display:flex; flex-direction:column; gap:5px; margin:8px 0 2px}
+  .cmd-row{display:flex; gap:10px; align-items:baseline; font-size:12.5px}
+  .cmd-row code{flex:0 0 auto; min-width:104px; color:var(--cy2); background:var(--bg2);
+    border:1px solid var(--line); padding:1px 7px; border-radius:6px; font-size:11.5px;
+    font-family:ui-monospace,Menlo,Consolas,monospace}
+  .cmd-row span{color:var(--mut)}
+
   footer{margin-top:22px; color:var(--dim); font-size:11px; text-align:center; letter-spacing:.5px}
 </style>
 
@@ -272,9 +282,10 @@
           <button data-q="Quais as tendências de IA para 2027?">🔎 Tendências 2027</button>
           <button data-q="Gerar uma API de clientes">🧩 Gerar API</button>
           <button data-q="Status do sistema">🛰️ Status</button>
+          <button data-q="/help">⌘ Comandos</button>
         </div>
         <div class="composer">
-          <input id="inp" type="text" placeholder="Fale com o OMEGA…" autocomplete="off">
+          <input id="inp" type="text" placeholder="Fale com o OMEGA ou digite /help…" autocomplete="off">
           <button id="send">Enviar</button>
         </div>
       </section>
@@ -503,9 +514,85 @@
   }
   function send(){
     var q = inp.value.trim(); if(!q) return;
-    el("msg user",'<span class="tag">Você</span>'+q.replace(/[<>&]/g,function(c){return{"<":"&lt;",">":"&gt;","&":"&amp;"}[c];}));
-    inp.value=""; respond(q);
+    el("msg user",'<span class="tag">Você</span>'+esc(q));
+    inp.value="";
+    if(q.charAt(0) === "/") runCommand(q); // chat que recebe comandos
+    else respond(q);
   }
+
+  /* ---------- comandos do console ---------- */
+  function sys(html){ return el("msg sys",'<span class="tag">SISTEMA</span><span class="body">'+html+'</span>'); }
+  function agentState(name){ var e=document.querySelector('[data-name="'+name+'"]'); return e && /busy/.test(e.className) ? "ocupado" : "pronto"; }
+
+  var COMMANDS = {
+    "/help":     { d:"lista os comandos disponíveis",                run:cmdHelp },
+    "/status":   { d:"estado geral do núcleo OMEGA",                 run:cmdStatus },
+    "/agentes":  { d:"lista os agentes e seus estados",              run:cmdAgents },
+    "/memoria":  { d:"mostra a memória semântica aprendida",         run:cmdMem },
+    "/persona":  { d:"mostra ou fixa a persona — /persona [nome]",   run:cmdPersona },
+    "/fontes":   { d:"mostra as fontes validadas mais recentes",     run:cmdSources },
+    "/avaliar":  { d:"roda um ciclo de autoavaliação",               run:cmdEval },
+    "/tarefas":  { d:"quantas tarefas foram processadas",            run:cmdTasks },
+    "/exportar": { d:"baixa a memória semântica em JSON",            run:cmdExport },
+    "/limpar":   { d:"limpa o console",                              run:cmdClear },
+    "/reset":    { d:"apaga a memória semântica persistida",         run:cmdReset },
+    "/sobre":    { d:"sobre este protótipo",                         run:cmdAbout }
+  };
+  var CMD_ALIAS = { "/ajuda":"/help", "/clear":"/limpar", "/memória":"/memoria", "/sources":"/fontes", "/eval":"/avaliar" };
+
+  function runCommand(raw){
+    var parts = raw.trim().split(/\s+/);
+    var name = (CMD_ALIAS[parts[0].toLowerCase()] || parts[0].toLowerCase());
+    var arg  = parts.slice(1).join(" ");
+    var c = COMMANDS[name];
+    if(!c){ sys("Comando desconhecido: <b>"+esc(parts[0])+"</b>. Digite <b>/help</b> para ver os comandos."); return; }
+    tasks++; tEl.textContent = tasks;
+    c.run(arg);
+  }
+
+  function cmdHelp(){
+    var rows = Object.keys(COMMANDS).map(function(k){
+      return '<div class="cmd-row"><code>'+k+(k==="/persona"?" [nome]":"")+'</code><span>'+COMMANDS[k].d+'</span></div>';
+    }).join("");
+    sys('Comandos disponíveis:<div class="cmd-list">'+rows+'</div>Ou escreva em linguagem natural — o roteador escolhe os agentes.');
+  }
+  function cmdStatus(){
+    setAgent("OMEGA PRIME","busy"); setTimeout(function(){ setAgent("OMEGA PRIME","run"); }, 2000);
+    sys("Sistemas nominais. <b>"+AGENTS.length+"</b> agentes permanentes · roteador multi-modelo (6 provedores) · memória semântica com <b>"+mem.length+"</b> conceito(s) · <b>"+tasks+"</b> tarefa(s). Uptime 99,98%.");
+  }
+  function cmdAgents(){
+    var list = AGENTS.map(function(a){
+      var st = agentState(a[0]);
+      return '<div class="cmd-row"><code>'+a[0]+'</code><span>'+a[1]+' · <b style="color:'+(st==="ocupado"?"var(--cy2)":"var(--ok)")+'">'+st+'</b></span></div>';
+    }).join("");
+    sys('<div class="cmd-list">'+list+'</div>');
+  }
+  function cmdMem(){
+    if(!mem.length){ sys("Memória semântica vazia. Faça perguntas para que eu aprenda."); return; }
+    var list = mem.map(function(x){ return '<div class="cmd-row"><code>'+esc(x.c)+'</code><span>'+(x.n>1?"reforçado "+x.n+"×":"novo")+'</span></div>'; }).join("");
+    sys('<b>'+mem.length+'</b> conceito(s) na memória:<div class="cmd-list">'+list+'</div>');
+  }
+  function cmdPersona(arg){
+    if(arg){ personaEl.textContent = arg; sys("Persona fixada em <b>"+esc(arg)+"</b>."); }
+    else sys("Persona ativa: <b>"+esc(personaEl.textContent)+"</b>. Use <b>/persona [nome]</b> para fixar uma.");
+  }
+  function cmdSources(){
+    if(!srcBox.querySelector(".src-i")){ sys("Nenhuma pesquisa realizada ainda."); return; }
+    sys(srcBox.innerHTML);
+  }
+  function cmdEval(){ runSelfEval(); sys("Ciclo de autoavaliação executado — auditando até ≥ 95% nas 6 métricas."); }
+  function cmdTasks(){ sys("<b>"+tasks+"</b> tarefa(s) processada(s) nesta sessão."); }
+  function cmdExport(){
+    try{
+      var blob = new Blob([JSON.stringify(mem,null,2)], {type:"application/json"});
+      var a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "omega-memoria.json";
+      document.body.appendChild(a); a.click(); a.remove();
+      sys("Memória exportada para <b>omega-memoria.json</b> (<b>"+mem.length+"</b> conceito(s)).");
+    }catch(e){ sys("Não foi possível exportar neste ambiente."); }
+  }
+  function cmdClear(){ feed.innerHTML = ""; sys("Console limpo."); }
+  function cmdReset(){ mem = []; try{ localStorage.removeItem(MEMK); }catch(e){} renderMem(); sys("Memória semântica apagada."); }
+  function cmdAbout(){ sys("OMEGA — protótipo de orquestração multiagente com aprendizado em tempo real. Respostas e pesquisa são simuladas; a memória é persistida no seu navegador."); }
   btn.addEventListener("click", send);
   inp.addEventListener("keydown", function(e){ if(e.key==="Enter") send(); });
   document.querySelectorAll(".chips button").forEach(function(c){
@@ -513,6 +600,6 @@
   });
 
   /* ---------- boot ---------- */
-  jarvis("Bom dia. Núcleo OMEGA inicializado: 14 agentes permanentes online, memória universal sincronizada, canais seguros estabelecidos. Em que posso ajudar?");
+  jarvis("Bom dia. Núcleo OMEGA inicializado: 14 agentes permanentes online, memória universal sincronizada, canais seguros estabelecidos. Fale comigo em linguagem natural ou digite /help para ver os comandos.");
 })();
 </script>
