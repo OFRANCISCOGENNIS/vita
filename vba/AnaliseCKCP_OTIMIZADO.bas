@@ -2632,10 +2632,20 @@ PulaConta:
         outp(rr, 11) = MatInfoLinha(fi, 2)   ' CLS2
         ' PRECO_UNITARIO = VALOR_MOEDA / QTD_ENTRADA (somas brutas, 4 casas)
         If q <> 0 Then outp(rr, 12) = Round(dV(k) / dQ(k), 4)
-        ' ADERENCIA por tipo de PEP ANEEL (ODD/ODI/ODM/ODS):
-        '   ODD (.D): QTD_ENTRADA ou VALOR_MOEDA positivo   -> NAO ADERENTE
-        '   ODI/ODM/ODS: QTD_ENTRADA ou VALOR_MOEDA negativo -> NAO ADERENTE
-        If TipoPEPCodigo(pep) = "D" Then
+        ' ADERENCIA:
+        '   1) QTD=0 e VALOR<>0                        -> NAO ADERENTE
+        '   2) sinais opostos (QTD e VALOR)             -> NAO ADERENTE
+        '   3) VALOR=0 e QTD<>0                         -> NAO ADERENTE
+        '   4) por tipo de PEP ANEEL (ODD/ODI/ODM/ODS):
+        '      ODD (.D): QTD_ENTRADA ou VALOR_MOEDA positivo   -> NAO ADERENTE
+        '      ODI/ODM/ODS: QTD_ENTRADA ou VALOR_MOEDA negativo -> NAO ADERENTE
+        If q = 0 And val <> 0 Then
+            outp(rr, 13) = "NAO ADERENTE"
+        ElseIf (q > 0 And val < 0) Or (q < 0 And val > 0) Then
+            outp(rr, 13) = "NAO ADERENTE"
+        ElseIf val = 0 And q <> 0 Then
+            outp(rr, 13) = "NAO ADERENTE"
+        ElseIf TipoPEPCodigo(pep) = "D" Then
             outp(rr, 13) = IIf(q > 0 Or val > 0, "NAO ADERENTE", "ADERENTE")
         Else
             outp(rr, 13) = IIf(q < 0 Or val < 0, "NAO ADERENTE", "ADERENTE")
