@@ -190,3 +190,7 @@ Dois códigos de serviço recebem `CLS2 = "COND PROT"` forçado para casar com m
 ## Índice rápido de Subs/Functions
 
 Ver `vba/AnaliseCKCP_OTIMIZADO.bas` ou o arquivo de documentação completo `AnaliseCKCP_OTIMIZADO_DOC.md` para o índice com números de linha.
+
+## Economia de tokens (obrigatório)
+
+Siga SEMPRE as regras de `.claude/skills/token-economy/SKILL.md`, mesmo sem invocação explícita: respostas mínimas, nunca ler o `.bas` inteiro (use `.claude/skills/token-economy/scripts/vba_index.sh` e `vba_sub.sh`), Grep em 2 fases com `head_limit`, Read só com `offset`/`limit` em arquivos grandes, edições cirúrgicas. Um hook PreToolUse (`.claude/hooks/token_guard.py`) bloqueia violações.
