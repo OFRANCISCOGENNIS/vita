@@ -2387,7 +2387,7 @@ function renderRegistro() {
             : r.resultado === 'LOSS' ? '<span class="reg-res reg-loss" title="errou">✗</span>'
             : (r.exp && r.t + r.exp * 60 > Math.floor(Date.now() / 1000)) ? '<span class="reg-res reg-open" title="aguardando expiração">⏳</span>' : '';
         return `<div class="reg-row"><span class="reg-hora">${fmtHora(r.t)}</span>` +
-            `<span class="reg-par">${r.par}${r.live ? ' <span class="reg-tag">IA ao vivo</span>' : ''}</span>` +
+            `<span class="reg-par">${r.par}${r.live ? ' <span class="reg-tag" title="IA ao vivo">IA</span>' : ''}</span>` +
             (r.grade ? `<span class="reg-grade grade-${r.grade}">${r.grade}</span>` : '') +
             `<span class="${r.dir === 1 ? 'chip-dir-up' : 'chip-dir-down'}">${r.dir === 1 ? '▲ CALL' : '▼ PUT'} ${r.score}/${r.enabled}</span>${res}</div>`;
     }).join('');

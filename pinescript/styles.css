@@ -394,7 +394,7 @@ body.tem-registro .decision-panel { grid-template-columns: 1fr; }
 .grade-A { background: rgba(12,163,12,0.18); color: #26c281; border: 1px solid #0ca30c; }
 .grade-B { background: rgba(250,178,25,0.15); color: #fab219; border: 1px solid #fab219; }
 .grade-C { background: rgba(208,59,59,0.15); color: #ef5350; border: 1px solid #d03b3b; }
-.reg-tag { font-size: 10px; font-weight: 700; color: #3987e5; border: 1px solid #3987e5; border-radius: 4px; padding: 0 5px; margin-left: 6px; letter-spacing: 0.4px; }
+.reg-tag { font-size: 10px; font-weight: 700; color: #3987e5; border: 1px solid #3987e5; border-radius: 4px; padding: 0 5px; margin-left: 6px; letter-spacing: 0.4px; white-space: nowrap; }
 .reg-grade { font-weight: 800; font-size: 12px; padding: 1px 8px; border-radius: 6px; }
 
 /* ============================================================================
@@ -1144,7 +1144,7 @@ body.tem-registro .decision-panel { grid-template-columns: 1fr; }
 /* Fica sempre encostado na borda direita, na vertical, ocupando a altura toda
    abaixo da barra superior. É position:fixed, então NÃO empurra o gráfico —
    o espaço é reservado com padding-right no .main-content (body.tem-registro). */
-:root { --reg-w: 300px; --reg-top: 64px; }
+:root { --reg-w: 328px; --reg-top: 64px; }
 #registroPanel.registro-col {
     position: fixed;
     top: var(--reg-top);
@@ -1165,13 +1165,16 @@ body.tem-registro .decision-panel { grid-template-columns: 1fr; }
     max-height: none;               /* ocupa toda a altura restante do dock */
     margin-top: 8px;
 }
-#registroPanel.registro-col .reg-row { padding: 5px 6px; font-size: 12.5px; gap: 8px; }
+#registroPanel.registro-col .reg-row { padding: 5px 4px; font-size: 12px; gap: 7px; flex-wrap: nowrap; }
+/* Nenhuma célula da linha quebra em duas linhas — nomes/legendas sempre inteiros. */
+#registroPanel.registro-col .reg-row > span { white-space: nowrap; }
+#registroPanel.registro-col .reg-par { flex: 1 1 auto; min-width: 0; }
 
 /* Reserva o espaço do dock para o conteúdo não ficar escondido atrás dele. */
 body.tem-registro .main-content { padding-right: calc(var(--reg-w) + var(--spacing)); }
 
 /* Telas estreitas: o dock vira faixa mais fina; bem pequenas, empilha embaixo. */
-@media (max-width: 1100px) { :root { --reg-w: 250px; } }
+@media (max-width: 1100px) { :root { --reg-w: 300px; } }
 @media (max-width: 760px) {
     #registroPanel.registro-col {
         position: static; width: 100%; max-width: none; border-radius: 12px;
