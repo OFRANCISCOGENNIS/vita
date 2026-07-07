@@ -106,6 +106,21 @@ check('atalho C recolhe controles', vis0 && await p.$eval('.sidebar', e => getCo
 // 8) PWA manifest
 check('PWA manifest presente', await p.$eval('link[rel=manifest]', e => e.href.startsWith('data:application/manifest')));
 
+// 8.5) Treino automático via URL (?treinar=1) no modo Simulado (offline)
+const p2 = await ctx.newPage();
+const jsErrs2 = [];
+p2.on('pageerror', e => jsErrs2.push(e.message));
+await p2.setViewportSize({ width: 1440, height: 820 });
+await p2.goto('file://' + file + '?treinar=1&fonte=sim', { waitUntil: 'domcontentloaded' });
+// espera a IA arrancar sozinha e terminar
+await p2.waitForFunction(() => typeof iaRodando !== 'undefined' && iaRodando === true, { timeout: 20000 }).catch(() => {});
+const arrancou = await p2.evaluate(() => document.getElementById('iaPanel').style.display === 'block' || iaRodando);
+await p2.waitForFunction(() => typeof iaRodando !== 'undefined' && !iaRodando, { timeout: 90000 });
+check('treino automático (?treinar=1) arranca sozinho', arrancou);
+check('treino automático produz iaCache', await p2.evaluate(() => Object.keys(iaCache).length > 0));
+check('treino automático sem erros de JS', jsErrs2.length === 0, jsErrs2.join(' | '));
+await p2.close();
+
 // 9) Sem erros de JS
 check('sem erros de JavaScript', jsErrs.length === 0, jsErrs.join(' | '));
 

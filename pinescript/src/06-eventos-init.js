@@ -183,8 +183,9 @@ document.getElementById('parPopular').addEventListener('change', function () {
     montarWidgetTV();
     carregar();
 });
-// Trocar a chave do Twelve Data recarrega se essa for a fonte ativa
+// Trocar a chave do Twelve Data: persiste e recarrega se essa for a fonte ativa
 document.getElementById('tdKey').addEventListener('change', function () {
+    localStorage.setItem('tdKey', this.value.trim());
     if (fonte() === 'twelvedata') carregar();
 });
 document.getElementById('btnNews').addEventListener('click', carregarNoticias);
@@ -261,6 +262,10 @@ window.addEventListener('resize', function () {
 // Inicializa em DOMContentLoaded (NÃO em 'load') para não depender do tv.js:
 // se o widget do TradingView estiver lento/bloqueado, o resto do app não trava.
 function iniciar() {
+    // chave Twelve Data: URL (?tdkey=) tem prioridade, senão a salva no navegador
+    const tdParam = _params.get('tdkey'), tdSalva = localStorage.getItem('tdKey');
+    if (tdParam) { document.getElementById('tdKey').value = tdParam; localStorage.setItem('tdKey', tdParam); }
+    else if (tdSalva) document.getElementById('tdKey').value = tdSalva;
     montarWidgetTV();   // gráfico oficial do TradingView no topo (assíncrono, com retry)
     carregarSimbolos();
     renderScanFiltro(); // checklist de moedas do scanner
@@ -276,6 +281,36 @@ function iniciar() {
     renderRegistro();   // restaura o registro de entradas salvo
     setTimeout(verificarEntradasPendentes, 4000);              // resolve WIN/LOSS pendentes ao abrir
     setInterval(verificarEntradasPendentes, 30000);            // e a cada 30s enquanto o app roda
+    autoTreinar();      // ?treinar=1 → dispara a IA sozinha ao abrir
+}
+
+// Treino automático via URL — "colocar a IA pra treinar" vira só abrir o link:
+//   ?treinar=1                          usa a fonte/moedas atuais
+//   ?treinar=1&fonte=binance            escolhe a fonte
+//   ?treinar=1&moedas=BTCUSDT,ETHUSDT   treina só essas moedas
+//   ?treinar=1&minval=5                 exige amostra mínima maior
+async function autoTreinar() {
+    if (!['1', 'true', 'ia', 'sim'].includes((_params.get('treinar') || '').toLowerCase())) return;
+    const fonteEl = document.getElementById('fonte');
+    const fonteParam = _params.get('fonte');
+    if (fonteParam && fonteEl.querySelector(`option[value="${fonteParam}"]`)) {
+        fonteEl.value = fonteParam;
+        fonteEl.dispatchEvent(new Event('change'));
+    }
+    const minval = parseInt(_params.get('minval'));
+    if (minval >= 3) document.getElementById('iaMinVal').value = minval;
+    // aguarda o exchangeInfo (pares forex Binance) e a carga inicial
+    await new Promise(r => setTimeout(r, 1600));
+    // pré-seleção de moedas: marca só as pedidas na URL
+    const moedas = (_params.get('moedas') || '').split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+    if (moedas.length) {
+        scanUniverse().forEach(s => scanSel[s] = false);
+        moedas.forEach(s => scanSel[s] = true);
+        salvarScanSel(); renderScanFiltro();
+    }
+    // no Simulado a IA precisa dos dados carregados (nas fontes ao vivo ela busca sozinha)
+    for (let i = 0; i < 20 && fonte() === 'sim' && (!dados || dados.length < 210); i++) await new Promise(r => setTimeout(r, 300));
+    if (!iaRodando) { showToast('🤖 Treino automático iniciado…', 'info'); otimizarIA(); }
 }
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', iniciar);
