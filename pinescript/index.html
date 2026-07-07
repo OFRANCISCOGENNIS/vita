@@ -562,6 +562,14 @@
         </footer>
     </div>
 
-    <script src="app.js"></script>
+    <!-- APP:START — módulos em ordem; o build concatena src/*.js e embute inline -->
+    <script src="src/00-core.js"></script>
+    <script src="src/01-indicadores.js"></script>
+    <script src="src/02-sinais.js"></script>
+    <script src="src/03-graficos-paineis.js"></script>
+    <script src="src/04-dados-conexao.js"></script>
+    <script src="src/05-registro-ia-noticias.js"></script>
+    <script src="src/06-eventos-init.js"></script>
+    <!-- APP:END -->
 </body>
 </html>

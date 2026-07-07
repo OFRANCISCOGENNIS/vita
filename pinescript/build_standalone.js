@@ -2,10 +2,11 @@
 // (Lightweight Charts) embutidos, para abrir direto no navegador (file://) sem
 // servidor. Uso: node build_standalone.js
 //
-// Minificação: usa esbuild (via npx) para reduzir app.js/styles.css. No JS só
-// remove espaços/comentários e simplifica sintaxe — NÃO renomeia identificadores
-// (o código continua auditável e nada externo quebra). Se o esbuild não estiver
-// disponível (offline), o build segue sem minificar.
+// Fonte da verdade do app: pinescript/src/*.js (módulos em ordem). O build
+// concatena esses arquivos, regenera app.js (bundle usado pela versão modular),
+// minifica com esbuild (só espaços/comentários e sintaxe — NÃO renomeia
+// identificadores, então nada externo quebra) e embute tudo no HTML. Se o
+// esbuild não estiver disponível (offline), o build segue sem minificar.
 const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
@@ -24,19 +25,28 @@ function minificar(src, tipo) {
   }
 }
 
+// 1) Concatena os módulos src/*.js (ordem alfabética = ordem de execução) e
+//    regenera app.js — mantém a versão modular (index.html) e o bundle em sincronia.
+const srcDir = path.join(dir, 'src');
+const modulos = fs.readdirSync(srcDir).filter(f => f.endsWith('.js')).sort();
+const bundle = modulos.map(f => fs.readFileSync(path.join(srcDir, f), 'utf8')).join('');
+fs.writeFileSync(path.join(dir, 'app.js'), bundle);
+console.log('bundle: ' + modulos.length + ' módulos -> app.js (' + bundle.length + ' bytes)');
+
 let html = fs.readFileSync(path.join(dir, 'index.html'), 'utf8');
 const lwc = fs.readFileSync(path.join(dir, 'lightweight-charts.standalone.production.js'), 'utf8');
 const css = minificar(fs.readFileSync(path.join(dir, 'styles.css'), 'utf8'), 'css');
-const app = minificar(fs.readFileSync(path.join(dir, 'app.js'), 'utf8'), 'js');
+const app = minificar(bundle, 'js');
 
 html = html.replace(
   /<!-- TradingView Lightweight Charts vendorizado localmente \(100% offline\) -->\s*<script src="lightweight-charts\.standalone\.production\.js"><\/script>/,
   '<script>\n' + lwc + '\n</script>'
 );
 html = html.replace(/<link rel="stylesheet" href="styles\.css">/, '<style>\n' + css + '\n</style>');
-html = html.replace(/<script src="app\.js"><\/script>/, '<script>\n' + app + '\n</script>');
+// Substitui o bloco de módulos (APP:START..APP:END) pelo bundle inline
+html = html.replace(/<!-- APP:START[\s\S]*?<!-- APP:END -->/, '<script>\n' + app + '\n</script>');
 
-const leftovers = (html.match(/(href="styles\.css"|src="app\.js"|src="lightweight-charts\.standalone\.production\.js")/g) || []);
+const leftovers = (html.match(/(href="styles\.css"|src="app\.js"|src="src\/|src="lightweight-charts\.standalone\.production\.js")/g) || []);
 if (leftovers.length) { console.error('FALHA: referências externas restantes:', leftovers); process.exit(1); }
 
 fs.writeFileSync(path.join(dir, 'Simulador_Standalone.html'), html);
