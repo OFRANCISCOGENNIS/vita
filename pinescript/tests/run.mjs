@@ -52,10 +52,15 @@ check('MACD+Bollinger somam 2 fatores', await p.evaluate(() => confLive.enabled)
 
 // 3) IA otimiza (validação robusta + cache por regime)
 await p.click('#btnGerar'); await p.waitForTimeout(400);
+await p.fill('#iaMinVal', '5');   // amostra mínima configurável
 await p.click('#btnIA');
 await p.waitForFunction(() => typeof iaRodando !== 'undefined' && !iaRodando, { timeout: 90000 });
-check('IA gerou resultado', /combina/.test(await p.$eval('#iaMeta', e => e.textContent)));
+const iaMetaTxt = await p.$eval('#iaMeta', e => e.textContent);
+check('IA gerou resultado', /combina/.test(iaMetaTxt));
+check('amostra mínima configurável reflete no resumo', /amostra mín\. 5 val \/ 10 treino/.test(iaMetaTxt), iaMetaTxt);
 check('iaCache indexado por regime', await p.evaluate(() => Object.keys(iaCache).some(k => k.includes('|'))));
+await p.fill('#iaMinVal', '3');
+await p.evaluate(() => document.activeElement.blur());   // atalhos ignoram teclas com input focado
 
 // 4) Verificador WIN/LOSS + placar real
 const calib = await p.evaluate(async () => {

@@ -237,6 +237,8 @@
                     <button id="btnIA" class="btn-primary" style="margin-top:6px;">🤖 IA: otimizar parâmetros</button>
                     <p class="group-note">A IA otimiza as moedas marcadas em <strong>🎯 Moedas p/ análise</strong> (uma a uma) e deixa o Scanner pronto com os melhores parâmetros de cada. No modo <strong>Simulado</strong>, otimiza só o par atual. Durante a execução, clique de novo no botão para <strong>cancelar</strong>.</p>
                     <label><input type="checkbox" id="iaRapida" checked> <span>IA rápida (busca inteligente — ~⅓ das combinações)</span></label>
+                    <label>Amostra mínima (validação) <input type="number" id="iaMinVal" value="3" min="3" max="30" step="1"></label>
+                    <p class="group-note">Nº mínimo de operações fora da amostra para um par ser considerado “afinado”. Maior = mais evidência exigida, menos pares passam (o treino exige o dobro).</p>
                     <label><input type="checkbox" id="autoReopt"> <span>Auto-reotimizar a cada 60 min</span></label>
                     <div class="scan-fil-actions" style="margin-top:6px;">
                         <button id="btnIAExport" class="btn-mini" type="button">💾 Exportar IA</button>

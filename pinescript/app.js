@@ -2533,8 +2533,10 @@ const IA_GRID = {
     estruturaLookback: [10, 20, 30],
     cooldownVelas: [3, 5]
 };
-const IA_MIN_OPS = 6;    // amostra mínima no TREINO
-const IA_MIN_VAL = 3;    // amostra mínima na VALIDAÇÃO (out-of-sample)
+// Amostra mínima na VALIDAÇÃO (out-of-sample), configurável na UI (#iaMinVal).
+// O treino exige o dobro — mantém a proporção histórica (3 val → 6 treino).
+function iaMinVal() { return Math.max(3, parseInt(document.getElementById('iaMinVal').value) || 3); }
+function iaMinOps() { return iaMinVal() * 2; }
 const IA_VELAS = 500;    // histórico por TF na otimização (mais amostra = validação mais confiável)
 let iaCancelar = false, iaRodando = false, autoReoptTimer = null;
 
@@ -2573,6 +2575,7 @@ function avaliarWalkForward() {
 // Coopera com a UI: cede a thread a cada 10 combos e respeita `iaCancelar`.
 async function _iaOtimizarSimbolo(symbol, isSim, dSimBase, beWR, EXP_OPCOES, el) {
     const tfs = isSim ? [tfMinutes()] : TFS_IA;
+    const minVal = iaMinVal(), minOps = iaMinOps();   // amostra mínima (UI) — fixa nesta rodada
     const porTf = [];
     let totalCombos = 0, regSym = null;
     for (const tf of tfs) {
@@ -2611,7 +2614,7 @@ async function _iaOtimizarSimbolo(symbol, isSim, dSimBase, beWR, EXP_OPCOES, el)
             expOverride = null;
             totalCombos++;
             if (++n % 10 === 0) await new Promise(r => setTimeout(r, 0));   // deixa a UI respirar
-            if (wf.treino.ops < IA_MIN_OPS || wf.val.ops < IA_MIN_VAL) continue;
+            if (wf.treino.ops < minOps || wf.val.ops < minVal) continue;
             // robustez = pior janela entre treino e validação, no LIMITE INFERIOR
             // de Wilson (anti-overfit + anti-sorte-de-amostra-pequena).
             const robust = Math.min(wilsonLB(wf.treino.w, wf.treino.ops), wf.robustLB);
@@ -2697,7 +2700,7 @@ async function otimizarIA() {
     recomputarSinais();
 
     if (iaCancelar) showToast('⏹ Otimização cancelada — resultados parciais mantidos', 'info');
-    document.getElementById('iaMeta').textContent = totalCombosGeral + ' combinações · ' + symbols.length + ' moeda(s) · break-even ' + (beWR * 100).toFixed(1) + '%';
+    document.getElementById('iaMeta').textContent = totalCombosGeral + ' combinações · ' + symbols.length + ' moeda(s) · break-even ' + (beWR * 100).toFixed(1) + '% · amostra mín. ' + iaMinVal() + ' val / ' + iaMinOps() + ' treino';
 
     if (symbols.length === 1) { renderIAUmPar(resultados[0], isSim, el); fimIA(); return; }
 
@@ -2706,7 +2709,7 @@ async function otimizarIA() {
     const semOk = resultados.filter(r => !r.porTf.length);
     comOk.sort((a, b) => b.porTf[0].edgeLB - a.porTf[0].edgeLB);
     if (!comOk.length) {
-        document.getElementById('iaContext').textContent = `Nenhuma das ${symbols.length} moedas passou na validação fora da amostra. Aumente as velas (300+) ou reduza a seleção.`;
+        document.getElementById('iaContext').textContent = `Nenhuma das ${symbols.length} moedas atingiu a amostra mínima (${iaMinVal()} val / ${iaMinOps()} treino). Aumente as velas (300+), reduza a “Amostra mínima” ou a seleção.`;
         document.getElementById('iaList').innerHTML = '';
         fimIA(); return;
     }
@@ -2746,7 +2749,7 @@ function renderIAUmPar(resultado, isSim, el) {
     const porTf = resultado.porTf;
     const par = PARES_YAHOO[symbol] ? PARES_YAHOO[symbol].label : symbol;
     if (!porTf.length) {
-        document.getElementById('iaContext').textContent = `Nenhuma combinação passou na validação fora da amostra para ${par}. Carregue mais velas (300+) ou troque o par.`;
+        document.getElementById('iaContext').textContent = `Nenhuma combinação atingiu a amostra mínima (${iaMinVal()} val / ${iaMinOps()} treino) para ${par}. Carregue mais velas (300+), reduza a “Amostra mínima” ou troque o par.`;
         document.getElementById('iaList').innerHTML = '';
         return;
     }
