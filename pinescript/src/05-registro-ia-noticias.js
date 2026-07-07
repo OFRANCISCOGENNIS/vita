@@ -535,14 +535,15 @@ async function carregarSimbolos() {
         const resp = await fetch(`${BINANCE_REST}/api/v3/exchangeInfo`);
         if (!resp.ok) return;
         const info = await resp.json();
+        const trading = info.symbols.filter(s => s.status === 'TRADING').map(s => s.symbol);
         const dl = document.getElementById('listaSimbolos');
         const frag = document.createDocumentFragment();
-        info.symbols
-            .filter(s => s.status === 'TRADING')
-            .map(s => s.symbol)
-            .sort()
-            .forEach(sym => { const o = document.createElement('option'); o.value = sym; frag.appendChild(o); });
+        trading.slice().sort().forEach(sym => { const o = document.createElement('option'); o.value = sym; frag.appendChild(o); });
         dl.appendChild(frag);
+        // Pares de câmbio que a Binance realmente lista entram no checklist do Scanner/IA
+        const setT = new Set(trading);
+        forexBinanceOk = Object.keys(FOREX_BINANCE_CAND).filter(s => setT.has(s));
+        if (!ehForex()) renderScanFiltro();   // re-renderiza pra incluir os pares validados
     } catch (e) { /* offline: datalist fica vazio, campo continua editável */ }
 }
 

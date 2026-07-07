@@ -2218,13 +2218,27 @@ function recalcularSinaisApenas() {
 
 const SCAN_CRIPTO = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'XRPUSDT', 'ADAUSDT', 'DOGEUSDT', 'AVAXUSDT', 'LINKUSDT', 'LTCUSDT', 'DOTUSDT', 'TRXUSDT', 'ATOMUSDT', 'NEARUSDT', 'APTUSDT'];
 
+// Pares de câmbio (moedas fiat contra USDT) que a Binance pode listar. Só os que
+// existirem de fato no exchangeInfo entram no checklist — a validação acontece em
+// runtime (carregarSimbolos), evitando entradas mortas. A Binance cota tudo em
+// USDT, então só há X/USDT (não há cruzados tipo EUR/GBP nessa fonte).
+const FOREX_BINANCE_CAND = {
+    EURUSDT: 'EUR/USDT (Euro)',
+    GBPUSDT: 'GBP/USDT (Libra)',
+    AUDUSDT: 'AUD/USDT (Dólar AUS)',
+    NZDUSDT: 'NZD/USDT (Dólar NZ)',
+    AEURUSDT: 'AEUR/USDT (Euro stable)',
+    EURIUSDT: 'EURI/USDT (Euro stable)'
+};
+let forexBinanceOk = [];   // preenchido após o exchangeInfo (só os pares reais)
+
 // ---- FILTRO DE MOEDAS DO SCANNER (checklist "🎯 Moedas p/ análise") ----
 // scanSel guarda só as EXCEÇÕES: uma moeda vale como marcada por padrão;
 // só entra aqui quando o usuário desmarca (false) ou marca de volta (true).
 let scanSel = JSON.parse(localStorage.getItem('scanSel') || '{}');
 function scanChecked(s) { return scanSel[s] !== false; }
-function scanUniverse() { return ehForex() ? Object.keys(PARES_YAHOO) : SCAN_CRIPTO; }
-function scanLabel(s) { return PARES_YAHOO[s] ? PARES_YAHOO[s].label : s; }
+function scanUniverse() { return ehForex() ? Object.keys(PARES_YAHOO) : SCAN_CRIPTO.concat(forexBinanceOk); }
+function scanLabel(s) { return PARES_YAHOO[s] ? PARES_YAHOO[s].label : (FOREX_BINANCE_CAND[s] || s); }
 function salvarScanSel() { localStorage.setItem('scanSel', JSON.stringify(scanSel)); }
 function atualizarScanFiltroMeta() {
     const m = document.getElementById('scanFiltroMeta');
@@ -2252,7 +2266,7 @@ async function escanear() {
     const btn = document.getElementById('btnScan');
     btn.disabled = true; btn.textContent = 'Escaneando…';
     const loader = f === 'binance' ? carregarHistoricoBinance : f === 'twelvedata' ? carregarHistoricoTwelveData : carregarHistoricoYahoo;
-    const lista = (f === 'binance' ? SCAN_CRIPTO : Object.keys(PARES_YAHOO)).filter(scanChecked);
+    const lista = (f === 'binance' ? SCAN_CRIPTO.concat(forexBinanceOk) : Object.keys(PARES_YAHOO)).filter(scanChecked);
     if (!lista.length) { showToast('Marque ao menos uma moeda no filtro "🎯 Moedas p/ análise".', 'err'); btn.disabled = false; btn.textContent = '🔎 Escanear melhores entradas'; return; }
     const arg = f === 'binance' ? binanceInterval() : tfMinutes();
     const confMode = document.getElementById('confMode').value;
@@ -2856,14 +2870,15 @@ async function carregarSimbolos() {
         const resp = await fetch(`${BINANCE_REST}/api/v3/exchangeInfo`);
         if (!resp.ok) return;
         const info = await resp.json();
+        const trading = info.symbols.filter(s => s.status === 'TRADING').map(s => s.symbol);
         const dl = document.getElementById('listaSimbolos');
         const frag = document.createDocumentFragment();
-        info.symbols
-            .filter(s => s.status === 'TRADING')
-            .map(s => s.symbol)
-            .sort()
-            .forEach(sym => { const o = document.createElement('option'); o.value = sym; frag.appendChild(o); });
+        trading.slice().sort().forEach(sym => { const o = document.createElement('option'); o.value = sym; frag.appendChild(o); });
         dl.appendChild(frag);
+        // Pares de câmbio que a Binance realmente lista entram no checklist do Scanner/IA
+        const setT = new Set(trading);
+        forexBinanceOk = Object.keys(FOREX_BINANCE_CAND).filter(s => setT.has(s));
+        if (!ehForex()) renderScanFiltro();   // re-renderiza pra incluir os pares validados
     } catch (e) { /* offline: datalist fica vazio, campo continua editável */ }
 }
 
