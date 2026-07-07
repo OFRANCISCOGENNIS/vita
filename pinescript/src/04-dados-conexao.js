@@ -225,8 +225,19 @@ async function carregarHistoricoYahoo(codigo, intervalMin, limit) {
     return candles.slice(Math.max(0, candles.length - limit));
 }
 
+// ---- MODO COMBINADO: Binance (cripto) + Twelve Data (forex) rodando juntos ----
+// Cada símbolo é roteado para a fonte certa: pares em PARES_YAHOO → Twelve Data;
+// o resto → Binance. Scanner e IA varrem os dois universos numa passada só.
+function modoCombinado() { return fonte() === 'ambos'; }
+function fonteDe(symbol) {
+    if (modoCombinado()) return PARES_YAHOO[symbol] ? 'twelvedata' : 'binance';
+    return fonte();
+}
+// Fonte efetiva do gráfico atual (resolve o símbolo aberto no modo combinado).
+function fonteEfetiva() { return modoCombinado() ? fonteDe(symbolAtual()) : fonte(); }
+
 // Fonte "Forex-like" (Forex/índices/ouro): sem volume agressor real
-function ehForex() { const f = fonte(); return f === 'yahoo' || f === 'twelvedata'; }
+function ehForex() { const f = fonteEfetiva(); return f === 'yahoo' || f === 'twelvedata'; }
 
 // ---- Twelve Data (Forex/Índices/Ouro com chave grátis; tem CORS próprio) ----
 function tdIntervalStr(min) { return min === 60 ? '1h' : min + 'min'; }
@@ -329,7 +340,7 @@ async function carregar() {
         return;
     }
 
-    if (fonte() === 'twelvedata') {
+    if (fonteEfetiva() === 'twelvedata') {
         conexaoAtual = '';
         const codigo = symbolAtual();
         if (!PARES_YAHOO[codigo]) {
@@ -369,7 +380,7 @@ async function carregar() {
         return;
     }
 
-    if (fonte() === 'yahoo') {
+    if (fonteEfetiva() === 'yahoo') {
         conexaoAtual = '';
         const codigo = symbolAtual();
         if (!PARES_YAHOO[codigo]) {
@@ -481,7 +492,10 @@ let forexBinanceOk = [];   // preenchido após o exchangeInfo (só os pares reai
 // só entra aqui quando o usuário desmarca (false) ou marca de volta (true).
 let scanSel = JSON.parse(localStorage.getItem('scanSel') || '{}');
 function scanChecked(s) { return scanSel[s] !== false; }
-function scanUniverse() { return ehForex() ? Object.keys(PARES_YAHOO) : SCAN_CRIPTO.concat(forexBinanceOk); }
+function scanUniverse() {
+    if (modoCombinado()) return SCAN_CRIPTO.concat(Object.keys(PARES_YAHOO));   // cripto + forex juntos
+    return ehForex() ? Object.keys(PARES_YAHOO) : SCAN_CRIPTO.concat(forexBinanceOk);
+}
 function scanLabel(s) { return PARES_YAHOO[s] ? PARES_YAHOO[s].label : (FOREX_BINANCE_CAND[s] || s); }
 function salvarScanSel() { localStorage.setItem('scanSel', JSON.stringify(scanSel)); }
 function atualizarScanFiltroMeta() {
@@ -509,10 +523,10 @@ async function escanear() {
     if (f === 'sim') { showToast('Troque a fonte para Binance ou Forex para escanear.', 'err'); return; }
     const btn = document.getElementById('btnScan');
     btn.disabled = true; btn.textContent = 'Escaneando…';
-    const loader = f === 'binance' ? carregarHistoricoBinance : f === 'twelvedata' ? carregarHistoricoTwelveData : carregarHistoricoYahoo;
-    const lista = (f === 'binance' ? SCAN_CRIPTO.concat(forexBinanceOk) : Object.keys(PARES_YAHOO)).filter(scanChecked);
+    // Universo do scanner (no modo combinado = cripto + forex); cada símbolo é
+    // carregado pela sua fonte via carregarHistoricoTF (roteamento por símbolo).
+    const lista = scanUniverse().filter(scanChecked);
     if (!lista.length) { showToast('Marque ao menos uma moeda no filtro "🎯 Moedas p/ análise".', 'err'); btn.disabled = false; btn.textContent = '🔎 Escanear melhores entradas'; return; }
-    const arg = f === 'binance' ? binanceInterval() : tfMinutes();
     const confMode = document.getElementById('confMode').value;
     const minScoreG = parseInt(document.getElementById('minScore').value);
     const dSave = dados;
@@ -527,7 +541,7 @@ async function escanear() {
     heatData = [];   // heatmap é reconstruído a cada varredura
     for (const s of lista) {
         try {
-            const d = await comCache(f + '|' + s + '|' + arg + '|400', () => loader(s, arg, 400));
+            const d = await carregarHistoricoTF(s, tfMinutes(), 400);   // fonte resolvida por símbolo
             if (!d || d.length < 210) continue;
             // Scanner + IA: aplica os melhores parâmetros já otimizados para este par,
             // preferindo o conjunto afinado para o REGIME atual do próprio ativo
@@ -575,13 +589,14 @@ async function escanear() {
     }).join('') : '<span class="decision-context">Nenhuma moeda com entrada agora — afrouxe a confluência ou troque o timeframe.</span>';
     elList.querySelectorAll('.scan-item').forEach(x => x.addEventListener('click', () => {
         const s = x.getAttribute('data-s');
-        document.getElementById('fonte').value = PARES_YAHOO[s] ? (ehForex() ? f : 'twelvedata') : 'binance';
+        // No modo combinado mantém 'ambos' (o gráfico resolve a fonte pelo símbolo)
+        if (!modoCombinado()) document.getElementById('fonte').value = PARES_YAHOO[s] ? (ehForex() ? f : 'twelvedata') : 'binance';
         document.getElementById('symbol').value = s;
         montarWidgetTV(); carregar();
     }));
     document.getElementById('scanPanel').style.display = 'block';
     res.forEach(r => registrarEntrada(PARES_YAHOO[r.s] ? PARES_YAHOO[r.s].label : r.s, r.dir, r.score, r.enabled,
-        { exp: (iaCache[r.s] && iaCache[r.s].exp) || parseInt(el('expiracao').value) || 5, sym: r.s, fonte: f }));
+        { exp: (iaCache[r.s] && iaCache[r.s].exp) || parseInt(el('expiracao').value) || 5, sym: r.s, fonte: fonteDe(r.s) }));
     if (res.length) renderRegistro();
     if (res.length && document.getElementById('somAtivo').checked) tocarSom(res[0].dir);
     btn.disabled = false; btn.textContent = '🔎 Escanear melhores entradas';

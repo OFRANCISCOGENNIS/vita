@@ -89,9 +89,10 @@ function intervalPorFonte(f, tfMin) {
     return f === 'binance' ? (tfMin === 60 ? '1h' : tfMin + 'm') : tfMin;
 }
 async function carregarHistoricoTF(symbol, tfMin, limit) {
-    const chave = fonte() + '|' + symbol + '|' + tfMin + '|' + limit;   // cache TTL 60s (IA em lote reusa)
+    const f = fonteDe(symbol);   // no modo combinado, cada símbolo vai p/ sua fonte
+    const chave = f + '|' + symbol + '|' + tfMin + '|' + limit;   // cache TTL 60s (IA em lote reusa)
     if (symbol === 'CRYPTOIDX') return comCache(chave, () => carregarHistoricoCryptoIDX(intervalPorFonte('binance', tfMin), limit));
-    return comCache(chave, () => loaderPorFonte(fonte())(symbol, intervalPorFonte(fonte(), tfMin), limit));
+    return comCache(chave, () => loaderPorFonte(f)(symbol, intervalPorFonte(f, tfMin), limit));
 }
 // TF maior correspondente ao TF de trabalho (para o filtro Multi-Timeframe)
 function htfDeTf(tfMin) {

@@ -348,7 +348,8 @@ async function otimizarIA() {
         el('minScore').value = d.ms; el('rsiSobrevenda').value = d.sv; el('rsiSobrecompra').value = d.sc;
         el('estruturaLookback').value = d.lk; el('cooldownVelas').value = d.cd; el('expiracao').value = d.exp;
         el('timeframe').value = d.tf;
-        el('fonte').value = PARES_YAHOO[d.sym] ? (ehForex() ? fonte() : 'twelvedata') : 'binance';
+        // modo combinado: mantém 'ambos' (o gráfico resolve a fonte pelo símbolo)
+        if (!modoCombinado()) el('fonte').value = PARES_YAHOO[d.sym] ? (ehForex() ? fonte() : 'twelvedata') : 'binance';
         el('symbol').value = d.sym;
         row.parentElement.querySelectorAll('.ia-row').forEach(x => x.classList.remove('ia-sel'));
         row.classList.add('ia-sel');
@@ -578,7 +579,7 @@ async function carregarSimbolos() {
         // Pares de câmbio que a Binance realmente lista entram no checklist do Scanner/IA
         const setT = new Set(trading);
         forexBinanceOk = Object.keys(FOREX_BINANCE_CAND).filter(s => setT.has(s));
-        if (!ehForex()) renderScanFiltro();   // re-renderiza pra incluir os pares validados
+        if (!ehForex() || modoCombinado()) renderScanFiltro();   // re-renderiza pra incluir os pares validados / universo combinado
     } catch (e) { /* offline: datalist fica vazio, campo continua editável */ }
 }
 

@@ -54,6 +54,7 @@
                             <option value="binance" selected>Binance — Cripto (ao vivo)</option>
                             <option value="twelvedata">Forex/Índices/Ouro — Twelve Data (chave)</option>
                             <option value="yahoo">Forex/Índices/Ouro — Yahoo (keyless)</option>
+                            <option value="ambos">Binance + Twelve Data (cripto + forex juntos)</option>
                             <option value="sim">Simulado (offline)</option>
                         </select>
                     </label>
@@ -61,7 +62,7 @@
                         Chave Twelve Data (grátis)
                         <input type="text" id="tdKey" value="demo" spellcheck="false" autocomplete="off" style="width:100%;">
                     </label>
-                    <p class="group-note">Twelve Data = Forex/Índices/Ouro estável (CORS próprio, sem proxy). Pegue sua chave grátis em <strong>twelvedata.com</strong> e cole acima. A chave "demo" só funciona no EUR/USD.</p>
+                    <p class="group-note">Twelve Data = Forex/Índices/Ouro estável (CORS próprio, sem proxy). Pegue sua chave grátis em <strong>twelvedata.com</strong> e cole acima. A chave "demo" só funciona no EUR/USD. <strong>Binance + Twelve Data</strong> roda cripto e forex juntos no Scanner e na IA (cada moeda usa a fonte certa) — com chave grátis, marque poucos pares de forex por vez (cota ~8 req/min).</p>
                     <label>
                         Par / moeda (cripto)
                         <input type="text" id="symbol" value="BTCUSDT" list="listaSimbolos" autocomplete="off" spellcheck="false">

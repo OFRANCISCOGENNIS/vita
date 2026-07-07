@@ -43,6 +43,17 @@ await p.waitForTimeout(500);
 check('checklist cripto tem 15 moedas', await p.$$eval('#scanFiltro input[data-sym]', e => e.length) === 15);
 await p.selectOption('#fonte', 'yahoo'); await p.waitForTimeout(300);
 check('checklist forex tem 24 pares', await p.$$eval('#scanFiltro input[data-sym]', e => e.length) === 24);
+// Modo combinado: universo = cripto + forex e roteamento de fonte por símbolo
+await p.selectOption('#fonte', 'ambos'); await p.waitForTimeout(300);
+const combo = await p.evaluate(() => ({
+  qtd: document.querySelectorAll('#scanFiltro input[data-sym]').length,
+  temCripto: !!document.querySelector('#scanFiltro input[data-sym="BTCUSDT"]'),
+  temForex: !!document.querySelector('#scanFiltro input[data-sym="EURUSD"]'),
+  rotaCripto: fonteDe('BTCUSDT'), rotaForex: fonteDe('EURUSD')
+}));
+check('modo combinado lista cripto + forex', combo.qtd > 24 && combo.temCripto && combo.temForex, 'qtd=' + combo.qtd);
+check('modo combinado roteia BTCUSDT→binance', combo.rotaCripto === 'binance');
+check('modo combinado roteia EURUSD→twelvedata', combo.rotaForex === 'twelvedata');
 await p.selectOption('#fonte', 'sim'); await p.waitForTimeout(200);
 
 // 2) Fatores extras MACD/Bollinger entram na confluência
