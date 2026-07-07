@@ -44,6 +44,32 @@ function crossover(cur, prev, nivel) { return prev !== null && cur !== null && p
 function crossunder(cur, prev, nivel) { return prev !== null && cur !== null && prev >= nivel && cur < nivel; }
 
 // ============================================================================
+// BLOCO 1.5 — ESTATÍSTICA DE ASSERTIVIDADE (intervalo de confiança + expectativa)
+// ============================================================================
+// Win rate cru MENTE em amostra pequena: 5/6 (83%) parece melhor que 55/80
+// (69%), mas tem muito menos evidência. Estas métricas corrigem isso — são a
+// base para a IA e o selo A/B/C deixarem de premiar sorte de amostra pequena.
+
+// Limite inferior de Wilson (~95%, z=1.96): estimativa CONSERVADORA da taxa real
+// de acerto, dado w vitórias em n operações. Quanto menor a amostra, mais o
+// limite puxa para baixo — é o antídoto contra "deu certo em 5 de 6, então é 83%".
+function wilsonLB(w, n, z) {
+    if (!n) return 0;
+    z = z || 1.96;
+    const p = w / n, z2 = z * z;
+    const centro = p + z2 / (2 * n);
+    const margem = z * Math.sqrt((p * (1 - p) + z2 / (4 * n)) / n);
+    return Math.max(0, (centro - margem) / (1 + z2 / n));
+}
+// Expectativa por operação numa binária de payout p (fração): quanto se ganha,
+// em média, por R$1 arriscado. wr·payout − (1−wr). >0 = lucrativo no longo prazo.
+function expectancia(wr, payout) { return wr * payout - (1 - wr); }
+// Break-even (win rate mínimo para empatar) dado o payout.
+function breakEven(payout) { return 1 / (1 + payout); }
+// Formata percentual inteiro (0.69 → "69%") — usado nas métricas de acerto.
+function pctTxt(x) { return (x * 100).toFixed(0) + '%'; }
+
+// ============================================================================
 // BLOCO 2 — LEITURA DE CONTROLES
 // ============================================================================
 

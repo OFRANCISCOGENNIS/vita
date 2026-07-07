@@ -69,7 +69,18 @@ const calib = await p.evaluate(async () => {
 });
 check('verificador resolveu 4 entradas', calib.resolvidos === 4, calib.resolvidos + ' resolvidas');
 check('placar real exibido', /Placar real/.test(calib.txt), calib.txt);
+check('placar mostra limite inferior (LB)', /LB\s*\d+%/.test(calib.txt), calib.txt);
 check('selos WIN/LOSS na tabela', await p.$$eval('#registroBody .reg-res', e => e.length) >= 3);
+
+// 4.5) Métricas de assertividade: Wilson LB penaliza amostra pequena; expectativa
+const stat = await p.evaluate(() => ({
+  lbPequena: wilsonLB(5, 6), lbGrande: wilsonLB(55, 80),
+  lb0: wilsonLB(0, 0), expPos: expectancia(0.6, 0.87), be: breakEven(0.87)
+}));
+check('Wilson LB penaliza amostra pequena (5/6 < 55/80)', stat.lbPequena < stat.lbGrande, `5/6→${stat.lbPequena.toFixed(2)} vs 55/80→${stat.lbGrande.toFixed(2)}`);
+check('Wilson LB robusto com n=0', stat.lb0 === 0);
+check('expectativa e break-even coerentes', stat.expPos > 0 && Math.abs(stat.be - 0.5348) < 0.01, `exp=${stat.expPos.toFixed(2)} be=${stat.be.toFixed(3)}`);
+check('painel de métricas traz card LB 95%', await p.evaluate(() => { calcularMetricas(entradas); return [...document.querySelectorAll('.metric-lbl')].some(e => /LB 95%/.test(e.textContent)); }));
 
 // 5) Tema claro/escuro
 await p.keyboard.press('t'); await p.waitForTimeout(200);

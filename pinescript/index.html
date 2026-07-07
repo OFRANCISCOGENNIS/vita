@@ -542,6 +542,15 @@
                         </ul>
                     </section>
                     <section>
+                        <h3>📐 Métricas de assertividade</h3>
+                        <ul class="ajuda-list">
+                            <li><strong>LB (limite inferior de Wilson, 95%)</strong> — o acerto que a estatística <em>garante</em>. Amostra pequena é penalizada: 5/6 (83%) vira LB 44%; 55/80 (69%) vira LB 58%. A IA ranqueia pelo <strong>edge no LB</strong>, não pelo acerto cru — deixa de premiar sorte.</li>
+                            <li><strong>Expectativa/op</strong> — R$ esperado por R$1 arriscado (ajustado ao payout): acerto×payout − (1−acerto). É o número que decide se o setup dá lucro no longo prazo.</li>
+                            <li><strong>Break-even</strong> — acerto mínimo pra empatar dado o payout (87% → 53,5%). Abaixo disso, expectativa negativa.</li>
+                            <li>O selo <strong>A</strong> exige expectativa positiva <em>no LB</em> e amostra ≥ 10 ops; senão cai pra B (pouca evidência).</li>
+                        </ul>
+                    </section>
+                    <section>
                         <h3>📡 Fontes de dados</h3>
                         <ul class="ajuda-list">
                             <li><strong>Binance</strong> — cripto ao vivo (WebSocket).</li>

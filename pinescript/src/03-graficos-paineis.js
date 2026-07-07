@@ -473,16 +473,17 @@ function atualizarQuantOps() {
     const banner = document.getElementById('qoBanner');
     if (temSinal) {
         const g = calcularGrade(dirDom);
-        const payout = Math.max(0.01, (parseFloat(document.getElementById('payout').value) || 87) / 100);
-        const expectOp = g.pEst != null ? g.pEst * payout - (1 - g.pEst) : null;
+        const expectOp = g.expOp;
         document.getElementById('qoOp').innerHTML =
             kv('Direção', dirDom === 1 ? '▲ COMPRA (CALL)' : '▼ VENDA (PUT)', dirDom === 1 ? 'kv-good' : 'kv-bad') +
             kv('Score', g.score + '/100 ' + '⭐'.repeat(g.estrelas)) +
-            kv('Probabilidade', g.pEst == null ? '—' : Math.round(g.pEst * 100) + '%', g.pEst != null && g.pEst >= 0.55 ? 'kv-good' : '') +
-            kv('Expectancy', expectOp == null ? '—' : (expectOp >= 0 ? '+' : '') + expectOp.toFixed(2) + 'R', expectOp >= 0 ? 'kv-good' : 'kv-bad') +
+            kv('Probabilidade', g.pEst == null ? '—' : Math.round(g.pEst * 100) + '%' + (g.pLB != null ? ' (LB ' + pctTxt(g.pLB) + ')' : ''), g.pLB != null && g.pLB >= 0.55 ? 'kv-good' : '') +
+            kv('Amostra', g.pN ? g.pN + ' ops' + (g.pN < 10 ? ' ⚠ pequena' : '') : '—', g.pN >= 10 ? 'kv-good' : '') +
+            kv('Expectancy', expectOp == null ? '—' : (expectOp >= 0 ? '+' : '') + expectOp.toFixed(2) + 'R' + (g.expOpLB != null ? ' (LB ' + (g.expOpLB >= 0 ? '+' : '') + g.expOpLB.toFixed(2) + ')' : ''), g.expOpLB != null && g.expOpLB >= 0 ? 'kv-good' : 'kv-bad') +
             kv('Risco sugerido (½ Kelly)', g.kelly == null ? '—' : (g.kelly * 100).toFixed(2) + '%') +
             kv('Expiração', expMinutes() + 'm');
-        const aprovada = g.grade !== 'C' && (expectOp == null || expectOp >= 0);
+        // Aprova só com expectativa positiva no LIMITE INFERIOR (evidência, não sorte)
+        const aprovada = g.grade !== 'C' && (g.expOpLB == null || g.expOpLB >= 0);
         banner.style.display = 'block';
         banner.className = 'qo-banner ' + (aprovada ? 'ok' : 'no');
         banner.textContent = aprovada ? '✓ OPERAÇÃO APROVADA' : '✕ OPERAÇÃO BLOQUEADA';
@@ -783,17 +784,26 @@ function calcularGrade(dir) {
     const forte = scoreRatio >= 0.7;
     const pairOk = pairWr == null || pairWr >= 0.55;
 
-    // probabilidade estimada: histórico do score atual neste gráfico > WF do par
+    // probabilidade estimada: histórico do score atual neste gráfico > WF do par.
+    // pEst = estimativa pontual (mostrada ao usuário); pLB = limite inferior de
+    // Wilson (usado para PONTUAR/decidir — não confia em amostra pequena); pN = nº
+    // de operações que sustentam a estimativa.
     const payout = Math.max(0.01, (parseFloat(document.getElementById('payout').value) || 87) / 100);
     const beWR = 1 / (1 + payout);
-    let pEst = null;
+    let pEst = null, pLB = null, pN = 0;
     const key = Math.max(cl.long, cl.short) + '/' + enabled;
-    if (byScoreGlobal && byScoreGlobal.scores[key] && byScoreGlobal.scores[key].t >= 5)
-        pEst = byScoreGlobal.scores[key].w / byScoreGlobal.scores[key].t;
-    else if (pairWr != null) pEst = pairWr;
+    if (byScoreGlobal && byScoreGlobal.scores[key] && byScoreGlobal.scores[key].t >= 5) {
+        const o = byScoreGlobal.scores[key];
+        pEst = o.w / o.t; pLB = wilsonLB(o.w, o.t); pN = o.t;
+    } else if (pairWr != null) {
+        pEst = pairWr;
+        pLB = cache && cache.wrLB != null ? cache.wrLB : pairWr;   // LB do backtest da IA, se houver
+        pN = cache && cache.ops != null ? cache.ops : 0;
+    }
 
     let score = Math.round(scoreRatio * 40);
-    if (pEst != null) score += Math.round(Math.max(0, Math.min(1, (pEst - beWR) / 0.15)) * 20);
+    // pontua pela borda CONSERVADORA (limite inferior), não pela estimativa cheia
+    if (pLB != null) score += Math.round(Math.max(0, Math.min(1, (pLB - beWR) / 0.15)) * 20);
     else score += 10;   // sem histórico: meio-termo
     if (htfOk) score += 10;
     if (srOk) score += 10;
@@ -801,22 +811,28 @@ function calcularGrade(dir) {
     if (pairOk && pairWr != null) score += 10; else if (pairWr == null) score += 5;
     score = Math.max(0, Math.min(100, score));
 
-    // Kelly fracionário (½) p/ binária: f* = (p(1+b) − 1)/b; sugere risco por operação
+    // Expectativa por operação (payout-aware): ponto e limite inferior.
+    const expOp = pEst != null ? expectancia(pEst, payout) : null;
+    const expOpLB = pLB != null ? expectancia(pLB, payout) : null;
+    // Kelly fracionário (½) na borda conservadora — dimensiona risco sem otimismo.
     let kelly = null;
-    if (pEst != null) kelly = Math.max(0, Math.min(0.05, ((pEst * (1 + payout) - 1) / payout) / 2));
+    if (pLB != null) kelly = Math.max(0, Math.min(0.05, ((pLB * (1 + payout) - 1) / payout) / 2));
 
     let grade;
     if (forte && htfOk && srOk && sessOk && pairOk) grade = 'A';
     else if (scoreRatio >= 0.5 && srOk && htfOk) grade = 'B';
     else grade = 'C';
+    // amostra insuficiente rebaixa A→B: não há evidência estatística para "ENTRAR"
+    if (grade === 'A' && pN > 0 && pN < 10) grade = 'B';
     const motivos = [];
     if (!forte) motivos.push('score baixo');
     if (!htfOk) motivos.push('contra o TF maior');
     if (!srOk) motivos.push('colado em S/R');
     if (!sessOk) motivos.push('sessão fraca (' + cl.sessao + ')');
-    if (pairWr != null && pairWr < 0.55) motivos.push('par com histórico fraco (' + (pairWr * 100).toFixed(0) + '%)');
-    if (pEst != null && pEst < beWR) motivos.push('expectativa negativa no payout atual');
-    return { grade, motivos, score, estrelas: Math.max(1, Math.round(score / 20)), pEst, kelly, regime: cl.regime };
+    if (pairWr != null && pairWr < 0.55) motivos.push('par com histórico fraco (' + pctTxt(pairWr) + ')');
+    if (expOpLB != null && expOpLB < 0) motivos.push('sem edge estatístico (LB ' + pctTxt(pLB) + ' < break-even ' + pctTxt(beWR) + ')');
+    if (pN > 0 && pN < 10) motivos.push('amostra pequena (' + pN + ' ops) — pouca confiança');
+    return { grade, motivos, score, estrelas: Math.max(1, Math.round(score / 20)), pEst, pLB, pN, expOp, expOpLB, kelly, regime: cl.regime };
 }
 
 function atualizarDecisao() {
@@ -885,7 +901,8 @@ function atualizarDecisao() {
         grEl.style.display = 'inline-flex';
         const extras = [];
         if (g.regime) extras.push('regime ' + REGIME_ROTULO[g.regime]);
-        if (g.pEst != null) extras.push('WR estimado ' + (g.pEst * 100).toFixed(0) + '%');
+        if (g.pEst != null) extras.push('WR estimado ' + pctTxt(g.pEst) + (g.pLB != null ? ' (LB ' + pctTxt(g.pLB) + (g.pN ? ', ' + g.pN + ' ops' : '') + ')' : ''));
+        if (g.expOp != null) extras.push('expectativa ' + (g.expOp >= 0 ? '+' : '') + g.expOp.toFixed(2) + '/op');
         if (g.kelly != null) extras.push('risco sugerido (½ Kelly) ' + (g.kelly * 100).toFixed(2) + '%');
         if (extras.length) r.textContent += ' ' + extras.join(' · ') + '.';
         if (g.motivos.length) r.textContent += ' Ressalvas: ' + g.motivos.join(', ') + '.';
@@ -998,8 +1015,10 @@ function calcularMetricas(validas) {
         return v == null ? null : ['WR últimos ' + n, v.toFixed(0) + '%', v >= beWR ? 'good' : 'bad'];
     }).filter(Boolean);
 
+    const wrLBpct = wilsonLB(wins.length, evaluated.length) * 100;   // WR "garantido" (95%)
     const cards = [
         ['Win rate geral', wr.toFixed(1) + '%', wr >= beWR ? 'good' : 'bad'],
+        ['Win rate (LB 95%)', wrLBpct.toFixed(1) + '%', wrLBpct >= beWR ? 'good' : 'bad'],
         ['Win rate p/ empatar', beWR.toFixed(1) + '%', ''],
         ...cardsRecentes,
         ['P&L acumulado', (pnl >= 0 ? '+' : '') + pnl.toFixed(2) + 'u', pnl >= 0 ? 'good' : 'bad'],
@@ -1024,8 +1043,9 @@ function calcularMetricas(validas) {
     });
     byScoreGlobal = { scores: byScore, beWR };
     scoreBody.innerHTML = Object.keys(byScore).sort().reverse().map(k => {
-        const o = byScore[k], r = o.w / o.t * 100;
-        return `<tr><td>${k}</td><td>${o.t}</td><td>${o.w}</td><td class="${r >= beWR ? 'res-win' : 'res-loss'}">${r.toFixed(0)}%</td></tr>`;
+        const o = byScore[k], r = o.w / o.t * 100, lb = wilsonLB(o.w, o.t) * 100;
+        // acerto cru + limite inferior: um score com poucas amostras mostra LB baixo
+        return `<tr><td>${k}</td><td>${o.t}</td><td>${o.w}</td><td class="${lb >= beWR ? 'res-win' : 'res-loss'}">${r.toFixed(0)}% <span class="ia-params">(LB ${lb.toFixed(0)}%)</span></td></tr>`;
     }).join('');
 
     // Curva de capital acumulada

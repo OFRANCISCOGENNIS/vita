@@ -123,6 +123,32 @@ function crossover(cur, prev, nivel) { return prev !== null && cur !== null && p
 function crossunder(cur, prev, nivel) { return prev !== null && cur !== null && prev >= nivel && cur < nivel; }
 
 // ============================================================================
+// BLOCO 1.5 — ESTATÍSTICA DE ASSERTIVIDADE (intervalo de confiança + expectativa)
+// ============================================================================
+// Win rate cru MENTE em amostra pequena: 5/6 (83%) parece melhor que 55/80
+// (69%), mas tem muito menos evidência. Estas métricas corrigem isso — são a
+// base para a IA e o selo A/B/C deixarem de premiar sorte de amostra pequena.
+
+// Limite inferior de Wilson (~95%, z=1.96): estimativa CONSERVADORA da taxa real
+// de acerto, dado w vitórias em n operações. Quanto menor a amostra, mais o
+// limite puxa para baixo — é o antídoto contra "deu certo em 5 de 6, então é 83%".
+function wilsonLB(w, n, z) {
+    if (!n) return 0;
+    z = z || 1.96;
+    const p = w / n, z2 = z * z;
+    const centro = p + z2 / (2 * n);
+    const margem = z * Math.sqrt((p * (1 - p) + z2 / (4 * n)) / n);
+    return Math.max(0, (centro - margem) / (1 + z2 / n));
+}
+// Expectativa por operação numa binária de payout p (fração): quanto se ganha,
+// em média, por R$1 arriscado. wr·payout − (1−wr). >0 = lucrativo no longo prazo.
+function expectancia(wr, payout) { return wr * payout - (1 - wr); }
+// Break-even (win rate mínimo para empatar) dado o payout.
+function breakEven(payout) { return 1 / (1 + payout); }
+// Formata percentual inteiro (0.69 → "69%") — usado nas métricas de acerto.
+function pctTxt(x) { return (x * 100).toFixed(0) + '%'; }
+
+// ============================================================================
 // BLOCO 2 — LEITURA DE CONTROLES
 // ============================================================================
 
@@ -1129,16 +1155,17 @@ function atualizarQuantOps() {
     const banner = document.getElementById('qoBanner');
     if (temSinal) {
         const g = calcularGrade(dirDom);
-        const payout = Math.max(0.01, (parseFloat(document.getElementById('payout').value) || 87) / 100);
-        const expectOp = g.pEst != null ? g.pEst * payout - (1 - g.pEst) : null;
+        const expectOp = g.expOp;
         document.getElementById('qoOp').innerHTML =
             kv('Direção', dirDom === 1 ? '▲ COMPRA (CALL)' : '▼ VENDA (PUT)', dirDom === 1 ? 'kv-good' : 'kv-bad') +
             kv('Score', g.score + '/100 ' + '⭐'.repeat(g.estrelas)) +
-            kv('Probabilidade', g.pEst == null ? '—' : Math.round(g.pEst * 100) + '%', g.pEst != null && g.pEst >= 0.55 ? 'kv-good' : '') +
-            kv('Expectancy', expectOp == null ? '—' : (expectOp >= 0 ? '+' : '') + expectOp.toFixed(2) + 'R', expectOp >= 0 ? 'kv-good' : 'kv-bad') +
+            kv('Probabilidade', g.pEst == null ? '—' : Math.round(g.pEst * 100) + '%' + (g.pLB != null ? ' (LB ' + pctTxt(g.pLB) + ')' : ''), g.pLB != null && g.pLB >= 0.55 ? 'kv-good' : '') +
+            kv('Amostra', g.pN ? g.pN + ' ops' + (g.pN < 10 ? ' ⚠ pequena' : '') : '—', g.pN >= 10 ? 'kv-good' : '') +
+            kv('Expectancy', expectOp == null ? '—' : (expectOp >= 0 ? '+' : '') + expectOp.toFixed(2) + 'R' + (g.expOpLB != null ? ' (LB ' + (g.expOpLB >= 0 ? '+' : '') + g.expOpLB.toFixed(2) + ')' : ''), g.expOpLB != null && g.expOpLB >= 0 ? 'kv-good' : 'kv-bad') +
             kv('Risco sugerido (½ Kelly)', g.kelly == null ? '—' : (g.kelly * 100).toFixed(2) + '%') +
             kv('Expiração', expMinutes() + 'm');
-        const aprovada = g.grade !== 'C' && (expectOp == null || expectOp >= 0);
+        // Aprova só com expectativa positiva no LIMITE INFERIOR (evidência, não sorte)
+        const aprovada = g.grade !== 'C' && (g.expOpLB == null || g.expOpLB >= 0);
         banner.style.display = 'block';
         banner.className = 'qo-banner ' + (aprovada ? 'ok' : 'no');
         banner.textContent = aprovada ? '✓ OPERAÇÃO APROVADA' : '✕ OPERAÇÃO BLOQUEADA';
@@ -1439,17 +1466,26 @@ function calcularGrade(dir) {
     const forte = scoreRatio >= 0.7;
     const pairOk = pairWr == null || pairWr >= 0.55;
 
-    // probabilidade estimada: histórico do score atual neste gráfico > WF do par
+    // probabilidade estimada: histórico do score atual neste gráfico > WF do par.
+    // pEst = estimativa pontual (mostrada ao usuário); pLB = limite inferior de
+    // Wilson (usado para PONTUAR/decidir — não confia em amostra pequena); pN = nº
+    // de operações que sustentam a estimativa.
     const payout = Math.max(0.01, (parseFloat(document.getElementById('payout').value) || 87) / 100);
     const beWR = 1 / (1 + payout);
-    let pEst = null;
+    let pEst = null, pLB = null, pN = 0;
     const key = Math.max(cl.long, cl.short) + '/' + enabled;
-    if (byScoreGlobal && byScoreGlobal.scores[key] && byScoreGlobal.scores[key].t >= 5)
-        pEst = byScoreGlobal.scores[key].w / byScoreGlobal.scores[key].t;
-    else if (pairWr != null) pEst = pairWr;
+    if (byScoreGlobal && byScoreGlobal.scores[key] && byScoreGlobal.scores[key].t >= 5) {
+        const o = byScoreGlobal.scores[key];
+        pEst = o.w / o.t; pLB = wilsonLB(o.w, o.t); pN = o.t;
+    } else if (pairWr != null) {
+        pEst = pairWr;
+        pLB = cache && cache.wrLB != null ? cache.wrLB : pairWr;   // LB do backtest da IA, se houver
+        pN = cache && cache.ops != null ? cache.ops : 0;
+    }
 
     let score = Math.round(scoreRatio * 40);
-    if (pEst != null) score += Math.round(Math.max(0, Math.min(1, (pEst - beWR) / 0.15)) * 20);
+    // pontua pela borda CONSERVADORA (limite inferior), não pela estimativa cheia
+    if (pLB != null) score += Math.round(Math.max(0, Math.min(1, (pLB - beWR) / 0.15)) * 20);
     else score += 10;   // sem histórico: meio-termo
     if (htfOk) score += 10;
     if (srOk) score += 10;
@@ -1457,22 +1493,28 @@ function calcularGrade(dir) {
     if (pairOk && pairWr != null) score += 10; else if (pairWr == null) score += 5;
     score = Math.max(0, Math.min(100, score));
 
-    // Kelly fracionário (½) p/ binária: f* = (p(1+b) − 1)/b; sugere risco por operação
+    // Expectativa por operação (payout-aware): ponto e limite inferior.
+    const expOp = pEst != null ? expectancia(pEst, payout) : null;
+    const expOpLB = pLB != null ? expectancia(pLB, payout) : null;
+    // Kelly fracionário (½) na borda conservadora — dimensiona risco sem otimismo.
     let kelly = null;
-    if (pEst != null) kelly = Math.max(0, Math.min(0.05, ((pEst * (1 + payout) - 1) / payout) / 2));
+    if (pLB != null) kelly = Math.max(0, Math.min(0.05, ((pLB * (1 + payout) - 1) / payout) / 2));
 
     let grade;
     if (forte && htfOk && srOk && sessOk && pairOk) grade = 'A';
     else if (scoreRatio >= 0.5 && srOk && htfOk) grade = 'B';
     else grade = 'C';
+    // amostra insuficiente rebaixa A→B: não há evidência estatística para "ENTRAR"
+    if (grade === 'A' && pN > 0 && pN < 10) grade = 'B';
     const motivos = [];
     if (!forte) motivos.push('score baixo');
     if (!htfOk) motivos.push('contra o TF maior');
     if (!srOk) motivos.push('colado em S/R');
     if (!sessOk) motivos.push('sessão fraca (' + cl.sessao + ')');
-    if (pairWr != null && pairWr < 0.55) motivos.push('par com histórico fraco (' + (pairWr * 100).toFixed(0) + '%)');
-    if (pEst != null && pEst < beWR) motivos.push('expectativa negativa no payout atual');
-    return { grade, motivos, score, estrelas: Math.max(1, Math.round(score / 20)), pEst, kelly, regime: cl.regime };
+    if (pairWr != null && pairWr < 0.55) motivos.push('par com histórico fraco (' + pctTxt(pairWr) + ')');
+    if (expOpLB != null && expOpLB < 0) motivos.push('sem edge estatístico (LB ' + pctTxt(pLB) + ' < break-even ' + pctTxt(beWR) + ')');
+    if (pN > 0 && pN < 10) motivos.push('amostra pequena (' + pN + ' ops) — pouca confiança');
+    return { grade, motivos, score, estrelas: Math.max(1, Math.round(score / 20)), pEst, pLB, pN, expOp, expOpLB, kelly, regime: cl.regime };
 }
 
 function atualizarDecisao() {
@@ -1541,7 +1583,8 @@ function atualizarDecisao() {
         grEl.style.display = 'inline-flex';
         const extras = [];
         if (g.regime) extras.push('regime ' + REGIME_ROTULO[g.regime]);
-        if (g.pEst != null) extras.push('WR estimado ' + (g.pEst * 100).toFixed(0) + '%');
+        if (g.pEst != null) extras.push('WR estimado ' + pctTxt(g.pEst) + (g.pLB != null ? ' (LB ' + pctTxt(g.pLB) + (g.pN ? ', ' + g.pN + ' ops' : '') + ')' : ''));
+        if (g.expOp != null) extras.push('expectativa ' + (g.expOp >= 0 ? '+' : '') + g.expOp.toFixed(2) + '/op');
         if (g.kelly != null) extras.push('risco sugerido (½ Kelly) ' + (g.kelly * 100).toFixed(2) + '%');
         if (extras.length) r.textContent += ' ' + extras.join(' · ') + '.';
         if (g.motivos.length) r.textContent += ' Ressalvas: ' + g.motivos.join(', ') + '.';
@@ -1654,8 +1697,10 @@ function calcularMetricas(validas) {
         return v == null ? null : ['WR últimos ' + n, v.toFixed(0) + '%', v >= beWR ? 'good' : 'bad'];
     }).filter(Boolean);
 
+    const wrLBpct = wilsonLB(wins.length, evaluated.length) * 100;   // WR "garantido" (95%)
     const cards = [
         ['Win rate geral', wr.toFixed(1) + '%', wr >= beWR ? 'good' : 'bad'],
+        ['Win rate (LB 95%)', wrLBpct.toFixed(1) + '%', wrLBpct >= beWR ? 'good' : 'bad'],
         ['Win rate p/ empatar', beWR.toFixed(1) + '%', ''],
         ...cardsRecentes,
         ['P&L acumulado', (pnl >= 0 ? '+' : '') + pnl.toFixed(2) + 'u', pnl >= 0 ? 'good' : 'bad'],
@@ -1680,8 +1725,9 @@ function calcularMetricas(validas) {
     });
     byScoreGlobal = { scores: byScore, beWR };
     scoreBody.innerHTML = Object.keys(byScore).sort().reverse().map(k => {
-        const o = byScore[k], r = o.w / o.t * 100;
-        return `<tr><td>${k}</td><td>${o.t}</td><td>${o.w}</td><td class="${r >= beWR ? 'res-win' : 'res-loss'}">${r.toFixed(0)}%</td></tr>`;
+        const o = byScore[k], r = o.w / o.t * 100, lb = wilsonLB(o.w, o.t) * 100;
+        // acerto cru + limite inferior: um score com poucas amostras mostra LB baixo
+        return `<tr><td>${k}</td><td>${o.t}</td><td>${o.w}</td><td class="${lb >= beWR ? 'res-win' : 'res-loss'}">${r.toFixed(0)}% <span class="ia-params">(LB ${lb.toFixed(0)}%)</span></td></tr>`;
     }).join('');
 
     // Curva de capital acumulada
@@ -2302,8 +2348,9 @@ async function escanear() {
                 score: Math.round(domScore / (enabled || 1) * 100),
                 dir: long > short ? 1 : short > long ? -1 : 0
             });
-            if (long >= alvo && long > short) res.push({ s, dir: 1, score: long, enabled, tuned });
-            else if (short >= alvo && short > long) res.push({ s, dir: -1, score: short, enabled, tuned });
+            const wrLB = cc && cc.wrLB != null ? cc.wrLB : null;   // acerto validado (limite inferior 95%)
+            if (long >= alvo && long > short) res.push({ s, dir: 1, score: long, enabled, tuned, wrLB });
+            else if (short >= alvo && short > long) res.push({ s, dir: -1, score: short, enabled, tuned, wrLB });
         } catch (e) { }
     }
     renderHeat();
@@ -2311,13 +2358,22 @@ async function escanear() {
     dados = dSave; recomputarIndicadores();
     if (el('useHtf').checked) { await carregarHtf(); }
     recomputarSinais();
-    res.sort((a, b) => b.score - a.score);
+    // Ranqueia por EDGE ESTATÍSTICO VALIDADO primeiro (pares cujo acerto no limite
+    // inferior supera o break-even), depois pela força da confluência atual.
+    const payoutSc = Math.max(0.01, (parseFloat(el('payout').value) || 87) / 100);
+    const beWRSc = 1 / (1 + payoutSc);
+    res.forEach(r => r.edgeLB = r.wrLB != null ? r.wrLB - beWRSc : null);
+    res.sort((a, b) => {
+        const va = a.edgeLB != null && a.edgeLB >= 0 ? 1 : 0, vb = b.edgeLB != null && b.edgeLB >= 0 ? 1 : 0;
+        return vb - va || (b.edgeLB ?? -1) - (a.edgeLB ?? -1) || b.score - a.score;
+    });
     document.getElementById('scanMeta').textContent = res.length + '/' + lista.length;
     const elList = document.getElementById('scanList');
     elList.innerHTML = res.length ? res.map(r => {
         const lbl = PARES_YAHOO[r.s] ? PARES_YAHOO[r.s].label : r.s;
         const tag = r.tuned ? ' <span class="scan-tuned" title="parâmetros otimizados pela IA">✦</span>' : '';
-        return `<span class="decision-chip scan-item" data-s="${r.s}">${lbl}${tag} <span class="${r.dir === 1 ? 'chip-dir-up' : 'chip-dir-down'}">${r.dir === 1 ? '▲ CALL' : '▼ PUT'} ${r.score}/${r.enabled}</span></span>`;
+        const lbTag = r.wrLB != null ? ` <span class="${r.edgeLB >= 0 ? 'chip-dir-up' : 'chip-dir-down'}" title="acerto validado no limite inferior (95%) vs break-even ${pctTxt(beWRSc)}">${pctTxt(r.wrLB)}✓</span>` : '';
+        return `<span class="decision-chip scan-item" data-s="${r.s}">${lbl}${tag} <span class="${r.dir === 1 ? 'chip-dir-up' : 'chip-dir-down'}">${r.dir === 1 ? '▲ CALL' : '▼ PUT'} ${r.score}/${r.enabled}</span>${lbTag}</span>`;
     }).join('') : '<span class="decision-context">Nenhuma moeda com entrada agora — afrouxe a confluência ou troque o timeframe.</span>';
     elList.querySelectorAll('.scan-item').forEach(x => x.addEventListener('click', () => {
         const s = x.getAttribute('data-s');
@@ -2449,11 +2505,17 @@ function atualizarCalibracaoIA() {
     if (res.length < 3) { cal.style.display = 'none'; return; }
     const wins = res.filter(r => r.resultado === 'WIN').length;
     const real = wins / res.length;
+    const lb = wilsonLB(wins, res.length);
     cal.style.display = 'block';
-    let txt = `📊 Placar real: <strong>${wins}/${res.length}</strong> (${Math.round(real * 100)}% acerto)`;
+    // Placar real com faixa de confiança: acerto de ponto + limite inferior (95%).
+    // A amostra pequena é sinalizada — poucos resultados não provam nada ainda.
+    let txt = `📊 Placar real: <strong>${wins}/${res.length}</strong> (${pctTxt(real)}, LB ${pctTxt(lb)})`;
+    if (res.length < 10) txt += ` <span class="chip-dir-none">amostra pequena</span>`;
     if (cc) {
-        const dif = Math.abs(real - cc.wr);
-        txt += ` · IA previu ${Math.round(cc.wr * 100)}% <span class="${dif <= 0.10 ? 'chip-dir-up' : 'chip-dir-down'}">${dif <= 0.10 ? 'calibrada ✓' : 'descalibrada ⚠'}</span>`;
+        // "calibrada" = a previsão da IA cai dentro do intervalo plausível do real,
+        // não apenas perto do ponto — julga contra a incerteza, não contra a sorte.
+        const dentro = cc.wr >= lb - 0.02;
+        txt += ` · IA previu ${pctTxt(cc.wr)}${cc.wrLB != null ? ' (LB ' + pctTxt(cc.wrLB) + ')' : ''} <span class="${dentro ? 'chip-dir-up' : 'chip-dir-down'}">${dentro ? 'calibrada ✓' : 'otimista ⚠'}</span>`;
     }
     cal.innerHTML = txt;
 }
@@ -2489,6 +2551,8 @@ function statsEnt(ents) {
 // ROBUSTO: treino nos primeiros 55% e validação em 3 janelas deslizantes
 // (55–70%, 70–85%, 85–100%). robustVal = pior janela com amostra — um parâmetro
 // que só funciona num pedaço da validação (sorte) não passa mais.
+// wrLB = limite inferior de Wilson da validação: a taxa de acerto que temos ~95%
+// de confiança de existir (amostra pequena é penalizada automaticamente).
 function avaliarWalkForward() {
     recomputarIndicadores(); recomputarSinais(); recomputarEntradas();
     const n = dados.length;
@@ -2497,8 +2561,10 @@ function avaliarWalkForward() {
         statsEnt(entradas.filter(e => e.index >= Math.floor(n * a) && e.index < Math.floor(n * b))));
     const w = folds.reduce((s, f) => s + f.w, 0), ops = folds.reduce((s, f) => s + f.ops, 0);
     const comAmostra = folds.filter(f => f.ops >= 2);
+    // robustez conservadora: pior janela medida no LIMITE INFERIOR de Wilson
     const robustVal = comAmostra.length ? Math.min(...comAmostra.map(f => f.wr)) : (ops ? w / ops : 0);
-    return { treino, val: { ops, w, wr: ops ? w / ops : 0 }, robustVal };
+    const robustLB = comAmostra.length ? Math.min(...comAmostra.map(f => wilsonLB(f.w, f.ops))) : wilsonLB(w, ops);
+    return { treino, val: { ops, w, wr: ops ? w / ops : 0, wrLB: wilsonLB(w, ops) }, robustVal, robustLB };
 }
 
 // Otimiza UM símbolo: varre a grade × timeframes e devolve o melhor combo por TF
@@ -2546,19 +2612,28 @@ async function _iaOtimizarSimbolo(symbol, isSim, dSimBase, beWR, EXP_OPCOES, el)
             totalCombos++;
             if (++n % 10 === 0) await new Promise(r => setTimeout(r, 0));   // deixa a UI respirar
             if (wf.treino.ops < IA_MIN_OPS || wf.val.ops < IA_MIN_VAL) continue;
-            // robustez = pior janela entre treino e as fatias da validação (anti-overfit)
-            const robust = Math.min(wf.treino.wr, wf.robustVal);
-            if (!best || robust > best.robust || (robust === best.robust && wf.val.ops > best.val.ops))
-                best = { tf, exp: c.exp, ms: c.ms, sv: c.sv, sc: c.sc, lk: c.lk, cd: c.cd, robust, treino: wf.treino, val: wf.val };
+            // robustez = pior janela entre treino e validação, no LIMITE INFERIOR
+            // de Wilson (anti-overfit + anti-sorte-de-amostra-pequena).
+            const robust = Math.min(wilsonLB(wf.treino.w, wf.treino.ops), wf.robustLB);
+            // edge que temos ~95% de confiança de existir fora da amostra
+            const edgeLB = wf.val.wrLB - beWR;
+            if (!best || edgeLB > best.edgeLB || (edgeLB === best.edgeLB && robust > best.robust))
+                best = { tf, exp: c.exp, ms: c.ms, sv: c.sv, sc: c.sc, lk: c.lk, cd: c.cd, robust, edgeLB, treino: wf.treino, val: wf.val };
         }
         if (best) porTf.push(best);
     }
-    // ranqueia pelo EDGE LÍQUIDO fora da amostra (acerto − break-even do payout)
-    porTf.forEach(r => r.edge = r.val.wr - beWR);
-    porTf.sort((a, b) => b.edge - a.edge || b.robust - a.robust);
+    const payout = 1 / beWR - 1;   // recupera o payout a partir do break-even
+    // Ranqueia pelo EDGE LÍQUIDO NO LIMITE INFERIOR (conservador): prefere o combo
+    // com evidência estatística de vantagem, não o de win rate cru mais alto.
+    porTf.forEach(r => {
+        r.edge = r.val.wr - beWR;              // edge do ponto estimado
+        r.edgeLB = r.val.wrLB - beWR;          // edge que a estatística garante (~95%)
+        r.expOp = expectancia(r.val.wr, payout);   // R$ esperado por R$1 arriscado
+    });
+    porTf.sort((a, b) => b.edgeLB - a.edgeLB || b.edge - a.edge);
     if (porTf.length) {
         const rec = porTf[0];
-        const reg = { tf: rec.tf, exp: rec.exp, ms: rec.ms, sv: rec.sv, sc: rec.sc, lk: rec.lk, cd: rec.cd, wr: rec.val.wr, reg: regSym };
+        const reg = { tf: rec.tf, exp: rec.exp, ms: rec.ms, sv: rec.sv, sc: rec.sc, lk: rec.lk, cd: rec.cd, wr: rec.val.wr, wrLB: rec.val.wrLB, ops: rec.val.ops, reg: regSym };
         iaCache[symbol] = reg;                                  // fallback geral
         if (regSym) iaCache[symbol + '|' + regSym] = reg;       // conjunto específico do regime
     }
@@ -2629,22 +2704,23 @@ async function otimizarIA() {
     // ---- VISÃO MULTI-MOEDA: um resultado por moeda (o melhor combo de cada) ----
     const comOk = resultados.filter(r => r.porTf.length);
     const semOk = resultados.filter(r => !r.porTf.length);
-    comOk.sort((a, b) => b.porTf[0].edge - a.porTf[0].edge);
+    comOk.sort((a, b) => b.porTf[0].edgeLB - a.porTf[0].edgeLB);
     if (!comOk.length) {
         document.getElementById('iaContext').textContent = `Nenhuma das ${symbols.length} moedas passou na validação fora da amostra. Aumente as velas (300+) ou reduza a seleção.`;
         document.getElementById('iaList').innerHTML = '';
         fimIA(); return;
     }
     document.getElementById('iaContext').textContent =
-        `${comOk.length}/${symbols.length} moedas afinadas — o Scanner (🔎) já usa esses parâmetros. Melhor: ${comOk[0].label} (${(comOk[0].porTf[0].val.wr * 100).toFixed(0)}% val, edge ${edgeTxtIA(comOk[0].porTf[0].edge)}). Clique numa moeda para abri-la já otimizada.`;
+        `${comOk.length}/${symbols.length} moedas afinadas — o Scanner (🔎) já usa esses parâmetros. Melhor: ${comOk[0].label} (${pctTxt(comOk[0].porTf[0].val.wr)} val · edge garantido ${edgeTxtIA(comOk[0].porTf[0].edgeLB)}). Ordenadas pelo edge no limite inferior (95% conf.), não pelo acerto cru. Clique numa moeda para abri-la já otimizada.`;
     const rows = comOk.map((r, i) => {
         const b = r.porTf[0];
-        const vwr = (b.val.wr * 100).toFixed(0), twr = (b.treino.wr * 100).toFixed(0);
-        const cls = b.edge >= 0.05 ? 'chip-dir-up' : b.edge >= 0 ? '' : 'chip-dir-down';
+        const vwr = pctTxt(b.val.wr), lb = pctTxt(b.val.wrLB), twr = pctTxt(b.treino.wr);
+        const cls = b.edgeLB >= 0.05 ? 'chip-dir-up' : b.edgeLB >= 0 ? '' : 'chip-dir-down';
         const star = i === 0 ? '<span class="scan-tuned">✦</span> ' : '';
+        const expTxt = (b.expOp >= 0 ? '+' : '') + b.expOp.toFixed(2);
         return `<div class="reg-row ia-row" data-sym="${r.symbol}" data-tf="${b.tf}" data-exp="${b.exp}" data-ms="${b.ms}" data-sv="${b.sv}" data-sc="${b.sc}" data-lk="${b.lk}" data-cd="${b.cd}">` +
             `<span class="reg-hora">${star}${r.label}</span>` +
-            `<span class="reg-par"><span class="${cls}">${vwr}% val · ${edgeTxtIA(b.edge)}</span> <span class="ia-params">(${twr}% treino · ${b.val.w}/${b.val.ops} ops · ${rotTf(b.tf)}·${b.exp}m)</span></span>` +
+            `<span class="reg-par"><span class="${cls}">${vwr} val · LB ${lb}</span> <span class="ia-params">(exp ${expTxt}/op · ${b.val.w}/${b.val.ops} ops · ${rotTf(b.tf)}·${b.exp}m)</span></span>` +
             `<span class="ia-params">score≥${b.ms} · RSI ${b.sv}/${b.sc} · estrut ${b.lk} · cd ${b.cd}</span></div>`;
     });
     if (semOk.length) rows.push(`<div class="reg-row"><span class="ia-params" style="opacity:.7">Sem edge válido: ${semOk.map(r => r.label).join(', ')}</span></div>`);
@@ -2675,15 +2751,17 @@ function renderIAUmPar(resultado, isSim, el) {
         return;
     }
     const rec = porTf[0];
+    const expBest = (rec.expOp >= 0 ? '+' : '') + rec.expOp.toFixed(2);
     document.getElementById('iaContext').textContent =
-        `${par}: melhor setup é ${rotTf(rec.tf)} com expiração ${rec.exp}m — ${(rec.val.wr * 100).toFixed(0)}% fora da amostra (edge líquido ${edgeTxtIA(rec.edge)} vs break-even). Clique para aplicar.`;
+        `${par}: melhor setup é ${rotTf(rec.tf)} com expiração ${rec.exp}m — ${pctTxt(rec.val.wr)} fora da amostra (LB ${pctTxt(rec.val.wrLB)}, edge garantido ${edgeTxtIA(rec.edgeLB)}, expectativa ${expBest}/op). Ranqueado pelo edge no limite inferior de confiança. Clique para aplicar.`;
     document.getElementById('iaList').innerHTML = porTf.map((r, i) => {
-        const vwr = (r.val.wr * 100).toFixed(0), twr = (r.treino.wr * 100).toFixed(0);
-        const cls = r.edge >= 0.05 ? 'chip-dir-up' : r.edge >= 0 ? '' : 'chip-dir-down';
+        const vwr = pctTxt(r.val.wr), lb = pctTxt(r.val.wrLB), twr = pctTxt(r.treino.wr);
+        const cls = r.edgeLB >= 0.05 ? 'chip-dir-up' : r.edgeLB >= 0 ? '' : 'chip-dir-down';
         const star = i === 0 ? '<span class="scan-tuned">✦</span> ' : '';
+        const expTxt = (r.expOp >= 0 ? '+' : '') + r.expOp.toFixed(2);
         return `<div class="reg-row ia-row" data-i="${i}">` +
             `<span class="reg-hora">${star}${rotTf(r.tf)}·${r.exp}m</span>` +
-            `<span class="reg-par"><span class="${cls}">${vwr}% val · ${edgeTxtIA(r.edge)}</span> <span class="ia-params">(${twr}% treino · ${r.val.w}/${r.val.ops} ops)</span></span>` +
+            `<span class="reg-par"><span class="${cls}">${vwr} val · LB ${lb}</span> <span class="ia-params">(exp ${expTxt}/op · ${twr} treino · ${r.val.w}/${r.val.ops} ops)</span></span>` +
             `<span class="ia-params">score≥${r.ms} · RSI ${r.sv}/${r.sc} · estrut ${r.lk} · cd ${r.cd}</span></div>`;
     }).join('');
     document.getElementById('iaList').querySelectorAll('.ia-row').forEach(row => row.addEventListener('click', () => {
@@ -2692,7 +2770,7 @@ function renderIAUmPar(resultado, isSim, el) {
         el('rsiSobrevenda').value = r.sv; el('rsiSobrecompra').value = r.sc;
         el('estruturaLookback').value = r.lk; el('cooldownVelas').value = r.cd;
         el('expiracao').value = r.exp;
-        iaCache[symbol] = { tf: r.tf, exp: r.exp, ms: r.ms, sv: r.sv, sc: r.sc, lk: r.lk, cd: r.cd, wr: r.val.wr };
+        iaCache[symbol] = { tf: r.tf, exp: r.exp, ms: r.ms, sv: r.sv, sc: r.sc, lk: r.lk, cd: r.cd, wr: r.val.wr, wrLB: r.val.wrLB, ops: r.val.ops };
         localStorage.setItem('iaCache', JSON.stringify(iaCache));
         row.parentElement.querySelectorAll('.ia-row').forEach(x => x.classList.remove('ia-sel'));
         row.classList.add('ia-sel');

@@ -546,8 +546,9 @@ async function escanear() {
                 score: Math.round(domScore / (enabled || 1) * 100),
                 dir: long > short ? 1 : short > long ? -1 : 0
             });
-            if (long >= alvo && long > short) res.push({ s, dir: 1, score: long, enabled, tuned });
-            else if (short >= alvo && short > long) res.push({ s, dir: -1, score: short, enabled, tuned });
+            const wrLB = cc && cc.wrLB != null ? cc.wrLB : null;   // acerto validado (limite inferior 95%)
+            if (long >= alvo && long > short) res.push({ s, dir: 1, score: long, enabled, tuned, wrLB });
+            else if (short >= alvo && short > long) res.push({ s, dir: -1, score: short, enabled, tuned, wrLB });
         } catch (e) { }
     }
     renderHeat();
@@ -555,13 +556,22 @@ async function escanear() {
     dados = dSave; recomputarIndicadores();
     if (el('useHtf').checked) { await carregarHtf(); }
     recomputarSinais();
-    res.sort((a, b) => b.score - a.score);
+    // Ranqueia por EDGE ESTATÍSTICO VALIDADO primeiro (pares cujo acerto no limite
+    // inferior supera o break-even), depois pela força da confluência atual.
+    const payoutSc = Math.max(0.01, (parseFloat(el('payout').value) || 87) / 100);
+    const beWRSc = 1 / (1 + payoutSc);
+    res.forEach(r => r.edgeLB = r.wrLB != null ? r.wrLB - beWRSc : null);
+    res.sort((a, b) => {
+        const va = a.edgeLB != null && a.edgeLB >= 0 ? 1 : 0, vb = b.edgeLB != null && b.edgeLB >= 0 ? 1 : 0;
+        return vb - va || (b.edgeLB ?? -1) - (a.edgeLB ?? -1) || b.score - a.score;
+    });
     document.getElementById('scanMeta').textContent = res.length + '/' + lista.length;
     const elList = document.getElementById('scanList');
     elList.innerHTML = res.length ? res.map(r => {
         const lbl = PARES_YAHOO[r.s] ? PARES_YAHOO[r.s].label : r.s;
         const tag = r.tuned ? ' <span class="scan-tuned" title="parâmetros otimizados pela IA">✦</span>' : '';
-        return `<span class="decision-chip scan-item" data-s="${r.s}">${lbl}${tag} <span class="${r.dir === 1 ? 'chip-dir-up' : 'chip-dir-down'}">${r.dir === 1 ? '▲ CALL' : '▼ PUT'} ${r.score}/${r.enabled}</span></span>`;
+        const lbTag = r.wrLB != null ? ` <span class="${r.edgeLB >= 0 ? 'chip-dir-up' : 'chip-dir-down'}" title="acerto validado no limite inferior (95%) vs break-even ${pctTxt(beWRSc)}">${pctTxt(r.wrLB)}✓</span>` : '';
+        return `<span class="decision-chip scan-item" data-s="${r.s}">${lbl}${tag} <span class="${r.dir === 1 ? 'chip-dir-up' : 'chip-dir-down'}">${r.dir === 1 ? '▲ CALL' : '▼ PUT'} ${r.score}/${r.enabled}</span>${lbTag}</span>`;
     }).join('') : '<span class="decision-context">Nenhuma moeda com entrada agora — afrouxe a confluência ou troque o timeframe.</span>';
     elList.querySelectorAll('.scan-item').forEach(x => x.addEventListener('click', () => {
         const s = x.getAttribute('data-s');
