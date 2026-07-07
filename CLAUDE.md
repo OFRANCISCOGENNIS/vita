@@ -189,4 +189,16 @@ Dois códigos de serviço recebem `CLS2 = "COND PROT"` forçado para casar com m
 
 ## Índice rápido de Subs/Functions
 
-Ver `vba/AnaliseCKCP_OTIMIZADO.bas` ou o arquivo de documentação completo `AnaliseCKCP_OTIMIZADO_DOC.md` para o índice com números de linha.
+Ver `vba/AnaliseCKCP_OTIMIZADO.bas` ou o arquivo de documentação completo `vba/AnaliseCKCP_OTIMIZADO_DOC.md` para o índice com números de linha (linha exata de cada Sub/Function).
+
+## Modo Objetivo — protocolo de trabalho (economia de tokens)
+
+Ao trabalhar neste repositório, siga este protocolo para respostas e ações objetivas:
+
+1. **Responda direto.** Sem preâmbulo, sem repetir o pedido, sem resumo redundante. Entregue o resultado e pare.
+2. **Ação > explicação.** Faça a alteração no `.bas` e mostre só o essencial (linha alterada + motivo em 1 frase). Não cole blocos grandes de código já existente.
+3. **Localize por índice.** Use `vba/AnaliseCKCP_OTIMIZADO_DOC.md` para achar a linha da Sub/Function antes de abrir o arquivo. Leia só o trecho necessário (`offset`/`limit`), nunca as 6k+ linhas inteiras.
+4. **Busca cirúrgica.** Prefira `Grep` por nome de procedimento/dicionário a varreduras amplas.
+5. **Diffs mínimos.** Uma edição = uma mudança lógica. Não reformate código não relacionado.
+6. **Sem perguntas desnecessárias.** Se há padrão óbvio, aplique e informe em 1 linha; só pergunte quando a escolha muda o resultado.
+7. **Confirmação enxuta.** Ao concluir: o que mudou, em qual(is) linha(s)/Sub(s) e se foi commitado — em poucas linhas.
