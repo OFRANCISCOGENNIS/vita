@@ -1155,6 +1155,39 @@ body {
 #registroPanel .reg-row { padding: 3px 6px; font-size: 12px; gap: 8px; }
 #registroPanel .reg-hora { min-width: 38px; }
 
+/* ---- Registro de entradas: COLUNA LATERAL DIREITA (tabela alta, lado todo) ---- */
+/* Sobrescreve o estilo anterior de "card pequeno". */
+#registroPanel.registro-col {
+    flex: 0 0 340px;
+    width: 340px;
+    max-width: 340px;
+    margin-left: 0;
+    align-self: flex-start;
+    position: sticky;
+    top: 10px;
+    max-height: calc(100vh - 20px);
+    flex-direction: column;   /* quando visível o JS aplica display:flex */
+    padding: 14px;
+    box-shadow: none;
+}
+#registroPanel.registro-col #chartRegistro { height: 70px; flex: 0 0 auto; }
+#registroPanel.registro-col .reg-list {
+    flex: 1 1 auto;
+    max-height: none;         /* ocupa toda a altura restante da coluna */
+    margin-top: 8px;
+}
+#registroPanel.registro-col .reg-row { padding: 5px 6px; font-size: 12.5px; gap: 8px; }
+
+/* Em telas estreitas o layout já empilha em coluna (media query existente):
+   aí o registro volta a ocupar a largura toda embaixo. */
+@media (max-width: 1200px) {
+    #registroPanel.registro-col {
+        flex-basis: auto; width: 100%; max-width: none;
+        position: static; max-height: none;
+    }
+    #registroPanel.registro-col .reg-list { max-height: 260px; }
+}
+
 </style>
 </head>
 <body>
@@ -1433,13 +1466,6 @@ body {
                     <div id="scanList" class="decision-chips"></div>
                 </div>
 
-                <div class="chart-container" id="registroPanel" style="display:none;">
-                    <h2>🗓️ Registro de entradas <span id="registroMeta" class="tv-sync-tag"></span>
-                        <button id="btnLimparReg" class="btn-ghost" style="float:right;">Limpar</button></h2>
-                    <div id="chartRegistro" style="height:84px;"></div>
-                    <div id="registroBody" class="reg-list"></div>
-                </div>
-
                 <div class="chart-container" id="iaPanel" style="display:none;">
                     <h2>🤖 IA — melhores parâmetros <span id="iaMeta" class="tv-sync-tag"></span></h2>
                     <div id="iaContext" class="decision-context"></div>
@@ -1609,6 +1635,14 @@ body {
                     </div>
                 </div>
             </section>
+
+            <!-- COLUNA DIREITA: Registro de entradas (tabela lateral) -->
+            <aside class="registro-col chart-container" id="registroPanel" style="display:none;">
+                <h2>🗓️ Registro de entradas <span id="registroMeta" class="tv-sync-tag"></span>
+                    <button id="btnLimparReg" class="btn-ghost" style="float:right;">Limpar</button></h2>
+                <div id="chartRegistro" style="height:70px;"></div>
+                <div id="registroBody" class="reg-list"></div>
+            </aside>
         </main>
 
         <!-- FOOTER -->
@@ -3900,9 +3934,9 @@ function registrarEntrada(par, dir, score, enabled, extra) {
 function renderRegistro() {
     const panel = document.getElementById('registroPanel');
     if (!registro.length) { panel.style.display = 'none'; return; }
-    panel.style.display = 'block';
+    panel.style.display = 'flex';
     if (!chartRegistro) {
-        chartRegistro = LightweightCharts.createChart(document.getElementById('chartRegistro'), { ...opcoesBase(), height: 84 });
+        chartRegistro = LightweightCharts.createChart(document.getElementById('chartRegistro'), { ...opcoesBase(), height: 70 });
         serieRegistro = chartRegistro.addLineSeries({ color: 'rgba(120,120,120,0.35)', lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
         chartRegistro.priceScale('right').applyOptions({ visible: false });
     }
@@ -3918,8 +3952,8 @@ function renderRegistro() {
             time: r.t,
             position: r.dir === 1 ? 'aboveBar' : 'belowBar',
             color: r.dir === 1 ? '#26a69a' : '#ef5350',
-            shape: r.dir === 1 ? 'arrowUp' : 'arrowDown',
-            text: r.par + (r.grade ? ' [' + r.grade + ']' : '')
+            shape: r.dir === 1 ? 'arrowUp' : 'arrowDown'
+            // sem texto: as setas ficam limpas na horizontal (par/grade aparecem na tabela abaixo)
         })),
         ...news.map(n => ({ time: n.t, position: 'inBar', color: '#fab219', shape: 'circle', text: '⚡' }))
     ].sort((a, b) => a.time - b.time));

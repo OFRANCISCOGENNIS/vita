@@ -2279,9 +2279,9 @@ function registrarEntrada(par, dir, score, enabled, extra) {
 function renderRegistro() {
     const panel = document.getElementById('registroPanel');
     if (!registro.length) { panel.style.display = 'none'; return; }
-    panel.style.display = 'block';
+    panel.style.display = 'flex';
     if (!chartRegistro) {
-        chartRegistro = LightweightCharts.createChart(document.getElementById('chartRegistro'), { ...opcoesBase(), height: 84 });
+        chartRegistro = LightweightCharts.createChart(document.getElementById('chartRegistro'), { ...opcoesBase(), height: 70 });
         serieRegistro = chartRegistro.addLineSeries({ color: 'rgba(120,120,120,0.35)', lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
         chartRegistro.priceScale('right').applyOptions({ visible: false });
     }
@@ -2297,8 +2297,8 @@ function renderRegistro() {
             time: r.t,
             position: r.dir === 1 ? 'aboveBar' : 'belowBar',
             color: r.dir === 1 ? '#26a69a' : '#ef5350',
-            shape: r.dir === 1 ? 'arrowUp' : 'arrowDown',
-            text: r.par + (r.grade ? ' [' + r.grade + ']' : '')
+            shape: r.dir === 1 ? 'arrowUp' : 'arrowDown'
+            // sem texto: as setas ficam limpas na horizontal (par/grade aparecem na tabela abaixo)
         })),
         ...news.map(n => ({ time: n.t, position: 'inBar', color: '#fab219', shape: 'circle', text: '⚡' }))
     ].sort((a, b) => a.time - b.time));

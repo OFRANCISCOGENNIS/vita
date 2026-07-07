@@ -1135,3 +1135,36 @@ body {
 #registroPanel .reg-list { max-height: 120px; margin-top: 6px; }
 #registroPanel .reg-row { padding: 3px 6px; font-size: 12px; gap: 8px; }
 #registroPanel .reg-hora { min-width: 38px; }
+
+/* ---- Registro de entradas: COLUNA LATERAL DIREITA (tabela alta, lado todo) ---- */
+/* Sobrescreve o estilo anterior de "card pequeno". */
+#registroPanel.registro-col {
+    flex: 0 0 340px;
+    width: 340px;
+    max-width: 340px;
+    margin-left: 0;
+    align-self: flex-start;
+    position: sticky;
+    top: 10px;
+    max-height: calc(100vh - 20px);
+    flex-direction: column;   /* quando visível o JS aplica display:flex */
+    padding: 14px;
+    box-shadow: none;
+}
+#registroPanel.registro-col #chartRegistro { height: 70px; flex: 0 0 auto; }
+#registroPanel.registro-col .reg-list {
+    flex: 1 1 auto;
+    max-height: none;         /* ocupa toda a altura restante da coluna */
+    margin-top: 8px;
+}
+#registroPanel.registro-col .reg-row { padding: 5px 6px; font-size: 12.5px; gap: 8px; }
+
+/* Em telas estreitas o layout já empilha em coluna (media query existente):
+   aí o registro volta a ocupar a largura toda embaixo. */
+@media (max-width: 1200px) {
+    #registroPanel.registro-col {
+        flex-basis: auto; width: 100%; max-width: none;
+        position: static; max-height: none;
+    }
+    #registroPanel.registro-col .reg-list { max-height: 260px; }
+}
