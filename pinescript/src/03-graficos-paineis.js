@@ -913,23 +913,27 @@ function atualizarDecisao() {
     // Som apenas na TRANSIÇÃO para CALL/PUT (não repete enquanto o veredito se
     // mantém; silenciado durante o treino de leitura para não apitar no replay)
     if (verdictKey !== ultimoVerdictSom) {
+        const ehEntrada = (verdictKey === 'CALL' || verdictKey === 'PUT') && !treino;
+        const dirN = verdictKey === 'CALL' ? 1 : -1;
+        // Selo A/B/C da virada — calculado uma vez, usado no registro e no filtro
+        // da notificação (que dispara só para as entradas de maior qualidade).
+        const gGrade = ehEntrada && dados.length ? calcularGrade(dirN).grade : null;
         // Registro em tempo real: a virada do veredito para CALL/PUT entra na
         // timeline do Registro de Entradas com o selo A/B/C do momento
-        if ((verdictKey === 'CALL' || verdictKey === 'PUT') && !treino && dados.length) {
-            const dirN = verdictKey === 'CALL' ? 1 : -1;
+        if (ehEntrada && dados.length) {
             const lbl = PARES_YAHOO[symbolAtual()] ? PARES_YAHOO[symbolAtual()].label : symbolAtual();
-            const g = usaGrade ? calcularGrade(dirN).grade : null;
-            registrarEntrada(lbl, dirN, Math.max(long, short), enabled, { grade: g, live: 1, exp: parseInt(document.getElementById('expiracao').value) || 5, sym: symbolAtual(), fonte: fonte() });
+            registrarEntrada(lbl, dirN, Math.max(long, short), enabled, { grade: usaGrade ? gGrade : null, live: 1, exp: parseInt(document.getElementById('expiracao').value) || 5, sym: symbolAtual(), fonte: fonte() });
             renderRegistro();
         }
         if (document.getElementById('somAtivo').checked && !treino) {
             if (verdictKey === 'CALL') tocarSom(1);
             else if (verdictKey === 'PUT') tocarSom(-1);
         }
-        // Notificação de navegador quando a aba está em segundo plano
-        if ((verdictKey === 'CALL' || verdictKey === 'PUT') && !treino) {
+        // Notificação de navegador — SÓ para entradas nível A (as de maior
+        // qualidade). Evita spam: as viradas B/C não notificam.
+        if (ehEntrada && gGrade === 'A') {
             const lbl = PARES_YAHOO[symbolAtual()] ? PARES_YAHOO[symbolAtual()].label : symbolAtual();
-            notificar(`${verdictKey === 'CALL' ? '▲ CALL' : '▼ PUT'} — ${lbl}`, `Veredito ${verdictKey} · confluência ${Math.max(long, short)}/${enabled} · exp ${document.getElementById('expiracao').value}m`);
+            notificar(`🅰 ${verdictKey === 'CALL' ? '▲ CALL' : '▼ PUT'} — ${lbl}`, `Entrada nível A · confluência ${Math.max(long, short)}/${enabled} · exp ${document.getElementById('expiracao').value}m`);
         }
         ultimoVerdictSom = verdictKey;
     }

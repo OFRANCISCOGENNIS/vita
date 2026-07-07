@@ -103,6 +103,23 @@ const vis0 = await p.$eval('.sidebar', e => getComputedStyle(e).display !== 'non
 await p.keyboard.press('c'); await p.waitForTimeout(150);
 check('atalho C recolhe controles', vis0 && await p.$eval('.sidebar', e => getComputedStyle(e).display === 'none'));
 
+// 7.5) Notificação só para entradas nível A
+const notif = await p.evaluate(() => {
+  const chamadas = [];
+  window.notificar = (t) => chamadas.push(t);   // espião (ignora guardas de permissão)
+  const gStub = grade => () => ({ grade, estrelas: 4, score: 80, motivos: [], regime: null, pEst: null, pLB: null, pN: 0, expOp: null, expOpLB: null, kelly: null });
+  const orig = window.calcularGrade;
+  const base = { long: 6, short: 0, enabled: 6, minScore: 3, confMode: 'score', fatores: (confLive && confLive.fatores) || [] };
+  window.calcularGrade = gStub('C'); confLive = Object.assign({}, base); ultimoVerdictSom = 'WAIT'; atualizarDecisao();
+  const aposC = chamadas.length;
+  window.calcularGrade = gStub('A'); confLive = Object.assign({}, base); ultimoVerdictSom = 'WAIT'; atualizarDecisao();
+  const aposA = chamadas.length;
+  window.calcularGrade = orig;
+  return { aposC, aposA };
+});
+check('notificação NÃO dispara em nível C', notif.aposC === 0, 'C=' + notif.aposC);
+check('notificação dispara em nível A', notif.aposA === 1, 'A=' + notif.aposA);
+
 // 8) PWA manifest
 check('PWA manifest presente', await p.$eval('link[rel=manifest]', e => e.href.startsWith('data:application/manifest')));
 
