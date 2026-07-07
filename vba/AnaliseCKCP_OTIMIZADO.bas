@@ -2172,6 +2172,9 @@ ProxEQ:
         ElseIf pepTemSrv And CobertoReligador(CStr(p(1))) And relCov.Exists(pp) Then
             outp(rr, 8) = 0
             outp(rr, 9) = "ADERENTE"
+        ElseIf pepTemSrv And NormClassif(CStr(p(1))) = "COND NU" And dif <= 5 Then
+            outp(rr, 8) = dif
+            outp(rr, 9) = "ADERENTE"   ' COND NU: diferenca MAT x SRV <= 5 (m) considerada aderente
         ElseIf pepTemSrv And EhCabo(CStr(p(1))) _
                And sq <> 0 _
                And IIf(Abs(mq) > Abs(sq), Abs(mq), Abs(sq)) < 15 Then
@@ -3125,6 +3128,7 @@ Private Sub Gerar_Regras()
     s = s & "ADERENCIA|Cabo em KG -> metros|Materiais de cabo lancados em KG sao convertidos para metros (metros = kg x fator) antes de comparar MAT com SRV." & vbLf
     s = s & "ADERENCIA|Servico COMBO|Alguns servicos tem fator multiplicador (ex.: cruzeta dupla = 2, por km x 1000). A QTD de servico e multiplicada por esse fator antes da comparacao." & vbLf
     s = s & "ADERENCIA|Cabo < 15 m negligenciavel|Se ha servico lancado e o maior valor entre MAT e SRV de cabo for menor que 15 m, a familia de cabo e considerada ADERENTE." & vbLf
+    s = s & "ADERENCIA|COND NU: diferenca <= 5|Se ha servico lancado e a diferenca entre MAT e SRV da familia COND NU for menor ou igual a 5 (m), a familia e considerada ADERENTE, independente da margem de 10%." & vbLf
     s = s & "ADERENCIA|RAMAL (75 m por servico)|Cada servico de RAMAL contempla ate 75 m de material RAMAL. Se MAT <= SRV x 75, o RAMAL fica ADERENTE." & vbLf
     s = s & "ADERENCIA|RAMAL cobre cabo (30 m por servico)|Cada servico de RAMAL libera 30 m. Se SRV(RAMAL) x 30 cobrir (>=) o total de cabo do PEP, os cabos/condutores ficam ADERENTES." & vbLf
     s = s & "ADERENCIA|RELIGADOR (60 m por servico)|Cada servico de RELIGADOR libera 60 m para tornar aderentes COND PROT, CABO ISOLADO e COND COBRE (2 servicos = 120 m, etc.)." & vbLf
