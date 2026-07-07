@@ -1,49 +1,48 @@
 ---
 name: token-economy
-description: Modo de máxima economia de tokens do Claude Code. Use quando o usuário pedir respostas curtas, economizar tokens/custo, "modo econômico", reduzir contexto, ou quando trabalhar em arquivos muito grandes (como vba/AnaliseCKCP_OTIMIZADO.bas, 6k+ linhas). Corta verbosidade de saída e ensina padrões de leitura/busca que evitam carregar arquivos inteiros no contexto.
+description: Modo de máxima economia de tokens do Claude Code. Use quando o usuário pedir respostas curtas, economizar tokens/custo, "modo econômico", reduzir contexto, ou ao trabalhar em arquivos grandes (ex. vba/AnaliseCKCP_OTIMIZADO.bas, 6k+ linhas). Corta verbosidade e impõe padrões de leitura/busca/edição que evitam carregar conteúdo desnecessário no contexto.
 ---
 
-# Token Economy — economize ~70% dos tokens
+# Token Economy
 
-Ative este modo para reduzir drasticamente o consumo de tokens sem perder qualidade.
+Objetivo: gastar o mínimo de tokens de entrada (contexto) e saída (resposta) que ainda resolve a tarefa. Entrada domina o custo — a maior alavanca é NÃO trazer conteúdo para o contexto.
 
-## 1. Comportamento de resposta
+## Saída (resposta ao usuário)
 
-- Menor tamanho que resolve. Sem intro, sem resumo final, sem repetir a pergunta.
-- Sem listas/negrito/cabeçalhos, salvo indispensável.
-- Não ofereça ajuda extra, não narre o que vai fazer — faça.
-- Ambíguo? UMA pergunta curta, nunca respostas por hipótese.
+- Menor resposta que resolve. Sem intro, sem resumo final, sem eco da pergunta, sem "vou fazer X".
+- Sem listas/negrito/cabeçalhos salvo indispensável. Sem exemplos salvo pedido.
+- Não ofereça ajuda extra. Terminou = 1 frase.
+- Ambíguo → UMA pergunta curta (AskUserQuestion), nunca hipóteses longas.
+- Código citado: só o trecho + 1 linha de contexto. Referencie por `arquivo:linha` em vez de colar blocos.
 
-## 2. Leitura de arquivos (a maior fonte de gasto)
+## Entrada (o que entra no contexto) — regras duras
 
-NUNCA leia um arquivo grande inteiro para "entender". Custa milhares de tokens.
+1. Arquivo >200 linhas: PROIBIDO Read sem `offset`/`limit`. Localize antes com Grep (`output_mode:"content"`, `-n`, `head_limit:20`), depois Read só a faixa (limit ≤ 80).
+2. Grep em 2 fases: `files_with_matches` → conteúdo só no arquivo certo. Sempre `head_limit`. Use `-o` quando só o match interessa.
+3. `.bas` grande: `scripts/vba_index.sh [arquivo] [filtro]` dá nome+linha de cada Sub/Function; `scripts/vba_sub.sh Nome` extrai só o corpo de uma rotina. Nunca leia o módulo inteiro.
+4. Bash: toda saída potencialmente longa termina em `| head -N` ou filtro (`wc -l`, `grep -c`, `cut`). Nunca `cat` de arquivo — use os tools.
+5. Nunca re-leia arquivo recém-editado/escrito para conferir; o harness rastreia o estado.
+6. Não repita no chat conteúdo que já está num tool result — referencie.
+7. Não re-derive fatos já estabelecidos na conversa.
 
-- Localize antes com `Grep` (`output_mode:"content"`, `-n`, `head_limit`) e só então `Read` com `offset`/`limit` na faixa exata.
-- Para o índice de Subs/Functions do `.bas`, use `scripts/vba_index.sh` (retorna nome + linha, ~30x mais barato que ler o arquivo).
-- Nunca re-leia um arquivo que você acabou de editar para "conferir": Edit falha se não casar.
-- Ao citar código, mostre só o trecho + 1 linha de contexto.
+## Edições
 
-## 3. Busca
+- Edit cirúrgico: old/new mínimos e únicos. `replace_all` para renomeações. Jamais Write de arquivo inteiro para mudar poucas linhas.
+- Agrupe edições no mesmo arquivo num turno; chamadas independentes em paralelo (1 bloco).
 
-- `Grep` com `files_with_matches` primeiro; só abra o conteúdo do candidato certo.
-- `type`/`glob` para filtrar em vez de varrer tudo.
-- Prefira uma query precisa a várias amplas.
+## Delegação e contexto
 
-## 4. Ferramentas
+- Busca ampla/incerta em muitos arquivos → subagente `Explore` (devolve só a conclusão; dumps ficam fora do seu contexto).
+- Tarefa isolada e pesada em leitura → subagente, se o usuário permitir.
+- Resultado intermediário volumoso que será reusado → grave em arquivo no scratchpad e referencie o caminho, não recole no chat.
 
-- Chamadas independentes em paralelo (um bloco), não sequenciais.
-- Não rode `cat`/`head`/`tail`/`find`/`grep` via Bash — os tools dedicados dão saída menor e paginada.
-- Bash: use `| head` / filtros para não despejar saída gigante no contexto.
+## Anti-padrões (nunca)
 
-## 5. Edições
+- "Ler para entender o projeto" varrendo arquivos: use CLAUDE.md + índice + grep dirigido.
+- Reexecutar comando só para reformatar saída já obtida.
+- Listar diretório inteiro quando um Glob com padrão resolve.
+- Verificação redundante (build+teste+lint) quando 1 checagem prova a mudança.
 
-- `Edit` cirúrgico (old/new mínimos, únicos). Nunca reescreva o arquivo inteiro por uma linha.
-- `replace_all` para renomeações repetidas em vez de N edições.
+## Gatilho mental
 
-## 6. Delegação
-
-- Busca ampla e incerta em muitos arquivos → subagente `Explore`, que devolve só a conclusão em vez de encher seu contexto com dumps.
-
-## Medindo
-
-`scripts/vba_index.sh` para navegar o `.bas` grande. Regra: se você está prestes a ler >200 linhas de uma vez, pare e busque primeiro.
+Antes de qualquer tool call: "isso vai trazer >100 linhas ao contexto? existe forma de obter só a resposta?" Se sim, refine primeiro.
