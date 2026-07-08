@@ -17,6 +17,7 @@ import {
   Radar,
   Settings,
   ShieldCheck,
+  Wand2,
   X,
 } from "lucide-react";
 import { Logo } from "@/components/logo";
@@ -29,6 +30,7 @@ const NAV = [
   { href: "/app", label: "Painel", icon: LayoutDashboard, exact: true },
   { href: "/app/radar", label: "Radar Viral", icon: Radar },
   { href: "/app/novo", label: "Novo projeto", icon: PlusCircle },
+  { href: "/app/estudio", label: "Estúdio IA", icon: Wand2 },
   { href: "/app/projetos", label: "Projetos", icon: FolderOpen },
   { href: "/app/exportacoes", label: "Exportações", icon: Download },
   { href: "/app/biblioteca", label: "Biblioteca", icon: Library },

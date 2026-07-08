@@ -11,6 +11,8 @@ import {
   mockAdminUsers,
   mockCuts,
   mockDashboardStats,
+  mockEffectTemplates,
+  mockGenerations,
   mockJobs,
   mockNichePatterns,
   mockProjects,
@@ -22,10 +24,20 @@ import { NICHES } from "./presets";
 import type {
   AdminMetrics,
   AdminUserRow,
+  CameraParams,
   Cut,
   CutMode,
   DashboardStats,
+  EffectTemplate,
+  EffectTemplateParams,
+  ExtendParams,
+  FramesParams,
+  Generation,
+  GenerationParams,
+  ImageToVideoParams,
   Job,
+  LipSyncParams,
+  MotionBrushParams,
   Niche,
   NicheAlert,
   NichePattern,
@@ -34,6 +46,8 @@ import type {
   Project,
   RenderResult,
   Resolution,
+  StudioFunction,
+  TextToVideoParams,
   TrendAnalysis,
   TrendPeriod,
   TrendVideo,
@@ -479,4 +493,235 @@ export async function adminUsers(): Promise<AdminUserRow[]> {
 
 export async function adminJobs(): Promise<Job[]> {
   return request(`/admin/jobs`, () => mockJobs);
+}
+
+// ---------------------------------------------------------------- Estúdio IA (studio)
+//
+// INTEGRAÇÃO PAGA: Kling AI API (ou Runway/Luma/Pika). Cada função posta em
+// /studio/* e retorna uma Generation em status "queued". O progresso 0→100 é
+// simulado no cliente (store/studio.ts) ou, em produção, transmitido via
+// ws://.../ws/progress/{job_id}. Sem API, cai no mock determinístico abaixo.
+
+/** Resolução mock derivada da proporção escolhida (ou vertical padrão). */
+function resForAspect(aspect?: string): string {
+  switch (aspect) {
+    case "16:9":
+      return "1920x1080";
+    case "1:1":
+      return "1080x1080";
+    case "4:5":
+      return "1080x1350";
+    default:
+      return "1080x1920";
+  }
+}
+
+function newMockGeneration(
+  fn: StudioFunction,
+  params: GenerationParams,
+  opts: {
+    prompt?: string | null;
+    inputAssetUrl?: string | null;
+    inputAssetUrl2?: string | null;
+    cutId?: string | null;
+    projectId?: string | null;
+    thumbLabel: string;
+    aspect?: string;
+    duration?: number;
+  },
+): Generation {
+  return {
+    id: uid(),
+    userId: mockUser.id,
+    projectId: opts.projectId ?? null,
+    cutId: opts.cutId ?? null,
+    function: fn,
+    prompt: opts.prompt ?? null,
+    params,
+    inputAssetUrl: opts.inputAssetUrl ?? null,
+    inputAssetUrl2: opts.inputAssetUrl2 ?? null,
+    status: "queued",
+    progress: 0,
+    errorMessage: null,
+    resultUrl: null,
+    thumbnailUrl: svgThumb(opts.thumbLabel, "tecnologia"),
+    durationSeconds: opts.duration ?? 5,
+    resolution: resForAspect(opts.aspect),
+    fps: 24,
+    model: "mock",
+    createdAt: new Date().toISOString(),
+    finishedAt: null,
+  };
+}
+
+export async function studioTextToVideo(prompt: string, params: TextToVideoParams): Promise<Generation> {
+  return request(
+    `/studio/text-to-video`,
+    () =>
+      newMockGeneration("text_to_video", params, {
+        prompt,
+        thumbLabel: prompt || "Texto → Vídeo",
+        aspect: params.aspectRatio,
+        duration: params.duration,
+      }),
+    { method: "POST", body: JSON.stringify({ prompt, params }) },
+  );
+}
+
+export async function studioImageToVideo(
+  inputAssetUrl: string,
+  prompt: string | null,
+  params: ImageToVideoParams,
+): Promise<Generation> {
+  return request(
+    `/studio/image-to-video`,
+    () =>
+      newMockGeneration("image_to_video", params, {
+        prompt,
+        inputAssetUrl,
+        thumbLabel: prompt || "Imagem → Vídeo",
+        duration: params.duration,
+      }),
+    { method: "POST", body: JSON.stringify({ inputAssetUrl, prompt, params }) },
+  );
+}
+
+export async function studioExtend(
+  source: { cutId?: string | null; generationId?: string | null },
+  params: ExtendParams,
+): Promise<Generation> {
+  return request(
+    `/studio/extend`,
+    () =>
+      newMockGeneration("extend", params, {
+        cutId: source.cutId ?? null,
+        thumbLabel: params.direction === "loop" ? "Loop perfeito" : "Extensão de clipe",
+        duration: params.seconds,
+      }),
+    { method: "POST", body: JSON.stringify({ ...source, params }) },
+  );
+}
+
+export async function studioFrames(
+  startImageUrl: string,
+  endImageUrl: string,
+  params: FramesParams,
+): Promise<Generation> {
+  return request(
+    `/studio/frames`,
+    () =>
+      newMockGeneration("frames", params, {
+        inputAssetUrl: startImageUrl,
+        inputAssetUrl2: endImageUrl,
+        thumbLabel: "Início → Fim",
+        duration: params.duration,
+      }),
+    { method: "POST", body: JSON.stringify({ startImageUrl, endImageUrl, params }) },
+  );
+}
+
+export async function studioMotionBrush(
+  inputAssetUrl: string,
+  params: MotionBrushParams,
+): Promise<Generation> {
+  return request(
+    `/studio/motion-brush`,
+    () =>
+      newMockGeneration("motion_brush", params, {
+        inputAssetUrl,
+        thumbLabel: `Motion Brush (${params.strokes.length} traços)`,
+        duration: params.duration,
+      }),
+    { method: "POST", body: JSON.stringify({ inputAssetUrl, params }) },
+  );
+}
+
+export async function studioLipSync(
+  source: { cutId?: string | null; inputAssetUrl?: string | null },
+  params: LipSyncParams,
+): Promise<Generation> {
+  return request(
+    `/studio/lip-sync`,
+    () =>
+      newMockGeneration("lip_sync", params, {
+        cutId: source.cutId ?? null,
+        inputAssetUrl: source.inputAssetUrl ?? null,
+        prompt: params.source === "ttsText" ? params.ttsText : null,
+        thumbLabel: "Lip Sync",
+        duration: 6,
+      }),
+    { method: "POST", body: JSON.stringify({ ...source, params }) },
+  );
+}
+
+export async function studioCamera(
+  source: { cutId?: string | null; inputAssetUrl?: string | null },
+  params: CameraParams,
+): Promise<Generation> {
+  return request(
+    `/studio/camera`,
+    () =>
+      newMockGeneration("camera", params, {
+        cutId: source.cutId ?? null,
+        inputAssetUrl: source.inputAssetUrl ?? null,
+        thumbLabel: `Câmera (${params.moves.length} movimentos)`,
+        duration: Math.max(1, ...params.moves.map((m) => m.endSecond), 5),
+      }),
+    { method: "POST", body: JSON.stringify({ ...source, params }) },
+  );
+}
+
+export async function studioEffect(
+  inputAssetUrl: string,
+  params: EffectTemplateParams,
+): Promise<Generation> {
+  return request(
+    `/studio/effect`,
+    () =>
+      newMockGeneration("effect_template", params, {
+        inputAssetUrl,
+        thumbLabel: `Efeito: ${params.template}`,
+      }),
+    { method: "POST", body: JSON.stringify({ inputAssetUrl, params }) },
+  );
+}
+
+export async function studioGenerations(): Promise<Generation[]> {
+  return request(`/studio/generations`, () => mockGenerations);
+}
+
+export async function studioGeneration(id: string): Promise<Generation> {
+  return request(`/studio/generations/${id}`, () => {
+    const found = mockGenerations.find((g) => g.id === id);
+    if (!found) throw new Error("Geração não encontrada");
+    return found;
+  });
+}
+
+export async function studioEffectTemplates(): Promise<{ templates: EffectTemplate[] }> {
+  return request(`/studio/effect-templates`, () => ({ templates: mockEffectTemplates }));
+}
+
+/** Cria um Cut a partir de uma geração (integra com editor/biblioteca). */
+export async function studioGenerationToCut(
+  generationId: string,
+  projectId?: string | null,
+): Promise<Cut> {
+  return request(
+    `/studio/generations/${generationId}/to-cut`,
+    () => {
+      // Mock: reuse an existing loadable cut id so the editor opens cleanly
+      // in offline/demo mode. In production this returns a brand-new Cut.
+      const base = mockCuts[0];
+      return {
+        ...base,
+        projectId: projectId ?? base.projectId,
+        title: "Geração do Estúdio IA",
+        status: "suggested" as const,
+        editState: null,
+        createdAt: new Date().toISOString(),
+      };
+    },
+    { method: "POST", body: JSON.stringify({ projectId: projectId ?? null }) },
+  );
 }

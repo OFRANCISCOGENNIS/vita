@@ -291,3 +291,133 @@ export interface AdminUserRow {
   minutesUsedMonth: number;
   createdAt: string;
 }
+
+// ---------------------------------------------------------------------------
+// ESTÚDIO IA — geração de vídeo por IA (estilo Kling). Contrato do APÊNDICE
+// de SPEC.md. Toda a geração é uma INTEGRAÇÃO PAGA (Kling/Runway/Luma/Pika);
+// o frontend entrega a UI + o ponto de integração com fallback mock.
+// ---------------------------------------------------------------------------
+
+export type StudioFunction =
+  | "text_to_video"
+  | "image_to_video"
+  | "extend"
+  | "frames"
+  | "motion_brush"
+  | "lip_sync"
+  | "camera"
+  | "effect_template";
+
+export type StudioAspectRatio = "9:16" | "1:1" | "16:9" | "4:5";
+export type StudioStyle = "cinematográfico" | "anime" | "realista" | "3D";
+/** Movimento de câmera simples (usado em texto→vídeo e imagem→vídeo). */
+export type CameraMovement = "none" | "zoom_in" | "orbit" | "pan_left";
+export type MotionIntensity = "sutil" | "moderado" | "intenso";
+export type ExtendDirection = "forward" | "loop";
+export type LipSyncSource = "ttsText" | "audioUrl";
+/** Tipos de movimento na timeline de câmera (mais completos). */
+export type CameraMoveType = "zoom_in" | "pan_left" | "orbit" | "tilt_up" | "dolly";
+export type EffectTemplateId =
+  | "explodir"
+  | "abraco"
+  | "envelhecer"
+  | "transformar"
+  | "derreter"
+  | "inflar";
+
+// --- params jsonb por função (contrato exato de SPEC.md) ---
+
+export interface TextToVideoParams {
+  aspectRatio: StudioAspectRatio;
+  duration: number;
+  style: StudioStyle;
+  cameraMovement: CameraMovement;
+  negativePrompt: string;
+}
+
+export interface ImageToVideoParams {
+  motion: MotionIntensity;
+  duration: number;
+  cameraMovement: CameraMovement;
+}
+
+export interface ExtendParams {
+  seconds: number;
+  direction: ExtendDirection;
+}
+
+export interface FramesParams {
+  duration: number;
+}
+
+export interface MotionBrushStroke {
+  path: [number, number][]; // pontos normalizados 0-1 sobre a imagem
+  direction: [number, number]; // vetor de direção do movimento
+  intensity: number; // 0-1
+}
+
+export interface MotionBrushParams {
+  strokes: MotionBrushStroke[];
+  duration: number;
+}
+
+export interface LipSyncParams {
+  source: LipSyncSource;
+  ttsText: string;
+  voice: string;
+  language: string;
+}
+
+export interface CameraMove {
+  type: CameraMoveType;
+  startSecond: number;
+  endSecond: number;
+}
+
+export interface CameraParams {
+  moves: CameraMove[];
+}
+
+export interface EffectTemplateParams {
+  template: EffectTemplateId;
+}
+
+export type GenerationParams =
+  | TextToVideoParams
+  | ImageToVideoParams
+  | ExtendParams
+  | FramesParams
+  | MotionBrushParams
+  | LipSyncParams
+  | CameraParams
+  | EffectTemplateParams;
+
+export interface Generation {
+  id: string;
+  userId: string;
+  projectId: string | null;
+  cutId: string | null;
+  function: StudioFunction;
+  prompt: string | null;
+  params: GenerationParams;
+  inputAssetUrl: string | null;
+  inputAssetUrl2: string | null; // frames início/fim
+  status: JobStatus; // queued | running | done | error
+  progress: number; // 0-100
+  errorMessage: string | null;
+  resultUrl: string | null;
+  thumbnailUrl: string | null;
+  durationSeconds: number;
+  resolution: string;
+  fps: number;
+  model: "kling-v1" | "mock";
+  createdAt: string;
+  finishedAt: string | null;
+}
+
+export interface EffectTemplate {
+  id: EffectTemplateId;
+  label: string;
+  thumbnailUrl: string;
+  previewUrl: string;
+}
