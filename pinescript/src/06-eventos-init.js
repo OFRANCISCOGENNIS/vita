@@ -2,6 +2,25 @@
 // BLOCO 11 — EVENTOS
 // ============================================================================
 
+// ---- Ripple discreto nos botões (delegado; nasce no ponto do clique) ----
+// Respeita prefers-reduced-motion — não cria o elemento se o usuário pediu
+// menos movimento (a animação em si já é bloqueada por CSS como reforço).
+const _reduceMotion = () => window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+document.addEventListener('click', (ev) => {
+    if (_reduceMotion()) return;
+    const btn = ev.target.closest('.btn-primary, .btn-mini, .btn-preset, .qo-toggle');
+    if (!btn) return;
+    const r = btn.getBoundingClientRect();
+    const d = Math.max(r.width, r.height);
+    const span = document.createElement('span');
+    span.className = 'qo-ripple';
+    span.style.width = span.style.height = d + 'px';
+    span.style.left = (ev.clientX - r.left - d / 2) + 'px';
+    span.style.top = (ev.clientY - r.top - d / 2) + 'px';
+    btn.appendChild(span);
+    span.addEventListener('animationend', () => span.remove());
+});
+
 document.getElementById('btnGerar').addEventListener('click', carregar);
 document.getElementById('btnRecalcular').addEventListener('click', recalcularSinaisApenas);
 document.getElementById('fonte').addEventListener('change', function () {

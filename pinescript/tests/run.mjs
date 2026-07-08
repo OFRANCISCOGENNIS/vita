@@ -299,6 +299,40 @@ const recol = await p.evaluate(() => {
 check('card recolhe ao clicar no título (corpo some)', recol.recolhido && recol.corpoOculto, JSON.stringify(recol));
 check('estado do card persiste e re-expande', recol.salvo && recol.reexpandido);
 
+// 7.99) Animações: ripple nasce no clique de um botão e some sozinho
+const rip = await p.evaluate(async () => {
+  const btn = document.getElementById('btnControles');   // sempre visível (topbar)
+  const r = btn.getBoundingClientRect();
+  btn.dispatchEvent(new MouseEvent('click', { bubbles: true, clientX: r.left + 5, clientY: r.top + 5 }));
+  const nasceu = !!btn.querySelector('.qo-ripple');
+  await new Promise(res => setTimeout(res, 700));
+  const sumiu = !btn.querySelector('.qo-ripple');
+  return { nasceu, sumiu };
+});
+check('ripple nasce no clique do botão', rip.nasceu);
+check('ripple some sozinho após a animação', rip.sumiu);
+// entradas do funil e chips de decisão animam (classe/keyframe presentes)
+const animMeta = await p.evaluate(() => {
+  const chip = document.querySelector('.decision-chip');
+  const elo = document.querySelector('.funil-elo');
+  return {
+    chipAnima: chip ? getComputedStyle(chip).animationName !== 'none' : false,
+    eloAnima: elo ? getComputedStyle(elo).animationName !== 'none' : false
+  };
+});
+check('chips de decisão e elos do funil têm animação de entrada', animMeta.chipAnima && animMeta.eloAnima, JSON.stringify(animMeta));
+// prefers-reduced-motion: emula e confirma que as animações de entrada desligam
+const pRM = await ctx.newPage();
+await pRM.emulateMedia({ reducedMotion: 'reduce' });
+await pRM.goto('file://' + file, { waitUntil: 'domcontentloaded' });
+await pRM.waitForTimeout(500);
+const semAnim = await pRM.evaluate(() => {
+  const el = document.querySelector('.charts-area > *');
+  return el ? getComputedStyle(el).animationName === 'none' : false;
+});
+check('prefers-reduced-motion desliga a animação de entrada dos cards', semAnim);
+await pRM.close();
+
 // 8) PWA manifest
 check('PWA manifest presente', await p.$eval('link[rel=manifest]', e => e.href.startsWith('data:application/manifest')));
 

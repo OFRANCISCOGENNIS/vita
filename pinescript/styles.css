@@ -1522,3 +1522,99 @@ button:focus-visible, .scan-item:focus-visible, .ia-row:focus-visible {
 .qo-intel { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; align-items: start; }
 .charts-area { gap: 12px; }
 .main-content { gap: 12px; padding: 12px; }
+
+/* ============================================================================
+   CAMADA DE ANIMAÇÕES (rica, em todo o app) — tudo com fallback reduced-motion
+   ============================================================================ */
+
+/* ---- Entrada dos cards ao carregar a página: fade + subida escalonada ---- */
+@keyframes cardIn { from { opacity: 0; transform: translateY(10px) scale(0.99); } to { opacity: 1; transform: none; } }
+.sidebar, .charts-area > * { animation: cardIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.charts-area > *:nth-child(1) { animation-delay: 0.02s; }
+.charts-area > *:nth-child(2) { animation-delay: 0.06s; }
+.charts-area > *:nth-child(3) { animation-delay: 0.10s; }
+.charts-area > *:nth-child(4) { animation-delay: 0.14s; }
+.charts-area > *:nth-child(n+5) { animation-delay: 0.16s; }
+.qo-intel > * { animation: cardIn 0.45s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.qo-intel > *:nth-child(1) { animation-delay: 0.05s; }
+.qo-intel > *:nth-child(2) { animation-delay: 0.09s; }
+.qo-intel > *:nth-child(3) { animation-delay: 0.13s; }
+.qo-intel > *:nth-child(4) { animation-delay: 0.17s; }
+.qo-intel > *:nth-child(5) { animation-delay: 0.21s; }
+
+/* ---- Recolher/expandir cards: transição suave de altura+opacidade ---- */
+.chart-container:not(.recolhido) > *:not(h2) {
+    animation: expandeConteudo 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes expandeConteudo { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+.chart-container.recolhivel { transition: padding 0.25s ease; }
+.chart-container.recolhivel > h2::after { transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1); }
+
+/* ---- Botões: ripple discreto + realce ---- */
+.btn-primary, .btn-mini, .btn-preset, .qo-toggle {
+    position: relative;
+    overflow: hidden;
+}
+.qo-ripple {
+    position: absolute; border-radius: 50%; pointer-events: none;
+    background: rgba(255, 255, 255, 0.35);
+    transform: scale(0); opacity: 0.6;
+    animation: qoRipple 0.55s ease-out forwards;
+}
+@keyframes qoRipple { to { transform: scale(2.6); opacity: 0; } }
+
+/* ---- Painéis que aparecem sob demanda (heat/scan/ia/estudo/train) ---- */
+#heatPanel, #scanPanel, #iaPanel, #estudoPanel, #trainPanel { animation: cardIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+/* ---- Chips de decisão e funil: entrada escalonada + glow no estado ok ---- */
+.decision-chip { animation: chipIn 0.3s ease both; }
+@keyframes chipIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: none; } }
+.funil-elo { animation: chipIn 0.32s ease both; }
+.quality-funnel .funil-elo:nth-child(2) { animation-delay: 0.03s; }
+.quality-funnel .funil-elo:nth-child(3) { animation-delay: 0.06s; }
+.quality-funnel .funil-elo:nth-child(4) { animation-delay: 0.09s; }
+.quality-funnel .funil-elo:nth-child(5) { animation-delay: 0.12s; }
+.quality-funnel .funil-elo:nth-child(6) { animation-delay: 0.15s; }
+.quality-funnel .funil-elo:nth-child(7) { animation-delay: 0.18s; }
+@keyframes funilGlow { 0%, 100% { box-shadow: 0 0 0 rgba(34, 197, 94, 0); } 50% { box-shadow: 0 0 10px rgba(34, 197, 94, 0.45); } }
+.funil-ok { animation: chipIn 0.32s ease both, funilGlow 2.4s ease-in-out 0.4s 2; }
+
+/* ---- Selo A/B/C: entra com leve "pop" quando muda de grade ---- */
+@keyframes gradePop { 0% { transform: scale(0.85); opacity: 0; } 60% { transform: scale(1.05); } 100% { transform: scale(1); opacity: 1; } }
+.decision-grade { animation: gradePop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); }
+
+/* ---- Botão de IA rodando: brilho "varredura" enquanto otimiza ---- */
+@keyframes iaVarredura { 0% { background-position: -120% 0; } 100% { background-position: 220% 0; } }
+#btnIA:disabled {
+    background: linear-gradient(100deg, var(--accent) 40%, var(--accent-2) 50%, var(--accent) 60%);
+    background-size: 250% 100%;
+    animation: iaVarredura 1.6s linear infinite;
+    cursor: progress;
+}
+
+/* ---- Setas do Registro: entram deslizando + toque de destaque na mais nova ---- */
+@keyframes setaIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+.reg-seta { animation: setaIn 0.3s ease both; }
+.reg-row { animation: cardIn 0.28s ease both; }
+
+/* ---- Toggle de tema: rotação suave do ícone ---- */
+#btnTema { transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); }
+#btnTema:active { transform: rotate(160deg); }
+
+/* ---- Modal de ajuda: fade + leve escala ---- */
+@keyframes ajudaIn { from { opacity: 0; transform: scale(0.97); } to { opacity: 1; transform: none; } }
+.ajuda-card { animation: ajudaIn 0.25s cubic-bezier(0.16, 1, 0.3, 1); }
+
+/* ---- Barra de progresso do drawdown/confiança: transição contínua ---- */
+.qo-ring circle { transition: stroke-dashoffset 0.5s cubic-bezier(0.4, 0, 0.2, 1); }
+
+/* Todas as animações desta camada desligam com prefers-reduced-motion */
+@media (prefers-reduced-motion: reduce) {
+    .sidebar, .charts-area > *, .qo-intel > *, .chart-container:not(.recolhido) > *:not(h2),
+    #heatPanel, #scanPanel, #iaPanel, #estudoPanel, #trainPanel,
+    .decision-chip, .funil-elo, .funil-ok, .decision-grade, .reg-seta, .reg-row, .ajuda-card {
+        animation: none !important;
+    }
+    #btnIA:disabled { animation: none; }
+    #btnTema:active { transform: none; }
+}
