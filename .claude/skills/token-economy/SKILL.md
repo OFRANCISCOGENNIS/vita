@@ -43,6 +43,10 @@ Objetivo: gastar o mínimo de tokens de entrada (contexto) e saída (resposta) q
 - Listar diretório inteiro quando um Glob com padrão resolve.
 - Verificação redundante (build+teste+lint) quando 1 checagem prova a mudança.
 
+## Medição real
+
+`scripts/token_report.py [dir_transcripts]` lê os JSONL de `~/.claude/projects/<projeto>/` e mostra tokens reais por modelo (input/cache/output), chamadas por tool e os tool results mais pesados — use para provar onde a sessão gastou e atacar a origem. Lembre: um tool result pesado reentra no contexto de todos os turnos seguintes.
+
 ## Gatilho mental
 
 Antes de qualquer tool call: "isso vai trazer >100 linhas ao contexto? existe forma de obter só a resposta?" Se sim, refine primeiro.
