@@ -141,3 +141,70 @@ quando a API não responder — todo fetch tem fallback para mock.
 - IDs uuid v4 em string.
 - Datas ISO 8601 UTC.
 - Erros da API: `{ "error": { "code": string, "message": string } }`.
+
+---
+
+# APÊNDICE — Módulo ESTÚDIO IA (geração de vídeo por IA, estilo Kling)
+
+Novo módulo central: gerar e dirigir vídeo por IA. 8 funções. Todas são
+integrações de IA generativa pesada (GPU/API paga) — a plataforma constrói a
+UI + o ponto de integração com fallback determinístico de demonstração.
+
+`// INTEGRAÇÃO PAGA: Kling AI API` (ou equivalente Runway/Luma/Pika) marca os pontos.
+
+## Entidade nova: `generations`
+
+- id (uuid), user_id, project_id (nullable), cut_id (nullable)
+- function: `text_to_video | image_to_video | extend | frames | motion_brush | lip_sync | camera | effect_template`
+- prompt (text, nullable), params (jsonb — específico por função, ver abaixo)
+- input_asset_url (nullable), input_asset_url_2 (nullable, p/ frames início/fim)
+- status: `queued | running | done | error`, progress (0–100), error_message
+- result_url (nullable), thumbnail_url (nullable), duration_seconds, resolution, fps
+- model (`kling-v1 | mock`), created_at, finished_at
+
+Progresso em tempo real reutiliza o WebSocket existente `/ws/progress/{job_id}`.
+
+### Shapes de `params` (contrato)
+
+```jsonc
+// text_to_video
+{ "aspectRatio": "9:16|1:1|16:9|4:5", "duration": 5, "style": "cinematográfico|anime|realista|3D",
+  "cameraMovement": "none|zoom_in|orbit|pan_left", "negativePrompt": "" }
+// image_to_video
+{ "motion": "sutil|moderado|intenso", "duration": 5, "cameraMovement": "none|zoom_in|..." }
+// extend
+{ "seconds": 4, "direction": "forward|loop" }   // gera continuação / loop perfeito
+// frames  (quadro inicial e final)
+{ "duration": 5 }                                // usa input_asset_url + input_asset_url_2
+// motion_brush
+{ "strokes": [ {"path": [[x,y],...], "direction": [dx,dy], "intensity": 0.7} ], "duration": 5 }
+// lip_sync
+{ "source": "ttsText|audioUrl", "ttsText": "", "voice": "pt-BR-Francisca|...", "language": "pt-BR" }
+// camera
+{ "moves": [ {"type": "zoom_in|pan_left|orbit|tilt_up|dolly", "startSecond": 0, "endSecond": 3} ] }
+// effect_template
+{ "template": "explodir|abraco|envelhecer|transformar|derreter|inflar" }
+```
+
+## Endpoints REST (prefixo /api/v1/studio)
+
+- `POST /studio/text-to-video`   {prompt, params} → Generation
+- `POST /studio/image-to-video`  {inputAssetUrl, prompt?, params} → Generation
+- `POST /studio/extend`          {cutId? | generationId?, params} → Generation
+- `POST /studio/frames`          {startImageUrl, endImageUrl, params} → Generation
+- `POST /studio/motion-brush`    {inputAssetUrl, params} → Generation
+- `POST /studio/lip-sync`        {cutId? | inputAssetUrl?, params} → Generation
+- `POST /studio/camera`          {cutId? | inputAssetUrl?, params} → Generation
+- `POST /studio/effect`          {inputAssetUrl, params} → Generation
+- `GET  /studio/generations`     → Generation[]
+- `GET  /studio/generations/{id}`→ Generation
+- `GET  /studio/effect-templates`→ {templates: [{id, label, thumbnailUrl, previewUrl}]}
+- `POST /studio/generations/{id}/to-cut` {projectId?} → cria um Cut a partir da geração (integra com editor/biblioteca)
+
+## Frontend
+
+- Novo item de menu no sidebar do `/app`: **"Estúdio IA"** (`/app/estudio`, ícone `Sparkles` ou `Wand2`), logo após "Novo projeto".
+- Página `/app/estudio`: coluna esquerda com as 8 ferramentas (tabs), painel central de configuração + área de resultado/preview, e galeria "Gerações recentes" com status/progresso ao vivo.
+- Cada geração concluída tem ações: **"Enviar para o editor"**, **"Salvar na biblioteca"**, **"Usar como capa"**.
+- Fallback: sem API, `mock-data.ts` fornece gerações de exemplo e o progresso é simulado no cliente (como a fila de render). Thumbnails/preview via SVG data-URI local.
+- Todos os estados (loading/vazio/erro/sucesso), pt-BR, sem botão morto.
