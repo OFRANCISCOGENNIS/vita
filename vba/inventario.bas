@@ -1098,7 +1098,12 @@ Private Function EhAderente(fam As String, libV As Variant, prjV As Variant, raw
         ElseIf pp = 0 Then
             EhAderente = (l = 0)
         Else
-            Dim tol As Double : tol = mTolAder : If tol <= 0 Then tol = 0.1
+            Dim tol As Double
+            If FamiliaTolAlta(fam) Then
+                tol = 0.15   ' CABO ISOLADO / CABO COBRE: margem elevada para 15%
+            Else
+                tol = mTolAder : If tol <= 0 Then tol = 0.1
+            End If
             EhAderente = (Abs(l - pp) <= tol*Abs(pp))
         End If
     Else
@@ -1109,6 +1114,13 @@ End Function
 ' True quando a familia (ja NormStr) e COND NU, tolerante a espaco/pontuacao.
 Private Function EhCondNu(fam As String) As Boolean
     EhCondNu = (Replace(fam, " ", "") = "CONDNU")
+End Function
+
+' Familias com margem de aderencia elevada para 15% (em vez do padrao mTolAder,
+' normalmente 10%). Match tolerante a espaco/pontuacao.
+Private Function FamiliaTolAlta(fam As String) As Boolean
+    Dim f As String : f = Replace(fam, " ", "")
+    FamiliaTolAlta = (f = "CABOISOLADO" Or f = "CABOCOBRE")
 End Function
 
 Private Function FmtKPI(v As Double) As String
@@ -3548,6 +3560,11 @@ Public Sub TestarLogicaInventario()
     RegTest nomes, oks, det, cnt, "EhAderente COND NU 3/0 (dif 3, prj 0) = True", (EhAderente("COND NU", 3, 0, "") = True)
     RegTest nomes, oks, det, cnt, "EhCondNu tolera pontuacao (COND-NU) = True", (EhCondNu(NormStr("COND-NU")) = True)
     RegTest nomes, oks, det, cnt, "EhCondNu COND PROT = False", (EhCondNu("COND PROT") = False)
+    ' CABO ISOLADO / CABO COBRE: margem elevada a 15% (dif 13% falharia nos 10% padrao):
+    RegTest nomes, oks, det, cnt, "EhAderente CABO ISOLADO 113/100 (dif 13%) = True", (EhAderente("CABO ISOLADO", 113, 100, "") = True)
+    RegTest nomes, oks, det, cnt, "EhAderente CABO COBRE 113/100 (dif 13%) = True", (EhAderente("CABO COBRE", 113, 100, "") = True)
+    RegTest nomes, oks, det, cnt, "EhAderente CABO ISOLADO 116/100 (dif 16%) = False", (EhAderente("CABO ISOLADO", 116, 100, "") = False)
+    RegTest nomes, oks, det, cnt, "EhAderente CABO ACO 113/100 (dif 13%, tol padrao) = False", (EhAderente("CABO ACO", 113, 100, "") = False)
     RegTest nomes, oks, det, cnt, "EhAderente UC ADERENTE = True", (EhAderente("PARAFUSO", "x", "y", "ADERENTE") = True)
     RegTest nomes, oks, det, cnt, "EhUnidadeInteira M = False", (EhUnidadeInteira("M") = False)
     RegTest nomes, oks, det, cnt, "EhUnidadeInteira UN = True", (EhUnidadeInteira("UN") = True)
