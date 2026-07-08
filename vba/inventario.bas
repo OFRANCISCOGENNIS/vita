@@ -424,6 +424,10 @@ Private Sub ProcessarSAPxPRJ(wsBase As Worksheet, wsDet As Worksheet)
             If srcIdx(9) > 0 Then libV = baseData(i, srcIdx(9))
             If srcIdx(10) > 0 Then prjV = baseData(i, srcIdx(10))
             ehAder = EhAderente(famR, libV, prjV, sitR)
+            ' Material UC com MAT LIB SAP e MAT PRJ CAD zerados: nao e mais isento
+            ' (mesmo com SIT MAT = NULO) - conta como NAO ADERENTE e reprova o PEP3.
+            Dim ucZerado As Boolean : ucZerado = MaterialUCZerado(tipoR, libV, prjV)
+            If ucZerado Then ehAder = False
             If pep4 <> "" And Not allP4.Exists(pep4) Then allP4.Add pep4, True
             If pep4 <> "" And Not p4pep3.Exists(pep4) Then p4pep3.Add pep4, pep3R
             ' UC sempre avalia; COM avalia apenas se for familia critica (CH FUS / PARA RAIO)
@@ -432,10 +436,11 @@ Private Sub ProcessarSAPxPRJ(wsBase As Worksheet, wsDet As Worksheet)
             If pep4 <> "" And ehAvaliavel And Not CaboComoCOM(famR, libV) Then
                 If Not temUC.Exists(pep4) Then temUC.Add pep4, True
                 If Not aprova.Exists(pep4) Then aprova.Add pep4, True
-                If Not ehAder And sitR <> "NULO" Then
+                If (Not ehAder And sitR <> "NULO") Or ucZerado Then
                     aprova(pep4) = False
                     ' registra a familia culpada no PEP3 (sem duplicar)
                     Dim fLbl As String : fLbl = IIf(famRaw <> "", famRaw, "(sem familia)")
+                    If ucZerado Then fLbl = fLbl & " (valores zerados)"
                     If Not pep3RepFam.Exists(pep3R) Then
                         pep3RepFam.Add pep3R, fLbl
                     ElseIf InStr(pep3RepFam(pep3R), fLbl) = 0 Then
@@ -447,7 +452,7 @@ Private Sub ProcessarSAPxPRJ(wsBase As Worksheet, wsDet As Worksheet)
                 Dim vv As Double : vv = 0
                 If IsNumeric(baseData(i, srcIdx(6))) Then vv = CDbl(baseData(i, srcIdx(6)))
                 sumValor = sumValor + vv
-                If Not ehAder And sitR <> "NULO" Then sumNaoAder = sumNaoAder + Abs(vv)
+                If (Not ehAder And sitR <> "NULO") Or ucZerado Then sumNaoAder = sumNaoAder + Abs(vv)
             End If
         Next i
 
@@ -487,8 +492,15 @@ Private Sub ProcessarSAPxPRJ(wsBase As Worksheet, wsDet As Worksheet)
             libV = "" : prjV = ""
             If srcIdx(9) > 0 Then libV = baseData(i, srcIdx(9))
             If srcIdx(10) > 0 Then prjV = baseData(i, srcIdx(10))
+            ' TIPO deste item (precisa vir antes p/ a regra de material UC zerado)
+            Dim tipoRow As String : tipoRow = ""
+            If srcIdx(11) > 0 Then tipoRow = NormStr(CStr(baseData(i, srcIdx(11))))
+            Dim ucZeradoRow As Boolean : ucZeradoRow = MaterialUCZerado(tipoRow, libV, prjV)
+
             Dim sitText As String
-            If (Left(famR, 4) = "COND" Or Left(famR, 4) = "CABO" Or famR = "RAMAL") And IsNumeric(libV) And IsNumeric(prjV) Then
+            If ucZeradoRow Then
+                sitText = "NAO ADERENTE"
+            ElseIf (Left(famR, 4) = "COND" Or Left(famR, 4) = "CABO" Or famR = "RAMAL") And IsNumeric(libV) And IsNumeric(prjV) Then
                 sitText = IIf(EhAderente(famR, libV, prjV, sitR), "ADERENTE", "NAO ADERENTE")
             Else
                 sitText = rawSit
@@ -497,10 +509,10 @@ Private Sub ProcessarSAPxPRJ(wsBase As Worksheet, wsDet As Worksheet)
             Dim p3row As String : p3row = ""
             If srcIdx(1) > 0 Then p3row = NormStr(CStr(baseData(i, srcIdx(1))))
 
-            ' TIPO e aderencia deste item (para motivo detalhado)
-            Dim tipoRow As String : tipoRow = ""
-            If srcIdx(11) > 0 Then tipoRow = NormStr(CStr(baseData(i, srcIdx(11))))
+            ' Aderencia deste item (para motivo detalhado). Material UC com valores
+            ' zerados nunca e aderente, mesmo fora das familias cabo/condutor.
             Dim ehAderRow As Boolean : ehAderRow = EhAderente(famR, libV, prjV, sitR)
+            If ucZeradoRow Then ehAderRow = False
 
             ' PRIORIDADE 1: se o PEP3 esta reprovado, TODA linha vira REPROVADO
             ' (inclusive CABO ISOLADO que seria isento) - arrastado pela reprovacao do PEP3.
@@ -511,7 +523,9 @@ Private Sub ProcessarSAPxPRJ(wsBase As Worksheet, wsDet As Worksheet)
             If pep3UC.Exists(p3row) Then p3Reprovado = CBool(pep3Rep(p3row))
             If p3Reprovado Then
                 outArr(i, 14) = noIco & " REPROVADO"
-                If tipoRow = "UC" And Not ehAderRow And sitR <> "NULO" Then
+                If ucZeradoRow Then
+                    motivo = "Material UC com valores zerados (MAT LIB SAP=0 e MAT PRJ CAD=0) - devolvido"
+                ElseIf tipoRow = "UC" And Not ehAderRow And sitR <> "NULO" Then
                     motivo = "Este item (UC) nao aderente: SAP=" & CStr(libV) & " / PRJ=" & CStr(prjV) & FmtDif(libV, prjV)
                 ElseIf tipoRow = "COM" And EhComCritico(famR) And Not ehAderRow And sitR <> "NULO" Then
                     motivo = "Este item (COM critico - " & famR & ") nao aderente: SAP=" & CStr(libV) & " / PRJ=" & CStr(prjV) & FmtDif(libV, prjV)
@@ -1121,6 +1135,12 @@ End Function
 Private Function FamiliaTolAlta(fam As String) As Boolean
     Dim f As String : f = Replace(fam, " ", "")
     FamiliaTolAlta = (f = "CABOISOLADO" Or f = "CABOCOBRE")
+End Function
+
+' True quando um material UC vem com MAT LIB SAP e MAT PRJ CAD zerados/vazios.
+' Esses itens deixam de ser isentos: viram NAO ADERENTE e reprovam (devolvem) o PEP3.
+Private Function MaterialUCZerado(tipoR As String, libV As Variant, prjV As Variant) As Boolean
+    MaterialUCZerado = (tipoR = "UC" And Val0(libV) = 0 And Val0(prjV) = 0)
 End Function
 
 Private Function FmtKPI(v As Double) As String
@@ -3566,6 +3586,11 @@ Public Sub TestarLogicaInventario()
     RegTest nomes, oks, det, cnt, "EhAderente CABO ISOLADO 116/100 (dif 16%) = False", (EhAderente("CABO ISOLADO", 116, 100, "") = False)
     RegTest nomes, oks, det, cnt, "EhAderente CABO ACO 113/100 (dif 13%, tol padrao) = False", (EhAderente("CABO ACO", 113, 100, "") = False)
     RegTest nomes, oks, det, cnt, "EhAderente UC ADERENTE = True", (EhAderente("PARAFUSO", "x", "y", "ADERENTE") = True)
+    ' Material UC com valores zerados: nao e mais isento, vira NAO ADERENTE:
+    RegTest nomes, oks, det, cnt, "MaterialUCZerado UC 0/0 = True", (MaterialUCZerado("UC", 0, 0) = True)
+    RegTest nomes, oks, det, cnt, "MaterialUCZerado UC vazio/vazio = True", (MaterialUCZerado("UC", "", "") = True)
+    RegTest nomes, oks, det, cnt, "MaterialUCZerado UC 0/10 = False", (MaterialUCZerado("UC", 0, 10) = False)
+    RegTest nomes, oks, det, cnt, "MaterialUCZerado COM 0/0 = False", (MaterialUCZerado("COM", 0, 0) = False)
     RegTest nomes, oks, det, cnt, "EhUnidadeInteira M = False", (EhUnidadeInteira("M") = False)
     RegTest nomes, oks, det, cnt, "EhUnidadeInteira UN = True", (EhUnidadeInteira("UN") = True)
     RegTest nomes, oks, det, cnt, "NT006 133100007 e ancora", (GetMat(mp, "133100007").EhAncora = True)
