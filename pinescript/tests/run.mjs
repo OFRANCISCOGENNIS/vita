@@ -193,6 +193,18 @@ const wk = await p.evaluate(async () => {
 check('Web Worker inline disponível', wk.temSrc && wk.usouWorker);
 check('worker e fallback: resultado idêntico (paridade)', wk.igual);
 
+// 7.9) Design: números tabulares globais + flash de valor (sobe/cai)
+const desg = await p.evaluate(() => {
+  const tnum = getComputedStyle(document.body).fontVariantNumeric || '';
+  const el = document.getElementById('confScoreCall');
+  el.textContent = '3/6';
+  setTextoFlash(el, '5/6'); const subiu = el.classList.contains('val-up');
+  setTextoFlash(el, '2/6'); const caiu = el.classList.contains('val-down');
+  return { tabular: /tabular-nums/.test(tnum), subiu, caiu };
+});
+check('números tabulares no body', desg.tabular);
+check('flash de valor: sobe=verde, cai=vermelho', desg.subiu && desg.caiu, JSON.stringify(desg));
+
 // 8) PWA manifest
 check('PWA manifest presente', await p.$eval('link[rel=manifest]', e => e.href.startsWith('data:application/manifest')));
 

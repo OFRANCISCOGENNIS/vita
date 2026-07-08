@@ -863,6 +863,24 @@ function atualizarLegenda() {
 // BLOCO 7 — PAINÉIS (status + tabela de entradas)
 // ============================================================================
 
+// Micro-interações: reanima uma classe CSS (remove → reflow → adiciona) para o
+// efeito disparar de novo mesmo quando o elemento já a tinha.
+function reanimar(el, cls) {
+    if (!el) return;
+    el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls);
+}
+// Atualiza um texto numérico e pisca verde/vermelho conforme subiu/caiu.
+function setTextoFlash(el, valor) {
+    if (!el) return;
+    const antigo = el.textContent, novo = String(valor);
+    if (antigo === novo) return;
+    el.textContent = novo;
+    if (!antigo) return;   // primeira pintura não pisca
+    const na = parseFloat(antigo), nv = parseFloat(novo);
+    if (isNaN(na) || isNaN(nv) || na === nv) return;
+    reanimar(el, nv > na ? 'val-up' : 'val-down');
+}
+
 function atualizarPaineis() {
     if (!computed || !computed.closes || !computed.closes.length) return;
     document.getElementById('countLong').textContent = sinaisLong.length;
@@ -884,8 +902,8 @@ function atualizarPaineis() {
     const en = confLive.enabled || 1;
     document.getElementById('confBarCall').style.width = Math.round(confLive.long / en * 100) + '%';
     document.getElementById('confBarPut').style.width = Math.round(confLive.short / en * 100) + '%';
-    document.getElementById('confScoreCall').textContent = confLive.long + '/' + confLive.enabled;
-    document.getElementById('confScorePut').textContent = confLive.short + '/' + confLive.enabled;
+    setTextoFlash(document.getElementById('confScoreCall'), confLive.long + '/' + confLive.enabled);
+    setTextoFlash(document.getElementById('confScorePut'), confLive.short + '/' + confLive.enabled);
 
     const fs = document.getElementById('filtersStatus');
     fs.innerHTML = '';
@@ -1616,6 +1634,7 @@ function atualizarDecisao() {
     if (verdictKey !== ultimoVerdictSom) {
         const ehEntrada = (verdictKey === 'CALL' || verdictKey === 'PUT') && !treino;
         const dirN = verdictKey === 'CALL' ? 1 : -1;
+        if (ehEntrada) reanimar(v, 'v-flash');   // pulse do veredito na virada p/ CALL/PUT
         // Selo A/B/C da virada — calculado uma vez, usado no registro e no filtro
         // da notificação (que dispara só para as entradas de maior qualidade).
         const gGrade = ehEntrada && dados.length ? calcularGrade(dirN).grade : null;
