@@ -1,0 +1,293 @@
+// Types mirroring SPEC.md entities (contract between apps/web and apps/api).
+
+export type PlanId = "free" | "pro" | "studio";
+export type PlanInterval = "month" | "year";
+
+export type CaptionPresetId =
+  | "hormozi"
+  | "karaoke"
+  | "neon"
+  | "minimal"
+  | "boldEmoji"
+  | "highlightBox"
+  | "typewriter"
+  | "gradientAnimated";
+
+export type Niche =
+  | "finanças"
+  | "fitness"
+  | "podcast"
+  | "humor"
+  | "educação"
+  | "tecnologia"
+  | "beleza"
+  | "games";
+
+export type Platform = "youtube" | "tiktok" | "instagram";
+export type SourceType = "upload" | "youtube" | "twitch" | "vimeo";
+export type Resolution = "720p" | "1080p" | "1440p" | "2160p";
+export type Language = "pt-BR" | "en" | "es" | "auto";
+export type ProjectStatus = "importing" | "transcribing" | "analyzing" | "ready" | "error";
+export type CutMode = "viral" | "qa" | "tutorial" | "quotes" | "manual";
+export type CutStatus = "suggested" | "edited" | "rendering" | "rendered";
+export type JobType = "import" | "transcribe" | "analyze" | "render" | "radar_scan";
+export type JobStatus = "queued" | "running" | "done" | "error";
+export type TrendPeriod = "24h" | "7d" | "30d";
+
+export interface BrandingKit {
+  logoUrl: string | null;
+  font: string;
+  colors: string[];
+  captionPreset: CaptionPresetId;
+}
+
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  avatarUrl: string | null;
+  googleId: string | null;
+  plan: PlanId;
+  minutesUsedMonth: number;
+  brandingKit: BrandingKit;
+  isAdmin?: boolean;
+  createdAt: string;
+}
+
+export interface Project {
+  id: string;
+  userId: string;
+  title: string;
+  sourceType: SourceType;
+  sourceUrl: string | null;
+  originalFilename: string | null;
+  durationSeconds: number;
+  resolution: Resolution;
+  fps: number;
+  language: Language;
+  status: ProjectStatus;
+  thumbnailUrl: string;
+  storageKey: string;
+  createdAt: string;
+}
+
+export interface TranscriptWord {
+  word: string;
+  start: number;
+  end: number;
+  speaker: string;
+}
+
+export interface ScoreBreakdown {
+  hook: number;
+  retention: number;
+  emotion: number;
+  nicheFit: number;
+}
+
+export interface SuggestedSound {
+  track: string;
+  reason: string;
+  trendVideoId: string;
+}
+
+export interface Cut {
+  id: string;
+  projectId: string;
+  title: string;
+  titleOptions: string[]; // 3 magnetic title options
+  description: string;
+  hashtags: string[];
+  startSeconds: number;
+  endSeconds: number;
+  viralScore: number; // 0-100
+  scoreBreakdown: ScoreBreakdown;
+  transcript: TranscriptWord[];
+  mode: CutMode;
+  suggestedSound: SuggestedSound;
+  bestPostTime: string;
+  status: CutStatus;
+  editState: Record<string, unknown> | null;
+  createdAt: string;
+}
+
+export interface Job {
+  id: string;
+  userId: string;
+  projectId: string | null;
+  cutId: string | null;
+  type: JobType;
+  status: JobStatus;
+  progress: number;
+  etaSeconds: number | null;
+  errorMessage: string | null;
+  payload: Record<string, unknown>;
+  createdAt: string;
+  finishedAt: string | null;
+}
+
+export interface Subscription {
+  id: string;
+  userId: string;
+  stripeCustomerId: string;
+  stripeSubscriptionId: string;
+  plan: PlanId;
+  interval: PlanInterval;
+  status: string;
+  currentPeriodEnd: string;
+}
+
+export interface TrendVideo {
+  id: string;
+  platform: Platform;
+  externalId: string;
+  url: string;
+  title: string;
+  channel: string;
+  thumbnailUrl: string;
+  niche: Niche;
+  language: Language;
+  durationSeconds: number;
+  views: number;
+  viewsPerHour: number;
+  likes: number;
+  comments: number;
+  publishedAt: string;
+  retentionIndex: number; // 0-100
+  fetchedAt: string;
+}
+
+// --- Raio-X jsonb shapes (exact contract from SPEC.md) ---
+
+export interface XraySound {
+  track: string;
+  trackTrending: boolean;
+  bpm: number;
+  energy: number;
+  soundEffects: string[];
+  voice: { wordsPerMinute: number; pauses: string; tone: string };
+  strategicSilences: { atSecond: number; durationMs: number }[];
+}
+
+export interface XrayImage {
+  cutsPerMinute: number;
+  zoomPunches: number;
+  dominantPalette: string[];
+  captions: { present: boolean; style: CaptionPresetId | string; position: string };
+  onScreenText: boolean;
+  lighting: string;
+  framing: string;
+}
+
+export interface XrayStructure {
+  hookType: string;
+  hookText: string;
+  narrativeArc: string;
+  idealDuration: number;
+  cta: string;
+  perfectLoop: boolean;
+}
+
+export interface RetentionPoint {
+  second: number;
+  retentionPct: number;
+  marker: string | null;
+}
+
+export interface TrendAnalysis {
+  id: string;
+  trendVideoId: string;
+  sound: XraySound;
+  image: XrayImage;
+  structure: XrayStructure;
+  retentionTimeline: RetentionPoint[];
+  generatedAt: string;
+}
+
+export interface NichePattern {
+  id: string;
+  niche: Niche;
+  period: TrendPeriod;
+  avgDuration: number;
+  topCaptionStyles: { style: CaptionPresetId | string; sharePct: number }[];
+  trendingSounds: { track: string; usedBy: number; growthPct: number }[];
+  topHooks: { hook: string; occurrences: number }[];
+  bestPostTimes: { day: string; hour: number; score: number }[];
+  computedAt: string;
+}
+
+export interface NicheAlert {
+  id: string;
+  userId: string;
+  niche: Niche;
+  enabled: boolean;
+  lastNotifiedAt: string | null;
+}
+
+export interface UsagePoint {
+  date: string;
+  minutes: number;
+  cuts: number;
+}
+
+export interface DashboardStats {
+  minutesProcessed: number;
+  cutsGenerated: number;
+  recentProjects: Project[];
+  usageSeries: UsagePoint[];
+  nicheHighlights: TrendVideo[];
+}
+
+export interface UrlPreview {
+  title: string;
+  channel: string;
+  durationSeconds: number;
+  thumbnailUrl: string;
+  availableResolutions: Resolution[];
+}
+
+export interface RenderResult {
+  downloadUrl: string;
+  srtUrl: string;
+  thumbUrl: string;
+  metaTxtUrl: string;
+}
+
+export interface Plan {
+  id: PlanId;
+  name: string;
+  priceMonthly: number;
+  priceYearlyPerMonth: number;
+  minutesPerMonth: number | null; // null = unlimited
+  maxResolution: Resolution;
+  watermark: boolean;
+  radarLevel: "limitado" | "completo" | "completo+";
+  highlight?: boolean;
+  features: string[];
+}
+
+export interface PlatformPreset {
+  id: "tiktok" | "reels" | "shorts";
+  name: string;
+  resolution: string;
+  maxDuration: string;
+  safeZone: { top: number; bottom: number; left: number; right: number };
+}
+
+export interface AdminMetrics {
+  totalUsers: number;
+  activeSubscriptions: number;
+  mrr: number;
+  minutesProcessedToday: number;
+  rendersQueued: number;
+  errorRatePct: number;
+}
+
+export interface AdminUserRow {
+  id: string;
+  name: string;
+  email: string;
+  plan: PlanId;
+  minutesUsedMonth: number;
+  createdAt: string;
+}
