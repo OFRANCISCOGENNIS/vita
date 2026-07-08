@@ -52,9 +52,9 @@ Tratamento de erro: `On Error GoTo TratarErro` captura `Err.Number/Description/S
 | `Blocos` | `CriarAbaBlocosPorFamilia` | Todos os blocos (postes+cabos+outros+Piauí) organizados em seções por família |
 | `Textos` | fluxo principal | 1 linha por TEXT/MTEXT do desenho, com classificação completa (colunas 1-13 + coluna 14 "Nome do Material") |
 | `Resumo` | fluxo principal | Agregações por família/status/altura/cabo + 2 gráficos (barras, pizza) |
-| `Mat. Instalados` | `CriarAbaStatus` | Blocos com status "MATERIAIS INSTALADOS" |
-| `Mat. Desinstalados` | `CriarAbaStatus` | Blocos com status "MATERIAIS DESINSTALADOS" |
-| `Mat. Existentes` | `CriarAbaStatus` | Blocos com status "MATERIAIS EXISTENTES" |
+| `Mat. Instalados` | `CriarAbaStatus` | Textos **e** blocos com status "MATERIAIS INSTALADOS" (2 seções: TEXTOS + BLOCOS) |
+| `Mat. Desinstalados` | `CriarAbaStatus` | Textos **e** blocos com status "MATERIAIS DESINSTALADOS" |
+| `Mat. Existentes` | `CriarAbaStatus` | Textos **e** blocos com status "MATERIAIS EXISTENTES" |
 | `Alertas` *(oculta)* | `CriarAbaAlertas` | Confiança baixa, família `CLASSIFICAR`, coordenadas duplicadas, status não classificado, postes com status conflitante |
 | `Vinculos` *(oculta)* | `CriarAbaVinculos` | Cada item vinculado ao poste mais próximo (proximidade X,Y) |
 | `Quantitativo (BOM)` *(oculta)* | `CriarAbaBOM` | Quantitativo agrupado por Status × Família × Descrição (metros para cabos, contagem para o resto) |

@@ -1095,7 +1095,8 @@ Private Sub CriarAbaStatus(ByVal wb As Object, ByVal wsAntes As Object, _
                             ByRef arrCor() As String, ByRef arrTexto() As String, _
                             ByRef arrFam() As String, ByRef arrStatus() As String, _
                             ByRef arrX() As Double, ByRef arrY() As Double, _
-                            ByRef arrH() As Double, ByVal nTotal As Long, _
+                            ByRef arrH() As Double, ByRef arrNomeMaterial() As String, _
+                            ByVal nTotal As Long, _
                             ByRef bTipo() As String, ByRef bBloco() As String, _
                             ByRef bStat() As String, ByRef bNum() As String, _
                             ByRef bDesc() As String, ByRef bBase() As String, _
@@ -1108,6 +1109,7 @@ Private Sub CriarAbaStatus(ByVal wb As Object, ByVal wsAntes As Object, _
 
     ' Colunas de texto como TEXTO (evita erro 1004 com valores iniciados
     ' por '=', '+', '-' ou '@', que o Excel tentaria virar formula).
+    ' G:I ficam numericas (X, Y, Altura/Metros).
     ws.Columns("A:F").NumberFormat = "@"
 
     Dim corTitulo As Long
@@ -1118,10 +1120,13 @@ Private Sub CriarAbaStatus(ByVal wb As Object, ByVal wsAntes As Object, _
         Case Else:                       corTitulo = RGB(80, 80, 80)
     End Select
 
-    ' --- Secao de BLOCOS deste status (unica tabela da aba) ---------------
     Dim rb As Long, cabRow As Long, i As Long
+
+    ' =====================================================================
+    '  SECAO 1: TEXTOS deste status (TEXT/MTEXT classificados)
+    ' =====================================================================
     rb = 1
-    ws.Cells(rb, 1).Value = "BLOCOS (" & statusFiltro & ")"
+    ws.Cells(rb, 1).Value = "TEXTOS (" & statusFiltro & ")"
     With ws.Range(ws.Cells(rb, 1), ws.Cells(rb, 9))
         .Merge
         .Font.Bold = True
@@ -1132,6 +1137,65 @@ Private Sub CriarAbaStatus(ByVal wb As Object, ByVal wsAntes As Object, _
     rb = rb + 1
 
     cabRow = rb
+    ws.Cells(rb, 1).Value = "Layer"
+    ws.Cells(rb, 2).Value = "Familia"
+    ws.Cells(rb, 3).Value = "Nome do Material"
+    ws.Cells(rb, 4).Value = "Conteudo do Texto"
+    ws.Cells(rb, 5).Value = "Cor ACI"
+    ws.Cells(rb, 6).Value = "Nome da Cor"
+    ws.Cells(rb, 7).Value = "X"
+    ws.Cells(rb, 8).Value = "Y"
+    ws.Cells(rb, 9).Value = "Altura"
+    With ws.Range(ws.Cells(rb, 1), ws.Cells(rb, 9))
+        .Font.Bold = True
+        .Interior.Color = RGB(220, 230, 241)
+        .Borders.LineStyle = 1
+    End With
+    rb = rb + 1
+
+    Dim cntT As Long
+    cntT = 0
+    For i = 1 To nTotal
+        If arrStatus(i) = statusFiltro Then
+            ws.Cells(rb, 1).Value = arrLayer(i)
+            ws.Cells(rb, 2).Value = arrFam(i)
+            ws.Cells(rb, 3).Value = arrNomeMaterial(i)
+            ws.Cells(rb, 4).Value = arrTexto(i)
+            ws.Cells(rb, 5).Value = arrAci(i)
+            ws.Cells(rb, 6).Value = arrCor(i)
+            ws.Cells(rb, 7).Value = arrX(i)
+            ws.Cells(rb, 8).Value = arrY(i)
+            ws.Cells(rb, 9).Value = arrH(i)
+            rb = rb + 1
+            cntT = cntT + 1
+        End If
+    Next i
+    If cntT = 0 Then
+        ws.Cells(rb, 1).Value = "(nenhum texto neste status)"
+        ws.Cells(rb, 1).Font.Italic = True
+        rb = rb + 1
+    Else
+        ws.Range(ws.Cells(cabRow, 1), ws.Cells(cabRow, 9)).AutoFilter
+    End If
+
+    ' Espacamento entre as duas tabelas
+    rb = rb + 2
+
+    ' =====================================================================
+    '  SECAO 2: BLOCOS deste status
+    ' =====================================================================
+    ws.Cells(rb, 1).Value = "BLOCOS (" & statusFiltro & ")"
+    With ws.Range(ws.Cells(rb, 1), ws.Cells(rb, 9))
+        .Merge
+        .Font.Bold = True
+        .Font.Size = 12
+        .Font.Color = RGB(255, 255, 255)
+        .Interior.Color = corTitulo
+    End With
+    rb = rb + 1
+
+    Dim cabRowB As Long
+    cabRowB = rb
     ws.Cells(rb, 1).Value = "Tipo"
     ws.Cells(rb, 2).Value = "Bloco"
     ws.Cells(rb, 3).Value = "Numero"
@@ -1168,10 +1232,9 @@ Private Sub CriarAbaStatus(ByVal wb As Object, ByVal wsAntes As Object, _
     If cntB = 0 Then
         ws.Cells(rb, 1).Value = "(nenhum bloco neste status)"
         ws.Cells(rb, 1).Font.Italic = True
-    Else
-        ws.Range(ws.Cells(cabRow, 1), ws.Cells(rb - 1, 9)).Columns.AutoFit
-        ws.Range(ws.Cells(cabRow, 1), ws.Cells(cabRow, 9)).AutoFilter
     End If
+
+    ws.Range(ws.Cells(1, 1), ws.Cells(rb, 9)).Columns.AutoFit
 End Sub
 
 ' =============================================================================
@@ -4469,14 +4532,14 @@ ProxPoste:
     nU = u
 
     ' =====================================================================
-    '  ABAS DE STATUS (agora com secao de BLOCOS do mesmo status)
+    '  ABAS DE STATUS (com secao de TEXTOS + secao de BLOCOS do mesmo status)
     ' =====================================================================
     Dim wsUlt As Object
 
     estagio = "aba Mat. Instalados"
     Call CriarAbaStatus(wb, ws2, "Mat. Instalados", "MATERIAIS INSTALADOS", _
                         arrLayer, arrAci, arrCor, arrTexto, arrFam, arrStatus, _
-                        arrX, arrY, arrH, n, _
+                        arrX, arrY, arrH, arrNomeMaterial, n, _
                         uTipo, uBloco, uStat, uNum, uDesc, uBase, uDist, uMet, _
                         uX, uY, nU)
 
@@ -4484,7 +4547,7 @@ ProxPoste:
     Set wsUlt = wb.Worksheets(wb.Worksheets.Count)
     Call CriarAbaStatus(wb, wsUlt, "Mat. Desinstalados", "MATERIAIS DESINSTALADOS", _
                         arrLayer, arrAci, arrCor, arrTexto, arrFam, arrStatus, _
-                        arrX, arrY, arrH, n, _
+                        arrX, arrY, arrH, arrNomeMaterial, n, _
                         uTipo, uBloco, uStat, uNum, uDesc, uBase, uDist, uMet, _
                         uX, uY, nU)
 
@@ -4492,7 +4555,7 @@ ProxPoste:
     Set wsUlt = wb.Worksheets(wb.Worksheets.Count)
     Call CriarAbaStatus(wb, wsUlt, "Mat. Existentes", "MATERIAIS EXISTENTES", _
                         arrLayer, arrAci, arrCor, arrTexto, arrFam, arrStatus, _
-                        arrX, arrY, arrH, n, _
+                        arrX, arrY, arrH, arrNomeMaterial, n, _
                         uTipo, uBloco, uStat, uNum, uDesc, uBase, uDist, uMet, _
                         uX, uY, nU)
 
