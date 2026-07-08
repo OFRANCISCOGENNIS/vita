@@ -1,0 +1,124 @@
+name: cortaai
+
+# Sobe TODA a plataforma com um comando:  docker compose up --build
+# Serviços: web (Next.js), api (FastAPI), worker (Celery/FFmpeg),
+#           radar (Celery beat), postgres, redis, minio (S3-compatível).
+
+x-api-env: &api-env
+  DATABASE_URL: postgresql+psycopg://cortaai:cortaai@postgres:5432/cortaai
+  REDIS_URL: redis://redis:6379/0
+  S3_ENDPOINT_URL: http://minio:9000
+  S3_PUBLIC_ENDPOINT_URL: http://localhost:9000
+  S3_ACCESS_KEY: cortaai
+  S3_SECRET_KEY: cortaai-secret
+  S3_BUCKET: cortaai-media
+  JWT_SECRET: ${JWT_SECRET:-dev-only-change-me}
+  SEED_ON_STARTUP: "1"
+  # INTEGRAÇÃO PAGA: preencha no .env para ativar os serviços reais.
+  STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+  STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+  YOUTUBE_API_KEY: ${YOUTUBE_API_KEY:-}
+  OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+  ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+  GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID:-}
+
+services:
+  web:
+    build: ./apps/web
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000/api/v1
+    depends_on:
+      api:
+        condition: service_started
+    restart: unless-stopped
+
+  api:
+    build: ./apps/api
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
+    environment: *api-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      minio:
+        condition: service_started
+    restart: unless-stopped
+
+  # Workers de processamento pesado (FFmpeg, Whisper, análise multimodal).
+  # Escale horizontalmente com:  docker compose up --scale worker=4
+  worker:
+    build: ./apps/api
+    command: celery -A app.workers.celery_app worker --loglevel=info --concurrency=2
+    environment: *api-env
+    depends_on:
+      - api
+      - redis
+    restart: unless-stopped
+
+  # Radar Viral: jobs agendados (cron) que consultam APIs oficiais,
+  # calculam o Índice de Retenção e agregam padrões por nicho.
+  radar:
+    build: ./apps/api
+    command: celery -A app.workers.celery_app beat --loglevel=info
+    environment: *api-env
+    depends_on:
+      - api
+      - redis
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: cortaai
+      POSTGRES_PASSWORD: cortaai
+      POSTGRES_DB: cortaai
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cortaai"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: cortaai
+      MINIO_ROOT_PASSWORD: cortaai-secret
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - miniodata:/data
+
+  # Cria o bucket de mídia na subida e libera leitura pública dos renders.
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      until mc alias set local http://minio:9000 cortaai cortaai-secret; do sleep 1; done;
+      mc mb --ignore-existing local/cortaai-media;
+      mc anonymous set download local/cortaai-media/renders;
+      exit 0"
+
+volumes:
+  pgdata:
+  redisdata:
+  miniodata:
