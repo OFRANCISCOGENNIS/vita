@@ -1,5 +1,6 @@
 from app.models.base import Base
 from app.models.cut import Cut
+from app.models.generation import Generation
 from app.models.job import Job
 from app.models.project import Project
 from app.models.subscription import Subscription
@@ -11,6 +12,7 @@ __all__ = [
     "User",
     "Project",
     "Cut",
+    "Generation",
     "Job",
     "Subscription",
     "TrendVideo",

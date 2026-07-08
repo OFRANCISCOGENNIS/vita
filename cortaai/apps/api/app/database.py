@@ -20,7 +20,9 @@ def get_engine() -> Engine:
     url = settings.database_url
     kwargs: dict = {"pool_pre_ping": True}
     if url.startswith("sqlite"):
-        kwargs["connect_args"] = {"check_same_thread": False}
+        # timeout: sqlite busy-wait so concurrent inline worker threads
+        # (dispatch fallback without Celery) don't hit "database is locked".
+        kwargs["connect_args"] = {"check_same_thread": False, "timeout": 30}
     return create_engine(url, **kwargs)
 
 

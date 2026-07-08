@@ -25,6 +25,20 @@ from app.schemas.radar import (
     UseSoundIn,
 )
 from app.schemas.dashboard import DashboardStatsOut, NicheHighlight, UsagePoint
+from app.schemas.studio import (
+    CameraIn,
+    EffectIn,
+    EffectTemplateOut,
+    EffectTemplatesOut,
+    ExtendIn,
+    FramesIn,
+    GenerationOut,
+    ImageToVideoIn,
+    LipSyncIn,
+    MotionBrushIn,
+    TextToVideoIn,
+    ToCutIn,
+)
 from app.schemas.billing import CheckoutIn, CheckoutOut, SubscriptionOut
 
 __all__ = [name for name in dir() if not name.startswith("_")]

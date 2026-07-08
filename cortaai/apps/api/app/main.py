@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.errors import register_exception_handlers
-from app.routers import admin, auth, billing, cuts, dashboard, projects, radar, renders, ws
+from app.routers import admin, auth, billing, cuts, dashboard, projects, radar, renders, studio, ws
 
 logger = logging.getLogger("cortaai")
 
@@ -56,6 +56,7 @@ app.include_router(cuts.router, prefix=API_PREFIX)
 app.include_router(renders.router, prefix=API_PREFIX)
 app.include_router(dashboard.router, prefix=API_PREFIX)
 app.include_router(billing.router, prefix=API_PREFIX)
+app.include_router(studio.router, prefix=API_PREFIX)
 app.include_router(admin.router, prefix=API_PREFIX)
 app.include_router(ws.router, prefix=API_PREFIX)
 

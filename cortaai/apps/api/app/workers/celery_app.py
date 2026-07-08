@@ -20,6 +20,7 @@ celery_app = Celery(
         "app.workers.tasks_analyze",
         "app.workers.tasks_render",
         "app.workers.tasks_radar",
+        "app.workers.tasks_generative",
     ],
 )
 

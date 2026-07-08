@@ -48,6 +48,14 @@ class Settings(BaseSettings):
     # INTEGRAÇÃO PAGA: LLM (títulos/descrições/hashtags/Raio-X)
     openai_api_key: str | None = None
     anthropic_api_key: str | None = None
+    # INTEGRAÇÃO PAGA: Kling AI API (ESTÚDIO IA — geração de vídeo por IA).
+    # Alternativas equivalentes: Runway, Luma (Dream Machine), Pika.
+    # Sem chave, o Estúdio usa o mock determinístico (model="mock").
+    kling_api_key: str | None = None
+    kling_api_base: str = "https://api.klingai.com"
+    kling_model: str = "kling-v1"
+    # Teto de gerações do Estúdio IA no plano Grátis (SPEC: recurso pesado de GPU).
+    studio_free_generation_limit: int = 3
 
     # --- App behaviour -----------------------------------------------------
     cors_origins: str = "http://localhost:3000"

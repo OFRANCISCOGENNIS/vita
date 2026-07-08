@@ -12,7 +12,8 @@ import sqlalchemy as sa
 
 from app.constants import NICHES, PERIODS
 from app.database import SessionLocal, create_all_tables
-from app.models import Cut, NicheAlert, Project, Subscription, TrendVideo, User
+from app.models import Cut, Generation, NicheAlert, Project, Subscription, TrendVideo, User
+from app.services import generative
 from app.services.scoring import compute_viral_score
 from app.services.security import hash_password
 from app.workers.tasks_radar import compute_niche_patterns, ensure_analysis, upsert_trend_video
@@ -187,6 +188,83 @@ def _seed_projects_and_cuts(db, demo: User) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Estúdio IA: gerações de exemplo (galeria populada em /app/estudio)
+# ---------------------------------------------------------------------------
+
+# (function, prompt pt-BR, params, input_asset_url)
+_GENERATIONS = [
+    (
+        "text_to_video",
+        "Um café fumegante numa mesa de madeira ao amanhecer, câmera aproximando lentamente, estilo cinematográfico",
+        {"aspectRatio": "9:16", "duration": 5, "style": "cinematográfico", "cameraMovement": "zoom_in", "negativePrompt": "texto, marca d'água"},
+        None,
+    ),
+    (
+        "image_to_video",
+        "Dar vida ao retrato: cabelos ao vento e olhar seguindo a câmera",
+        {"motion": "moderado", "duration": 5, "cameraMovement": "orbit"},
+        "https://picsum.photos/seed/estudio-retrato/720/1280",
+    ),
+    (
+        "effect_template",
+        None,
+        {"template": "explodir"},
+        "https://picsum.photos/seed/estudio-efeito/720/1280",
+    ),
+    (
+        "lip_sync",
+        None,
+        {"source": "ttsText", "ttsText": "E aí, pessoal! Bem-vindos ao meu canal.", "voice": "pt-BR-Francisca", "language": "pt-BR"},
+        "https://picsum.photos/seed/estudio-lipsync/720/1280",
+    ),
+    (
+        "camera",
+        "Passagem cinematográfica sobre a cidade ao entardecer",
+        {"moves": [{"type": "dolly", "startSecond": 0, "endSecond": 2}, {"type": "orbit", "startSecond": 2, "endSecond": 5}]},
+        "https://picsum.photos/seed/estudio-camera/1280/720",
+    ),
+    (
+        "frames",
+        "Transição suave do botão fechado para a flor totalmente aberta",
+        {"duration": 5},
+        "https://picsum.photos/seed/estudio-frame-a/720/1280",
+    ),
+]
+
+
+def _seed_generations(db, demo: User) -> None:
+    existing = db.execute(
+        sa.select(sa.func.count(Generation.id)).where(Generation.user_id == demo.id)
+    ).scalar_one()
+    if existing:
+        return  # idempotente: gerações demo já presentes
+
+    for i, (function, prompt, params, asset) in enumerate(_GENERATIONS):
+        result = generative.run_generation(function, prompt, params, input_asset_url=asset)
+        second_asset = "https://picsum.photos/seed/estudio-frame-b/720/1280" if function == "frames" else None
+        db.add(
+            Generation(
+                user_id=demo.id,
+                function=function,
+                prompt=prompt,
+                params=params,
+                input_asset_url=asset,
+                input_asset_url_2=second_asset,
+                status="done",
+                progress=100,
+                result_url=result["result_url"],
+                thumbnail_url=result["thumbnail_url"],
+                duration_seconds=result["duration_seconds"],
+                resolution=result["resolution"],
+                fps=result["fps"],
+                model=result["model"],
+                created_at=_now() - timedelta(hours=i * 5 + 1),
+                finished_at=_now() - timedelta(hours=i * 5),
+            )
+        )
+
+
+# ---------------------------------------------------------------------------
 # Radar Viral: trend videos (2 per SPEC niche = 16) + Raio-X + patterns
 # ---------------------------------------------------------------------------
 
@@ -239,6 +317,7 @@ def run_seed() -> None:
     try:
         demo, admin = _seed_users(db)
         _seed_projects_and_cuts(db, demo)
+        _seed_generations(db, demo)
         _seed_trends(db)
         db.commit()
     except Exception:
