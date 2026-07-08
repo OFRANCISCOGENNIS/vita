@@ -1156,7 +1156,10 @@ Private Sub CriarAbaStatus(ByVal wb As Object, ByVal wsAntes As Object, _
     Dim cntT As Long
     cntT = 0
     For i = 1 To nTotal
-        If arrStatus(i) = statusFiltro Then
+        ' Nao traz itens ainda por classificar (familia CLASSIFICAR / vazia)
+        If arrStatus(i) = statusFiltro And _
+           arrFam(i) <> "CLASSIFICAR" And arrFam(i) <> "-" And _
+           arrFam(i) <> "NAO CLASSIFICADO" And Len(Trim$(arrFam(i))) > 0 Then
             ws.Cells(rb, 1).Value = arrLayer(i)
             ws.Cells(rb, 2).Value = arrFam(i)
             ws.Cells(rb, 3).Value = arrNomeMaterial(i)
