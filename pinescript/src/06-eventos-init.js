@@ -47,7 +47,7 @@ function showToast(msg, tipo, ms) {
 
 // ---- Tema claro/escuro (CSS por variáveis + recolore os gráficos existentes) ----
 const CORES_TEMA = {
-    dark: { bg: '#0b1220', text: '#c8d3e8', grid: '#1c2740', border: '#22304e' },
+    dark: { bg: '#0e1520', text: '#AAB5C5', grid: '#1a2230', border: 'rgba(170,181,197,0.12)' },
     light: { bg: '#ffffff', text: '#3a4761', grid: '#e7ecf7', border: '#c9d4ea' }
 };
 function temaAtual() { return document.documentElement.dataset.theme === 'light' ? 'light' : 'dark'; }

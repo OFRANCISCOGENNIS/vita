@@ -11,41 +11,60 @@
 }
 
 :root {
-    /* Superfícies e tinta — tema QUANT OPS (navy institucional) */
-    --page: #060a14;
-    --surface: #0b1220;
-    --surface-2: #101a2e;
-    --ink: #ffffff;
-    --ink-2: #c8d3e8;
-    --ink-muted: #7d8cab;
-    --hairline: rgba(140, 170, 255, 0.12);
-    --grid: #1c2740;
+    /* Superfícies e tinta — QUANT OPS PREMIUM (dark theme institucional) */
+    --page: #080B12;
+    --surface: #101722;
+    --surface-2: #182230;
+    --ink: #FFFFFF;
+    --ink-2: #AAB5C5;
+    --ink-muted: #6E7A8C;
+    --hairline: rgba(170, 181, 197, 0.10);
+    --grid: #1a2230;
 
     /* Acento e séries */
-    --accent: #3987e5;
-    --serie-ema-r: #3987e5;
-    --serie-ema-l: #c98500;
-    --serie-ema-200: #9085e9;
+    --accent: #3B82F6;
+    --accent-2: #60A5FA;
+    --serie-ema-r: #3B82F6;
+    --serie-ema-l: #F59E0B;
+    --serie-ema-200: #8B7FF0;
 
-    /* Status (reservados) */
-    --good: #0ca30c;
-    --warning: #fab219;
-    --critical: #d03b3b;
+    /* Status */
+    --good: #22C55E;
+    --warning: #F59E0B;
+    --critical: #EF4444;
 
-    /* Direções de trade (padrão candles TV) */
-    --call: #26a69a;
-    --put: #ef5350;
+    /* Direções de trade */
+    --call: #22C55E;
+    --put: #EF4444;
 
-    --radius: 10px;
+    /* Vidro + elevação (glassmorphism leve) */
+    --glass: rgba(16, 23, 34, 0.72);
+    --glass-brd: rgba(170, 181, 197, 0.10);
+    --elev-1: 0 1px 2px rgba(0, 0, 0, 0.35);
+    --elev-2: 0 6px 20px rgba(0, 0, 0, 0.35);
+    --elev-3: 0 16px 44px rgba(0, 0, 0, 0.45);
+
+    --radius: 14px;
+    --radius-sm: 10px;
     --spacing: 16px;
-    --transition: all 0.25s ease;
+    --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 body {
-    font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
-    background: var(--page);
+    /* Inter / Manrope / SF Pro quando disponíveis; senão system-ui (offline-safe) */
+    font-family: 'Inter', 'Manrope', -apple-system, 'SF Pro Display', system-ui, 'Segoe UI', sans-serif;
     color: var(--ink-2);
-    line-height: 1.6;
+    line-height: 1.55;
+    letter-spacing: -0.01em;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    /* Fundo em degradê escuro premium (halo azulado sutil no topo) */
+    background:
+        radial-gradient(1200px 620px at 78% -8%, rgba(59, 130, 246, 0.10), transparent 60%),
+        radial-gradient(900px 520px at 0% 100%, rgba(139, 127, 240, 0.06), transparent 55%),
+        var(--page);
+    background-attachment: fixed;
+    min-height: 100vh;
     /* Números tabulares em todo o app: dígitos com largura fixa não "pulam" ao
        atualizar ao vivo e alinham em colunas — leitura de terminal de trading. */
     font-variant-numeric: tabular-nums;
@@ -1245,7 +1264,16 @@ body.carregando #chartPreco::after {
     --ink-muted: #68738f;
     --hairline: rgba(40, 70, 140, 0.16);
     --grid: #e7ecf7;
+    /* Vidro claro coerente com o tema claro */
+    --glass: rgba(255, 255, 255, 0.78);
+    --glass-brd: rgba(40, 70, 140, 0.14);
 }
+:root[data-theme="light"] body {
+    background:
+        radial-gradient(1200px 620px at 78% -8%, rgba(59, 130, 246, 0.10), transparent 60%),
+        var(--page);
+}
+:root[data-theme="light"] .qo-topbar { background: rgba(255, 255, 255, 0.75); }
 :root[data-theme="light"] .toast { box-shadow: 0 8px 24px rgba(80, 100, 160, 0.25); }
 :root[data-theme="light"] .qo-ring { filter: saturate(1.1); }
 
@@ -1352,3 +1380,96 @@ button:focus-visible, .scan-item:focus-visible, .ia-row:focus-visible {
 .btn-preset:hover { border-color: var(--accent); transform: translateY(-1px); }
 .btn-preset.is-active { background: var(--accent); border-color: var(--accent); color: #fff; }
 .btn-preset-auto { grid-column: 1 / -1; }
+
+/* ============================================================================
+   REDESIGN PREMIUM — glassmorphism, elevação e refino (camada por cima)
+   ============================================================================ */
+
+/* Superfícies de vidro: gráfico, sidebar e dock com blur + borda suave */
+.chart-container,
+.sidebar,
+#registroPanel.registro-col {
+    background: var(--glass);
+    -webkit-backdrop-filter: blur(16px) saturate(1.2);
+    backdrop-filter: blur(16px) saturate(1.2);
+    border: 1px solid var(--glass-brd);
+    border-radius: var(--radius);
+    box-shadow: var(--elev-2);
+}
+
+/* Topbar: barra fina, fixa, translúcida */
+.qo-topbar {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    background: rgba(8, 11, 18, 0.72);
+    -webkit-backdrop-filter: blur(14px) saturate(1.2);
+    backdrop-filter: blur(14px) saturate(1.2);
+    border-bottom: 1px solid var(--glass-brd);
+    box-shadow: var(--elev-1);
+}
+
+/* Botões primários: gradiente sutil + glow no hover */
+.btn-primary {
+    background: linear-gradient(180deg, var(--accent-2), var(--accent));
+    box-shadow: 0 2px 10px rgba(59, 130, 246, 0.28);
+    letter-spacing: 0.2px;
+}
+.btn-primary:hover {
+    background: linear-gradient(180deg, #7cb0ff, var(--accent-2));
+    box-shadow: 0 4px 18px rgba(59, 130, 246, 0.45);
+    transform: translateY(-1px);
+}
+.btn-primary:active { transform: translateY(0); }
+
+/* Inputs / selects: cantos suaves + foco com glow do acento */
+.control-group input[type="number"],
+.control-group select,
+#symbol,
+#tdKey {
+    border-radius: var(--radius-sm);
+    transition: var(--transition);
+}
+.control-group input[type="number"]:focus,
+.control-group select:focus,
+#symbol:focus,
+#tdKey:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.18);
+}
+
+/* Cards de métrica / heat: leve elevação + hover que "levanta" */
+.metric-card,
+.qo-heat-row,
+.decision-chip,
+.scan-item {
+    border-radius: var(--radius-sm);
+    transition: var(--transition);
+}
+.metric-card:hover { border-color: var(--glass-brd); transform: translateY(-2px); box-shadow: var(--elev-1); }
+
+/* Títulos de seção com respiro (grid de 8px) */
+.chart-container h2 { letter-spacing: -0.2px; }
+.sidebar h2 { border-bottom-color: rgba(59, 130, 246, 0.5); }
+
+/* Scrollbars finas e discretas (WebKit) */
+.sidebar::-webkit-scrollbar,
+.reg-list::-webkit-scrollbar,
+#registroBody::-webkit-scrollbar { width: 8px; height: 8px; }
+.sidebar::-webkit-scrollbar-thumb,
+.reg-list::-webkit-scrollbar-thumb,
+#registroBody::-webkit-scrollbar-thumb { background: rgba(170, 181, 197, 0.18); border-radius: 8px; }
+.sidebar::-webkit-scrollbar-thumb:hover { background: rgba(170, 181, 197, 0.3); }
+.sidebar::-webkit-scrollbar-track { background: transparent; }
+* { scrollbar-width: thin; scrollbar-color: rgba(170, 181, 197, 0.18) transparent; }
+
+/* Chips de decisão: pílulas de vidro */
+.decision-chip { background: var(--surface-2); border: 1px solid var(--glass-brd); }
+.decision-chip:hover { background: var(--surface-2); border-color: rgba(59, 130, 246, 0.4); }
+
+/* Menos moldura pesada nos gráficos internos (integra ao card) */
+.tv-chart { border-radius: var(--radius-sm); overflow: hidden; }
+
+@media (prefers-reduced-motion: reduce) {
+    .btn-primary:hover, .metric-card:hover, .scan-item:hover { transform: none; }
+}
