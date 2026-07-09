@@ -52,7 +52,7 @@ Tratamento de erro: `On Error GoTo TratarErro` captura `Err.Number/Description/S
 | `Blocos` | `CriarAbaBlocosPorFamilia` | Todos os blocos (postes+cabos+outros+Piauí) organizados em seções por família |
 | `Textos` | fluxo principal | 1 linha por TEXT/MTEXT do desenho, com classificação completa (colunas 1-13 + coluna 14 "Nome do Material") |
 | `Resumo` | fluxo principal | Agregações por família/status/altura/cabo + 2 gráficos (barras, pizza) |
-| `Mat. Instalados` | `CriarAbaStatus` | Só o resumo agrupado (Item "8 D11600", Qtd, Material, Família/Tipo, Metros) — status "MATERIAIS INSTALADOS" |
+| `Mat. Instalados` | `CriarAbaStatus` | Só o resumo agrupado (Item "8 D11600", Qtd, Material, Família/Tipo, Descrição, Metros) — status "MATERIAIS INSTALADOS" |
 | `Mat. Desinstalados` | `CriarAbaStatus` | Idem, para status "MATERIAIS DESINSTALADOS" |
 | `Mat. Existentes` | `CriarAbaStatus` | Idem, para status "MATERIAIS EXISTENTES" |
 | `Alertas` *(oculta)* | `CriarAbaAlertas` | Confiança baixa, família `CLASSIFICAR`, coordenadas duplicadas, status não classificado, postes com status conflitante |

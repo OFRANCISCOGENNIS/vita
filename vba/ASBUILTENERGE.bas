@@ -1181,8 +1181,9 @@ Private Sub CriarAbaStatus(ByVal wb As Object, ByVal wsAntes As Object, _
 
     ' Colunas de texto como TEXTO (evita erro 1004 com valores iniciados
     ' por '=', '+', '-' ou '@', que o Excel tentaria virar formula).
-    ' H:J ficam numericas (Metros, X, Y).
-    ws.Columns("A:G").NumberFormat = "@"
+    ' B (Qtd) e F (Metros) ficam numericas.
+    ws.Columns("A").NumberFormat = "@"
+    ws.Columns("C:E").NumberFormat = "@"
 
     Dim corTitulo As Long
     Select Case statusFiltro
@@ -1199,7 +1200,7 @@ Private Sub CriarAbaStatus(ByVal wb As Object, ByVal wsAntes As Object, _
     ' =====================================================================
     rb = 1
     ws.Cells(rb, 1).Value = "MATERIAIS CLASSIFICADOS (" & statusFiltro & ")"
-    With ws.Range(ws.Cells(rb, 1), ws.Cells(rb, 5))
+    With ws.Range(ws.Cells(rb, 1), ws.Cells(rb, 6))
         .Merge
         .Font.Bold = True
         .Font.Size = 14
@@ -1215,11 +1216,12 @@ Private Sub CriarAbaStatus(ByVal wb As Object, ByVal wsAntes As Object, _
     '  SECAO 1: RESUMO — MATERIAIS IGUAIS AGRUPADOS ("8 D11600")
     '  Agrupa por Familia + Nome do Material (textos e blocos juntos).
     ' =====================================================================
-    Dim aggQtd As Object, aggMet As Object
+    Dim aggQtd As Object, aggMet As Object, aggDesc As Object
     Set aggQtd = CreateObject("Scripting.Dictionary")
     Set aggMet = CreateObject("Scripting.Dictionary")
+    Set aggDesc = CreateObject("Scripting.Dictionary")
 
-    Dim gFam As String, gMat As String, gKey As String, gMet As Double
+    Dim gFam As String, gMat As String, gKey As String, gMet As Double, gDesc As String
 
     ' --- Agrega TEXTOS (exceto familia por classificar) --------------------
     For i = 1 To nTotal
@@ -1238,6 +1240,7 @@ Private Sub CriarAbaStatus(ByVal wb As Object, ByVal wsAntes As Object, _
             Else
                 aggQtd.Add gKey, 1
                 aggMet.Add gKey, gMet
+                aggDesc.Add gKey, arrTexto(i)   ' 1a ocorrencia como descricao representativa
             End If
         End If
     Next i
@@ -1270,12 +1273,13 @@ Private Sub CriarAbaStatus(ByVal wb As Object, ByVal wsAntes As Object, _
                 Else
                     aggMet.Add gKey, 0
                 End If
+                aggDesc.Add gKey, bDesc(i)   ' 1a ocorrencia como descricao representativa
             End If
         End If
     Next i
 
     ws.Cells(rb, 1).Value = "RESUMO - MATERIAIS AGRUPADOS"
-    With ws.Range(ws.Cells(rb, 1), ws.Cells(rb, 5))
+    With ws.Range(ws.Cells(rb, 1), ws.Cells(rb, 6))
         .Merge
         .Font.Bold = True
         .Font.Size = 11
@@ -1291,8 +1295,9 @@ Private Sub CriarAbaStatus(ByVal wb As Object, ByVal wsAntes As Object, _
     ws.Cells(rb, 2).Value = "Qtd"
     ws.Cells(rb, 3).Value = "Material"
     ws.Cells(rb, 4).Value = "Familia/Tipo"
-    ws.Cells(rb, 5).Value = "Metros (total)"
-    With ws.Range(ws.Cells(rb, 1), ws.Cells(rb, 5))
+    ws.Cells(rb, 5).Value = "Descricao"
+    ws.Cells(rb, 6).Value = "Metros (total)"
+    With ws.Range(ws.Cells(rb, 1), ws.Cells(rb, 6))
         .Font.Bold = True
         .Interior.Color = RGB(220, 230, 241)
         .Borders.LineStyle = 1
@@ -1315,20 +1320,21 @@ Private Sub CriarAbaStatus(ByVal wb As Object, ByVal wsAntes As Object, _
             ws.Cells(rb, 2).Value = aggQtd(kAg)
             ws.Cells(rb, 3).Value = partesAg(1)
             ws.Cells(rb, 4).Value = partesAg(0)
-            If CDbl(aggMet(kAg)) > 0 Then ws.Cells(rb, 5).Value = aggMet(kAg)
+            ws.Cells(rb, 5).Value = aggDesc(kAg)
+            If CDbl(aggMet(kAg)) > 0 Then ws.Cells(rb, 6).Value = aggMet(kAg)
             ' Zebrado leve para leitura
             If (rb - resumoIni) Mod 2 = 1 Then
-                ws.Range(ws.Cells(rb, 1), ws.Cells(rb, 5)) _
+                ws.Range(ws.Cells(rb, 1), ws.Cells(rb, 6)) _
                   .Interior.Color = RGB(242, 245, 250)
             End If
             totItens = totItens + CLng(aggQtd(kAg))
             rb = rb + 1
         Next kAg
-        ws.Range(ws.Cells(resumoIni, 1), ws.Cells(rb - 1, 5)).Borders.LineStyle = 1
+        ws.Range(ws.Cells(resumoIni, 1), ws.Cells(rb - 1, 6)).Borders.LineStyle = 1
         ' Linha TOTAL
         ws.Cells(rb, 1).Value = "TOTAL"
         ws.Cells(rb, 2).Value = totItens
-        With ws.Range(ws.Cells(rb, 1), ws.Cells(rb, 5))
+        With ws.Range(ws.Cells(rb, 1), ws.Cells(rb, 6))
             .Font.Bold = True
             .Interior.Color = RGB(220, 230, 241)
             .Borders.LineStyle = 1
@@ -1340,10 +1346,11 @@ Private Sub CriarAbaStatus(ByVal wb As Object, ByVal wsAntes As Object, _
         rb = rb + 1
     End If
 
-    ws.Range(ws.Cells(1, 1), ws.Cells(rb, 5)).Columns.AutoFit
-    ' Largura minima confortavel para a coluna "Item" ("8 D11600")
+    ws.Range(ws.Cells(1, 1), ws.Cells(rb, 6)).Columns.AutoFit
+    ' Largura minima confortavel para a coluna "Item" ("8 D11600") e "Descricao"
     If ws.Columns(1).ColumnWidth < 16 Then ws.Columns(1).ColumnWidth = 16
-    ws.Range(ws.Cells(resumoIni - 1, 1), ws.Cells(resumoIni - 1, 5)).AutoFilter
+    If ws.Columns(5).ColumnWidth < 40 Then ws.Columns(5).ColumnWidth = 40
+    ws.Range(ws.Cells(resumoIni - 1, 1), ws.Cells(resumoIni - 1, 6)).AutoFilter
 End Sub
 
 ' =============================================================================
