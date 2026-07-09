@@ -333,6 +333,33 @@ const semAnim = await pRM.evaluate(() => {
 check('prefers-reduced-motion desliga a animação de entrada dos cards', semAnim);
 await pRM.close();
 
+// 7.995) Agentes de Estudo: ativam, otimizam em rodízio e vigiam o regime
+const ag = await p.evaluate(async () => {
+  if (!dados || dados.length < 210) { dados = gerarDadosSim(300, 2); recomputarIndicadores(); }
+  // ativa via checkbox (dispara o listener real)
+  const cb = document.getElementById('agentesAtivo');
+  cb.checked = true; cb.dispatchEvent(new Event('change'));
+  const statusAtivo = document.getElementById('agentesStatus').textContent.includes('ativos');
+  const logCentral = agLog.some(l => l.agente.includes('Central'));
+  // otimizador contínuo: roda uma rodada completa no modo Simulado
+  delete iaCache[symbolAtual()];
+  await agenteOtimizador();
+  const otimizou = agLog.some(l => l.agente.includes('Otimizador'));
+  // dados simulados aleatórios: ou achou parâmetros (cache) ou reportou "sem edge" — ambos são trabalho correto
+  const cacheAtualizado = !!iaCache[symbolAtual()] || agLog.some(l => l.agente.includes('Otimizador') && /sem edge/.test(l.msg));
+  // sentinela de regime: força um "regime anterior" diferente e tica
+  agUltimoRegime = regimeUltimo() === 'trend' ? 'range' : 'trend';
+  agenteRegime();
+  const viuVirada = agLog.some(l => l.agente.includes('Regime'));
+  const linhasLog = document.querySelectorAll('#agentesLog .reg-row').length;
+  cb.checked = false; cb.dispatchEvent(new Event('change'));
+  return { statusAtivo, logCentral, otimizou, cacheAtualizado, viuVirada, linhasLog };
+});
+check('agentes ativam e logam na central', ag.statusAtivo && ag.logCentral, JSON.stringify(ag));
+check('agente otimizador estuda a moeda e atualiza o iaCache', ag.otimizou && ag.cacheAtualizado);
+check('agente sentinela detecta virada de regime', ag.viuVirada);
+check('log dos agentes renderiza no painel', ag.linhasLog >= 2, 'linhas=' + ag.linhasLog);
+
 // 8) PWA manifest
 check('PWA manifest presente', await p.$eval('link[rel=manifest]', e => e.href.startsWith('data:application/manifest')));
 

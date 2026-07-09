@@ -344,6 +344,13 @@
                     <div id="iaList" class="reg-list"></div>
                 </div>
 
+                <!-- Agentes de Estudo: estudo contínuo do mercado em segundo plano -->
+                <div class="chart-container" id="agentesPanel">
+                    <h2>🕵️ Agentes de Estudo <span id="agentesStatus" class="tv-sync-tag">○ desligados</span></h2>
+                    <label class="reg-filtro"><input type="checkbox" id="agentesAtivo"> <span>Estudo contínuo: reotimiza as moedas marcadas em rodízio (🧪), vigia a virada de regime (🔭), audita a calibração (⚖️) e mede os fatores (🧠)</span></label>
+                    <div id="agentesLog" class="reg-list"></div>
+                </div>
+
                 <div class="chart-container" id="estudoPanel" style="display:none;">
                     <h2>📚 Estudos de Mercado <span id="estudoMeta" class="tv-sync-tag"></span></h2>
                     <div id="estudoRegime" class="decision-chips"></div>
@@ -559,6 +566,7 @@
                             <li>O <strong>Scanner</strong> usa esses parâmetros; clique numa moeda pra abri-la afinada.</li>
                             <li>O <strong>Registro</strong> marca ✓/✗ automaticamente após a expiração e compara o acerto real com o previsto.</li>
                             <li>O backtest roda num <strong>Web Worker</strong> (segundo plano), então a tela não trava durante a otimização.</li>
+                            <li><strong>🕵️ Agentes de Estudo</strong> (opcional): com o estudo contínuo ativado, 4 agentes trabalham sozinhos — 🧪 reotimiza as moedas em rodízio, 🔭 aplica os parâmetros certos quando o regime vira, ⚖️ audita a calibração e 🧠 mede os fatores. O painel mostra o que cada um encontrou.</li>
                         </ul>
                     </section>
                     <section>
@@ -600,6 +608,7 @@
     <script src="src/05-registro-ia-noticias.js"></script>
     <script src="src/06-eventos-init.js"></script>
     <script src="src/07-backtest.js"></script>
+    <script src="src/08-agentes.js"></script>
     <!-- APP:END -->
 </body>
 </html>
