@@ -7,6 +7,7 @@ import { useEditorStore } from "@/store/editor";
 import { Input, Select } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { KeyframesPanel } from "./keyframes-panel";
+import { StickersPanel } from "./stickers-panel";
 
 const TRANSITIONS = ["nenhuma", "corte seco", "zoom", "slide"] as const;
 
@@ -74,6 +75,7 @@ export function LayersPanel() {
         ))}
       </Select>
       <KeyframesPanel />
+      <StickersPanel />
 
       <p className="text-xs leading-relaxed text-zinc-500">
         As camadas seguem as zonas seguras do preset de plataforma selecionado no preview.

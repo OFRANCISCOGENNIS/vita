@@ -33,12 +33,14 @@ import { EditorTimeline } from "./timeline";
 import { CaptionsPanel } from "./captions-panel";
 import { LayersPanel } from "./layers-panel";
 import { EffectsPanel } from "./effects-panel";
+import { OverlaysPanel } from "./overlays-panel";
 import { AudioPanel } from "./audio-panel";
-import { TranscriptPanel } from "./transcript-panel";
+import { TextoPanel } from "./texto-panel";
+import { AutoPanel } from "./auto-panel";
 import { ExportModal } from "./export-modal";
 import { ShortcutsModal } from "./shortcuts-modal";
 
-type PanelTab = "captions" | "effects" | "layers" | "audio" | "transcript";
+type PanelTab = "captions" | "effects" | "overlays" | "layers" | "audio" | "texto" | "auto";
 
 export default function Editor({ cutId }: { cutId: string }) {
   const {
@@ -300,21 +302,25 @@ export default function Editor({ cutId }: { cutId: string }) {
               tabs={[
                 { id: "captions", label: "Legendas" },
                 { id: "effects", label: "Efeitos" },
+                { id: "overlays", label: "Overlays" },
                 { id: "layers", label: "Camadas" },
                 { id: "audio", label: "Áudio" },
-                { id: "transcript", label: "Texto" },
+                { id: "texto", label: "Texto" },
+                { id: "auto", label: "Auto" },
               ]}
               value={panel}
               onChange={setPanel}
-              className="w-full [&>button]:flex-1 [&>button]:px-1.5"
+              className="w-full [&>button]:min-w-0 [&>button]:flex-1 [&>button]:truncate [&>button]:px-1 [&>button]:text-[13px]"
             />
           </div>
           <div className={cn("min-h-0 flex-1 overflow-y-auto p-4")}>
             {panel === "captions" && <CaptionsPanel />}
             {panel === "effects" && <EffectsPanel />}
+            {panel === "overlays" && <OverlaysPanel />}
             {panel === "layers" && <LayersPanel />}
             {panel === "audio" && <AudioPanel />}
-            {panel === "transcript" && <TranscriptPanel />}
+            {panel === "texto" && <TextoPanel />}
+            {panel === "auto" && <AutoPanel />}
           </div>
         </aside>
       </div>

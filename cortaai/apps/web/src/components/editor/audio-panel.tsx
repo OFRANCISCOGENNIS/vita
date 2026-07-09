@@ -10,6 +10,7 @@ import { useEditorStore } from "@/store/editor";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { AudioAdvanced } from "./audio-advanced";
+import { AudioCapcutPanel } from "./audio-capcut";
 
 export function AudioPanel() {
   const { cut, doc, apply } = useEditorStore();
@@ -47,6 +48,8 @@ export function AudioPanel() {
           description="Abaixa a música quando há fala"
         />
       </section>
+
+      <AudioCapcutPanel />
 
       <AudioAdvanced />
 

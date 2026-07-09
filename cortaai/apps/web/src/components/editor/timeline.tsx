@@ -6,7 +6,7 @@
 import { useMemo, useRef, type MouseEvent } from "react";
 import { Captions, Film, Layers, Music2, Pause, Play, Scissors, SkipBack, ZoomIn, ZoomOut } from "lucide-react";
 import { cn, formatDuration, seededRandom } from "@/lib/utils";
-import { speedAt, TRANSITION_META } from "@/lib/edit-visuals";
+import { beatTimes, speedAt, TRANSITION_META } from "@/lib/edit-visuals";
 import { useEditorStore } from "@/store/editor";
 import { Slider } from "@/components/ui/slider";
 import { groupSentences } from "./sentences";
@@ -49,6 +49,9 @@ export function EditorTimeline() {
     const x = e.clientX - rect.left;
     return Math.min(duration, Math.max(0, x / timelineZoom));
   }
+
+  // Marcadores de batida (beat sync) na trilha de áudio.
+  const beats = doc.audioCapcut.beatSync ? beatTimes(doc.audioCapcut.bpm, duration) : [];
 
   const tickStep = timelineZoom >= 24 ? 1 : timelineZoom >= 10 ? 5 : 10;
   const ticks: number[] = [];
@@ -285,9 +288,24 @@ export function EditorTimeline() {
                   aria-hidden
                 />
               )}
+              {/* Beat markers (beat sync) */}
+              {beats.map((b, i) => (
+                <span
+                  key={`beat-${i}`}
+                  className="pointer-events-none absolute inset-y-0 z-10 w-px bg-fuchsia-400/70"
+                  style={{ left: b * timelineZoom }}
+                  title={`Batida em ${formatDuration(b)}`}
+                  aria-hidden
+                />
+              ))}
               {doc.audio.musicTrack && (
                 <span className="absolute left-2 top-1 z-20 rounded bg-black/60 px-1.5 text-[9px] text-emerald-200">
                   🎵 {doc.audio.musicTrack}
+                </span>
+              )}
+              {doc.audioCapcut.beatSync && (
+                <span className="absolute right-2 top-1 z-20 rounded bg-fuchsia-500/20 px-1.5 text-[9px] font-medium text-fuchsia-200">
+                  ♪ {beats.length} batidas
                 </span>
               )}
             </div>
