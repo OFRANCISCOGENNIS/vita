@@ -6,6 +6,7 @@
 import { useMemo, useRef, type MouseEvent } from "react";
 import { Captions, Film, Layers, Music2, Pause, Play, Scissors, SkipBack, ZoomIn, ZoomOut } from "lucide-react";
 import { cn, formatDuration, seededRandom } from "@/lib/utils";
+import { speedAt, TRANSITION_META } from "@/lib/edit-visuals";
 import { useEditorStore } from "@/store/editor";
 import { Slider } from "@/components/ui/slider";
 import { groupSentences } from "./sentences";
@@ -168,9 +169,54 @@ export function EditorTimeline() {
                     }}
                   />
                 ))}
-              {/* splits */}
-              {doc.splits.map((s) => (
-                <span key={s} className="absolute inset-y-0 z-10 w-0.5 bg-amber-300" style={{ left: s * timelineZoom }} title={`Divisão em ${formatDuration(s)}`} />
+              {/* splits + transitions */}
+              {doc.splits.map((s) => {
+                const tr = doc.transitions.find((t) => t.at === s);
+                const meta = tr ? TRANSITION_META.find((m) => m.id === tr.type) : null;
+                return (
+                  <span key={s} className="absolute inset-y-0 z-10" style={{ left: s * timelineZoom }} title={meta ? `${meta.label} em ${formatDuration(s)}` : `Divisão em ${formatDuration(s)}`}>
+                    <span className="absolute inset-y-0 w-0.5 bg-amber-300" />
+                    {meta && (
+                      <span className="absolute -top-0.5 -left-2 rounded bg-fuchsia-600/90 px-0.5 text-[8px] leading-tight text-white" aria-hidden>
+                        {meta.emoji}
+                      </span>
+                    )}
+                  </span>
+                );
+              })}
+              {/* reframe keyframes */}
+              {doc.reframe.keyframes.map((k) => (
+                <span
+                  key={`rf-${k.t}`}
+                  className="absolute top-0.5 z-10 h-2 w-2 -translate-x-1/2 rotate-45 bg-fuchsia-400"
+                  style={{ left: k.t * timelineZoom }}
+                  title={`Reenquadrar ${k.zoom.toFixed(2)}x em ${formatDuration(k.t)}`}
+                />
+              ))}
+              {/* speed keyframes + ramp */}
+              {doc.speed.keyframes.length > 0 && (
+                <svg className="pointer-events-none absolute inset-x-0 bottom-0 z-[9] h-3" width={width} height={12} aria-hidden preserveAspectRatio="none">
+                  <polyline
+                    points={Array.from({ length: Math.max(2, Math.round(width / 8)) }, (_, i) => {
+                      const x = (i / Math.max(1, Math.round(width / 8) - 1)) * width;
+                      const t = x / timelineZoom;
+                      const rate = speedAt(doc.speed, t);
+                      const y = 12 - ((rate - 0.25) / (4 - 0.25)) * 12;
+                      return `${x.toFixed(1)},${y.toFixed(1)}`;
+                    }).join(" ")}
+                    fill="none"
+                    stroke="#fbbf24"
+                    strokeWidth={1.5}
+                  />
+                </svg>
+              )}
+              {doc.speed.keyframes.map((k) => (
+                <span
+                  key={`sp-${k.t}`}
+                  className="absolute bottom-0.5 z-10 h-2 w-2 -translate-x-1/2 rotate-45 bg-amber-400"
+                  style={{ left: k.t * timelineZoom }}
+                  title={`${k.rate.toFixed(2)}x em ${formatDuration(k.t)}`}
+                />
               ))}
               {/* in/out shading */}
               {doc.inPoint != null && (
@@ -222,8 +268,25 @@ export function EditorTimeline() {
                   );
                 })}
               </svg>
+              {/* fade in/out handles */}
+              {doc.audioAdvanced.fadeInSec > 0 && (
+                <div
+                  className="pointer-events-none absolute inset-y-0 left-0 z-10"
+                  style={{ width: Math.min(width, doc.audioAdvanced.fadeInSec * timelineZoom), background: "linear-gradient(to right, rgba(0,0,0,0.7), transparent)" }}
+                  title={`Fade in ${doc.audioAdvanced.fadeInSec.toFixed(1)}s`}
+                  aria-hidden
+                />
+              )}
+              {doc.audioAdvanced.fadeOutSec > 0 && (
+                <div
+                  className="pointer-events-none absolute inset-y-0 right-0 z-10"
+                  style={{ width: Math.min(width, doc.audioAdvanced.fadeOutSec * timelineZoom), background: "linear-gradient(to left, rgba(0,0,0,0.7), transparent)" }}
+                  title={`Fade out ${doc.audioAdvanced.fadeOutSec.toFixed(1)}s`}
+                  aria-hidden
+                />
+              )}
               {doc.audio.musicTrack && (
-                <span className="absolute left-2 top-1 rounded bg-black/60 px-1.5 text-[9px] text-emerald-200">
+                <span className="absolute left-2 top-1 z-20 rounded bg-black/60 px-1.5 text-[9px] text-emerald-200">
                   🎵 {doc.audio.musicTrack}
                 </span>
               )}

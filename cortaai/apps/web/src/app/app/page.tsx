@@ -214,6 +214,17 @@ export default function DashboardPage() {
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <SkeletonCard /><SkeletonCard /><SkeletonCard /><SkeletonCard />
           </div>
+        ) : stats.nicheHighlights.length === 0 ? (
+          <EmptyState
+            variant="search"
+            title="Sem destaques ainda"
+            description="Explore o Radar Viral para descobrir vídeos em alta no seu nicho."
+            action={
+              <Link href="/app/radar" className="inline-flex h-10 items-center gap-2 rounded-xl border border-line px-4 text-sm font-medium text-zinc-200 hover:border-violet-500/50 hover:text-white">
+                Abrir Radar Viral
+              </Link>
+            }
+          />
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {stats.nicheHighlights.map((t) => (

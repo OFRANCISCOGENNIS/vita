@@ -12,6 +12,7 @@ import {
   CloudUpload,
   Download,
   History,
+  Image as ImageIcon,
   Keyboard,
   Loader2,
   Redo2,
@@ -31,12 +32,13 @@ import { EditorPreview } from "./preview";
 import { EditorTimeline } from "./timeline";
 import { CaptionsPanel } from "./captions-panel";
 import { LayersPanel } from "./layers-panel";
+import { EffectsPanel } from "./effects-panel";
 import { AudioPanel } from "./audio-panel";
 import { TranscriptPanel } from "./transcript-panel";
 import { ExportModal } from "./export-modal";
 import { ShortcutsModal } from "./shortcuts-modal";
 
-type PanelTab = "captions" | "layers" | "audio" | "transcript";
+type PanelTab = "captions" | "effects" | "layers" | "audio" | "transcript";
 
 export default function Editor({ cutId }: { cutId: string }) {
   const {
@@ -266,6 +268,13 @@ export default function Editor({ cutId }: { cutId: string }) {
           </Button>
         </div>
 
+        <Link
+          href={`/app/capa/${cut.id}`}
+          className="inline-flex h-10 items-center gap-2 rounded-xl border border-line bg-surface-3 px-4 text-sm font-medium text-zinc-100 transition-colors hover:bg-zinc-700/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+        >
+          <ImageIcon className="h-4 w-4" aria-hidden />
+          <span className="hidden sm:inline">Capa</span>
+        </Link>
         <Button variant="secondary" onClick={() => setShareOpen(true)}>
           <Share2 className="h-4 w-4" aria-hidden />
           <span className="hidden sm:inline">Compartilhar</span>
@@ -290,17 +299,19 @@ export default function Editor({ cutId }: { cutId: string }) {
             <Tabs
               tabs={[
                 { id: "captions", label: "Legendas" },
+                { id: "effects", label: "Efeitos" },
                 { id: "layers", label: "Camadas" },
                 { id: "audio", label: "Áudio" },
                 { id: "transcript", label: "Texto" },
               ]}
               value={panel}
               onChange={setPanel}
-              className="w-full [&>button]:flex-1"
+              className="w-full [&>button]:flex-1 [&>button]:px-1.5"
             />
           </div>
           <div className={cn("min-h-0 flex-1 overflow-y-auto p-4")}>
             {panel === "captions" && <CaptionsPanel />}
+            {panel === "effects" && <EffectsPanel />}
             {panel === "layers" && <LayersPanel />}
             {panel === "audio" && <AudioPanel />}
             {panel === "transcript" && <TranscriptPanel />}

@@ -5,7 +5,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { CalendarClock, ChevronDown, Music2, Pencil, RefreshCw, Share2 } from "lucide-react";
+import { CalendarClock, ChevronDown, Image as ImageIcon, Music2, Pencil, RefreshCw, Share2 } from "lucide-react";
 import * as api from "@/lib/api";
 import type { Cut } from "@/lib/types";
 import { cn, formatDuration } from "@/lib/utils";
@@ -131,6 +131,14 @@ export function CutCard({ cut: initial }: { cut: Cut }) {
         <Button size="sm" variant="secondary" onClick={regenerate} loading={regenerating} aria-label="Regenerar corte">
           {!regenerating && <RefreshCw className="h-3.5 w-3.5" aria-hidden />} Regenerar
         </Button>
+        <Link
+          href={`/app/capa/${cut.id}`}
+          aria-label="Criar capa deste corte"
+          title="Estúdio de Capa"
+          className="inline-flex h-8 w-8 items-center justify-center rounded-xl text-zinc-300 transition-colors hover:bg-white/5 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+        >
+          <ImageIcon className="h-3.5 w-3.5" aria-hidden />
+        </Link>
         <Button size="sm" variant="ghost" onClick={() => setShareOpen(true)} aria-label="Compartilhar corte" title="Compartilhar">
           <Share2 className="h-3.5 w-3.5" aria-hidden />
         </Button>
