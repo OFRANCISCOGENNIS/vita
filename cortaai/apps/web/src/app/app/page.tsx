@@ -6,7 +6,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { ArrowRight, Clock, FolderOpen, Radar, Scissors, TrendingUp } from "lucide-react";
+import { ArrowRight, Clock, FolderOpen, Radar, Scissors, ShieldAlert, TrendingUp } from "lucide-react";
 import * as api from "@/lib/api";
 import type { DashboardStats } from "@/lib/types";
 import { formatDuration, timeAgo } from "@/lib/utils";
@@ -67,6 +67,26 @@ export default function DashboardPage() {
           Aqui está o resumo da sua fábrica de cortes.
         </p>
       </div>
+
+      {/* Atalho para administradores (não força redirecionamento — é uma escolha). */}
+      {user?.isAdmin && (
+        <Link
+          href="/app/admin"
+          className="flex items-center gap-3 rounded-2xl border border-amber-500/30 bg-gradient-to-r from-amber-500/10 to-transparent px-4 py-3 transition-colors hover:border-amber-500/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+        >
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 text-white" aria-hidden>
+            <ShieldAlert className="h-5 w-5" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="flex items-center gap-2 text-sm font-semibold text-white">
+              Painel do ADM
+              <span className="rounded bg-amber-500 px-1.5 py-0.5 text-[10px] font-black uppercase tracking-widest text-black">ADM</span>
+            </span>
+            <span className="block text-xs text-zinc-400">Você tem acesso administrativo — veja as métricas da plataforma inteira.</span>
+          </span>
+          <ArrowRight className="h-4 w-4 shrink-0 text-amber-400" aria-hidden />
+        </Link>
+      )}
 
       {/* Stat cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
