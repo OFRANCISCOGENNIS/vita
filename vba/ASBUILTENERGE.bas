@@ -1120,14 +1120,14 @@ Private Sub CriarAbaStatus(ByVal wb As Object, ByVal wsAntes As Object, _
         Case Else:                       corTitulo = RGB(80, 80, 80)
     End Select
 
-    Dim rb As Long, cabRow As Long, i As Long
+    Dim rb As Long, i As Long
 
     ' =====================================================================
     '  TITULO PRINCIPAL
     ' =====================================================================
     rb = 1
     ws.Cells(rb, 1).Value = "MATERIAIS CLASSIFICADOS (" & statusFiltro & ")"
-    With ws.Range(ws.Cells(rb, 1), ws.Cells(rb, 10))
+    With ws.Range(ws.Cells(rb, 1), ws.Cells(rb, 5))
         .Merge
         .Font.Bold = True
         .Font.Size = 14
@@ -1187,7 +1187,7 @@ Private Sub CriarAbaStatus(ByVal wb As Object, ByVal wsAntes As Object, _
         End If
     Next i
 
-    ws.Cells(rb, 1).Value = "RESUMO — MATERIAIS AGRUPADOS"
+    ws.Cells(rb, 1).Value = "RESUMO - MATERIAIS AGRUPADOS"
     With ws.Range(ws.Cells(rb, 1), ws.Cells(rb, 5))
         .Merge
         .Font.Bold = True
@@ -1253,103 +1253,10 @@ Private Sub CriarAbaStatus(ByVal wb As Object, ByVal wsAntes As Object, _
         rb = rb + 1
     End If
 
-    rb = rb + 2
-
-    ' =====================================================================
-    '  SECAO 2: DETALHAMENTO — TEXTOS + BLOCOS deste status
-    '  Coluna "Origem" distingue TEXTO de BLOCO.
-    ' =====================================================================
-    ws.Cells(rb, 1).Value = "DETALHAMENTO (" & statusFiltro & ")"
-    With ws.Range(ws.Cells(rb, 1), ws.Cells(rb, 10))
-        .Merge
-        .Font.Bold = True
-        .Font.Size = 11
-        .Font.Color = RGB(255, 255, 255)
-        .Interior.Color = corTitulo
-        .RowHeight = 20
-        .VerticalAlignment = -4108
-        .IndentLevel = 1
-    End With
-    rb = rb + 1
-
-    cabRow = rb
-    ws.Cells(rb, 1).Value = "Origem"
-    ws.Cells(rb, 2).Value = "Familia/Tipo"
-    ws.Cells(rb, 3).Value = "Nome do Material"
-    ws.Cells(rb, 4).Value = "Descricao / Conteudo"
-    ws.Cells(rb, 5).Value = "Layer / Bloco"
-    ws.Cells(rb, 6).Value = "Numero"
-    ws.Cells(rb, 7).Value = "Distancia"
-    ws.Cells(rb, 8).Value = "Metros"
-    ws.Cells(rb, 9).Value = "X"
-    ws.Cells(rb, 10).Value = "Y"
-    With ws.Range(ws.Cells(rb, 1), ws.Cells(rb, 10))
-        .Font.Bold = True
-        .Interior.Color = RGB(220, 230, 241)
-        .Borders.LineStyle = 1
-    End With
-    rb = rb + 1
-
-    Dim cnt As Long, detIni As Long
-    cnt = 0
-    detIni = rb
-
-    ' --- Linhas de TEXTOS (exceto familia ainda por classificar) ----------
-    For i = 1 To nTotal
-        If arrStatus(i) = statusFiltro And _
-           arrFam(i) <> "CLASSIFICAR" And arrFam(i) <> "-" And _
-           arrFam(i) <> "NAO CLASSIFICADO" And Len(Trim$(arrFam(i))) > 0 Then
-            ws.Cells(rb, 1).Value = "TEXTO"
-            ws.Cells(rb, 2).Value = arrFam(i)
-            ws.Cells(rb, 3).Value = arrNomeMaterial(i)
-            ws.Cells(rb, 4).Value = arrTexto(i)
-            ws.Cells(rb, 5).Value = arrLayer(i)
-            ws.Cells(rb, 6).Value = ""
-            ws.Cells(rb, 7).Value = ""
-            ws.Cells(rb, 8).Value = ""
-            ws.Cells(rb, 9).Value = arrX(i)
-            ws.Cells(rb, 10).Value = arrY(i)
-            rb = rb + 1
-            cnt = cnt + 1
-        End If
-    Next i
-
-    ' --- Linhas de BLOCOS -------------------------------------------------
-    For i = 1 To nBloco
-        If bStat(i) = statusFiltro Then
-            ws.Cells(rb, 1).Value = "BLOCO"
-            ws.Cells(rb, 2).Value = bTipo(i)
-            ws.Cells(rb, 3).Value = bBase(i)
-            ws.Cells(rb, 4).Value = bDesc(i)
-            ws.Cells(rb, 5).Value = bBloco(i)
-            ws.Cells(rb, 6).Value = bNum(i)
-            ws.Cells(rb, 7).Value = bDist(i)
-            ws.Cells(rb, 8).Value = bMet(i)
-            ws.Cells(rb, 9).Value = bBX(i)
-            ws.Cells(rb, 10).Value = bBY(i)
-            rb = rb + 1
-            cnt = cnt + 1
-        End If
-    Next i
-
-    If cnt = 0 Then
-        ws.Cells(rb, 1).Value = "(nenhum item neste status)"
-        ws.Cells(rb, 1).Font.Italic = True
-    Else
-        ' Zebrado leve + bordas no detalhamento
-        For i = detIni To rb - 1
-            If (i - detIni) Mod 2 = 1 Then
-                ws.Range(ws.Cells(i, 1), ws.Cells(i, 10)) _
-                  .Interior.Color = RGB(242, 245, 250)
-            End If
-        Next i
-        ws.Range(ws.Cells(detIni, 1), ws.Cells(rb - 1, 10)).Borders.LineStyle = 1
-        ws.Range(ws.Cells(cabRow, 1), ws.Cells(cabRow, 10)).AutoFilter
-    End If
-
-    ws.Range(ws.Cells(1, 1), ws.Cells(rb, 10)).Columns.AutoFit
-    ' Largura minima confortavel para a coluna "Item" do resumo ("8 D11600")
+    ws.Range(ws.Cells(1, 1), ws.Cells(rb, 5)).Columns.AutoFit
+    ' Largura minima confortavel para a coluna "Item" ("8 D11600")
     If ws.Columns(1).ColumnWidth < 16 Then ws.Columns(1).ColumnWidth = 16
+    ws.Range(ws.Cells(resumoIni - 1, 1), ws.Cells(resumoIni - 1, 5)).AutoFilter
 End Sub
 
 ' =============================================================================
