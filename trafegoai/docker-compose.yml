@@ -1,0 +1,80 @@
+version: "3.9"
+
+# TrafegoAI — sobe toda a stack com: docker compose up
+# Serviços: postgres, redis, api (NestJS), worker (BullMQ), web (Next.js)
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: trafegoai
+      POSTGRES_PASSWORD: trafegoai
+      POSTGRES_DB: trafegoai
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U trafegoai"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: ./apps/api
+    environment:
+      DATABASE_URL: postgresql://trafegoai:trafegoai@postgres:5432/trafegoai
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
+      TOKEN_ENCRYPTION_KEY: ${TOKEN_ENCRYPTION_KEY:-0123456789abcdef0123456789abcdef}
+      PORT: "4000"
+      SEED_ON_BOOT: "true"
+    ports:
+      - "4000:4000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: sh -c "npx prisma migrate deploy && npm run seed:ifempty && node dist/main.js"
+
+  # Worker de jobs (sincronização de métricas + motor de regras de automação).
+  # Para escalar: docker compose up --scale worker=4
+  worker:
+    build:
+      context: ./apps/api
+    environment:
+      DATABASE_URL: postgresql://trafegoai:trafegoai@postgres:5432/trafegoai
+      REDIS_URL: redis://redis:6379
+      TOKEN_ENCRYPTION_KEY: ${TOKEN_ENCRYPTION_KEY:-0123456789abcdef0123456789abcdef}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: node dist/jobs/worker.main.js
+
+  web:
+    build:
+      context: ./apps/web
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:4000
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:4000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+
+volumes:
+  pgdata:

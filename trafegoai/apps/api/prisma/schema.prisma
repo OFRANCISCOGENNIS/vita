@@ -1,0 +1,371 @@
+// TrafegoAI — schema completo
+// Usuários, organizações, contas conectadas, campanhas, métricas históricas,
+// regras de automação, recomendações de IA, metas, relatórios e auditoria.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ===================== Contas e organizações =====================
+
+enum Plan {
+  STARTER
+  PRO
+  AGENCY
+}
+
+enum Role {
+  ADMIN
+  MANAGER
+  CLIENT_VIEWER
+}
+
+model User {
+  id           String       @id @default(cuid())
+  email        String       @unique
+  name         String
+  passwordHash String? // null quando o login é só via Google OAuth
+  googleId     String?      @unique
+  createdAt    DateTime     @default(now())
+  memberships  Membership[]
+  auditLogs    AuditLog[]
+  chats        ChatMessage[]
+}
+
+model Organization {
+  id            String   @id @default(cuid())
+  name          String
+  plan          Plan     @default(STARTER)
+  // White-label (plano Agência)
+  brandLogoUrl  String?
+  brandColor    String?  @default("#6366f1")
+  customDomain  String?
+  stripeCustomerId String?
+  createdAt     DateTime @default(now())
+
+  memberships     Membership[]
+  clients         Client[]
+  adAccounts      AdAccount[]
+  rules           AutomationRule[]
+  recommendations Recommendation[]
+  anomalies       Anomaly[]
+  goals           Goal[]
+  reports         Report[]
+  auditLogs       AuditLog[]
+  creatives       Creative[]
+  chats           ChatMessage[]
+}
+
+model Membership {
+  id     String @id @default(cuid())
+  userId String
+  orgId  String
+  role   Role   @default(ADMIN)
+  user   User         @relation(fields: [userId], references: [id])
+  org    Organization @relation(fields: [orgId], references: [id])
+
+  @@unique([userId, orgId])
+}
+
+// Cliente da agência (modo agência): agrupa contas de anúncio, metas e relatórios
+model Client {
+  id        String      @id @default(cuid())
+  orgId     String
+  name      String
+  org       Organization @relation(fields: [orgId], references: [id])
+  accounts  AdAccount[]
+  goals     Goal[]
+  reports   Report[]
+}
+
+// ===================== Contas de anúncio conectadas =====================
+
+enum Platform {
+  GOOGLE
+  META
+  TIKTOK
+}
+
+enum ConnectionStatus {
+  ACTIVE
+  EXPIRED
+  ERROR
+}
+
+model AdAccount {
+  id              String           @id @default(cuid())
+  orgId           String
+  clientId        String?
+  platform        Platform
+  externalId      String // id da conta na plataforma (ex.: act_123, customer id)
+  name            String
+  currency        String           @default("BRL")
+  status          ConnectionStatus @default(ACTIVE)
+  statusDetail    String?
+  // Tokens OAuth criptografados em repouso (AES-256-GCM) — nunca em texto plano
+  accessTokenEnc  String?
+  refreshTokenEnc String?
+  tokenExpiresAt  DateTime?
+  lastSyncAt      DateTime?
+  createdAt       DateTime         @default(now())
+
+  org       Organization  @relation(fields: [orgId], references: [id])
+  client    Client?       @relation(fields: [clientId], references: [id])
+  campaigns Campaign[]
+  metrics   MetricDaily[]
+  hourly    HourlyPerformance[]
+
+  @@unique([platform, externalId, orgId])
+}
+
+// ===================== Estrutura de campanhas =====================
+
+enum EntityStatus {
+  ACTIVE
+  PAUSED
+  ARCHIVED
+}
+
+model Campaign {
+  id          String       @id @default(cuid())
+  accountId   String
+  externalId  String
+  name        String
+  status      EntityStatus @default(ACTIVE)
+  objective   String? // ex.: CONVERSIONS, TRAFFIC, SALES
+  budgetDaily Decimal?     @db.Decimal(12, 2)
+  account     AdAccount    @relation(fields: [accountId], references: [id])
+  adSets      AdSet[]
+
+  @@unique([accountId, externalId])
+}
+
+model AdSet {
+  id         String       @id @default(cuid())
+  campaignId String
+  externalId String
+  name       String
+  status     EntityStatus @default(ACTIVE)
+  targeting  Json? // segmentação básica normalizada entre plataformas
+  campaign   Campaign     @relation(fields: [campaignId], references: [id])
+  ads        Ad[]
+
+  @@unique([campaignId, externalId])
+}
+
+model Ad {
+  id         String       @id @default(cuid())
+  adSetId    String
+  externalId String
+  name       String
+  status     EntityStatus @default(ACTIVE)
+  creativeId String?
+  adSet      AdSet        @relation(fields: [adSetId], references: [id])
+  creative   Creative?    @relation(fields: [creativeId], references: [id])
+
+  @@unique([adSetId, externalId])
+}
+
+// ===================== Métricas (schema comum normalizado) =====================
+
+enum MetricLevel {
+  ACCOUNT
+  CAMPAIGN
+  ADSET
+  AD
+}
+
+// Métricas diárias normalizadas entre Google/Meta/TikTok pelo NormalizerService.
+// Métricas derivadas (ROAS, CPA, CPC, CPM, CTR, tx. conversão) são calculadas na leitura.
+model MetricDaily {
+  id          String      @id @default(cuid())
+  date        DateTime    @db.Date
+  level       MetricLevel
+  refId       String // id interno da entidade (campaign/adset/ad) ou accountId
+  accountId   String
+  platform    Platform
+  spend       Decimal     @db.Decimal(14, 2)
+  revenue     Decimal     @db.Decimal(14, 2)
+  impressions Int
+  clicks      Int
+  conversions Int
+  frequency   Decimal?    @db.Decimal(8, 4) // usada na detecção de fadiga de criativo
+
+  account AdAccount @relation(fields: [accountId], references: [id])
+
+  @@unique([date, level, refId])
+  @@index([accountId, date])
+  @@index([level, refId, date])
+}
+
+// Agregado por dia-da-semana/hora para o mapa de calor de melhores horários
+model HourlyPerformance {
+  id          String    @id @default(cuid())
+  accountId   String
+  dayOfWeek   Int // 0=domingo ... 6=sábado
+  hour        Int // 0..23
+  spend       Decimal   @db.Decimal(14, 2)
+  conversions Int
+  revenue     Decimal   @db.Decimal(14, 2)
+  account     AdAccount @relation(fields: [accountId], references: [id])
+
+  @@unique([accountId, dayOfWeek, hour])
+}
+
+// ===================== Criativos =====================
+
+model Creative {
+  id          String   @id @default(cuid())
+  orgId       String
+  platform    Platform
+  headline    String
+  primaryText String?
+  description String?
+  cta         String?
+  imageUrl    String?
+  angle       String? // ângulo do anúncio sugerido pela IA
+  aiGenerated Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  org         Organization @relation(fields: [orgId], references: [id])
+  ads         Ad[]
+}
+
+// ===================== IA: recomendações e anomalias =====================
+
+enum RecommendationStatus {
+  OPEN
+  APPLIED
+  DISMISSED
+  UNDONE
+}
+
+model Recommendation {
+  id             String               @id @default(cuid())
+  orgId          String
+  accountId      String?
+  type           String // REALLOCATE_BUDGET | PAUSE_ADSET | SCALE_CAMPAIGN | SWAP_CREATIVE | ADJUST_SCHEDULE
+  title          String
+  why            String // o "porquê" em linguagem simples
+  impactEstimate String // ganho estimado (ex.: "+R$ 2.300/mês em receita")
+  priority       Int // 1 = maior impacto
+  status         RecommendationStatus @default(OPEN)
+  payload        Json // ação executável via API + dados p/ desfazer
+  appliedAt      DateTime?
+  createdAt      DateTime             @default(now())
+  org            Organization         @relation(fields: [orgId], references: [id])
+
+  @@index([orgId, status, priority])
+}
+
+model Anomaly {
+  id         String   @id @default(cuid())
+  orgId      String
+  accountId  String?
+  severity   String // CRITICAL | WARNING | INFO
+  metric     String // SPEND_SPIKE | CONVERSION_DROP | NO_DELIVERY | TRACKING_BROKEN
+  message    String
+  detectedAt DateTime @default(now())
+  resolved   Boolean  @default(false)
+  org        Organization @relation(fields: [orgId], references: [id])
+}
+
+// ===================== Regras de automação =====================
+
+model AutomationRule {
+  id          String   @id @default(cuid())
+  orgId       String
+  name        String
+  enabled     Boolean  @default(true)
+  // Condição "se": métrica, operador e limiar avaliados numa janela de dias
+  metric      String // CPA | ROAS | SPEND | CTR | CPC
+  operator    String // GT | LT
+  threshold   Decimal  @db.Decimal(12, 2)
+  windowDays  Int      @default(3)
+  // Ação "então"
+  action      String // PAUSE | INCREASE_BUDGET | DECREASE_BUDGET | NOTIFY
+  actionValue Decimal? @db.Decimal(12, 2) // ex.: 20 = +20% de verba
+  scope       Json // { level: "CAMPAIGN"|"ADSET", platform?, accountId?, campaignIds? }
+  lastRunAt   DateTime?
+  createdAt   DateTime @default(now())
+  org         Organization    @relation(fields: [orgId], references: [id])
+  executions  RuleExecution[]
+}
+
+model RuleExecution {
+  id         String   @id @default(cuid())
+  ruleId     String
+  firedAt    DateTime @default(now())
+  targetType String
+  targetId   String
+  targetName String
+  detail     String
+  rule       AutomationRule @relation(fields: [ruleId], references: [id])
+}
+
+// ===================== Metas e previsões =====================
+
+model Goal {
+  id            String  @id @default(cuid())
+  orgId         String
+  clientId      String?
+  month         String // "2026-07"
+  targetRoas    Decimal? @db.Decimal(8, 2)
+  targetCpa     Decimal? @db.Decimal(12, 2)
+  monthlyBudget Decimal? @db.Decimal(14, 2)
+  org           Organization @relation(fields: [orgId], references: [id])
+  client        Client?      @relation(fields: [clientId], references: [id])
+
+  @@unique([orgId, clientId, month])
+}
+
+// ===================== Relatórios white-label =====================
+
+model Report {
+  id         String   @id @default(cuid())
+  orgId      String
+  clientId   String?
+  name       String
+  schedule   String   @default("NONE") // NONE | WEEKLY | MONTHLY
+  recipients String[] @default([])
+  shareToken String   @unique @default(cuid()) // dashboard somente-leitura por link
+  brand      Json? // { logoUrl, color } — override do white-label da org
+  lastSentAt DateTime?
+  createdAt  DateTime @default(now())
+  org        Organization @relation(fields: [orgId], references: [id])
+  client     Client?      @relation(fields: [clientId], references: [id])
+}
+
+// ===================== Auditoria e chat =====================
+
+// Toda ação que altera campanhas/verba fica registrada aqui (LGPD + rastreabilidade)
+model AuditLog {
+  id         String   @id @default(cuid())
+  orgId      String
+  userId     String?
+  action     String // ex.: CAMPAIGN_PAUSED, BUDGET_CHANGED, RECOMMENDATION_APPLIED, RULE_FIRED
+  targetType String
+  targetId   String
+  before     Json?
+  after      Json?
+  createdAt  DateTime @default(now())
+  org        Organization @relation(fields: [orgId], references: [id])
+  user       User?        @relation(fields: [userId], references: [id])
+
+  @@index([orgId, createdAt])
+}
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  orgId     String
+  userId    String
+  role      String // user | assistant
+  content   String
+  createdAt DateTime @default(now())
+  org       Organization @relation(fields: [orgId], references: [id])
+  user      User         @relation(fields: [userId], references: [id])
+}
