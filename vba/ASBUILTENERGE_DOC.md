@@ -37,7 +37,7 @@ Monta mapa Layer → Cor ACI (CorLayerSegura)
   → CriarAbaBOM             — quantitativo agrupado por Status/Família/Descrição
   → CriarAbaBlocosPorFamilia ("Blocos")      — aba unificada organizada em seções por família
   → Oculta abas auxiliares (Alertas, Vinculos, Quantitativo (BOM))
-  → Move "Blocos" para 1ª posição, depois CriarAbaPainel insere "PAINEL" como 1ª aba
+  → Move "Blocos" para 1ª posição
   → wb.SaveAs (.xlsx) + wb.Close + xl.Quit
   → MostrarAnimacaoVelocidade   — tela HTA de resultado (mshta.exe)
 ```
@@ -48,8 +48,7 @@ Tratamento de erro: `On Error GoTo TratarErro` captura `Err.Number/Description/S
 
 | Aba | Origem | Descrição |
 |-----|--------|-----------|
-| `PAINEL` | `CriarAbaPainel` | Dashboard executivo — primeira aba, números consolidados |
-| `Blocos` | `CriarAbaBlocosPorFamilia` | Todos os blocos (postes+cabos+outros+Piauí) organizados em seções por família |
+| `Blocos` | `CriarAbaBlocosPorFamilia` | Todos os blocos (postes+cabos+outros+Piauí) organizados em seções por família — primeira aba |
 | `Textos` | fluxo principal | 1 linha por TEXT/MTEXT do desenho, com classificação completa (colunas 1-13 + coluna 14 "Nome do Material") |
 | `Resumo` | fluxo principal | Agregações por família/status/altura/cabo + 2 gráficos (barras, pizza) |
 | `Mat. Instalados` | `CriarAbaStatus` | Só o resumo agrupado (Item "8 D11600", Qtd, Material, Família/Tipo, Descrição, Metros) — status "MATERIAIS INSTALADOS" |
@@ -83,7 +82,7 @@ arrNomeMaterial() As String ' NOME DO MATERIAL (planilha RECLASSIFICAR MATERIAL 
 
 ### Arrays paralelos — blocos unificados (u*)
 
-Montados a partir de 4 fontes (postes, cabos, outros, Piauí) e usados por `CriarAbaStatus`, `CriarAbaBlocosPorFamilia`, `CriarAbaPainel`:
+Montados a partir de 4 fontes (postes, cabos, outros, Piauí) e usados por `CriarAbaStatus`, `CriarAbaBlocosPorFamilia`:
 
 ```vba
 uTipo(), uFam()   As String   ' tipo/família final (pode ser reclassificado por descrição)

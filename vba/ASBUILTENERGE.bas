@@ -1011,18 +1011,25 @@ Private Function ExtrairAlturaPoste(ByVal txt As String) As Double
 End Function
 
 Private Function ExtrairMetrosCabo(ByVal txt As String) As Double
+    ' Quando o texto tem casas decimais (ex.: "716.0m"), conta so os digitos
+    ' ANTES do "." como metros (ignora a fracao).
     Dim s As String, i As Long, ch As String, num As String
+    Dim vistoPonto As Boolean
     s = Trim$(txt)
     num = ""
+    vistoPonto = False
     For i = 1 To Len(s)
         ch = Mid$(s, i, 1)
         If ch >= "0" And ch <= "9" Then
-            num = num & ch
+            If Not vistoPonto Then num = num & ch
+        ElseIf ch = "." Or ch = "," Then
+            vistoPonto = True
         ElseIf (ch = "m" Or ch = "M") And Len(num) > 0 Then
             ExtrairMetrosCabo = CDbl(num)
             Exit Function
         Else
             num = ""
+            vistoPonto = False
         End If
     Next i
     ExtrairMetrosCabo = 0
@@ -3559,317 +3566,6 @@ Private Function EscreverSecaoFamilia(ByVal ws As Object, ByVal startRow As Long
     EscreverSecaoFamilia = r
 End Function
 
-' =============================================================================
-'  BARRA VISUAL EM TEXTO (blocos cheios) — proporcional a valor/maximo
-' =============================================================================
-Private Function BarraTexto(ByVal valor As Long, ByVal maxv As Long) As String
-    Dim ln As Long, j As Long, s As String
-    If maxv <= 0 Or valor <= 0 Then
-        BarraTexto = ""
-        Exit Function
-    End If
-    ln = CLng((valor / maxv) * 18)
-    If ln < 1 Then ln = 1
-    For j = 1 To ln
-        s = s & ChrW(9608)   ' caractere "bloco cheio"
-    Next j
-    BarraTexto = s
-End Function
-
-' =============================================================================
-'  ABA "PAINEL" — DASHBOARD DE ANALISE RAPIDA (v3.4)
-'  -----------------------------------------------------------------------------
-'  Consolida numa unica tela os numeros que voce mais consulta:
-'    1. TOTAIS GERAIS (textos, postes, cabos, outros)
-'    2. MATERIAIS POR STATUS (instalados / desinstalados / existentes) com
-'       contagem de textos + blocos, percentual e barra visual
-'    3. Tabela cruzada FAMILIA x STATUS dos blocos (o que entrou / o que saiu)
-'  Fica como a PRIMEIRA aba, abrindo direto na visao executiva.
-' =============================================================================
-Private Sub CriarAbaPainel(ByVal wb As Object, _
-        ByRef uFam() As String, ByRef uStat() As String, ByVal nU As Long, _
-        ByVal nB As Long, ByVal nC As Long, ByVal nO As Long, _
-        ByRef arrStatus() As String, ByVal n As Long)
-
-    ' Painel e OPCIONAL: qualquer falha aqui nunca deve abortar a exportacao.
-    On Error GoTo PainelErro
-
-    Const C_INST As String = "MATERIAIS INSTALADOS"
-    Const C_DESI As String = "MATERIAIS DESINSTALADOS"
-    Const C_EXIS As String = "MATERIAIS EXISTENTES"
-
-    Dim ws As Object
-    Set ws = wb.Worksheets.Add(Before:=wb.Worksheets(1))
-    ws.Name = "PAINEL"
-
-    ' --- Contagens por status: TEXTOS ---
-    Dim tTxtI As Long, tTxtD As Long, tTxtE As Long, tTxtO As Long
-    Dim i As Long
-    For i = 1 To n
-        Select Case arrStatus(i)
-            Case C_INST: tTxtI = tTxtI + 1
-            Case C_DESI: tTxtD = tTxtD + 1
-            Case C_EXIS: tTxtE = tTxtE + 1
-            Case Else:   tTxtO = tTxtO + 1
-        End Select
-    Next i
-
-    ' --- Contagens por status: BLOCOS ---
-    Dim tBlkI As Long, tBlkD As Long, tBlkE As Long, tBlkO As Long
-    For i = 1 To nU
-        Select Case uStat(i)
-            Case C_INST: tBlkI = tBlkI + 1
-            Case C_DESI: tBlkD = tBlkD + 1
-            Case C_EXIS: tBlkE = tBlkE + 1
-            Case Else:   tBlkO = tBlkO + 1
-        End Select
-    Next i
-
-    ' Combinados (textos + blocos)
-    Dim cI As Long, cD As Long, cE As Long, cO As Long, grand As Long
-    cI = tTxtI + tBlkI: cD = tTxtD + tBlkD
-    cE = tTxtE + tBlkE: cO = tTxtO + tBlkO
-    grand = n + nU
-    If grand < 1 Then grand = 1
-
-    Dim r As Long
-
-    ' ===== TITULO =====================================================
-    ws.Cells(1, 1).Value = "PAINEL DE ANALISE"
-    With ws.Range("A1:F1")
-        .Merge
-        .Font.Bold = True
-        .Font.Size = 18
-        .HorizontalAlignment = -4108
-        .VerticalAlignment = -4108
-        .Interior.Color = RGB(31, 78, 120)
-        .Font.Color = RGB(255, 255, 255)
-    End With
-    ws.Rows(1).RowHeight = 32
-    ws.Cells(2, 1).Value = "ZWCAD - Exportar Textos v3.4    |    Gerado em " & _
-                           Format$(Now, "dd/mm/yyyy hh:nn")
-    With ws.Range("A2:F2")
-        .Merge
-        .Font.Italic = True
-        .Font.Color = RGB(110, 110, 110)
-        .HorizontalAlignment = -4108
-    End With
-
-    ' ===== SECAO 1: TOTAIS GERAIS =====================================
-    r = 4
-    ws.Cells(r, 1).Value = "1. TOTAIS GERAIS"
-    With ws.Range(ws.Cells(r, 1), ws.Cells(r, 6))
-        .Merge
-        .Font.Bold = True
-        .Font.Size = 12
-        .Interior.Color = RGB(47, 84, 150)
-        .Font.Color = RGB(255, 255, 255)
-    End With
-    r = r + 1
-
-    Dim baseTot As Long
-    baseTot = r
-    ws.Cells(r, 1).Value = "Textos classificados":            ws.Cells(r, 2).Value = n:        r = r + 1
-    ws.Cells(r, 1).Value = "Blocos de poste":                 ws.Cells(r, 2).Value = nB:       r = r + 1
-    ws.Cells(r, 1).Value = "Blocos de cabo":                  ws.Cells(r, 2).Value = nC:       r = r + 1
-    ws.Cells(r, 1).Value = "Outros materiais (trafo, chave...)": ws.Cells(r, 2).Value = nO:    r = r + 1
-    ws.Cells(r, 1).Value = "TOTAL de blocos":                 ws.Cells(r, 2).Value = nU
-    ws.Range(ws.Cells(r, 1), ws.Cells(r, 2)).Font.Bold = True:                                 r = r + 1
-    ws.Cells(r, 1).Value = "TOTAL geral (textos + blocos)":   ws.Cells(r, 2).Value = grand
-    ws.Range(ws.Cells(r, 1), ws.Cells(r, 2)).Font.Bold = True
-    With ws.Range(ws.Cells(baseTot, 1), ws.Cells(r, 2))
-        .Borders.LineStyle = 1
-        .Borders.Color = RGB(200, 200, 200)
-    End With
-    ws.Range(ws.Cells(baseTot, 2), ws.Cells(r, 2)).Font.Size = 12
-    r = r + 2
-
-    ' ===== SECAO 2: MATERIAIS POR STATUS ==============================
-    ws.Cells(r, 1).Value = "2. MATERIAIS POR STATUS"
-    With ws.Range(ws.Cells(r, 1), ws.Cells(r, 6))
-        .Merge
-        .Font.Bold = True
-        .Font.Size = 12
-        .Interior.Color = RGB(47, 84, 150)
-        .Font.Color = RGB(255, 255, 255)
-    End With
-    r = r + 1
-
-    ' Cabecalho
-    ws.Cells(r, 1).Value = "Status"
-    ws.Cells(r, 2).Value = "Textos"
-    ws.Cells(r, 3).Value = "Blocos"
-    ws.Cells(r, 4).Value = "Total"
-    ws.Cells(r, 5).Value = "%"
-    ws.Cells(r, 6).Value = "Distribuicao"
-    With ws.Range(ws.Cells(r, 1), ws.Cells(r, 6))
-        .Font.Bold = True
-        .Interior.Color = RGB(220, 230, 241)
-        .Borders.LineStyle = 1
-    End With
-    r = r + 1
-
-    Dim maxTot As Long
-    maxTot = cI
-    If cD > maxTot Then maxTot = cD
-    If cE > maxTot Then maxTot = cE
-    If cO > maxTot Then maxTot = cO
-
-    Dim linhaStatus As Long
-    linhaStatus = r
-    ' INSTALADOS
-    ws.Cells(r, 1).Value = "INSTALADOS": ws.Cells(r, 2).Value = tTxtI
-    ws.Cells(r, 3).Value = tBlkI: ws.Cells(r, 4).Value = cI
-    ws.Cells(r, 5).Value = Format$(cI / grand, "0.0%")
-    ws.Cells(r, 6).Value = BarraTexto(cI, maxTot)
-    Call PintaStatusCelula(ws.Cells(r, 1), C_INST)
-    ws.Cells(r, 6).Font.Color = RGB(0, 130, 0): r = r + 1
-    ' DESINSTALADOS
-    ws.Cells(r, 1).Value = "DESINSTALADOS": ws.Cells(r, 2).Value = tTxtD
-    ws.Cells(r, 3).Value = tBlkD: ws.Cells(r, 4).Value = cD
-    ws.Cells(r, 5).Value = Format$(cD / grand, "0.0%")
-    ws.Cells(r, 6).Value = BarraTexto(cD, maxTot)
-    Call PintaStatusCelula(ws.Cells(r, 1), C_DESI)
-    ws.Cells(r, 6).Font.Color = RGB(190, 0, 0): r = r + 1
-    ' EXISTENTES
-    ws.Cells(r, 1).Value = "EXISTENTES": ws.Cells(r, 2).Value = tTxtE
-    ws.Cells(r, 3).Value = tBlkE: ws.Cells(r, 4).Value = cE
-    ws.Cells(r, 5).Value = Format$(cE / grand, "0.0%")
-    ws.Cells(r, 6).Value = BarraTexto(cE, maxTot)
-    Call PintaStatusCelula(ws.Cells(r, 1), C_EXIS)
-    ws.Cells(r, 6).Font.Color = RGB(0, 70, 160): r = r + 1
-    ' Outros / sem status
-    ws.Cells(r, 1).Value = "Outros / sem status": ws.Cells(r, 2).Value = tTxtO
-    ws.Cells(r, 3).Value = tBlkO: ws.Cells(r, 4).Value = cO
-    ws.Cells(r, 5).Value = Format$(cO / grand, "0.0%")
-    ws.Cells(r, 6).Value = BarraTexto(cO, maxTot)
-    ws.Cells(r, 1).Interior.Color = RGB(235, 235, 235)
-    ws.Cells(r, 6).Font.Color = RGB(120, 120, 120): r = r + 1
-    ' TOTAL
-    ws.Cells(r, 1).Value = "TOTAL": ws.Cells(r, 2).Value = n
-    ws.Cells(r, 3).Value = nU: ws.Cells(r, 4).Value = grand
-    ws.Cells(r, 5).Value = "100%"
-    With ws.Range(ws.Cells(r, 1), ws.Cells(r, 6))
-        .Font.Bold = True
-        .Interior.Color = RGB(242, 242, 242)
-    End With
-    With ws.Range(ws.Cells(linhaStatus, 1), ws.Cells(r, 6))
-        .Borders.LineStyle = 1
-        .Borders.Color = RGB(200, 200, 200)
-    End With
-    r = r + 2
-
-    ' ===== SECAO 3: BLOCOS POR FAMILIA x STATUS =======================
-    ws.Cells(r, 1).Value = "3. BLOCOS POR FAMILIA x STATUS"
-    With ws.Range(ws.Cells(r, 1), ws.Cells(r, 6))
-        .Merge
-        .Font.Bold = True
-        .Font.Size = 12
-        .Interior.Color = RGB(47, 84, 150)
-        .Font.Color = RGB(255, 255, 255)
-    End With
-    r = r + 1
-
-    ' Cabecalho
-    ws.Cells(r, 1).Value = "Familia"
-    ws.Cells(r, 2).Value = "Instalados"
-    ws.Cells(r, 3).Value = "Desinstalados"
-    ws.Cells(r, 4).Value = "Existentes"
-    ws.Cells(r, 5).Value = "Outros"
-    ws.Cells(r, 6).Value = "Total"
-    With ws.Range(ws.Cells(r, 1), ws.Cells(r, 6))
-        .Font.Bold = True
-        .Interior.Color = RGB(220, 230, 241)
-        .Borders.LineStyle = 1
-    End With
-    ws.Cells(r, 2).Interior.Color = RGB(226, 239, 218)
-    ws.Cells(r, 3).Interior.Color = RGB(252, 228, 214)
-    ws.Cells(r, 4).Interior.Color = RGB(217, 226, 243)
-    r = r + 1
-
-    ' Monta lista ordenada de familias (mesma ordem da aba Blocos)
-    Dim ordem As Variant
-    ordem = Array("POSTE", "ESTRUTURA", "CABO", "TRAFO", "CH FUSIVEL", "CH FACA", _
-                  "CHAVE", "PARA RAIO", "RELIGADOR", "REGULADOR", "MUFLA", _
-                  "ATERRAMENTO", "ATERRAMENTO DE CERCA", "CORDOALHA", _
-                  "MEDICAO", "CAPACITOR", "RAMAL", "OUTRO")
-    Dim fams As Object
-    Set fams = CreateObject("Scripting.Dictionary")
-    Dim oi As Long, ap As Boolean
-    For oi = 0 To UBound(ordem)
-        ap = False
-        For i = 1 To nU
-            If uFam(i) = CStr(ordem(oi)) Then ap = True: Exit For
-        Next i
-        If ap And Not fams.Exists(CStr(ordem(oi))) Then fams.Add CStr(ordem(oi)), True
-    Next oi
-    For i = 1 To nU
-        If Len(uFam(i)) > 0 And Not fams.Exists(uFam(i)) Then fams.Add uFam(i), True
-    Next i
-
-    Dim linhaFam As Long
-    linhaFam = r
-    Dim somaI As Long, somaD As Long, somaE As Long, somaO As Long
-    Dim k As Variant, fI As Long, fD As Long, fE As Long, fO As Long, fT As Long
-    For Each k In fams.Keys
-        fI = 0: fD = 0: fE = 0: fO = 0
-        For i = 1 To nU
-            If uFam(i) = CStr(k) Then
-                Select Case uStat(i)
-                    Case C_INST: fI = fI + 1
-                    Case C_DESI: fD = fD + 1
-                    Case C_EXIS: fE = fE + 1
-                    Case Else:   fO = fO + 1
-                End Select
-            End If
-        Next i
-        fT = fI + fD + fE + fO
-        ws.Cells(r, 1).Value = CStr(k)
-        ws.Cells(r, 2).Value = fI
-        ws.Cells(r, 3).Value = fD
-        ws.Cells(r, 4).Value = fE
-        ws.Cells(r, 5).Value = fO
-        ws.Cells(r, 6).Value = fT
-        ws.Cells(r, 6).Font.Bold = True
-        If fI > 0 Then ws.Cells(r, 2).Interior.Color = RGB(226, 239, 218)
-        If fD > 0 Then ws.Cells(r, 3).Interior.Color = RGB(252, 228, 214)
-        If fE > 0 Then ws.Cells(r, 4).Interior.Color = RGB(217, 226, 243)
-        somaI = somaI + fI: somaD = somaD + fD
-        somaE = somaE + fE: somaO = somaO + fO
-        r = r + 1
-    Next k
-
-    ' Linha TOTAL
-    ws.Cells(r, 1).Value = "TOTAL"
-    ws.Cells(r, 2).Value = somaI
-    ws.Cells(r, 3).Value = somaD
-    ws.Cells(r, 4).Value = somaE
-    ws.Cells(r, 5).Value = somaO
-    ws.Cells(r, 6).Value = somaI + somaD + somaE + somaO
-    With ws.Range(ws.Cells(r, 1), ws.Cells(r, 6))
-        .Font.Bold = True
-        .Interior.Color = RGB(242, 242, 242)
-    End With
-    With ws.Range(ws.Cells(linhaFam, 1), ws.Cells(r, 6))
-        .Borders.LineStyle = 1
-        .Borders.Color = RGB(200, 200, 200)
-    End With
-
-    ' --- Larguras ---
-    ws.Columns("A").ColumnWidth = 34
-    ws.Columns("B").ColumnWidth = 14
-    ws.Columns("C").ColumnWidth = 15
-    ws.Columns("D").ColumnWidth = 13
-    ws.Columns("E").ColumnWidth = 11
-    ws.Columns("F").ColumnWidth = 24
-    ws.Range("B:F").HorizontalAlignment = -4108  ' centraliza numeros
-
-    Exit Sub
-
-PainelErro:
-    ' Falha ao montar o painel: ignora silenciosamente (aba e opcional).
-    ' A exportacao continua normalmente com as demais abas.
-End Sub
 
 ' =============================================================================
 '  MACRO PRINCIPAL
@@ -4745,14 +4441,7 @@ ProxPoste:
     End If
     On Error GoTo TratarErro
 
-    ' =====================================================================
-    '  PAINEL (dashboard de analise rapida) como PRIMEIRA aba
-    ' =====================================================================
-    On Error Resume Next
-    Call CriarAbaPainel(wb, uFam, uStat, nU, nB, nC, nO, arrStatus, n)
-    On Error GoTo TratarErro
-
-    ' Ativa a primeira aba (PAINEL) e salva
+    ' Ativa a primeira aba ("Blocos") e salva
     estagio = "ativando aba e salvando arquivo"
     wb.Worksheets(1).Activate
     wb.SaveAs outPath, 51  ' xlOpenXMLWorkbook
