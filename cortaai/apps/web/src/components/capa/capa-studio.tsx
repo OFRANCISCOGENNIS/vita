@@ -7,9 +7,11 @@
 
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   Download,
+  ImagePlus,
   ImageUp,
   Plus,
   RotateCcw,
@@ -28,6 +30,8 @@ import {
   type CapaText,
   type CapaTextStyle,
 } from "@/lib/capa";
+import { downscaleToMax } from "@/lib/photo-engine";
+import { HANDOFF_TO_CAPA, HANDOFF_TO_FOTOS } from "@/store/photo-editor";
 import { cn } from "@/lib/utils";
 import { toast } from "@/store/toast";
 import { Button } from "@/components/ui/button";
@@ -49,6 +53,7 @@ interface Slot {
 }
 
 export function CapaStudio({ cutId }: { cutId: string }) {
+  const router = useRouter();
   const [cut, setCut] = useState<Cut | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [state, setState] = useState<CapaState>(defaultCapaState());
@@ -94,6 +99,24 @@ export function CapaStudio({ cutId }: { cutId: string }) {
       alive = false;
     };
   }, [cutId]);
+
+  // Handoff from the Editor de Fotos ("Exportar para capa"): use the edited
+  // photo as the base image of this cover.
+  useEffect(() => {
+    try {
+      const data = sessionStorage.getItem(HANDOFF_TO_CAPA);
+      if (!data) return;
+      sessionStorage.removeItem(HANDOFF_TO_CAPA);
+      const img = new Image();
+      img.onload = () => {
+        setBaseImg(img);
+        toast("Imagem recebida do Editor de Fotos", { variant: "info" });
+      };
+      img.src = data;
+    } catch {
+      /* sessionStorage unavailable — ignore */
+    }
+  }, []);
 
   // Live render whenever the composition changes.
   useEffect(() => {
@@ -162,6 +185,19 @@ export function CapaStudio({ cutId }: { cutId: string }) {
       setTimeout(() => URL.revokeObjectURL(url), 1000);
       toast("Capa exportada como PNG");
     }, "image/png");
+  }
+
+  /** Sends the current composition to the Editor de Fotos for pixel-level edits. */
+  function openInPhotoEditor() {
+    try {
+      // ≤2MP JPEG keeps the dataURL comfortably under the sessionStorage quota.
+      const small = downscaleToMax(composeFull(), 2_000_000);
+      sessionStorage.setItem(HANDOFF_TO_FOTOS, small.toDataURL("image/jpeg", 0.92));
+      toast("Capa enviada para o Editor de Fotos", { variant: "info" });
+      router.push("/app/fotos");
+    } catch {
+      toast("Não foi possível abrir no Editor de Fotos", { variant: "error" });
+    }
   }
 
   function saveToSlot(slot: "A" | "B") {
@@ -247,6 +283,9 @@ export function CapaStudio({ cutId }: { cutId: string }) {
           <h1 className="truncate text-lg font-bold text-white">Estúdio de Capa</h1>
           <p className="truncate text-xs text-zinc-500" title={cut.title}>{cut.title}</p>
         </div>
+        <Button variant="outline" size="sm" onClick={openInPhotoEditor} title="Editar os pixels desta capa no Editor de Fotos">
+          <ImagePlus className="h-4 w-4" aria-hidden /> Abrir no Editor de Fotos
+        </Button>
         <Button onClick={exportPng}>
           <Download className="h-4 w-4" aria-hidden /> Exportar PNG
         </Button>

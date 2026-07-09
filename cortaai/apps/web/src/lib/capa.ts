@@ -193,6 +193,11 @@ function drawImageCover(ctx: CanvasRenderingContext2D, img: HTMLImageElement, W:
   ctx.drawImage(img, dx, dy, dw, dh);
 }
 
+/** Viral-style text renderer — shared with the Editor de Fotos text layers. */
+export function drawCapaText(ctx: CanvasRenderingContext2D, W: number, H: number, t: CapaText) {
+  drawText(ctx, W, H, t);
+}
+
 function drawText(ctx: CanvasRenderingContext2D, W: number, H: number, t: CapaText) {
   const fontPx = Math.round(t.size * H);
   const text = t.style === "impacto" ? t.text.toUpperCase() : t.text;
