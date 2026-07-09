@@ -160,7 +160,9 @@ Quando o poste é identificado via o "Cod. Estrutura" posicional (`Mid(texto,10,
 | `V...` (ex.: `V9600`, `V11300`) | `POSTE FIBRA` |
 | `C...` | `POSTE CIRCULAR` |
 | `M...` (ex.: `M9`, `M11`) | `POSTE DE MADEIRA` |
-| outro | `POSTE` (genérico) |
+| outro (N, S, T, etc.) | `""` (vazio — **NÃO** é poste) |
+
+> **Importante:** prefixos não reconhecidos retornam string vazia (antes retornavam `POSTE` genérico). Isso evitava que qualquer código com letra+dígito na posição 10 (ex.: `N1`, `S021`, `T10`) fosse rotulado como POSTE por engano.
 
 #### Coluna "Nome do Material" (`ExtrairNomeMaterial`)
 
@@ -194,8 +196,10 @@ Na aba de resumo (`CriarAbaStatus`), a coluna **Qtd** soma essa quantidade embut
 ### Extração de nome base de poste (`ExtrairNomeBasePoste` / `ExtrairNomeBasePosteBloco`)
 Extrai prefixo de letras (até 3) + primeiro bloco de dígitos + opcionalmente `/dígitos`. Ex.: `"C12/600 N3-N3D S021"` → `"C12/600"`; `"M11 N1 S024 EA1"` → `"M11"`; `"DT11/300 N1 S034"` → `"DT11/300"`.
 
-### Código de Estrutura fixo
-Para cada TEXT/MTEXT, extrai `Mid(conteudo, 10, 7)` como "Cod. Estrutura" (coluna fixa por posição de caractere — assume um formato de texto padronizado do desenho, ex.: `"66046515-D11600-N3-PR-S1I"` → `"D11600"`). Se esse trecho tiver padrão de poste válido e a família ainda não foi determinada, a família passa a ser deduzida pelo prefixo do código via `FamiliaPosteDoPrefixo` (score 85) em vez do genérico `POSTE`.
+### Código de Estrutura fixo (com prioridade e validação de formato)
+Para cada TEXT/MTEXT, extrai `Mid(conteudo, 10, 7)` como "Cod. Estrutura", **mas somente quando o texto tem de fato o formato de código SAP** `"<8 dígitos><separador>..."` — validado por `EhCodigoEstruturaSAP` (ex.: `"66046515-D11600-N3-PR-S1I"` → `"D11600"`). Antes a extração era aplicada a *qualquer* texto com ≥10 caracteres, o que fazia muitos materiais não-poste virarem POSTE.
+
+Quando o código extraído começa por um **prefixo de poste reconhecido** (D/V/C/M), essa família de poste tem **prioridade** sobre a classificação por palavra-chave (score 90). Motivo: anotações acessórias como `-PR-` (para-raio no poste) ou `-TR-` (trafo no poste) não devem sobrepor o material principal — ex.: `"66046515-D11600-N3-PR-S1I"` é `POSTE DT`, não `PARA RAIO MT`. Prefixos não-poste (N, S, T…) não forçam nada e o texto mantém a classificação por palavra-chave (ou `CLASSIFICAR`).
 
 ### Vínculo por proximidade (`CalcularProximidade`)
 Para cada item que não é poste, encontra o poste mais próximo (distância euclidiana em X,Y). Postes vinculam consigo mesmos (distância 0). Usado na aba `Vinculos`.
@@ -227,7 +231,7 @@ Este módulo é um projeto **independente** do `AnaliseCKCP_OTIMIZADO.bas` (docu
 
 ## Pontos de atenção para futuras mudanças
 
-- **`Mid(texto, 10, 7)`** (Cod. Estrutura) é posicional e frágil — qualquer mudança no padrão de texto do desenho quebra essa extração.
+- **`Mid(texto, 10, 7)`** (Cod. Estrutura) é posicional e frágil — qualquer mudança no padrão de texto do desenho quebra essa extração. Agora só é aplicado quando `EhCodigoEstruturaSAP` confirma o formato `<8 dígitos><separador>`, e só força família de poste para prefixos reconhecidos (D/V/C/M).
 - **Filtro `nB > cap` / `ReDim Preserve`**: todo array novo precisa ser adicionado nos blocos de crescimento (há 4 pontos de crescimento espelhados: leitura de texto, leitura de postes DUPLO linha 1 e linha 2).
 - **`BlocoCasa`** é a única barreira contra falso-positivo entre blocos (`RDARA120` vs `RDARA1200`) — qualquer novo código de bloco deve ser adicionado com atenção a colisões de prefixo.
 - **Padrão Piauí (`MapaPiaui`) coexiste com o padrão RS (`RDARA*`)** por não haver sobreposição de nomes; novos padrões regionais devem seguir o mesmo cuidado.

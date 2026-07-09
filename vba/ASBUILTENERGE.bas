@@ -643,7 +643,9 @@ Private Function ClassificarFamilia(ByVal txt As String) As String
         ClassificarFamilia = "POSTE DT"
         Exit Function
     End If
-    If Left$(s, 1) = "C" And InStr(s, "/") > 0 Then
+    ' Poste circular: "C" + digito(s) + "/" (ex.: "C12/600"). Exige digito
+    ' logo apos o "C" para nao casar com textos como "C/TALA".
+    If Left$(s, 1) = "C" And InStr(s, "/") > 0 And IsNumeric(Mid$(s, 2, 1)) Then
         ClassificarFamilia = "POSTE CIRCULAR"
         Exit Function
     End If
@@ -779,6 +781,9 @@ End Function
 ' extraido (ex.: via Cod. Estrutura Mid(texto,10,7)).
 '   D... -> POSTE DT       V... -> POSTE FIBRA
 '   C... -> POSTE CIRCULAR M... -> POSTE DE MADEIRA
+' IMPORTANTE: retorna "" (vazio) para prefixos NAO reconhecidos como poste.
+' Antes retornava "POSTE" generico, o que fazia qualquer codigo com
+' letra+digito (ex.: N1, S021, T10) ser classificado erroneamente como poste.
 Private Function FamiliaPosteDoPrefixo(ByVal codigo As String) As String
     Dim p As String
     p = UCase$(Left$(Trim$(codigo), 1))
@@ -787,8 +792,29 @@ Private Function FamiliaPosteDoPrefixo(ByVal codigo As String) As String
         Case "V": FamiliaPosteDoPrefixo = "POSTE FIBRA"
         Case "C": FamiliaPosteDoPrefixo = "POSTE CIRCULAR"
         Case "M": FamiliaPosteDoPrefixo = "POSTE DE MADEIRA"
-        Case Else: FamiliaPosteDoPrefixo = "POSTE"
+        Case Else: FamiliaPosteDoPrefixo = ""
     End Select
+End Function
+
+' Verifica se o texto tem o formato "<8 digitos><separador><resto>" — o
+' codigo SAP da estrutura (ex.: "66046515-D11600-N3-PR-S1I"), no qual o nome
+' do poste começa na posicao 10 ("depois de 9 caracteres vem o nome do poste").
+' So quando este formato e confirmado faz sentido aplicar Mid(texto,10,7).
+Private Function EhCodigoEstruturaSAP(ByVal txt As String) As Boolean
+    Dim s As String, i As Long, ch As String
+    s = Trim$(RemoverEnvoltorioHashtag(Trim$(txt)))
+    If Len(s) < 10 Then EhCodigoEstruturaSAP = False: Exit Function
+    For i = 1 To 8
+        ch = Mid$(s, i, 1)
+        If ch < "0" Or ch > "9" Then EhCodigoEstruturaSAP = False: Exit Function
+    Next i
+    ' 9o caractere deve ser um separador (nao alfanumerico), tipicamente "-"
+    ch = UCase$(Mid$(s, 9, 1))
+    If (ch >= "0" And ch <= "9") Or (ch >= "A" And ch <= "Z") Then
+        EhCodigoEstruturaSAP = False
+    Else
+        EhCodigoEstruturaSAP = True
+    End If
 End Function
 
 ' Coluna "NOME DO MATERIAL" (planilha RECLASSIFICAR MATERIAL): codigo do
@@ -3785,21 +3811,28 @@ Public Sub ExportarTextosParaExcel()
                         Call ClassificarComConfianca(conteudo, lname, famTmp, scoreTmp)
                     End If
 
-                    ' Extrai codigo de estrutura: Mid(texto, 10, 7)
+                    ' Extrai codigo de estrutura: Mid(texto, 10, 7).
+                    ' SO faz sentido quando o texto tem o formato de codigo SAP
+                    ' "<8 digitos><separador>..." (ex.: "66046515-D11600-N3-...").
                     Dim codEst As String, nomeBaseEst As String
                     codEst = ""
-                    If Len(conteudo) >= 10 Then
+                    If EhCodigoEstruturaSAP(conteudo) Then
                         codEst = Trim$(Mid$(conteudo, 10, 7))
                     End If
-                    ' Se extraido tiver padrao de POSTE -> classifica pelo prefixo
-                    ' do codigo (D=DT, V=FIBRA, C=CIRCULAR, M=MADEIRA)
+                    ' O codigo SAP de estrutura tem PRIORIDADE: quando o texto
+                    ' segue esse formato e o codigo comeca por prefixo de POSTE
+                    ' reconhecido (D=DT, V=FIBRA, C=CIRCULAR, M=MADEIRA), essa e
+                    ' a familia — anotacoes acessorias como "-PR-" (para-raio no
+                    ' poste) ou "-TR-" nao devem sobrepor o material principal.
+                    ' Prefixos NAO-poste (N, S, T, etc.) NAO forcam POSTE.
                     If Len(codEst) > 0 Then
                         nomeBaseEst = ExtrairNomeBasePoste(codEst)
                         If Len(nomeBaseEst) > 0 Then
-                            If famTmp = "CLASSIFICAR" Or famTmp = "-" Or _
-                               famTmp = "NAO CLASSIFICADO" Then
-                                famTmp  = FamiliaPosteDoPrefixo(nomeBaseEst)
-                                scoreTmp = 85
+                            Dim famPosteEst As String
+                            famPosteEst = FamiliaPosteDoPrefixo(nomeBaseEst)
+                            If Len(famPosteEst) > 0 Then
+                                famTmp  = famPosteEst
+                                scoreTmp = 90
                             End If
                         End If
                     End If
