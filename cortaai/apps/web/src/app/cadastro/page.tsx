@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { AuthCard, AuthDivider, GoogleButton } from "@/components/auth-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { demoGoogleIdToken } from "@/lib/google";
 import { useAuthStore } from "@/store/auth";
 import { toast } from "@/store/toast";
 
@@ -43,10 +44,10 @@ export default function RegisterPage() {
     }
   }
 
-  async function handleGoogle() {
+  async function completeGoogle(idToken: string) {
     setGoogleLoading(true);
     try {
-      await loginGoogle();
+      await loginGoogle(idToken);
       toast("Conta Google conectada");
       router.push("/app");
     } catch {
@@ -56,9 +57,15 @@ export default function RegisterPage() {
     }
   }
 
+  // Fallback de demonstração (sem Client ID do Google): cadastra com um token
+  // demo decodificável, gerando um usuário de exemplo.
+  async function handleGoogleDemo() {
+    await completeGoogle(demoGoogleIdToken());
+  }
+
   return (
     <AuthCard title="Criar conta grátis" subtitle="Tudo liberado, sem limites e sem cartão de crédito.">
-      <GoogleButton onClick={handleGoogle} loading={googleLoading} />
+      <GoogleButton onClick={handleGoogleDemo} onCredential={completeGoogle} loading={googleLoading} />
       <AuthDivider />
       <form onSubmit={handleSubmit} noValidate className="space-y-4">
         <Input

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { AuthCard, AuthDivider, GoogleButton } from "@/components/auth-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { demoGoogleIdToken } from "@/lib/google";
 import { useAuthStore } from "@/store/auth";
 import { toast } from "@/store/toast";
 
@@ -41,10 +42,10 @@ export default function LoginPage() {
     }
   }
 
-  async function handleGoogle() {
+  async function completeGoogle(idToken: string) {
     setGoogleLoading(true);
     try {
-      await loginGoogle();
+      await loginGoogle(idToken);
       toast("Login com Google concluído");
       router.push("/app");
     } catch {
@@ -54,9 +55,15 @@ export default function LoginPage() {
     }
   }
 
+  // Fallback de demonstração (sem Client ID do Google): entra com um token
+  // demo decodificável, gerando um usuário de exemplo.
+  async function handleGoogleDemo() {
+    await completeGoogle(demoGoogleIdToken());
+  }
+
   return (
     <AuthCard title="Entrar na sua conta" subtitle="Seus cortes estão esperando por você.">
-      <GoogleButton onClick={handleGoogle} loading={googleLoading} />
+      <GoogleButton onClick={handleGoogleDemo} onCredential={completeGoogle} loading={googleLoading} />
       <AuthDivider />
       <form onSubmit={handleSubmit} noValidate className="space-y-4">
         <Input

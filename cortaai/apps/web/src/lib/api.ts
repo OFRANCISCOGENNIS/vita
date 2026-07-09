@@ -52,6 +52,7 @@ import type {
   UrlPreview,
   User,
 } from "./types";
+import { decodeGoogleJwt } from "./google";
 import { svgThumb, uid } from "./utils";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
@@ -97,27 +98,71 @@ async function request<T>(
 
 // ---------------------------------------------------------------- auth
 
+/**
+ * Deriva um nome amigável a partir do e-mail — para o login demo não gerar
+ * todos os usuários com o mesmo nome. Ex.: "joao.silva@gmail.com" → "Joao Silva".
+ */
+export function nameFromEmail(email: string): string {
+  const local = (email.split("@")[0] ?? "").trim();
+  const words = local
+    .split(/[._-]+/)
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+  return words.length ? words.join(" ") : "Usuário";
+}
+
 export async function login(email: string, _password: string): Promise<{ token: string; user: User }> {
-  return request(`/auth/login`, () => ({ token: `mock-token-${uid()}`, user: { ...mockUser, email } }), {
-    method: "POST",
-    body: JSON.stringify({ email, password: _password }),
-  });
+  return request(
+    `/auth/login`,
+    () => ({
+      token: `mock-token-${uid()}`,
+      // Demo: usuário fresco derivado do e-mail — não é a Marina nem admin.
+      user: { ...mockUser, id: uid(), email, name: nameFromEmail(email), isAdmin: false },
+    }),
+    {
+      method: "POST",
+      body: JSON.stringify({ email, password: _password }),
+    },
+  );
 }
 
 export async function register(name: string, email: string, password: string): Promise<{ token: string; user: User }> {
   return request(
     `/auth/register`,
-    () => ({ token: `mock-token-${uid()}`, user: { ...mockUser, name, email } }),
+    () => ({
+      token: `mock-token-${uid()}`,
+      user: { ...mockUser, id: uid(), name, email, isAdmin: false },
+    }),
     { method: "POST", body: JSON.stringify({ name, email, password }) },
   );
 }
 
-// INTEGRAÇÃO PAGA/EXTERNA: Google OAuth — o id_token real viria do SDK do Google.
+// INTEGRAÇÃO EXTERNA: Google Sign-In (GIS). O idToken é um JWT real assinado
+// pelo Google. Sem backend, decodificamos o payload no cliente para montar o
+// usuário com nome/e-mail/foto REAIS. Com backend, o idToken é validado lá.
 export async function loginGoogle(idToken: string): Promise<{ token: string; user: User }> {
-  return request(`/auth/google`, () => ({ token: `mock-google-${uid()}`, user: mockUser }), {
-    method: "POST",
-    body: JSON.stringify({ id_token: idToken }),
-  });
+  return request(
+    `/auth/google`,
+    () => {
+      const { sub, email, name, picture } = decodeGoogleJwt(idToken);
+      if (!sub || !email) throw new Error("Perfil do Google incompleto");
+      const user: User = {
+        id: sub,
+        email,
+        name: name || nameFromEmail(email),
+        avatarUrl: picture || null,
+        googleId: sub,
+        brandingKit: mockUser.brandingKit,
+        isAdmin: false,
+        createdAt: new Date().toISOString(),
+      };
+      return { token: `mock-google-${uid()}`, user };
+    },
+    {
+      method: "POST",
+      body: JSON.stringify({ id_token: idToken }),
+    },
+  );
 }
 
 export async function passwordReset(email: string): Promise<void> {
