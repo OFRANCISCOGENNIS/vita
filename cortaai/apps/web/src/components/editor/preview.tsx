@@ -9,15 +9,24 @@ import { Pause, Play } from "lucide-react";
 import { PLATFORM_PRESETS, CAPTION_PRESETS } from "@/lib/presets";
 import { cn, formatTimecode } from "@/lib/utils";
 import {
+  GRAIN_DATA_URI,
+  adjustmentFilter,
   colorGradeToFilter,
+  filterCss,
+  fxFilterString,
+  fxMotionVars,
   layerAnimAt,
+  overlaySwatch,
   reframeAt,
   reframeTransform,
   reframeWindow,
   speedAt,
+  stickerPos,
   temperatureWash,
   vignetteBackground,
+  type FxState,
   type LayerSample,
+  type OverlayLayer,
 } from "@/lib/edit-visuals";
 import { useEditorStore, type AspectRatio, type PlatformPresetId } from "@/store/editor";
 import { ChromaCanvas } from "./chroma-canvas";
@@ -78,9 +87,19 @@ export function EditorPreview() {
 
   // --- advanced effect derivations ---
   const grade = doc.colorGrade;
-  const filter = colorGradeToFilter(grade);
+  const stylizedFilter = filterCss(doc.filter.id, doc.filter.intensity);
+  const fxFilter = fxFilterString(doc.fx);
+  const adjFilter = adjustmentFilter(doc.adjustment);
+  // Media base filter = correção de cor + filtro estilizado + FX de cor + ajuste global.
+  const filter = [colorGradeToFilter(grade), stylizedFilter?.filter, fxFilter, adjFilter]
+    .filter(Boolean)
+    .join(" ");
   const wash = temperatureWash(grade);
   const vignette = vignetteBackground(grade);
+  // Motion FX que animam um wrapper (glitch/tremor/zoom-pulse).
+  const motionFx = (["glitch", "shake", "zoomPulse"] as const).filter((id) => doc.fx[id].enabled);
+  // Tint da camada de ajuste, quando um filtro global é escolhido.
+  const adjWash = doc.adjustment.enabled && doc.adjustment.filter ? filterCss(doc.adjustment.filter, 70)?.overlay : null;
 
   const editingReframe = overlayMode === "reframe";
   const reframeBase = { zoom: doc.reframe.zoom, panX: doc.reframe.panX, panY: doc.reframe.panY, rotation: doc.reframe.rotation };
@@ -149,38 +168,40 @@ export function EditorPreview() {
         className="relative overflow-hidden rounded-2xl border border-line bg-black shadow-2xl transition-all duration-300"
         style={{ width: previewWidth, height: previewHeight, maxWidth: "100%" }}
       >
-        {/* Graded + reframed MEDIA layer */}
-        <div
-          className="absolute inset-0"
-          style={{ filter, transform: mediaTransform, transformOrigin: "center", transition: playing ? "none" : "transform 120ms linear" }}
-          aria-hidden
-        >
-          {doc.chroma.enabled ? (
-            <ChromaCanvas
-              width={previewWidth}
-              height={previewHeight}
-              keyColor={doc.chroma.keyColor}
-              tolerance={doc.chroma.tolerance}
-              softness={doc.chroma.softness}
-              showBefore={doc.chroma.showBefore}
-            />
-          ) : (
-            <div className="absolute inset-0 bg-gradient-to-br from-violet-900/70 via-surface-2 to-fuchsia-900/50">
-              <div
-                className={cn(
-                  "absolute left-1/2 top-1/2 h-40 w-40 -translate-x-1/2 -translate-y-1/2 rounded-full bg-gradient-to-br from-violet-500/40 to-fuchsia-500/30 blur-2xl",
-                  playing && "animate-pulse-soft",
-                )}
+        {/* Graded + reframed MEDIA layer (wrapped by motion FX, se houver) */}
+        <MotionFx fx={doc.fx} active={motionFx}>
+          <div
+            className="absolute inset-0"
+            style={{ filter, transform: mediaTransform, transformOrigin: "center", transition: playing ? "none" : "transform 120ms linear" }}
+            aria-hidden
+          >
+            {doc.chroma.enabled ? (
+              <ChromaCanvas
+                width={previewWidth}
+                height={previewHeight}
+                keyColor={doc.chroma.keyColor}
+                tolerance={doc.chroma.tolerance}
+                softness={doc.chroma.softness}
+                showBefore={doc.chroma.showBefore}
               />
-              <div
-                className={cn(
-                  "absolute left-1/2 top-[42%] h-28 w-28 -translate-x-1/2 -translate-y-1/2 rounded-3xl border border-white/10 bg-white/5 backdrop-blur transition-transform duration-500",
-                  playing && doc.layers.autoZoomPunch && "scale-110",
-                )}
-              />
-            </div>
-          )}
-        </div>
+            ) : (
+              <div className="absolute inset-0 bg-gradient-to-br from-violet-900/70 via-surface-2 to-fuchsia-900/50">
+                <div
+                  className={cn(
+                    "absolute left-1/2 top-1/2 h-40 w-40 -translate-x-1/2 -translate-y-1/2 rounded-full bg-gradient-to-br from-violet-500/40 to-fuchsia-500/30 blur-2xl",
+                    playing && "animate-pulse-soft",
+                  )}
+                />
+                <div
+                  className={cn(
+                    "absolute left-1/2 top-[42%] h-28 w-28 -translate-x-1/2 -translate-y-1/2 rounded-3xl border border-white/10 bg-white/5 backdrop-blur transition-transform duration-500",
+                    playing && doc.layers.autoZoomPunch && "scale-110",
+                  )}
+                />
+              </div>
+            )}
+          </div>
+        </MotionFx>
 
         {/* Temperature/tint wash */}
         {wash && (
@@ -190,8 +211,31 @@ export function EditorPreview() {
             aria-hidden
           />
         )}
+        {/* Filtro estilizado — tint overlay (fade/retrô/frio/quente) */}
+        {stylizedFilter?.overlay && (
+          <div
+            className="pointer-events-none absolute inset-0"
+            style={{ backgroundColor: stylizedFilter.overlay.color, opacity: stylizedFilter.overlay.opacity, mixBlendMode: stylizedFilter.overlay.blend as React.CSSProperties["mixBlendMode"] }}
+            aria-hidden
+          />
+        )}
+        {/* Camada de ajuste — tint global do filtro escolhido */}
+        {adjWash && (
+          <div
+            className="pointer-events-none absolute inset-0"
+            style={{ backgroundColor: adjWash.color, opacity: adjWash.opacity, mixBlendMode: adjWash.blend as React.CSSProperties["mixBlendMode"] }}
+            aria-hidden
+          />
+        )}
+        {/* Biblioteca de efeitos — overlays (VHS, grain, scanlines, leaks, prisma, RGB split) */}
+        <FxOverlays fx={doc.fx} />
         {/* Vignette */}
         {vignette && <div className="pointer-events-none absolute inset-0" style={{ background: vignette }} aria-hidden />}
+
+        {/* Overlays + Picture-in-Picture (blend modes) */}
+        {doc.overlays.map((o) => (
+          <OverlayVisual key={o.id} overlay={o} w={previewWidth} h={previewHeight} />
+        ))}
 
         {/* Masks (visual effect) */}
         {doc.masks.map((m) => (
@@ -273,6 +317,76 @@ export function EditorPreview() {
           >
             🔥
           </span>
+        )}
+
+        {/* Stickers da biblioteca (com tracking / seguir movimento) */}
+        {doc.stickers.map((s) => {
+          const pos = stickerPos(s, currentTime);
+          return (
+            <span
+              key={s.id}
+              className="pointer-events-none absolute select-none text-2xl leading-none"
+              style={{
+                left: `${pos.x * 100}%`,
+                top: `${pos.y * 100}%`,
+                transform: `translate(-50%, -50%) scale(${s.scale.toFixed(2)})`,
+                transition: playing ? "none" : "left 120ms linear, top 120ms linear",
+              }}
+              aria-hidden
+            >
+              {s.content}
+            </span>
+          );
+        })}
+
+        {/* Texto animado (templates in/out) */}
+        {doc.animatedText.enabled && doc.animatedText.text && (
+          <div
+            className={cn(
+              "pointer-events-none absolute inset-x-4 flex justify-center text-center",
+              doc.animatedText.position === "topo" && "top-[16%]",
+              doc.animatedText.position === "centro" && "top-1/2 -translate-y-1/2",
+              doc.animatedText.position === "rodapé" && "bottom-[16%]",
+            )}
+            aria-hidden
+          >
+            <span
+              key={`${doc.animatedText.preset}-${doc.animatedText.text}-${doc.animatedText.loop}`}
+              className={cn(
+                "font-extrabold uppercase leading-tight [text-shadow:0_2px_10px_rgba(0,0,0,0.85)]",
+                `at-${doc.animatedText.preset}`,
+                doc.animatedText.loop && doc.animatedText.preset !== "glow" && "at-loop",
+              )}
+              style={{
+                color: doc.animatedText.color,
+                fontSize: Math.max(14, doc.animatedText.sizePx * (previewHeight / 1920) * 2.2),
+              }}
+            >
+              {doc.animatedText.text}
+            </span>
+          </div>
+        )}
+
+        {/* Estabilização / Enhance — dica "antes/depois" e selos */}
+        {doc.processing.enhance && (
+          <div className="pointer-events-none absolute inset-y-0 left-1/2 z-[15] w-px bg-white/50" aria-hidden>
+            <span className="absolute left-1 top-2 rounded bg-black/60 px-1 text-[8px] font-medium text-zinc-300">antes</span>
+            <span className="absolute right-1 top-2 -translate-x-full rounded bg-black/60 px-1 text-[8px] font-medium text-emerald-300">depois</span>
+          </div>
+        )}
+        {(doc.processing.stabilize || doc.processing.enhance) && (
+          <div className="pointer-events-none absolute bottom-2 right-2 z-20 flex flex-col items-end gap-1" aria-hidden>
+            {doc.processing.stabilize && (
+              <span className="rounded-md bg-black/60 px-1.5 py-0.5 text-[9px] font-medium text-sky-300 backdrop-blur">
+                estabilizado {doc.processing.stabilizeStrength}%
+              </span>
+            )}
+            {doc.processing.enhance && (
+              <span className="rounded-md bg-black/60 px-1.5 py-0.5 text-[9px] font-medium text-fuchsia-300 backdrop-blur">
+                enhance → {doc.processing.upscaleTarget}
+              </span>
+            )}
+          </div>
         )}
 
         {/* Reframe editing box */}
@@ -360,6 +474,133 @@ export function EditorPreview() {
 
 function maskLabel(kind: string): string {
   return kind === "blur" ? "Desfoque" : kind === "pixelate" ? "Pixel" : kind === "spotlight" ? "Holofote" : "Forma";
+}
+
+/** Nests one animated wrapper per active motion effect (glitch/shake/zoom-pulse). */
+function MotionFx({
+  fx,
+  active,
+  children,
+}: {
+  fx: FxState;
+  active: readonly ("glitch" | "shake" | "zoomPulse")[];
+  children: React.ReactNode;
+}) {
+  if (active.length === 0) return <>{children}</>;
+  return active.reduce<React.ReactNode>((node, id) => {
+    const cls = id === "glitch" ? "fx-glitch" : id === "shake" ? "fx-shake" : "fx-zoom-pulse";
+    return (
+      <div className={cn("absolute inset-0", cls)} style={fxMotionVars(id, fx[id].intensity) as React.CSSProperties} aria-hidden>
+        {node}
+      </div>
+    );
+  }, children as React.ReactNode);
+}
+
+/** Painted overlay effects from the FX library (blended over the media). */
+function FxOverlays({ fx }: { fx: FxState }) {
+  const k = (id: keyof FxState) => fx[id].intensity / 100;
+  return (
+    <>
+      {fx.rgbSplit.enabled && (
+        <>
+          <div
+            className="pointer-events-none absolute inset-0 mix-blend-screen"
+            style={{ background: "linear-gradient(90deg, rgba(255,0,0,0.5), transparent 40%)", opacity: 0.4 * k("rgbSplit"), transform: `translateX(${(-4 * k("rgbSplit")).toFixed(1)}px)` }}
+            aria-hidden
+          />
+          <div
+            className="pointer-events-none absolute inset-0 mix-blend-screen"
+            style={{ background: "linear-gradient(270deg, rgba(0,255,255,0.5), transparent 40%)", opacity: 0.4 * k("rgbSplit"), transform: `translateX(${(4 * k("rgbSplit")).toFixed(1)}px)` }}
+            aria-hidden
+          />
+        </>
+      )}
+      {fx.chromatic.enabled && (
+        <div
+          className="pointer-events-none absolute inset-0 mix-blend-screen"
+          style={{
+            background: "radial-gradient(ellipse at center, transparent 55%, rgba(255,40,40,0.4) 80%, rgba(40,120,255,0.4) 100%)",
+            opacity: 0.6 * k("chromatic"),
+          }}
+          aria-hidden
+        />
+      )}
+      {fx.scanlines.enabled && (
+        <div
+          className="pointer-events-none absolute inset-0"
+          style={{ backgroundImage: "repeating-linear-gradient(to bottom, rgba(0,0,0,0.35) 0 1px, transparent 1px 3px)", opacity: 0.5 + 0.5 * k("scanlines") }}
+          aria-hidden
+        />
+      )}
+      {fx.vhs.enabled && (
+        <div
+          className="fx-vhs-roll pointer-events-none absolute inset-0 mix-blend-overlay"
+          style={{
+            backgroundImage:
+              "repeating-linear-gradient(to bottom, rgba(255,0,120,0.06) 0 2px, rgba(0,180,255,0.06) 2px 4px), linear-gradient(to bottom, rgba(255,255,255,0.12), transparent 6%, transparent 94%, rgba(255,255,255,0.12))",
+            backgroundSize: "100% 100%, 100% 220%",
+            opacity: 0.5 + 0.5 * k("vhs"),
+          }}
+          aria-hidden
+        />
+      )}
+      {fx.filmGrain.enabled && (
+        <div
+          className="fx-grain pointer-events-none absolute inset-[-10%] mix-blend-overlay"
+          style={{ backgroundImage: `url("${GRAIN_DATA_URI}")`, backgroundSize: "180px 180px", opacity: 0.25 + 0.55 * k("filmGrain") }}
+          aria-hidden
+        />
+      )}
+      {fx.lightLeaks.enabled && (
+        <div
+          className="fx-leak pointer-events-none absolute inset-0 mix-blend-screen"
+          style={{
+            background: "radial-gradient(60% 50% at 85% 15%, rgba(255,170,80,0.85), transparent 60%), radial-gradient(50% 40% at 10% 90%, rgba(255,90,140,0.6), transparent 60%)",
+            opacity: 0.35 + 0.55 * k("lightLeaks"),
+          }}
+          aria-hidden
+        />
+      )}
+      {fx.prism.enabled && (
+        <div
+          className="fx-prism pointer-events-none absolute inset-0 mix-blend-screen"
+          style={{
+            background: "linear-gradient(115deg, rgba(255,0,0,0.35), rgba(255,255,0,0.35), rgba(0,255,120,0.35), rgba(0,180,255,0.35), rgba(180,0,255,0.35))",
+            opacity: 0.3 + 0.5 * k("prism"),
+          }}
+          aria-hidden
+        />
+      )}
+    </>
+  );
+}
+
+/** A single overlay / PiP layer rendered with its blend mode over the frame. */
+function OverlayVisual({ overlay, w, h }: { overlay: OverlayLayer; w: number; h: number }) {
+  const isPip = overlay.kind === "pip";
+  const boxW = isPip ? w * 0.42 * overlay.scale : w * overlay.scale;
+  const boxH = isPip ? boxW * 1.3 : h * overlay.scale;
+  return (
+    <div
+      className={cn("pointer-events-none absolute overflow-hidden", isPip ? "rounded-lg ring-2 ring-white/70 shadow-lg" : "rounded-none")}
+      style={{
+        left: `${overlay.x * 100}%`,
+        top: `${overlay.y * 100}%`,
+        width: boxW,
+        height: boxH,
+        transform: "translate(-50%, -50%)",
+        opacity: overlay.opacity,
+        background: overlaySwatch(overlay.hue),
+        mixBlendMode: overlay.blend as React.CSSProperties["mixBlendMode"],
+      }}
+      aria-hidden
+    >
+      <span className="absolute left-1 top-1 rounded bg-black/50 px-1 text-[8px] font-medium text-white/90">
+        {overlay.label}
+      </span>
+    </div>
+  );
 }
 
 /** The visual effect of a single mask region (pointer-events none). */

@@ -8,26 +8,47 @@
 import { create } from "zustand";
 import type { CaptionPresetId, Cut } from "@/lib/types";
 import {
+  DEFAULT_ADJUSTMENT,
+  DEFAULT_ANIMATED_TEXT,
   DEFAULT_AUDIO_ADVANCED,
+  DEFAULT_AUDIO_CAPCUT,
   DEFAULT_CHROMA,
+  DEFAULT_FILTER,
+  DEFAULT_FX,
   DEFAULT_LAYERS_ANIM,
+  DEFAULT_MONTAGE,
+  DEFAULT_PROCESSING,
   DEFAULT_REFRAME,
   DEFAULT_SPEED,
   LOOKS,
   NEUTRAL_GRADE,
   NEUTRAL_LAYER_SAMPLE,
+  beatTimes,
   layerAnimAt,
+  montageSlideDuration,
+  type AdjustmentState,
+  type AnimatedTextState,
   type AudioAdvanced,
+  type AudioCapcut,
   type ChromaState,
   type ColorGrade,
+  type FilterId,
+  type FilterState,
+  type FxId,
+  type FxState,
   type LayerAnimId,
   type LayerKeyframe,
   type LayersAnim,
   type LookId,
   type MaskKind,
   type MaskRegion,
+  type MontageState,
+  type OverlayKind,
+  type OverlayLayer,
+  type ProcessingState,
   type ReframeState,
   type SpeedState,
+  type StickerItem,
   type Transition,
   type TransitionType,
 } from "@/lib/edit-visuals";
@@ -85,6 +106,16 @@ export interface EditorDoc {
   transitions: Transition[];
   masks: MaskRegion[];
   audioAdvanced: AudioAdvanced;
+  // --- CapCut Pro pack (fase 3) ---
+  fx: FxState; // biblioteca de efeitos (glitch, VHS, grain, ...)
+  filter: FilterState; // filtro estilizado (fade, filme, retrô, ...)
+  overlays: OverlayLayer[]; // overlays + PiP com blend modes
+  adjustment: AdjustmentState; // camada de ajuste (cor/FX em toda a composição)
+  animatedText: AnimatedTextState; // texto animado (templates in/out)
+  stickers: StickerItem[]; // stickers/emoji com tracking
+  audioCapcut: AudioCapcut; // beat sync, redução de ruído, voice changer
+  processing: ProcessingState; // estabilização + enhance/upscale
+  montage: MontageState; // auto-montagem / slideshow
 }
 
 export interface EditorVersion {
@@ -142,6 +173,24 @@ interface EditorState {
   setAudioAdvanced: (patch: Partial<AudioAdvanced>) => void;
   setOverlayMode: (mode: "none" | "reframe" | "masks") => void;
   setSelectedMaskId: (id: string | null) => void;
+  // --- CapCut Pro pack actions (all undoable via apply) ---
+  setFx: (id: FxId, patch: Partial<{ enabled: boolean; intensity: number }>) => void;
+  resetFx: () => void;
+  setFilter: (patch: Partial<FilterState>) => void;
+  applyFilter: (id: FilterId | null) => void;
+  addOverlay: (kind: OverlayKind) => void;
+  updateOverlay: (id: string, patch: Partial<OverlayLayer>) => void;
+  removeOverlay: (id: string) => void;
+  setAdjustment: (patch: Partial<AdjustmentState>) => void;
+  setAnimatedText: (patch: Partial<AnimatedTextState>) => void;
+  addSticker: (content: string) => void;
+  updateSticker: (id: string, patch: Partial<StickerItem>) => void;
+  removeSticker: (id: string) => void;
+  setAudioCapcut: (patch: Partial<AudioCapcut>) => void;
+  snapCutsToBeats: () => number;
+  setProcessing: (patch: Partial<ProcessingState>) => void;
+  setMontage: (patch: Partial<MontageState>) => void;
+  buildMontage: () => void;
 }
 
 const DEFAULT_DOC: EditorDoc = {
@@ -186,6 +235,15 @@ const DEFAULT_DOC: EditorDoc = {
   transitions: [],
   masks: [],
   audioAdvanced: DEFAULT_AUDIO_ADVANCED,
+  fx: DEFAULT_FX,
+  filter: DEFAULT_FILTER,
+  overlays: [],
+  adjustment: DEFAULT_ADJUSTMENT,
+  animatedText: DEFAULT_ANIMATED_TEXT,
+  stickers: [],
+  audioCapcut: DEFAULT_AUDIO_CAPCUT,
+  processing: DEFAULT_PROCESSING,
+  montage: DEFAULT_MONTAGE,
 };
 
 const HISTORY_LIMIT = 60;
@@ -427,4 +485,135 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   setOverlayMode: (mode) => set({ overlayMode: mode }),
   setSelectedMaskId: (id) => set({ selectedMaskId: id }),
+
+  // ---------------------------------------------------------------- FX (biblioteca de efeitos)
+  // INTEGRAÇÃO real: FFmpeg/backend — cada efeito vira um filtro no pipeline de render.
+  setFx: (id, patch) => {
+    const { doc, apply } = get();
+    apply({ fx: { ...doc.fx, [id]: { ...doc.fx[id], ...patch } } });
+  },
+  resetFx: () => get().apply({ fx: { ...DEFAULT_FX } }),
+
+  // ---------------------------------------------------------------- filtros
+  setFilter: (patch) => {
+    const { doc, apply } = get();
+    apply({ filter: { ...doc.filter, ...patch } });
+  },
+  applyFilter: (id) => {
+    const { doc, apply } = get();
+    apply({ filter: { ...doc.filter, id } });
+  },
+
+  // ---------------------------------------------------------------- overlays + PiP
+  addOverlay: (kind) => {
+    const { doc, apply } = get();
+    const n = doc.overlays.length + 1;
+    const overlay: OverlayLayer = {
+      id: uidShort(),
+      kind,
+      label: kind === "pip" ? `PiP ${n}` : `Overlay ${n}`,
+      x: kind === "pip" ? 0.72 : 0.5,
+      y: kind === "pip" ? 0.24 : 0.5,
+      scale: kind === "pip" ? 0.34 : 1,
+      opacity: kind === "pip" ? 1 : 0.7,
+      blend: kind === "pip" ? "normal" : "screen",
+      hue: (n * 47) % 360,
+    };
+    apply({ overlays: [...doc.overlays, overlay] });
+  },
+  updateOverlay: (id, patch) => {
+    const { doc, apply } = get();
+    apply({ overlays: doc.overlays.map((o) => (o.id === id ? { ...o, ...patch } : o)) });
+  },
+  removeOverlay: (id) => {
+    const { doc, apply } = get();
+    apply({ overlays: doc.overlays.filter((o) => o.id !== id) });
+  },
+
+  // ---------------------------------------------------------------- camada de ajuste
+  setAdjustment: (patch) => {
+    const { doc, apply } = get();
+    apply({ adjustment: { ...doc.adjustment, ...patch } });
+  },
+
+  // ---------------------------------------------------------------- texto animado
+  setAnimatedText: (patch) => {
+    const { doc, apply } = get();
+    apply({ animatedText: { ...doc.animatedText, ...patch } });
+  },
+
+  // ---------------------------------------------------------------- stickers com tracking
+  addSticker: (content) => {
+    const { doc, apply } = get();
+    const sticker: StickerItem = { id: uidShort(), content, x: 0.5, y: 0.4, scale: 1.4, tracking: false };
+    apply({ stickers: [...doc.stickers, sticker] });
+  },
+  updateSticker: (id, patch) => {
+    const { doc, apply } = get();
+    apply({ stickers: doc.stickers.map((s) => (s.id === id ? { ...s, ...patch } : s)) });
+  },
+  removeSticker: (id) => {
+    const { doc, apply } = get();
+    apply({ stickers: doc.stickers.filter((s) => s.id !== id) });
+  },
+
+  // ---------------------------------------------------------------- áudio CapCut
+  // INTEGRAÇÃO real: FFmpeg/backend — redução de ruído, pitch/voice changer e beat detection.
+  setAudioCapcut: (patch) => {
+    const { doc, apply } = get();
+    apply({ audioCapcut: { ...doc.audioCapcut, ...patch } });
+  },
+  snapCutsToBeats: () => {
+    const { cut, doc, apply } = get();
+    if (!cut) return 0;
+    const duration = cut.endSeconds - cut.startSeconds;
+    const beats = beatTimes(doc.audioCapcut.bpm, duration);
+    const merged = [...doc.splits];
+    let added = 0;
+    for (const b of beats) {
+      if (b <= 0 || b >= duration) continue;
+      if (!merged.some((s) => Math.abs(s - b) < 0.05)) {
+        merged.push(b);
+        added++;
+      }
+    }
+    if (added > 0) apply({ splits: merged.sort((a, b) => a - b) });
+    return added;
+  },
+
+  // ---------------------------------------------------------------- estabilização + enhance
+  // INTEGRAÇÃO real: FFmpeg/backend — vidstab (estabilização) e upscale (Real-ESRGAN etc.).
+  setProcessing: (patch) => {
+    const { doc, apply } = get();
+    apply({ processing: { ...doc.processing, ...patch } });
+  },
+
+  // ---------------------------------------------------------------- auto-montagem / slideshow
+  setMontage: (patch) => {
+    const { doc, apply } = get();
+    apply({ montage: { ...doc.montage, ...patch } });
+  },
+  buildMontage: () => {
+    const { cut, doc, apply } = get();
+    if (!cut) return;
+    const duration = cut.endSeconds - cut.startSeconds;
+    const slideDur = montageSlideDuration(doc.montage.tempo);
+    // Fit the requested slide count inside the clip (at least 2 boundaries).
+    const maxSlides = Math.max(2, Math.min(doc.montage.slides, Math.floor(duration / Math.max(0.2, slideDur)) || doc.montage.slides));
+    const step = duration / maxSlides;
+    const splits: number[] = [];
+    const transitions: Transition[] = [];
+    for (let i = 1; i < maxSlides; i++) {
+      const at = Math.round(i * step * 10) / 10;
+      if (at > 0 && at < duration && !splits.includes(at)) {
+        splits.push(at);
+        transitions.push({ at, type: doc.montage.transition, duration: 0.5 });
+      }
+    }
+    apply({
+      splits: splits.sort((a, b) => a - b),
+      transitions,
+      montage: { ...doc.montage, slides: maxSlides, built: true },
+    });
+  },
 }));

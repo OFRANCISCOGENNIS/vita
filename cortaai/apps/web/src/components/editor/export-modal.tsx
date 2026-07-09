@@ -21,8 +21,9 @@ const RESOLUTIONS = [
 
 export function ExportModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const router = useRouter();
-  const { cut } = useEditorStore();
+  const { cut, doc } = useEditorStore();
   const enqueue = useRenderQueueStore((s) => s.enqueue);
+  const processing = doc.processing;
 
   const [resolution, setResolution] = useState<string>("2160p");
   const [fps, setFps] = useState<30 | 60>(60);
@@ -44,6 +45,12 @@ export function ExportModal({ open, onClose }: { open: boolean; onClose: () => v
     setSubmitting(true);
     try {
       const project = await api.getProject(cut.projectId).catch(() => null);
+      // Estabilização / enhance entram no rótulo do preset para aparecerem na fila.
+      const extras = [
+        processing.stabilize ? `estabilizado ${processing.stabilizeStrength}%` : "",
+        processing.enhance ? `enhance→${processing.upscaleTarget}` : "",
+      ].filter(Boolean);
+      const preset = [maxQuality ? "maxima-qualidade" : "padrao", ...extras].join(" · ");
       await enqueue({
         cutId: cut.id,
         cutTitle: cut.title,
@@ -51,7 +58,7 @@ export function ExportModal({ open, onClose }: { open: boolean; onClose: () => v
         resolution,
         fps,
         codec,
-        preset: maxQuality ? "maxima-qualidade" : "padrao",
+        preset,
       });
       onClose();
       router.push("/app/exportacoes");
@@ -144,10 +151,26 @@ export function ExportModal({ open, onClose }: { open: boolean; onClose: () => v
           </span>
         </button>
 
+        {/* Pós-processamento vindo da aba "Auto" (estabilização + enhance/upscale) */}
+        {(processing.stabilize || processing.enhance) && (
+          <div className="space-y-1 rounded-xl border border-fuchsia-500/30 bg-fuchsia-500/5 p-3 text-xs text-fuchsia-100">
+            <p className="flex items-center gap-2 font-semibold">
+              <Sparkles className="h-4 w-4 shrink-0 text-fuchsia-400" aria-hidden /> Pós-processamento
+            </p>
+            <ul className="ml-6 list-disc space-y-0.5 text-fuchsia-200/90">
+              {processing.stabilize && <li>Estabilização · força {processing.stabilizeStrength}%</li>}
+              {processing.enhance && <li>Enhance / upscale para {processing.upscaleTarget}</li>}
+            </ul>
+          </div>
+        )}
+
         <p className="flex items-start gap-2 rounded-xl bg-sky-500/10 p-3 text-xs leading-relaxed text-sky-200">
           <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
-          A origem nunca é ampliada (sem upscale): se o vídeo original for 1080p, a exportação 4K
-          entrega o melhor 1080p possível dentro do container escolhido.
+          {processing.enhance ? (
+            <>Com o Enhance ligado, a origem é ampliada por IA até {processing.upscaleTarget} (upscale reprocessado no render).</>
+          ) : (
+            <>A origem nunca é ampliada (sem upscale): se o vídeo original for 1080p, a exportação 4K entrega o melhor 1080p possível dentro do container escolhido. Ative o Enhance na aba &ldquo;Auto&rdquo; para upscale por IA.</>
+          )}
         </p>
 
         <div className="flex justify-end gap-2">
