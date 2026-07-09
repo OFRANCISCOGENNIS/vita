@@ -1,0 +1,77 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  @apply bg-surface text-zinc-200 antialiased;
+  background-image:
+    radial-gradient(ellipse 60% 40% at 70% -10%, rgba(139, 92, 246, 0.12), transparent),
+    radial-gradient(ellipse 50% 35% at 20% 0%, rgba(217, 70, 239, 0.07), transparent);
+  background-attachment: fixed;
+}
+
+/* Subtle custom scrollbar for the dark theme */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.22);
+  background-clip: content-box;
+  border: 2px solid transparent;
+}
+
+/* Range input thumb (sliders) */
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  height: 16px;
+  width: 16px;
+  border-radius: 9999px;
+  background: white;
+  border: 3px solid #8b5cf6;
+  cursor: pointer;
+  margin-top: 0;
+}
+input[type="range"]::-moz-range-thumb {
+  height: 16px;
+  width: 16px;
+  border-radius: 9999px;
+  background: white;
+  border: 3px solid #8b5cf6;
+  cursor: pointer;
+}
+
+@keyframes caret-blink {
+  0%, 50% { border-color: transparent; }
+  51%, 100% { border-color: #34d399; }
+}
+.caption-typewriter {
+  animation: caret-blink 1s step-end infinite;
+}
+
+@keyframes gradient-move {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+.caption-gradient-animated {
+  background-size: 200% 200%;
+  animation: gradient-move 3s ease infinite;
+}
