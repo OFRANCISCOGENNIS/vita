@@ -9,6 +9,7 @@ import { cn, formatDuration } from "@/lib/utils";
 import { useEditorStore } from "@/store/editor";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import { AudioAdvanced } from "./audio-advanced";
 
 export function AudioPanel() {
   const { cut, doc, apply } = useEditorStore();
@@ -46,6 +47,8 @@ export function AudioPanel() {
           description="Abaixa a música quando há fala"
         />
       </section>
+
+      <AudioAdvanced />
 
       <section>
         <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-zinc-500">

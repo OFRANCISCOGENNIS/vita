@@ -55,6 +55,19 @@ import type {
 import { decodeGoogleJwt } from "./google";
 import { isAdminEmail } from "./admins";
 import { svgThumb, uid } from "./utils";
+import { addUserGeneration, addUserProject, isDemoSession, readUserData } from "./session-scope";
+
+/** Dashboard stats for a real (non-demo) user who has no seeded activity. */
+function emptyDashboardStats(): DashboardStats {
+  const { projects } = readUserData();
+  return {
+    minutesProcessed: 0,
+    cutsGenerated: 0,
+    recentProjects: projects.slice(0, 6),
+    usageSeries: [],
+    nicheHighlights: [],
+  };
+}
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
 const TIMEOUT_MS = 1500;
@@ -339,16 +352,20 @@ export async function uploadInit(
 export async function uploadComplete(uploadId: string, filename: string): Promise<Project> {
   return request(
     `/projects/upload-complete`,
-    () => ({
-      ...mockProjects[1],
-      id: uid(),
-      title: filename.replace(/\.[a-z0-9]+$/i, ""),
-      originalFilename: filename,
-      sourceType: "upload" as const,
-      status: "transcribing" as const,
-      thumbnailUrl: svgThumb(filename, "tecnologia"),
-      createdAt: new Date().toISOString(),
-    }),
+    () => {
+      const project: Project = {
+        ...mockProjects[1],
+        id: uid(),
+        title: filename.replace(/\.[a-z0-9]+$/i, ""),
+        originalFilename: filename,
+        sourceType: "upload" as const,
+        status: "transcribing" as const,
+        thumbnailUrl: svgThumb(filename, "tecnologia"),
+        createdAt: new Date().toISOString(),
+      };
+      addUserProject(project);
+      return project;
+    },
     { method: "POST", body: JSON.stringify({ uploadId }) },
   );
 }
@@ -356,14 +373,18 @@ export async function uploadComplete(uploadId: string, filename: string): Promis
 export async function importUrl(url: string, quality: Resolution): Promise<Project> {
   return request(
     `/projects/import-url`,
-    () => ({
-      ...mockProjects[0],
-      id: uid(),
-      sourceUrl: url,
-      resolution: quality,
-      status: "importing" as const,
-      createdAt: new Date().toISOString(),
-    }),
+    () => {
+      const project: Project = {
+        ...mockProjects[0],
+        id: uid(),
+        sourceUrl: url,
+        resolution: quality,
+        status: "importing" as const,
+        createdAt: new Date().toISOString(),
+      };
+      addUserProject(project);
+      return project;
+    },
     { method: "POST", body: JSON.stringify({ url, quality }) },
   );
 }
@@ -388,12 +409,12 @@ export async function urlPreview(url: string): Promise<UrlPreview> {
 }
 
 export async function listProjects(): Promise<Project[]> {
-  return request(`/projects`, () => mockProjects);
+  return request(`/projects`, () => (isDemoSession() ? mockProjects : readUserData().projects));
 }
 
 export async function getProject(id: string): Promise<Project> {
   return request(`/projects/${id}`, () => {
-    const found = mockProjects.find((p) => p.id === id);
+    const found = readUserData().projects.find((p) => p.id === id) ?? mockProjects.find((p) => p.id === id);
     if (!found) throw new Error("Projeto não encontrado");
     return found;
   });
@@ -417,8 +438,13 @@ export async function generateCuts(
 
 export async function getProjectCuts(projectId: string): Promise<Cut[]> {
   return request(`/projects/${projectId}/cuts`, () =>
-    mockCuts.filter((c) => c.projectId === projectId),
+    (isDemoSession() ? mockCuts : readUserData().cuts).filter((c) => c.projectId === projectId),
   );
+}
+
+/** All cuts available to the current session (demo → seed; else the user's own). */
+export async function listCuts(): Promise<Cut[]> {
+  return request(`/cuts`, () => (isDemoSession() ? mockCuts : readUserData().cuts));
 }
 
 export async function getCut(cutId: string): Promise<Cut> {
@@ -515,7 +541,7 @@ export async function batchZip(jobIds: string[]): Promise<{ zipUrl: string }> {
 // ---------------------------------------------------------------- dashboard / admin
 
 export async function dashboardStats(): Promise<DashboardStats> {
-  return request(`/dashboard/stats`, () => mockDashboardStats);
+  return request(`/dashboard/stats`, () => (isDemoSession() ? mockDashboardStats : emptyDashboardStats()));
 }
 
 export async function adminMetrics(): Promise<AdminMetrics> {
@@ -565,7 +591,7 @@ function newMockGeneration(
     duration?: number;
   },
 ): Generation {
-  return {
+  const generation: Generation = {
     id: uid(),
     userId: mockUser.id,
     projectId: opts.projectId ?? null,
@@ -587,6 +613,9 @@ function newMockGeneration(
     createdAt: new Date().toISOString(),
     finishedAt: null,
   };
+  // For real (non-demo) users, persist so it shows in their own library.
+  addUserGeneration(generation);
+  return generation;
 }
 
 export async function studioTextToVideo(prompt: string, params: TextToVideoParams): Promise<Generation> {
@@ -722,7 +751,7 @@ export async function studioEffect(
 }
 
 export async function studioGenerations(): Promise<Generation[]> {
-  return request(`/studio/generations`, () => mockGenerations);
+  return request(`/studio/generations`, () => (isDemoSession() ? mockGenerations : readUserData().generations));
 }
 
 export async function studioGeneration(id: string): Promise<Generation> {
