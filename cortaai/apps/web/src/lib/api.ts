@@ -53,6 +53,7 @@ import type {
   User,
 } from "./types";
 import { decodeGoogleJwt } from "./google";
+import { isAdminEmail } from "./admins";
 import { svgThumb, uid } from "./utils";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
@@ -117,7 +118,7 @@ export async function login(email: string, _password: string): Promise<{ token: 
     () => ({
       token: `mock-token-${uid()}`,
       // Demo: usuário fresco derivado do e-mail — não é a Marina nem admin.
-      user: { ...mockUser, id: uid(), email, name: nameFromEmail(email), isAdmin: false },
+      user: { ...mockUser, id: uid(), email, name: nameFromEmail(email), isAdmin: isAdminEmail(email) },
     }),
     {
       method: "POST",
@@ -131,7 +132,7 @@ export async function register(name: string, email: string, password: string): P
     `/auth/register`,
     () => ({
       token: `mock-token-${uid()}`,
-      user: { ...mockUser, id: uid(), name, email, isAdmin: false },
+      user: { ...mockUser, id: uid(), name, email, isAdmin: isAdminEmail(email) },
     }),
     { method: "POST", body: JSON.stringify({ name, email, password }) },
   );
@@ -153,7 +154,7 @@ export async function loginGoogle(idToken: string): Promise<{ token: string; use
         avatarUrl: picture || null,
         googleId: sub,
         brandingKit: mockUser.brandingKit,
-        isAdmin: false,
+        isAdmin: isAdminEmail(email),
         createdAt: new Date().toISOString(),
       };
       return { token: `mock-google-${uid()}`, user };

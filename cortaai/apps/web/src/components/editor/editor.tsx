@@ -15,6 +15,7 @@ import {
   Keyboard,
   Loader2,
   Redo2,
+  Share2,
   Undo2,
 } from "lucide-react";
 import * as api from "@/lib/api";
@@ -25,6 +26,7 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs } from "@/components/ui/tabs";
+import { ShareModal } from "@/components/share-modal";
 import { EditorPreview } from "./preview";
 import { EditorTimeline } from "./timeline";
 import { CaptionsPanel } from "./captions-panel";
@@ -64,6 +66,7 @@ export default function Editor({ cutId }: { cutId: string }) {
   const [exportOpen, setExportOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [versionsOpen, setVersionsOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(() => {
@@ -263,6 +266,10 @@ export default function Editor({ cutId }: { cutId: string }) {
           </Button>
         </div>
 
+        <Button variant="secondary" onClick={() => setShareOpen(true)}>
+          <Share2 className="h-4 w-4" aria-hidden />
+          <span className="hidden sm:inline">Compartilhar</span>
+        </Button>
         <Button onClick={() => setExportOpen(true)}>
           <Download className="h-4 w-4" aria-hidden /> Exportar
         </Button>
@@ -302,6 +309,7 @@ export default function Editor({ cutId }: { cutId: string }) {
       </div>
 
       <ExportModal open={exportOpen} onClose={() => setExportOpen(false)} />
+      <ShareModal open={shareOpen} onClose={() => setShareOpen(false)} cut={cut} />
       <ShortcutsModal open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
       {/* click-away for versions dropdown */}
       {versionsOpen && (

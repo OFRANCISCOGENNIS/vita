@@ -22,17 +22,21 @@ import {
 } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { Badge } from "@/components/ui/badge";
+import { ThemeToggle } from "@/components/theme-toggle";
+import { OnboardingTour } from "@/components/onboarding-tour";
+import { CommandPalette } from "@/components/command-palette";
+import { GlobalShortcuts } from "@/components/global-shortcuts";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store/auth";
 import { useRenderQueueStore } from "@/store/render-queue";
 
 const NAV = [
   { href: "/app", label: "Painel", icon: LayoutDashboard, exact: true },
-  { href: "/app/radar", label: "Radar Viral", icon: Radar },
-  { href: "/app/novo", label: "Novo projeto", icon: PlusCircle },
-  { href: "/app/estudio", label: "Estúdio IA", icon: Wand2 },
+  { href: "/app/radar", label: "Radar Viral", icon: Radar, tour: "radar" },
+  { href: "/app/novo", label: "Novo projeto", icon: PlusCircle, tour: "novo" },
+  { href: "/app/estudio", label: "Estúdio IA", icon: Wand2, tour: "estudio" },
   { href: "/app/projetos", label: "Projetos", icon: FolderOpen },
-  { href: "/app/exportacoes", label: "Exportações", icon: Download },
+  { href: "/app/exportacoes", label: "Exportações", icon: Download, tour: "exportacoes" },
   { href: "/app/biblioteca", label: "Biblioteca", icon: Library },
   { href: "/app/marca", label: "Kit de marca", icon: Palette },
   { href: "/app/configuracoes", label: "Configurações", icon: Settings },
@@ -89,6 +93,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <Link
               key={item.href}
               href={item.href}
+              data-tour={item.tour}
               aria-current={active ? "page" : undefined}
               className={cn(
                 "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400",
@@ -123,12 +128,22 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       </nav>
       <div className="border-t border-line p-4">
         <div className="flex items-center gap-3">
-          <span
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-600 to-fuchsia-600 text-sm font-bold text-white"
-            aria-hidden
-          >
-            {user.name.charAt(0).toUpperCase()}
-          </span>
+          {user.avatarUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={user.avatarUrl}
+              alt=""
+              aria-hidden
+              className="h-9 w-9 shrink-0 rounded-full object-cover ring-1 ring-violet-500/40"
+            />
+          ) : (
+            <span
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-600 to-fuchsia-600 text-sm font-bold text-white"
+              aria-hidden
+            >
+              {user.name.charAt(0).toUpperCase()}
+            </span>
+          )}
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-medium text-zinc-100">{user.name}</p>
             <p className="truncate text-xs text-zinc-500">{user.email}</p>
@@ -152,12 +167,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen">
       {/* Desktop sidebar */}
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 border-r border-line bg-surface-1/70 backdrop-blur lg:block">
+      <aside className="no-print fixed inset-y-0 left-0 z-30 hidden w-64 border-r border-line bg-surface-1/70 backdrop-blur lg:block">
         {sidebar}
       </aside>
       {/* Mobile sidebar */}
       {mobileOpen && (
-        <div className="fixed inset-0 z-40 lg:hidden">
+        <div className="no-print fixed inset-0 z-40 lg:hidden">
           <button
             className="absolute inset-0 bg-black/70"
             onClick={() => setMobileOpen(false)}
@@ -170,7 +185,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
       <div className="flex min-w-0 flex-1 flex-col lg:pl-64">
         {/* Topbar */}
-        <header className="sticky top-0 z-20 flex h-16 items-center gap-4 border-b border-line bg-surface/80 px-4 backdrop-blur sm:px-6">
+        <header className="no-print sticky top-0 z-20 flex h-16 items-center gap-4 border-b border-line bg-surface/80 px-4 backdrop-blur sm:px-6">
           <button
             className="rounded-lg p-2 text-zinc-400 hover:text-white lg:hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
             onClick={() => setMobileOpen(true)}
@@ -179,6 +194,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <Menu className="h-5 w-5" />
           </button>
           <div className="min-w-0 flex-1" />
+          <ThemeToggle />
           <Link
             href="/app/novo"
             className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 px-4 text-sm font-semibold text-white shadow-glow transition-all hover:from-violet-500 hover:to-fuchsia-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
@@ -187,6 +203,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </Link>
         </header>
         <main className={cn("flex-1", isEditor ? "" : "px-4 py-6 sm:px-6 lg:px-8")}>{children}</main>
+      </div>
+
+      {/* App-wide overlays (client-only, hidden in print) */}
+      <div className="no-print">
+        <OnboardingTour />
+        <CommandPalette isEditor={!!isEditor} />
+        <GlobalShortcuts isEditor={!!isEditor} />
       </div>
     </div>
   );

@@ -6,13 +6,16 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        // Driven by CSS custom properties (see globals.css) so the whole app
+        // adapts to the light/dark theme. Space-separated RGB channels + the
+        // <alpha-value> placeholder keep opacity modifiers (bg-surface-1/70) working.
         surface: {
-          DEFAULT: "#0a0a0f",
-          1: "#101018",
-          2: "#16161f",
-          3: "#1e1e2a",
+          DEFAULT: "rgb(var(--bg) / <alpha-value>)",
+          1: "rgb(var(--surface-1) / <alpha-value>)",
+          2: "rgb(var(--surface-2) / <alpha-value>)",
+          3: "rgb(var(--surface-3) / <alpha-value>)",
         },
-        line: "rgba(255,255,255,0.08)",
+        line: "var(--line)",
         accent: {
           DEFAULT: "#8b5cf6",
           soft: "#a78bfa",

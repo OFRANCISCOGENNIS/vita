@@ -18,6 +18,7 @@ import {
   Heart,
   ImageIcon,
   Music2,
+  Printer,
   Repeat,
   Sparkles,
   Timer,
@@ -132,13 +133,25 @@ export default function XrayPage() {
   const loading = !video || !xray;
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6">
-      <Link
-        href="/app/radar"
-        className="inline-flex items-center gap-1.5 text-sm text-zinc-400 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400 rounded-lg"
-      >
-        <ArrowLeft className="h-4 w-4" aria-hidden /> Voltar ao Radar
-      </Link>
+    <div className="print-report mx-auto max-w-6xl space-y-6">
+      <div className="no-print flex items-center justify-between gap-3">
+        <Link
+          href="/app/radar"
+          className="inline-flex items-center gap-1.5 text-sm text-zinc-400 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400 rounded-lg"
+        >
+          <ArrowLeft className="h-4 w-4" aria-hidden /> Voltar ao Radar
+        </Link>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => window.print()}
+          disabled={loading}
+          aria-label="Exportar Raio-X em PDF"
+        >
+          <Printer className="h-4 w-4" aria-hidden /> Exportar PDF
+        </Button>
+      </div>
+      <p className="hidden text-2xl font-bold text-white print:block">Raio-X — CortaAí</p>
 
       {/* Video header */}
       {loading ? (
@@ -183,7 +196,7 @@ export default function XrayPage() {
               </span>
             </div>
             {/* Radar → production actions */}
-            <div className="mt-6 flex flex-wrap gap-2.5">
+            <div className="no-print mt-6 flex flex-wrap gap-2.5">
               <Button onClick={() => setAction("sound")} loading={actionLoading && action === "sound"}>
                 <Music2 className="h-4 w-4" aria-hidden /> Usar este som em alta na trilha
               </Button>

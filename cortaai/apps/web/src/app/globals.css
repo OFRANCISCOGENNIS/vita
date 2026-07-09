@@ -2,8 +2,33 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ---------------------------------------------------------------------------
+   Design tokens (theme-aware). Dark is the default (:root); light theme is
+   activated by ThemeProvider/anti-FOUC script setting data-theme="light" on
+   <html>. Surface + line colors are driven by these vars via tailwind.config.
+   --------------------------------------------------------------------------- */
 :root {
   color-scheme: dark;
+  --bg: 10 10 15; /* #0a0a0f */
+  --surface-1: 16 16 24; /* #101018 */
+  --surface-2: 22 22 31; /* #16161f */
+  --surface-3: 30 30 42; /* #1e1e2a */
+  --line: rgba(255, 255, 255, 0.08);
+  --line-50: rgba(255, 255, 255, 0.04);
+  --scrollbar-thumb: rgba(255, 255, 255, 0.12);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.22);
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: 247 247 250; /* #f7f7fa */
+  --surface-1: 255 255 255; /* #ffffff */
+  --surface-2: 248 248 251; /* #f8f8fb */
+  --surface-3: 238 238 243; /* #eeeef3 */
+  --line: rgba(9, 9, 20, 0.1);
+  --line-50: rgba(9, 9, 20, 0.05);
+  --scrollbar-thumb: rgba(9, 9, 20, 0.18);
+  --scrollbar-thumb-hover: rgba(9, 9, 20, 0.3);
 }
 
 html {
@@ -18,7 +43,15 @@ body {
   background-attachment: fixed;
 }
 
-/* Subtle custom scrollbar for the dark theme */
+/* Light theme: darker default ink + softer, tinted gradient wash. */
+:root[data-theme="light"] body {
+  color: #27272a;
+  background-image:
+    radial-gradient(ellipse 60% 40% at 70% -10%, rgba(139, 92, 246, 0.1), transparent),
+    radial-gradient(ellipse 50% 35% at 20% 0%, rgba(217, 70, 239, 0.06), transparent);
+}
+
+/* Custom scrollbar (theme-aware) */
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;
@@ -27,13 +60,13 @@ body {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--scrollbar-thumb);
   border-radius: 8px;
   border: 2px solid transparent;
   background-clip: content-box;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.22);
+  background: var(--scrollbar-thumb-hover);
   background-clip: content-box;
   border: 2px solid transparent;
 }
@@ -74,4 +107,109 @@ input[type="range"]::-moz-range-thumb {
 .caption-gradient-animated {
   background-size: 200% 200%;
   animation: gradient-move 3s ease infinite;
+}
+
+/* ---------------------------------------------------------------------------
+   LIGHT THEME REMAP — components use flat dark-only utilities (text-white,
+   text-zinc-*, bg-white/*, ...) with no dark: variants. Under data-theme=light
+   we remap the ink scale + white-alpha decorations so everything stays legible.
+   The [data-theme="light"] prefix wins on specificity; accents (violet/fuchsia/
+   emerald/rose) are intentionally left untouched.
+   --------------------------------------------------------------------------- */
+
+/* Line color modifier (bake per-theme alpha; the /50 utility can't be derived
+   from a raw var() color, so it's overridden explicitly for both themes). */
+.border-line\/50 { border-color: var(--line-50); }
+
+/* Text ink scale */
+:root[data-theme="light"] .text-white { color: #0b0b12; }
+:root[data-theme="light"] .hover\:text-white:hover { color: #0b0b12; }
+:root[data-theme="light"] .group:hover .group-hover\:text-white { color: #0b0b12; }
+:root[data-theme="light"] .text-zinc-100 { color: #18181b; }
+:root[data-theme="light"] .text-zinc-200 { color: #27272a; }
+:root[data-theme="light"] .text-zinc-300 { color: #3f3f46; }
+:root[data-theme="light"] .text-zinc-400 { color: #52525b; }
+:root[data-theme="light"] .text-zinc-500 { color: #71717a; }
+:root[data-theme="light"] .text-zinc-600 { color: #a1a1aa; }
+:root[data-theme="light"] .text-zinc-700 { color: #c4c4cc; }
+
+/* Placeholders */
+:root[data-theme="light"] .placeholder\:text-zinc-500::placeholder { color: #71717a; }
+:root[data-theme="light"] .placeholder\:text-zinc-600::placeholder { color: #a1a1aa; }
+
+/* White-alpha decorative backgrounds → dark-ink equivalents */
+:root[data-theme="light"] .bg-white\/5 { background-color: rgba(9, 9, 20, 0.05); }
+:root[data-theme="light"] .bg-white\/10 { background-color: rgba(9, 9, 20, 0.08); }
+:root[data-theme="light"] .bg-white\/15 { background-color: rgba(9, 9, 20, 0.1); }
+:root[data-theme="light"] .hover\:bg-white\/5:hover { background-color: rgba(9, 9, 20, 0.05); }
+:root[data-theme="light"] .hover\:bg-white\/10:hover { background-color: rgba(9, 9, 20, 0.08); }
+
+/* White-alpha rings / borders */
+:root[data-theme="light"] .ring-white\/20 { --tw-ring-color: rgba(9, 9, 20, 0.18); }
+:root[data-theme="light"] .ring-white\/10 { --tw-ring-color: rgba(9, 9, 20, 0.1); }
+:root[data-theme="light"] .border-white\/10 { border-color: rgba(9, 9, 20, 0.1); }
+
+/* Skeleton shimmer (white→white gradient is invisible on light) — repaint it.
+   Targets exactly the Skeleton element (all three classes present). */
+:root[data-theme="light"] .from-white\/5.via-white\/10.to-white\/5 {
+  background-image: linear-gradient(
+    to right,
+    rgba(9, 9, 20, 0.04),
+    rgba(9, 9, 20, 0.09),
+    rgba(9, 9, 20, 0.04)
+  );
+}
+
+/* ---------------------------------------------------------------------------
+   PRINT — "Exportar Raio-X em PDF" (window.print). Hides app chrome (.no-print),
+   forces paper-friendly colors and lays the report out full-width. Recharts SVG
+   keeps its inline fill/stroke colors, so the retention chart still prints.
+   --------------------------------------------------------------------------- */
+@media print {
+  .no-print { display: none !important; }
+
+  html, body {
+    background: #fff !important;
+  }
+  body {
+    background-image: none !important;
+    color: #18181b !important;
+  }
+  main {
+    padding: 0 !important;
+  }
+
+  .print-report {
+    max-width: 100% !important;
+    margin: 0 !important;
+  }
+  .print-report [class*="bg-surface"],
+  .print-report .bg-surface-1,
+  .print-report .bg-surface-2 {
+    background: #fff !important;
+  }
+  .print-report [class*="border-line"],
+  .print-report .border-line {
+    border-color: #d4d4d8 !important;
+  }
+  .print-report .text-white,
+  .print-report .text-zinc-100,
+  .print-report .text-zinc-200,
+  .print-report .text-zinc-300 {
+    color: #18181b !important;
+  }
+  .print-report .text-zinc-400,
+  .print-report .text-zinc-500,
+  .print-report .text-zinc-600 {
+    color: #52525b !important;
+  }
+  .print-report .rounded-2xl,
+  .print-report .rounded-xl,
+  .print-report .avoid-break {
+    break-inside: avoid;
+  }
+
+  @page {
+    margin: 1.4cm;
+  }
 }

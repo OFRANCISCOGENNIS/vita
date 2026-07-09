@@ -5,7 +5,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { CalendarClock, ChevronDown, Music2, Pencil, RefreshCw } from "lucide-react";
+import { CalendarClock, ChevronDown, Music2, Pencil, RefreshCw, Share2 } from "lucide-react";
 import * as api from "@/lib/api";
 import type { Cut } from "@/lib/types";
 import { cn, formatDuration } from "@/lib/utils";
@@ -14,6 +14,7 @@ import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { ScoreBadge } from "./score-badge";
 import { BreakdownBars } from "./breakdown-bars";
+import { ShareModal } from "./share-modal";
 
 const modeLabels: Record<Cut["mode"], string> = {
   viral: "Momentos virais",
@@ -34,6 +35,7 @@ export function CutCard({ cut: initial }: { cut: Cut }) {
   const [cut, setCut] = useState(initial);
   const [showBreakdown, setShowBreakdown] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
 
   const snippet = cut.transcript
     .slice(0, 16)
@@ -129,7 +131,12 @@ export function CutCard({ cut: initial }: { cut: Cut }) {
         <Button size="sm" variant="secondary" onClick={regenerate} loading={regenerating} aria-label="Regenerar corte">
           {!regenerating && <RefreshCw className="h-3.5 w-3.5" aria-hidden />} Regenerar
         </Button>
+        <Button size="sm" variant="ghost" onClick={() => setShareOpen(true)} aria-label="Compartilhar corte" title="Compartilhar">
+          <Share2 className="h-3.5 w-3.5" aria-hidden />
+        </Button>
       </div>
+
+      <ShareModal open={shareOpen} onClose={() => setShareOpen(false)} cut={cut} />
     </article>
   );
 }

@@ -1,6 +1,12 @@
 import type { Metadata, Viewport } from "next";
 import { Toaster } from "@/components/ui/toaster";
+import { ThemeProvider } from "@/components/theme-provider";
 import "./globals.css";
+
+// Runs before first paint to avoid a theme flash (FOUC). Reads the persisted
+// zustand shape {state:{theme}} from localStorage, resolves "system" via
+// matchMedia, and stamps <html> with data-theme/.dark/color-scheme.
+const THEME_SCRIPT = `(function(){try{var t="dark";var raw=localStorage.getItem("cortaai-theme");if(raw){var p=JSON.parse(raw);if(p&&p.state&&p.state.theme)t=p.state.theme;}if(t==="system"){t=window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";}var r=document.documentElement;r.dataset.theme=t;r.classList.toggle("dark",t==="dark");r.style.colorScheme=t;}catch(e){}})();`;
 
 const SITE_URL = "https://cortaai.com.br";
 
@@ -44,10 +50,15 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="pt-BR" className="dark">
+    <html lang="pt-BR" className="dark" data-theme="dark" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+      </head>
       <body className="min-h-screen">
-        {children}
-        <Toaster />
+        <ThemeProvider>
+          {children}
+          <Toaster />
+        </ThemeProvider>
       </body>
     </html>
   );
