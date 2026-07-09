@@ -49,6 +49,9 @@ jobs:
 
       - name: Configurar Pages
         uses: actions/configure-pages@v5
+        with:
+          # Habilita o GitHub Pages automaticamente na primeira execução.
+          enablement: true
 
       - name: Upload do artefato
         uses: actions/upload-pages-artifact@v3
