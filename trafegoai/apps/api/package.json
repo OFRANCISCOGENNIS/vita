@@ -6,11 +6,11 @@
   "scripts": {
     "build": "nest build",
     "dev": "nest start --watch",
-    "start": "node dist/main.js",
-    "worker": "node dist/jobs/worker.main.js",
+    "start": "node dist/src/main.js",
+    "worker": "node dist/src/jobs/worker.main.js",
     "prisma:migrate": "prisma migrate dev",
     "seed": "ts-node prisma/seed.ts",
-    "seed:ifempty": "node dist/prisma-seed/seed.js --if-empty || ts-node prisma/seed.ts --if-empty",
+    "seed:ifempty": "node dist/prisma/seed.js --if-empty",
     "lint": "eslint \"src/**/*.ts\"",
     "test": "jest"
   },

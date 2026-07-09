@@ -46,7 +46,7 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    command: sh -c "npx prisma migrate deploy && npm run seed:ifempty && node dist/main.js"
+    command: sh -c "npx prisma migrate deploy && npm run seed:ifempty && node dist/src/main.js"
 
   # Worker de jobs (sincronização de métricas + motor de regras de automação).
   # Para escalar: docker compose up --scale worker=4
@@ -62,7 +62,7 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    command: node dist/jobs/worker.main.js
+    command: node dist/src/jobs/worker.main.js
 
   web:
     build:

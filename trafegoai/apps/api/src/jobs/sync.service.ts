@@ -1,12 +1,17 @@
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { Queue } from 'bullmq';
-import IORedis from 'ioredis';
 
 export const SYNC_QUEUE = 'metrics-sync';
 export const RULES_QUEUE = 'automation-rules';
 
 export function redisConnection() {
-  return new IORedis(process.env.REDIS_URL ?? 'redis://localhost:6379', { maxRetriesPerRequest: null });
+  const url = new URL(process.env.REDIS_URL ?? 'redis://localhost:6379');
+  return {
+    host: url.hostname,
+    port: Number(url.port || 6379),
+    ...(url.password ? { password: url.password } : {}),
+    maxRetriesPerRequest: null,
+  };
 }
 
 /**

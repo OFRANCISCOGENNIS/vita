@@ -1,0 +1,68 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Tokens de tema — dark premium por padrão, light opcional (classe .light no <html>) */
+:root {
+  --bg: 13 13 13;         /* página */
+  --surface: 26 26 25;    /* cards / gráficos */
+  --border: 44 44 42;
+  --ink: 255 255 255;
+  --ink-2: 195 194 183;
+  --muted: 137 135 129;
+  /* Séries por plataforma (slots fixos, passos para superfície escura) */
+  --series-google: #3987e5;
+  --series-meta: #199e70;
+  --series-tiktok: #c98500;
+  --grid: #2c2c2a;
+  --good: #0ca30c;
+  --warning: #fab219;
+  --critical: #d03b3b;
+}
+
+html.light {
+  --bg: 249 249 247;
+  --surface: 252 252 251;
+  --border: 225 224 217;
+  --ink: 11 11 11;
+  --ink-2: 82 81 78;
+  --muted: 137 135 129;
+  --series-google: #2a78d6;
+  --series-meta: #1baf7a;
+  --series-tiktok: #eda100;
+  --grid: #e1e0d9;
+  --good: #006300;
+  --warning: #b97900;
+  --critical: #d03b3b;
+}
+
+body {
+  @apply bg-bg text-ink antialiased;
+}
+
+.card {
+  @apply rounded-xl border border-border bg-surface p-4;
+}
+
+.skeleton {
+  @apply animate-pulse rounded-md bg-border/60;
+}
+
+.btn {
+  @apply inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors
+    focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent
+    disabled:cursor-not-allowed disabled:opacity-50;
+}
+.btn-primary { @apply btn bg-accent text-white hover:bg-indigo-500; }
+.btn-ghost { @apply btn border border-border text-ink-2 hover:bg-border/40 hover:text-ink; }
+.btn-danger { @apply btn bg-red-600/90 text-white hover:bg-red-600; }
+
+.input {
+  @apply w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-ink placeholder:text-muted
+    focus:outline-none focus:ring-2 focus:ring-accent;
+}
+
+.badge { @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium; }
+
+/* Números tabulares para colunas alinhadas */
+.tnum { font-variant-numeric: tabular-nums; }

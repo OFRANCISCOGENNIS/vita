@@ -29,18 +29,18 @@ export abstract class BaseMockConnector implements AdsConnector {
     return this.exchangeCode('refresh');
   }
 
-  async fetchCampaigns(): Promise<NormalizedCampaign[]> {
+  async fetchCampaigns(_accessToken: string, _accountExternalId: string): Promise<NormalizedCampaign[]> {
     return []; // modo demo: campanhas vêm do seed
   }
 
-  async fetchMetrics(): Promise<NormalizedMetric[]> {
+  async fetchMetrics(_accessToken: string, _accountExternalId: string, _from: string, _to: string): Promise<NormalizedMetric[]> {
     return []; // modo demo: métricas vêm do seed
   }
 
-  async pauseCampaign(): Promise<void> {}
-  async activateCampaign(): Promise<void> {}
-  async updateBudget(): Promise<void> {}
-  async duplicateCampaign(): Promise<string> {
+  async pauseCampaign(_accessToken: string, _campaignExternalId: string): Promise<void> {}
+  async activateCampaign(_accessToken: string, _campaignExternalId: string): Promise<void> {}
+  async updateBudget(_accessToken: string, _campaignExternalId: string, _dailyBudget: number): Promise<void> {}
+  async duplicateCampaign(_accessToken: string, _campaignExternalId: string): Promise<string> {
     return `dup-${Date.now().toString(36)}`;
   }
 }
