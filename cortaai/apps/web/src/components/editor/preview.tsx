@@ -5,7 +5,8 @@
 // advanced effects (color grade, reframe, chroma key, masks, layer keyframes,
 // speed) applied VISUALLY so the user sees every edit on the placeholder media.
 
-import { Pause, Play } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Pause, Play, Volume2, VolumeX } from "lucide-react";
 import { PLATFORM_PRESETS, CAPTION_PRESETS } from "@/lib/presets";
 import { cn, formatTimecode } from "@/lib/utils";
 import {
@@ -56,12 +57,57 @@ export function EditorPreview() {
     currentTime,
     overlayMode,
     selectedMaskId,
+    mediaUrl,
     togglePlay,
+    setPlaying,
+    seek,
     apply,
     setReframe,
     updateMask,
     setSelectedMaskId,
   } = useEditorStore();
+
+  // --- real <video> playback (local upload / direct URL) ---------------------
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const [muted, setMuted] = useState(true);
+  const hasVideo = !!mediaUrl && !doc.chroma.enabled;
+  const startSeconds = cut?.startSeconds ?? 0;
+  const endSeconds = cut?.endSeconds ?? 0;
+
+  // Play/pause the element in lock-step with the editor's transport.
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v || !hasVideo) return;
+    if (playing) {
+      const p = v.play();
+      if (p && typeof p.catch === "function") {
+        // Autoplay policy: if unmuted play is blocked, retry muted.
+        p.catch(() => {
+          v.muted = true;
+          setMuted(true);
+          void v.play().catch(() => undefined);
+        });
+      }
+    } else {
+      v.pause();
+    }
+  }, [playing, hasVideo]);
+
+  // Follow external seeks (timeline scrub, arrow keys) — but ignore the tiny
+  // drift the element itself reports via timeupdate to avoid a feedback loop.
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v || !hasVideo) return;
+    const target = startSeconds + currentTime;
+    if (Math.abs(v.currentTime - target) > 0.3) {
+      try {
+        v.currentTime = target;
+      } catch {
+        /* metadata not ready yet */
+      }
+    }
+  }, [currentTime, hasVideo, startSeconds]);
+
   if (!cut) return null;
 
   const duration = cut.endSeconds - cut.startSeconds;
@@ -183,6 +229,41 @@ export function EditorPreview() {
                 tolerance={doc.chroma.tolerance}
                 softness={doc.chroma.softness}
                 showBefore={doc.chroma.showBefore}
+              />
+            ) : mediaUrl ? (
+              <video
+                ref={videoRef}
+                src={mediaUrl}
+                muted={muted}
+                playsInline
+                preload="metadata"
+                className="absolute inset-0 h-full w-full bg-black object-cover"
+                onLoadedMetadata={(e) => {
+                  // Start the element at the cut's in-point.
+                  const v = e.currentTarget;
+                  try {
+                    v.currentTime = startSeconds + currentTime;
+                  } catch {
+                    /* ignore */
+                  }
+                }}
+                onTimeUpdate={(e) => {
+                  const v = e.currentTarget;
+                  // Respect the cut's out-point: stop at the end of the segment.
+                  if (endSeconds > startSeconds && v.currentTime >= endSeconds) {
+                    v.pause();
+                    setPlaying(false);
+                    seek(endSeconds - startSeconds);
+                    return;
+                  }
+                  // The element is the clock while it plays — mirror it to the store.
+                  if (playing) seek(v.currentTime - startSeconds);
+                }}
+                onEnded={() => {
+                  setPlaying(false);
+                  seek(Math.max(0, endSeconds - startSeconds));
+                }}
+                aria-hidden
               />
             ) : (
               <div className="absolute inset-0 bg-gradient-to-br from-violet-900/70 via-surface-2 to-fuchsia-900/50">
@@ -446,6 +527,21 @@ export function EditorPreview() {
             {playing ? <Pause className="h-6 w-6" /> : <Play className="ml-0.5 h-6 w-6" />}
           </span>
         </button>
+
+        {/* Mute toggle (only for real video) */}
+        {hasVideo && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setMuted((m) => !m);
+            }}
+            aria-label={muted ? "Ativar som" : "Silenciar"}
+            title={muted ? "Ativar som" : "Silenciar"}
+            className="absolute bottom-2 right-2 z-20 flex h-8 w-8 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur transition-colors hover:bg-black/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+          >
+            {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+          </button>
+        )}
 
         {/* Speed indicator */}
         {(Math.abs(currentRate - 1) > 0.001 || doc.speed.keyframes.length > 0) && (

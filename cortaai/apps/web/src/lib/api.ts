@@ -36,6 +36,7 @@ import type {
   GenerationParams,
   ImageToVideoParams,
   Job,
+  Language,
   LipSyncParams,
   MotionBrushParams,
   Niche,
@@ -55,7 +56,7 @@ import type {
 import { decodeGoogleJwt } from "./google";
 import { isAdminEmail } from "./admins";
 import { svgThumb, uid } from "./utils";
-import { addUserGeneration, addUserProject, isDemoSession, readUserData } from "./session-scope";
+import { addUserCut, addUserGeneration, addUserProject, isDemoSession, readUserData } from "./session-scope";
 
 /** Dashboard stats for a real (non-demo) user who has no seeded activity. */
 function emptyDashboardStats(): DashboardStats {
@@ -349,24 +350,123 @@ export async function uploadInit(
   );
 }
 
-export async function uploadComplete(uploadId: string, filename: string): Promise<Project> {
+/**
+ * Builds ONE default Cut spanning the whole source (0 → duration) so a freshly
+ * created project is immediately editable. Carries the media reference
+ * (mediaId/mediaUrl) so the editor can replay the real video.
+ */
+function makeDefaultCut(
+  projectId: string,
+  opts: { title: string; durationSeconds: number; mediaId?: string; mediaUrl?: string },
+): Cut {
+  const dur = opts.durationSeconds > 0 ? Math.round(opts.durationSeconds * 100) / 100 : 0;
+  return {
+    id: uid(),
+    projectId,
+    title: opts.title,
+    titleOptions: [opts.title],
+    description: "",
+    hashtags: [],
+    startSeconds: 0,
+    endSeconds: dur,
+    viralScore: 0,
+    scoreBreakdown: { hook: 0, retention: 0, emotion: 0, nicheFit: 0 },
+    transcript: [],
+    mode: "manual",
+    suggestedSound: { track: "Sem trilha", reason: "adicione uma trilha no editor", trendVideoId: "" },
+    bestPostTime: "—",
+    status: "suggested",
+    editState: null,
+    createdAt: new Date().toISOString(),
+    ...(opts.mediaId ? { mediaId: opts.mediaId } : {}),
+    ...(opts.mediaUrl ? { mediaUrl: opts.mediaUrl } : {}),
+  };
+}
+
+export interface UploadCompleteMeta {
+  mediaId?: string;
+  durationSeconds?: number;
+  thumbnailUrl?: string;
+  language?: Language;
+}
+
+export async function uploadComplete(
+  uploadId: string,
+  filename: string,
+  meta: UploadCompleteMeta = {},
+): Promise<Project> {
   return request(
     `/projects/upload-complete`,
     () => {
+      const title = filename.replace(/\.[a-z0-9]+$/i, "");
+      const durationSeconds =
+        meta.durationSeconds && meta.durationSeconds > 0 ? Math.round(meta.durationSeconds) : 0;
       const project: Project = {
         ...mockProjects[1],
         id: uid(),
-        title: filename.replace(/\.[a-z0-9]+$/i, ""),
+        title,
         originalFilename: filename,
         sourceType: "upload" as const,
-        status: "transcribing" as const,
-        thumbnailUrl: svgThumb(filename, "tecnologia"),
+        sourceUrl: null,
+        durationSeconds,
+        // Real local upload → media is available now, so it's editable at once.
+        status: "ready" as const,
+        language: meta.language && meta.language !== "auto" ? meta.language : mockProjects[1].language,
+        thumbnailUrl: meta.thumbnailUrl || svgThumb(title, "tecnologia"),
+        storageKey: `local/${meta.mediaId ?? uid()}`,
         createdAt: new Date().toISOString(),
+        ...(meta.mediaId ? { mediaId: meta.mediaId } : {}),
       };
       addUserProject(project);
+      // Default full-length cut so the editor opens on real playable media.
+      const cut = makeDefaultCut(project.id, {
+        title,
+        durationSeconds,
+        mediaId: meta.mediaId,
+      });
+      addUserCut(cut);
       return project;
     },
     { method: "POST", body: JSON.stringify({ uploadId }) },
+  );
+}
+
+/**
+ * Import a DIRECT playable video URL (.mp4/.webm). 100% client-side: the URL is
+ * stored as the project/cut mediaUrl and the editor streams it directly.
+ */
+export async function importDirectUrl(
+  url: string,
+  quality: Resolution,
+  meta: { title?: string; durationSeconds?: number; thumbnailUrl?: string } = {},
+): Promise<Project> {
+  return request(
+    `/projects/import-url`,
+    () => {
+      const title = meta.title || url.split("/").pop()?.replace(/\.[a-z0-9]+$/i, "") || "Vídeo importado";
+      const durationSeconds =
+        meta.durationSeconds && meta.durationSeconds > 0 ? Math.round(meta.durationSeconds) : 0;
+      const project: Project = {
+        ...mockProjects[0],
+        id: uid(),
+        title,
+        sourceType: "upload" as const,
+        sourceUrl: url,
+        originalFilename: null,
+        durationSeconds,
+        resolution: quality,
+        status: "ready" as const,
+        thumbnailUrl: meta.thumbnailUrl || svgThumb(title, "tecnologia"),
+        storageKey: `remote/${uid()}`,
+        createdAt: new Date().toISOString(),
+        mediaUrl: url,
+      };
+      addUserProject(project);
+      const cut = makeDefaultCut(project.id, { title, durationSeconds, mediaUrl: url });
+      addUserCut(cut);
+      return project;
+    },
+    { method: "POST", body: JSON.stringify({ url, quality, direct: true }) },
   );
 }
 
@@ -379,8 +479,16 @@ export async function importUrl(url: string, quality: Resolution): Promise<Proje
         id: uid(),
         sourceUrl: url,
         resolution: quality,
-        status: "importing" as const,
+        // No backend at runtime: we can't download/transcode YouTube/Twitch/Vimeo
+        // in the browser. Create the project (so navigation works) but flag that
+        // real download + processing needs the connected backend — no fake play.
+        status: "ready" as const,
+        storageKey: `remote/${uid()}`,
         createdAt: new Date().toISOString(),
+        processingNote:
+          "Este link exige o backend conectado para baixar e processar o vídeo. " +
+          "No modo demo (site estático), a reprodução do vídeo real não está disponível — " +
+          "envie um arquivo local ou cole um link direto .mp4/.webm para editar com o vídeo de verdade.",
       };
       addUserProject(project);
       return project;
@@ -449,8 +557,9 @@ export async function listCuts(): Promise<Cut[]> {
 
 export async function getCut(cutId: string): Promise<Cut> {
   // Convenience for the editor: SPEC exposes cuts via project listing + PATCH by id.
+  // Reads the current user's own cuts first, then falls back to the demo seed.
   return request(`/cuts/${cutId}`, () => {
-    const found = mockCuts.find((c) => c.id === cutId);
+    const found = readUserData().cuts.find((c) => c.id === cutId) ?? mockCuts.find((c) => c.id === cutId);
     if (!found) throw new Error("Corte não encontrado");
     return found;
   });
@@ -460,7 +569,8 @@ export async function patchCut(cutId: string, patch: Partial<Cut>): Promise<Cut>
   return request(
     `/cuts/${cutId}`,
     () => {
-      const found = mockCuts.find((c) => c.id === cutId) ?? mockCuts[0];
+      const found =
+        readUserData().cuts.find((c) => c.id === cutId) ?? mockCuts.find((c) => c.id === cutId) ?? mockCuts[0];
       return { ...found, ...patch };
     },
     { method: "PATCH", body: JSON.stringify(patch) },
@@ -471,7 +581,8 @@ export async function regenerateCut(cutId: string): Promise<Cut> {
   return request(
     `/cuts/${cutId}/regenerate`,
     () => {
-      const found = mockCuts.find((c) => c.id === cutId) ?? mockCuts[0];
+      const found =
+        readUserData().cuts.find((c) => c.id === cutId) ?? mockCuts.find((c) => c.id === cutId) ?? mockCuts[0];
       const bump = (n: number) => Math.min(99, Math.max(40, n + Math.round(Math.random() * 14 - 6)));
       return {
         ...found,

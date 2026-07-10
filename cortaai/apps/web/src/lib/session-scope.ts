@@ -8,7 +8,7 @@
 // api.ts consults these helpers in its data getters so all consuming pages are
 // corrected at once.
 
-import type { Generation, Project } from "./types";
+import type { Cut, Generation, Project } from "./types";
 
 export const DEMO_EMAIL = "criador@cortaai.com.br";
 
@@ -47,7 +47,7 @@ export function isDemoSession(): boolean {
 
 interface UserData {
   projects: Project[];
-  cuts: import("./types").Cut[];
+  cuts: Cut[];
   generations: Generation[];
 }
 
@@ -91,9 +91,39 @@ export function addUserProject(project: Project): void {
   writeUserData({ ...data, projects: [project, ...data.projects.filter((p) => p.id !== project.id)] });
 }
 
+/** Persist a newly-created cut for the current (non-demo) user. */
+export function addUserCut(cut: Cut): void {
+  if (isDemoSession()) return;
+  const data = readUserData();
+  writeUserData({ ...data, cuts: [cut, ...data.cuts.filter((c) => c.id !== cut.id)] });
+}
+
 /** Persist a newly-created studio generation for the current (non-demo) user. */
 export function addUserGeneration(generation: Generation): void {
   if (isDemoSession()) return;
   const data = readUserData();
   writeUserData({ ...data, generations: [generation, ...data.generations.filter((g) => g.id !== generation.id)] });
+}
+
+/**
+ * Remove a user project and its cuts from storage. Returns the media ids that
+ * were referenced (project + cuts) so the caller can free the IndexedDB blobs.
+ * No-op for the demo session (its data is seed-only).
+ */
+export function deleteUserProject(projectId: string): string[] {
+  if (isDemoSession()) return [];
+  const data = readUserData();
+  const mediaIds = new Set<string>();
+  data.projects.forEach((p) => {
+    if (p.id === projectId && p.mediaId) mediaIds.add(p.mediaId);
+  });
+  data.cuts.forEach((c) => {
+    if (c.projectId === projectId && c.mediaId) mediaIds.add(c.mediaId);
+  });
+  writeUserData({
+    ...data,
+    projects: data.projects.filter((p) => p.id !== projectId),
+    cuts: data.cuts.filter((c) => c.projectId !== projectId),
+  });
+  return Array.from(mediaIds);
 }

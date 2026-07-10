@@ -64,9 +64,11 @@ function Pipeline({ status }: { status: Project["status"] }) {
   );
 }
 
-export default function ProjectDetailPage() {
+export default function ProjectDetailPage({ id: propId }: { id?: string } = {}) {
+  // Demo/mock projects arrive via the dynamic [id] route (useParams). User
+  // projects (not pre-rendered) arrive via /app/projeto?id=<id> as a prop.
   const params = useParams<{ id: string }>();
-  const id = params.id;
+  const id = propId ?? params?.id ?? "";
 
   const [project, setProject] = useState<Project | null>(null);
   const [cuts, setCuts] = useState<Cut[] | null>(null);
@@ -153,6 +155,13 @@ export default function ProjectDetailPage() {
               </div>
             </div>
           </div>
+
+          {project.processingNote && (
+            <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+              <p className="font-semibold text-amber-100">Processamento requer backend conectado</p>
+              <p className="mt-1 text-amber-200/90">{project.processingNote}</p>
+            </div>
+          )}
 
           {project.status !== "ready" ? (
             <Pipeline status={project.status} />

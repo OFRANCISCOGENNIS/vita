@@ -196,7 +196,7 @@ export default function DashboardPage() {
               return (
                 <Link
                   key={p.id}
-                  href={`/app/projetos/${p.id}`}
+                  href={`/app/projeto?id=${p.id}`}
                   className="group overflow-hidden rounded-2xl border border-line bg-surface-1 shadow-card transition-all hover:-translate-y-0.5 hover:border-violet-500/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
                 >
                   <div className="relative aspect-video overflow-hidden">

@@ -63,6 +63,7 @@ export default function Editor({ cutId }: { cutId: string }) {
     splitAtPlayhead,
     markSaved,
     restoreVersion,
+    revokeMedia,
   } = useEditorStore();
 
   const [loadError, setLoadError] = useState(false);
@@ -85,11 +86,14 @@ export default function Editor({ cutId }: { cutId: string }) {
 
   const duration = cut ? cut.endSeconds - cut.startSeconds : 0;
 
-  // Playback ticker
+  // Playback ticker — drives the playhead for demo/mock cuts (gradient preview).
+  // When a real <video> is loaded, the element itself is the clock (it calls
+  // seek() via timeupdate), so we skip the synthetic tick to avoid double time.
   useEffect(() => {
     if (!playing) return;
     const timer = setInterval(() => {
       const s = useEditorStore.getState();
+      if (s.mediaUrl) return; // real video drives the playhead
       const max = s.cut ? s.cut.endSeconds - s.cut.startSeconds : 0;
       const next = s.currentTime + 0.1;
       if (next >= max) {
@@ -154,8 +158,14 @@ export default function Editor({ cutId }: { cutId: string }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [apply, redo, seek, splitAtPlayhead, togglePlay, undo]);
 
-  // Pause playback when leaving the page.
-  useEffect(() => () => setPlaying(false), [setPlaying]);
+  // Pause playback and free the media object URL when leaving the editor.
+  useEffect(
+    () => () => {
+      setPlaying(false);
+      revokeMedia();
+    },
+    [setPlaying, revokeMedia],
+  );
 
   if (loadError) {
     return (
@@ -195,7 +205,7 @@ export default function Editor({ cutId }: { cutId: string }) {
       {/* Editor toolbar */}
       <div className="flex items-center gap-2 border-b border-line bg-surface-1/60 px-4 py-2.5">
         <Link
-          href={`/app/projetos/${cut.projectId}`}
+          href={`/app/projeto?id=${cut.projectId}`}
           className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-sm text-zinc-400 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
         >
           <ArrowLeft className="h-4 w-4" aria-hidden />

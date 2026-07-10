@@ -123,7 +123,7 @@ export function CutCard({ cut: initial }: { cut: Cut }) {
 
       <div className="mt-4 flex items-center gap-2">
         <Link
-          href={`/app/editor/${cut.id}`}
+          href={`/app/editor?cut=${cut.id}`}
           className="inline-flex h-8 flex-1 items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 px-3 text-xs font-medium text-white shadow-glow transition-all hover:from-violet-500 hover:to-fuchsia-500 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
         >
           <Pencil className="h-3.5 w-3.5" aria-hidden /> Editar no estúdio

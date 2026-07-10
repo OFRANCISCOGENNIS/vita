@@ -75,7 +75,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     );
   }
 
-  const isEditor = pathname?.startsWith("/app/editor/");
+  const isEditor = pathname?.startsWith("/app/editor");
 
   const sidebar = (
     <div className="flex h-full flex-col">

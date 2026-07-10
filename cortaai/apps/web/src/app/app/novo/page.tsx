@@ -19,7 +19,8 @@ import {
 } from "lucide-react";
 import * as api from "@/lib/api";
 import type { Language, Resolution, UrlPreview } from "@/lib/types";
-import { cn, formatBytes, formatDuration, uid } from "@/lib/utils";
+import { probeVideoFile, probeVideoSrc, saveMedia } from "@/lib/media-store";
+import { cn, formatBytes, formatDuration, svgThumb, uid } from "@/lib/utils";
 import { toast } from "@/store/toast";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -30,6 +31,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 const ACCEPTED = [".mp4", ".mov", ".mkv", ".webm"];
 const MAX_BYTES = 10 * 1024 ** 3; // 10 GB
+/** Direct, browser-playable video links (streamed as-is, no backend needed). */
+const DIRECT_VIDEO_RE = /\.(mp4|webm)(\?.*)?$/i;
 
 interface QueueItem {
   id: string;
@@ -57,12 +60,16 @@ export default function NewProjectPage() {
   const [defaultLanguage, setDefaultLanguage] = useState<Language>("auto");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const timersRef = useRef(new Map<string, ReturnType<typeof setInterval>>());
+  // Real uploaded File objects kept by uploadId until the "upload" simulation
+  // completes and we persist the blob to IndexedDB.
+  const filesRef = useRef(new Map<string, File>());
 
   // URL import state
   const [url, setUrl] = useState("");
   const [urlError, setUrlError] = useState<string | undefined>();
   const [previewLoading, setPreviewLoading] = useState(false);
   const [preview, setPreview] = useState<UrlPreview | null>(null);
+  const [previewIsDirect, setPreviewIsDirect] = useState(false);
   const [quality, setQuality] = useState<Resolution>("1080p");
   const [importing, setImporting] = useState(false);
 
@@ -78,6 +85,46 @@ export default function NewProjectPage() {
       q.map((i) => (i.id === id ? { ...i, ...(typeof patch === "function" ? patch(i) : patch) } : i)),
     );
   }, []);
+
+  /**
+   * On upload completion: probe the real File (duration + poster frame), persist
+   * the blob to IndexedDB under a mediaId, then register a READY project + a
+   * default full-length cut carrying that mediaId — so the editor replays the
+   * real video. Degrades gracefully if the File or storage is unavailable.
+   */
+  const finalizeUpload = useCallback(
+    async (uploadId: string, filename: string, language: Language) => {
+      const file = filesRef.current.get(uploadId);
+      let mediaId: string | undefined;
+      let durationSeconds = 0;
+      let thumbnailUrl: string | undefined;
+      if (file) {
+        const probe = await probeVideoFile(file).catch(() => ({ durationSeconds: 0, posterDataUrl: null }));
+        durationSeconds = probe.durationSeconds;
+        thumbnailUrl = probe.posterDataUrl ?? undefined;
+        mediaId = uid();
+        try {
+          await saveMedia(mediaId, file);
+        } catch {
+          mediaId = undefined; // storage blocked (private mode/quota) — no playable media
+        }
+      }
+      const project = await api.uploadComplete(uploadId, filename, {
+        mediaId,
+        durationSeconds,
+        thumbnailUrl,
+        language,
+      });
+      filesRef.current.delete(uploadId);
+      updateItem(uploadId, { status: "concluído", progress: 100, etaSeconds: 0, projectId: project.id });
+      toast("Upload concluído!", {
+        description: mediaId
+          ? `"${filename}" está pronto — abra o projeto para editar com o vídeo real.`
+          : `"${filename}" foi registrado (armazenamento local indisponível para o vídeo).`,
+      });
+    },
+    [updateItem],
+  );
 
   /** Simulated chunked upload/import with realistic speed jitter, pause/resume. */
   const startSimulation = useCallback(
@@ -99,15 +146,11 @@ export default function NewProjectPage() {
             timersRef.current.delete(id);
             // finish: register project with the API
             if (kind === "upload") {
-              api.uploadComplete(id, filename).then((project) => {
-                updateItem(id, { status: "concluído", progress: 100, etaSeconds: 0, projectId: project.id });
-                toast("Upload concluído!", {
-                  description: `"${filename}" foi enviado. A transcrição já começou.`,
-                });
-              });
+              void finalizeUpload(id, filename, item.language);
             } else {
+              // URL projects were already created in startImport (projectId set).
               updateItem(id, { status: "concluído", progress: 100, etaSeconds: 0 });
-              toast("Importação concluída!", { description: `"${filename}" está pronto para gerar cortes.` });
+              toast("Importação concluída!", { description: `"${filename}" está pronto.` });
             }
             return q.map((i) =>
               i.id === id ? { ...i, progress: 100, status: "processando" as const, etaSeconds: 0 } : i,
@@ -129,7 +172,7 @@ export default function NewProjectPage() {
       }, 700);
       timersRef.current.set(id, timer);
     },
-    [updateItem],
+    [updateItem, finalizeUpload],
   );
 
   async function addFiles(files: FileList | File[]) {
@@ -152,6 +195,8 @@ export default function NewProjectPage() {
       // Real flow: presigned chunk URLs from the API (MinIO multipart upload).
       const { uploadId, chunkSize } = await api.uploadInit(file.name, file.size, file.type);
       void chunkSize;
+      // Keep the real File so we can persist it to IndexedDB on completion.
+      filesRef.current.set(uploadId, file);
       const item: QueueItem = {
         id: uploadId,
         kind: "upload",
@@ -182,26 +227,42 @@ export default function NewProjectPage() {
     const timer = timersRef.current.get(id);
     if (timer) clearInterval(timer);
     timersRef.current.delete(id);
+    filesRef.current.delete(id);
     setQueue((q) => q.filter((i) => i.id !== id));
   }
 
   async function fetchPreview() {
-    const valid = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be|twitch\.tv|vimeo\.com)\/.+/i.test(url);
-    if (!valid) {
-      setUrlError("Cole um link válido do YouTube, Twitch ou Vimeo.");
+    const trimmed = url.trim();
+    const isDirect = DIRECT_VIDEO_RE.test(trimmed);
+    const validPlatform = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be|twitch\.tv|vimeo\.com)\/.+/i.test(trimmed);
+    if (!isDirect && !validPlatform) {
+      setUrlError("Cole um link do YouTube, Twitch, Vimeo ou um link direto .mp4/.webm.");
       return;
     }
     setUrlError(undefined);
     setPreviewLoading(true);
     setPreview(null);
+    setPreviewIsDirect(isDirect);
     try {
-      const p = await api.urlPreview(url);
-      setPreview(p);
-      // Suggest the maximum available resolution by default.
-      const max = [...p.availableResolutions].sort(
-        (a, b) => parseInt(b) - parseInt(a),
-      )[0];
-      setQuality(max);
+      if (isDirect) {
+        // Direct video: read real duration + poster in the browser (no backend).
+        const probe = await probeVideoSrc(trimmed);
+        const filename = trimmed.split("/").pop()?.split("?")[0] ?? "Vídeo";
+        setPreview({
+          title: filename.replace(/\.[a-z0-9]+$/i, "") || "Vídeo importado",
+          channel: "Link direto (.mp4/.webm)",
+          durationSeconds: probe.durationSeconds,
+          thumbnailUrl: probe.posterDataUrl ?? svgThumb(filename, "tecnologia"),
+          availableResolutions: ["1080p"] as Resolution[],
+        });
+        setQuality("1080p");
+      } else {
+        const p = await api.urlPreview(trimmed);
+        setPreview(p);
+        // Suggest the maximum available resolution by default.
+        const max = [...p.availableResolutions].sort((a, b) => parseInt(b) - parseInt(a))[0];
+        setQuality(max);
+      }
     } catch {
       setUrlError("Não conseguimos ler este link. Verifique se o vídeo é público.");
     } finally {
@@ -213,8 +274,15 @@ export default function NewProjectPage() {
     if (!preview) return;
     setImporting(true);
     try {
-      const project = await api.importUrl(url, quality);
-      const fakeSize = preview.durationSeconds * 2.2 * 1024 * 1024;
+      const trimmed = url.trim();
+      const project = previewIsDirect
+        ? await api.importDirectUrl(trimmed, quality, {
+            title: preview.title,
+            durationSeconds: preview.durationSeconds,
+            thumbnailUrl: preview.thumbnailUrl,
+          })
+        : await api.importUrl(trimmed, quality);
+      const fakeSize = Math.max(1, preview.durationSeconds) * 2.2 * 1024 * 1024;
       const item: QueueItem = {
         id: uid(),
         kind: "url",
@@ -230,8 +298,14 @@ export default function NewProjectPage() {
       setQueue((q) => [item, ...q]);
       startSimulation(item.id, "url", fakeSize, preview.title);
       setPreview(null);
+      setPreviewIsDirect(false);
       setUrl("");
-      toast("Importação iniciada", { description: `Baixando em ${quality} via yt-dlp.`, variant: "info" });
+      toast(previewIsDirect ? "Vídeo direto importado" : "Importação iniciada", {
+        description: previewIsDirect
+          ? "Link pronto — abra o projeto para editar com o vídeo real."
+          : `Baixar e transcodar em ${quality} exige o backend conectado. O projeto foi criado, mas a reprodução do vídeo real não está disponível no modo demo.`,
+        variant: "info",
+      });
     } catch {
       toast("Falha ao iniciar a importação", { variant: "error" });
     } finally {
@@ -328,8 +402,8 @@ export default function NewProjectPage() {
         <CardContent className="space-y-4">
           <div className="flex flex-col gap-2 sm:flex-row">
             <Input
-              label="URL do vídeo (YouTube, Twitch ou Vimeo)"
-              placeholder="https://youtube.com/watch?v=..."
+              label="URL do vídeo (YouTube, Twitch, Vimeo ou link direto .mp4/.webm)"
+              placeholder="https://youtube.com/watch?v=...  ou  https://.../video.mp4"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && fetchPreview()}
@@ -435,7 +509,7 @@ export default function NewProjectPage() {
                   )}
                   {item.status === "concluído" && item.projectId ? (
                     <Link
-                      href={`/app/projetos/${item.projectId}`}
+                      href={`/app/projeto?id=${item.projectId}`}
                       className="shrink-0 rounded-xl border border-line px-3 py-1.5 text-xs font-medium text-zinc-200 hover:border-violet-500/50 hover:text-white"
                     >
                       Abrir projeto

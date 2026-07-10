@@ -7,6 +7,7 @@
 
 import { create } from "zustand";
 import type { CaptionPresetId, Cut } from "@/lib/types";
+import { getMediaObjectUrl } from "@/lib/media-store";
 import {
   DEFAULT_ADJUSTMENT,
   DEFAULT_ANIMATED_TEXT,
@@ -138,8 +139,14 @@ interface EditorState {
   // Transient preview-overlay UI (outside history, like playback state).
   overlayMode: "none" | "reframe" | "masks";
   selectedMaskId: string | null;
+  // Resolved playable media URL for the loaded cut (real video), or null for
+  // demo/mock cuts with no media (→ gradient placeholder). Outside history.
+  mediaUrl: string | null;
+  /** Object URL we created (must be revoked). Null when mediaUrl is a direct URL. */
+  ownedObjectUrl: string | null;
 
   loadCut: (cut: Cut) => void;
+  revokeMedia: () => void;
   apply: (patch: Partial<EditorDoc>) => void;
   undo: () => void;
   redo: () => void;
@@ -263,8 +270,19 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   versions: [],
   overlayMode: "none",
   selectedMaskId: null,
+  mediaUrl: null,
+  ownedObjectUrl: null,
 
-  loadCut: (cut) =>
+  loadCut: (cut) => {
+    // Free any object URL from a previously-loaded cut before switching.
+    const prevOwned = get().ownedObjectUrl;
+    if (prevOwned && typeof URL !== "undefined") {
+      try {
+        URL.revokeObjectURL(prevOwned);
+      } catch {
+        /* ignore */
+      }
+    }
     set({
       cut,
       doc: {
@@ -280,6 +298,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       savedAt: new Date().toISOString(),
       overlayMode: "none",
       selectedMaskId: null,
+      // Direct URL is playable immediately; an IndexedDB blob resolves async below.
+      mediaUrl: cut.mediaUrl ?? null,
+      ownedObjectUrl: null,
       versions: [
         {
           label: "Versão inicial (sugestão da IA)",
@@ -287,7 +308,36 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           doc: DEFAULT_DOC,
         },
       ],
-    }),
+    });
+    // Resolve a locally-stored blob (IndexedDB) into an object URL.
+    if (!cut.mediaUrl && cut.mediaId) {
+      void getMediaObjectUrl(cut.mediaId).then((url) => {
+        if (!url) return;
+        // Ignore if the user already navigated to a different cut.
+        if (get().cut?.id !== cut.id) {
+          try {
+            URL.revokeObjectURL(url);
+          } catch {
+            /* ignore */
+          }
+          return;
+        }
+        set({ mediaUrl: url, ownedObjectUrl: url });
+      });
+    }
+  },
+
+  revokeMedia: () => {
+    const owned = get().ownedObjectUrl;
+    if (owned && typeof URL !== "undefined") {
+      try {
+        URL.revokeObjectURL(owned);
+      } catch {
+        /* ignore */
+      }
+    }
+    set({ mediaUrl: null, ownedObjectUrl: null });
+  },
 
   apply: (patch) =>
     set((s) => ({

@@ -7,6 +7,8 @@ import Link from "next/link";
 import { Search, Trash2 } from "lucide-react";
 import * as api from "@/lib/api";
 import { MOCK_NOW } from "@/lib/mock-data";
+import { deleteUserProject } from "@/lib/session-scope";
+import { deleteMedia } from "@/lib/media-store";
 import type { Project } from "@/lib/types";
 import { cn, formatDuration, timeAgo } from "@/lib/utils";
 import { toast } from "@/store/toast";
@@ -64,6 +66,10 @@ export default function ProjectsPage() {
     setDeleting(true);
     try {
       await api.deleteProject(confirmDelete.id);
+      // Client-side persistence: drop the project + its cuts and free the
+      // IndexedDB video blobs they referenced (no-op for the demo seed).
+      const mediaIds = deleteUserProject(confirmDelete.id);
+      await Promise.all(mediaIds.map((mid) => deleteMedia(mid)));
       setProjects((prev) => (prev ?? []).filter((p) => p.id !== confirmDelete.id));
       toast("Projeto excluído", { description: `"${confirmDelete.title}" e seus cortes foram removidos.` });
     } catch {
@@ -153,7 +159,7 @@ export default function ProjectsPage() {
                 key={p.id}
                 className="group relative overflow-hidden rounded-2xl border border-line bg-surface-1 shadow-card transition-all hover:-translate-y-0.5 hover:border-violet-500/40"
               >
-                <Link href={`/app/projetos/${p.id}`} className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400">
+                <Link href={`/app/projeto?id=${p.id}`} className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400">
                   <div className="relative aspect-video overflow-hidden">
                     <img src={p.thumbnailUrl} alt="" className="h-full w-full object-cover transition-transform group-hover:scale-[1.03]" />
                     <span className="absolute bottom-2 right-2 rounded-md bg-black/70 px-1.5 py-0.5 text-[11px] text-white">
