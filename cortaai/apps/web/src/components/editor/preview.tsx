@@ -134,6 +134,45 @@ export function EditorPreview() {
   const activeWords = cut.transcript.filter((w) => Math.abs(w.start - absTime) < 1.6).slice(0, 5);
   const captionText = activeWords.length > 0 ? activeWords.map((w) => w.word).join(" ") : "Sua legenda aparece aqui";
 
+  // --- caption controls (wired to the preview) ---
+  const displayCaption = doc.captionStyle.censorProfanity
+    ? captionText.replace(/\b(merda|porra|caralho)\b/gi, "****")
+    : captionText;
+  const captionAnim = doc.captionStyle.animation;
+  const karaoke = captionAnim === "karaokê";
+  // Entrance animation class (not for presets that own their own animation).
+  const captionEntranceClass =
+    ["typewriter", "gradientAnimated"].includes(doc.captionPreset)
+      ? ""
+      : captionAnim === "pop"
+        ? "cap-anim-pop"
+        : captionAnim === "slide"
+          ? "cap-anim-slide"
+          : "";
+  const HIGHLIGHT_ACCENT = "#fde047"; // números / CAPS / palavras-chave
+  const KEYWORD_SET = new Set([
+    "nunca", "sempre", "agora", "segredo", "erro", "grátis", "gratis", "novo",
+    "atenção", "atencao", "importante", "hoje", "melhor", "pior",
+  ]);
+  const isKeyword = (raw: string): boolean => {
+    const w = raw.replace(/[^0-9A-Za-zÀ-ÿ]/g, "");
+    if (!w) return false;
+    if (/\d/.test(w)) return true;
+    if (w.length > 1 && w === w.toUpperCase() && /[A-Za-zÀ-ÿ]/.test(w)) return true;
+    return KEYWORD_SET.has(w.toLowerCase());
+  };
+  const captionWords = displayCaption.split(/\s+/).filter(Boolean);
+  const captionAsWords = doc.captionStyle.highlightKeywords || karaoke;
+
+  // --- layer transition affordance at segment boundaries ---
+  const segTransition = doc.layers.transition;
+  const nearBoundary =
+    segTransition !== "nenhuma"
+      ? doc.splits.find((b) => Math.abs(currentTime - b) < 0.45) ?? null
+      : null;
+  const transiClass =
+    segTransition === "zoom" ? "transi-zoom" : segTransition === "slide" ? "transi-slide" : "transi-whip";
+
   const previewHeight = 420;
   const previewWidth = Math.round(previewHeight * aspect.ratio);
 
@@ -369,11 +408,13 @@ export function EditorPreview() {
 
         {/* Caption preview */}
         <p
+          key={`cap-${captionAnim}-${displayCaption}`}
           className={cn(
             "absolute inset-x-3 text-center leading-tight transition-all",
             captionDef.previewClass,
             doc.captionPreset === "typewriter" && "caption-typewriter mx-auto w-fit max-w-full",
             doc.captionPreset === "gradientAnimated" && "caption-gradient-animated",
+            captionEntranceClass,
             doc.captionStyle.position === "topo" && "top-[22%]",
             doc.captionStyle.position === "centro" && "top-1/2 -translate-y-1/2",
             doc.captionStyle.position === "rodapé" && "bottom-[22%]",
@@ -386,7 +427,21 @@ export function EditorPreview() {
             WebkitTextStroke: doc.captionStyle.outline ? "1px rgba(0,0,0,0.9)" : undefined,
           }}
         >
-          {doc.captionStyle.censorProfanity ? captionText.replace(/\b(merda|porra|caralho)\b/gi, "****") : captionText}
+          {captionAsWords
+            ? captionWords.map((w, i) => (
+                <span
+                  key={i}
+                  className={cn(karaoke && "cap-kara")}
+                  style={{
+                    animationDelay: karaoke ? `${i * 0.12}s` : undefined,
+                    color: doc.captionStyle.highlightKeywords && isKeyword(w) ? HIGHLIGHT_ACCENT : undefined,
+                  }}
+                >
+                  {i > 0 ? " " : ""}
+                  {w}
+                </span>
+              ))
+            : displayCaption}
         </p>
 
         {/* Watermark (keyframeable) */}
@@ -532,6 +587,16 @@ export function EditorPreview() {
               shape={m.shape}
             />
           ))}
+
+        {/* Transição entre segmentos — afordância breve ao cruzar um corte */}
+        {nearBoundary != null && (
+          <div key={`transi-${nearBoundary}`} className="pointer-events-none absolute inset-0 z-[16]" aria-hidden>
+            <div className={cn("absolute inset-0 bg-black/25", transiClass)} />
+            <span className="absolute left-1/2 top-2 -translate-x-1/2 rounded-md bg-black/70 px-2 py-0.5 text-[10px] font-semibold text-cyan-200 backdrop-blur">
+              transição · {segTransition}
+            </span>
+          </div>
+        )}
 
         {/* Play/pause overlay */}
         <button

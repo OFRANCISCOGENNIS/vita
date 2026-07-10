@@ -132,7 +132,7 @@ export function CutCard({ cut: initial }: { cut: Cut }) {
           {!regenerating && <RefreshCw className="h-3.5 w-3.5" aria-hidden />} Regenerar
         </Button>
         <Link
-          href={`/app/capa/${cut.id}`}
+          href={`/app/capa/editor?cut=${cut.id}`}
           aria-label="Criar capa deste corte"
           title="Estúdio de Capa"
           className="inline-flex h-8 w-8 items-center justify-center rounded-xl text-zinc-300 transition-colors hover:bg-white/5 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"

@@ -253,6 +253,30 @@ input[type="range"]::-moz-range-thumb {
 .at-loop { animation-iteration-count: infinite; }
 
 /* ---------------------------------------------------------------------------
+   Caption entrance animations (editor: legenda → "Animação de entrada").
+   Applied to the caption element/words; keyed on the text so each new caption
+   replays. Karaokê staggers a pop per word via inline animation-delay.
+   --------------------------------------------------------------------------- */
+@keyframes cap-anim-pop {
+  0% { transform: scale(0.6); opacity: 0; }
+  60% { transform: scale(1.08); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.cap-anim-pop { animation: cap-anim-pop 0.45s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+@keyframes cap-anim-slide {
+  0% { transform: translateY(45%); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+.cap-anim-slide { animation: cap-anim-slide 0.4s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+@keyframes cap-kara {
+  0% { transform: translateY(20%) scale(0.9); opacity: 0.25; }
+  100% { transform: translateY(0) scale(1); opacity: 1; }
+}
+.cap-kara { display: inline-block; animation: cap-kara 0.3s ease both; }
+
+/* ---------------------------------------------------------------------------
    LIGHT THEME REMAP — components use flat dark-only utilities (text-white,
    text-zinc-*, bg-white/*, ...) with no dark: variants. Under data-theme=light
    we remap the ink scale + white-alpha decorations so everything stays legible.

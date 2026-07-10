@@ -281,7 +281,7 @@ export default function Editor({ cutId }: { cutId: string }) {
         </div>
 
         <Link
-          href={`/app/capa/${cut.id}`}
+          href={`/app/capa/editor?cut=${cut.id}`}
           className="inline-flex h-10 items-center gap-2 rounded-xl border border-line bg-surface-3 px-4 text-sm font-medium text-zinc-100 transition-colors hover:bg-zinc-700/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
         >
           <ImageIcon className="h-4 w-4" aria-hidden />

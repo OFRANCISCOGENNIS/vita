@@ -9,7 +9,7 @@ const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 /** Absolute URL to open a cut in the editor. */
 export function cutShareUrl(cutId: string): string {
   const origin = typeof window !== "undefined" ? window.location.origin : "https://cortaai.com.br";
-  return `${origin}${BASE_PATH}/app/editor/${cutId}`;
+  return `${origin}${BASE_PATH}/app/editor?cut=${cutId}`;
 }
 
 /** Share caption: title + hashtags. */

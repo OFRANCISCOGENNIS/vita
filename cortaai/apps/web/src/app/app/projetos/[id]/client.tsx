@@ -99,12 +99,15 @@ export default function ProjectDetailPage({ id: propId }: { id?: string } = {}) 
   async function handleGenerate() {
     setGenerating(true);
     try {
-      const { jobId } = await api.generateCuts(id, mode, aggressiveness, count);
-      toast("Geração de cortes iniciada", {
-        description: `Modo "${CUT_MODES.find((m) => m.id === mode)?.name}", agressividade ${aggressiveness}/5, até ${count} cortes (job ${jobId.slice(0, 8)}).`,
+      await api.generateCuts(id, mode, aggressiveness, count);
+      // Refresh the grid so the freshly generated cuts appear right away.
+      const fresh = await api.getProjectCuts(id);
+      setCuts(fresh);
+      toast("Cortes gerados", {
+        description: `Modo "${CUT_MODES.find((m) => m.id === mode)?.name}", agressividade ${aggressiveness}/5, até ${count} cortes. Seleção simulada — a IA real de cortes exige o backend conectado.`,
       });
     } catch {
-      toast("Falha ao iniciar a geração", { variant: "error" });
+      toast("Falha ao gerar os cortes", { variant: "error" });
     } finally {
       setGenerating(false);
     }

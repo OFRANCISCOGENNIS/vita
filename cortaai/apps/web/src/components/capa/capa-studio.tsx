@@ -209,6 +209,17 @@ export function CapaStudio({ cutId }: { cutId: string }) {
     toast(`Salvo como opção ${slot}`, { variant: "info" });
   }
 
+  /** Download a saved A/B slot (full-res PNG data URL) as a file. */
+  function downloadSlot(slot: "A" | "B", dataUrl: string) {
+    const a = document.createElement("a");
+    a.href = dataUrl;
+    a.download = `capa-${cutId.slice(0, 8)}-opcao-${slot}.png`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    toast(`Opção ${slot} baixada como PNG`);
+  }
+
   // Pointer drag for a text/sticker handle (updates normalized position).
   function dragHandle(e: ReactPointerEvent, get: () => { x: number; y: number }, set: (x: number, y: number) => void) {
     e.preventDefault();
@@ -274,7 +285,7 @@ export function CapaStudio({ cutId }: { cutId: string }) {
     <div className="mx-auto max-w-6xl">
       <div className="mb-5 flex items-center gap-3">
         <Link
-          href={`/app/editor/${cut.id}`}
+          href={`/app/editor?cut=${cut.id}`}
           className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-sm text-zinc-400 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
         >
           <ArrowLeft className="h-4 w-4" aria-hidden /> Editor
@@ -375,17 +386,28 @@ export function CapaStudio({ cutId }: { cutId: string }) {
                       <>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={entry.dataUrl} alt={`Opção ${slot}`} className="mb-2 max-h-40 w-full rounded-lg object-contain" />
-                        <Button
-                          size="sm"
-                          variant={chosen === slot ? "primary" : "outline"}
-                          className="w-full"
-                          onClick={() => {
-                            setChosen(slot);
-                            toast(`Opção ${slot} escolhida como capa`);
-                          }}
-                        >
-                          Escolher {slot}
-                        </Button>
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant={chosen === slot ? "primary" : "outline"}
+                            className="flex-1"
+                            onClick={() => {
+                              setChosen(slot);
+                              toast(`Opção ${slot} escolhida como capa`);
+                            }}
+                          >
+                            Escolher {slot}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            aria-label={`Baixar opção ${slot}`}
+                            title="Baixar esta opção"
+                            onClick={() => downloadSlot(slot, entry.dataUrl)}
+                          >
+                            <Download className="h-3.5 w-3.5" aria-hidden />
+                          </Button>
+                        </div>
                       </>
                     ) : (
                       <div className="flex h-40 items-center justify-center rounded-lg bg-surface-2 text-xs text-zinc-600">

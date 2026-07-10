@@ -67,7 +67,7 @@ export default function CapaIndexPage() {
           {cuts.map((c) => (
             <Link
               key={c.id}
-              href={`/app/capa/${c.id}`}
+              href={`/app/capa/editor?cut=${c.id}`}
               className="group flex flex-col rounded-2xl border border-line bg-surface-1 p-4 shadow-card transition-all hover:-translate-y-0.5 hover:border-violet-500/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
             >
               <div className="flex items-center gap-2 text-xs text-zinc-500">

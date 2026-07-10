@@ -532,16 +532,101 @@ export async function deleteProject(id: string): Promise<void> {
   return request(`/projects/${id}`, () => undefined, { method: "DELETE" });
 }
 
+// Magnetic pt-BR headlines used to seed simulated cut suggestions. Real cut
+// selection needs the connected backend (transcription + multimodal analysis);
+// these give the demo/offline flow believable, editable cuts.
+const MAGNETIC_TITLES = [
+  "O erro que 90% cometem sem perceber",
+  "Ninguém te contou isso antes",
+  "O segredo que mudou tudo pra mim",
+  "Faça isso antes de desistir",
+  "3 sinais que você não pode ignorar",
+  "A verdade que ninguém quer ouvir",
+  "Isso vai mudar sua forma de pensar",
+  "O momento exato em que o jogo virou",
+  "Pare de fazer isso agora mesmo",
+  "O que aprendi da forma mais difícil",
+  "Todo mundo erra nessa parte",
+  "O detalhe que faz toda a diferença",
+  "Como sair do zero em tempo recorde",
+  "A pergunta que travou todo mundo",
+  "Guarde este corte pra depois",
+  "Você faria diferente? Comenta aí",
+  "O gancho perfeito começa assim",
+  "Não pule os primeiros 3 segundos",
+  "A parte que ninguém esperava",
+  "Isso aqui viralizou por um motivo",
+];
+
+const GENERATED_HASHTAGS = ["#cortaai", "#viral", "#shorts", "#reels", "#fyp", "#brasil"];
+
+/** Builds N believable suggested Cuts spanning the project's media (simulated). */
+function buildGeneratedCuts(project: Project, mode: CutMode, count: number): Cut[] {
+  const n = Math.max(1, Math.min(20, Math.round(count || 1)));
+  const total = project.durationSeconds > 0 ? project.durationSeconds : n * 45;
+  const seg = total / n;
+  const clipLen = Math.max(8, Math.min(seg, 60));
+  const rnd = () => 55 + Math.floor(Math.random() * 44); // 55-98
+  return Array.from({ length: n }, (_, i) => {
+    const start = Math.round(i * seg);
+    const end = Math.min(total, Math.round(start + clipLen));
+    const title = MAGNETIC_TITLES[(i * 3) % MAGNETIC_TITLES.length];
+    const alt1 = MAGNETIC_TITLES[(i * 3 + 1) % MAGNETIC_TITLES.length];
+    const alt2 = MAGNETIC_TITLES[(i * 3 + 2) % MAGNETIC_TITLES.length];
+    const score = rnd();
+    return {
+      id: uid(),
+      projectId: project.id,
+      title,
+      titleOptions: [title, alt1, alt2],
+      description: `Corte gerado de "${project.title}".`,
+      hashtags: GENERATED_HASHTAGS.slice(0, 3 + (i % 3)),
+      startSeconds: start,
+      endSeconds: end > start ? end : start + clipLen,
+      viralScore: score,
+      scoreBreakdown: { hook: rnd(), retention: rnd(), emotion: rnd(), nicheFit: rnd() },
+      transcript: [],
+      mode,
+      suggestedSound: {
+        track: "Trilha em alta (sugestão)",
+        reason: "casa com o ritmo do corte",
+        trendVideoId: "",
+      },
+      bestPostTime: ["seg 19h", "ter 12h", "qua 20h", "qui 18h", "sex 21h"][i % 5],
+      status: "suggested" as const,
+      editState: null,
+      createdAt: new Date().toISOString(),
+      ...(project.mediaId ? { mediaId: project.mediaId } : {}),
+      ...(project.mediaUrl ? { mediaUrl: project.mediaUrl } : {}),
+    } satisfies Cut;
+  });
+}
+
 export async function generateCuts(
   projectId: string,
   mode: CutMode,
   aggressiveness: number,
   count: number,
 ): Promise<{ jobId: string }> {
-  return request(`/projects/${projectId}/generate-cuts`, () => ({ jobId: uid() }), {
-    method: "POST",
-    body: JSON.stringify({ mode, aggressiveness, count }),
-  });
+  return request(
+    `/projects/${projectId}/generate-cuts`,
+    () => {
+      // Mock generation: for a real (non-demo) user, actually create + persist
+      // the cuts so they show up in the project grid and Biblioteca. The demo
+      // account keeps its curated seed cuts untouched.
+      if (!isDemoSession()) {
+        const project =
+          readUserData().projects.find((p) => p.id === projectId) ??
+          mockProjects.find((p) => p.id === projectId);
+        if (project) buildGeneratedCuts(project, mode, count).forEach(addUserCut);
+      }
+      return { jobId: uid() };
+    },
+    {
+      method: "POST",
+      body: JSON.stringify({ mode, aggressiveness, count }),
+    },
+  );
 }
 
 export async function getProjectCuts(projectId: string): Promise<Cut[]> {
@@ -877,6 +962,33 @@ export async function studioEffectTemplates(): Promise<{ templates: EffectTempla
   return request(`/studio/effect-templates`, () => ({ templates: mockEffectTemplates }));
 }
 
+// Stable id for the per-user "Estúdio IA" library project that collects cuts
+// created from studio generations, so they surface in Biblioteca (which lists
+// cuts grouped by the user's projects).
+const STUDIO_PROJECT_ID = "studio-ia-library";
+
+/** Ensure the current (non-demo) user has an "Estúdio IA" project; returns it. */
+function ensureStudioProject(): Project {
+  const existing = readUserData().projects.find((p) => p.id === STUDIO_PROJECT_ID);
+  if (existing) return existing;
+  const project: Project = {
+    ...mockProjects[1],
+    id: STUDIO_PROJECT_ID,
+    userId: mockUser.id,
+    title: "Estúdio IA",
+    sourceType: "upload" as const,
+    sourceUrl: null,
+    originalFilename: null,
+    durationSeconds: 0,
+    status: "ready" as const,
+    thumbnailUrl: svgThumb("Estúdio IA", "tecnologia"),
+    storageKey: `studio/${STUDIO_PROJECT_ID}`,
+    createdAt: new Date().toISOString(),
+  };
+  addUserProject(project);
+  return project;
+}
+
 /** Cria um Cut a partir de uma geração (integra com editor/biblioteca). */
 export async function studioGenerationToCut(
   generationId: string,
@@ -885,17 +997,51 @@ export async function studioGenerationToCut(
   return request(
     `/studio/generations/${generationId}/to-cut`,
     () => {
-      // Mock: reuse an existing loadable cut id so the editor opens cleanly
-      // in offline/demo mode. In production this returns a brand-new Cut.
-      const base = mockCuts[0];
-      return {
-        ...base,
-        projectId: projectId ?? base.projectId,
-        title: "Geração do Estúdio IA",
-        status: "suggested" as const,
+      const gen =
+        (isDemoSession() ? mockGenerations : readUserData().generations).find(
+          (g) => g.id === generationId,
+        ) ?? null;
+      const title = gen?.prompt?.trim() ? gen.prompt.trim().slice(0, 70) : "Geração do Estúdio IA";
+
+      // Demo: reuse an existing loadable cut id so the editor opens cleanly and
+      // the seed library stays curated (demo data is read-only by design).
+      if (isDemoSession()) {
+        return {
+          ...mockCuts[0],
+          projectId: projectId ?? mockCuts[0].projectId,
+          title,
+          status: "suggested" as const,
+          editState: null,
+          createdAt: new Date().toISOString(),
+        };
+      }
+
+      // Real user: build a brand-new Cut and persist it so it appears in the
+      // editor (via ?cut=<id>) and in Biblioteca (under the Estúdio IA project).
+      const proj = ensureStudioProject();
+      const dur = gen?.durationSeconds && gen.durationSeconds > 0 ? gen.durationSeconds : 5;
+      const cut: Cut = {
+        id: uid(),
+        projectId: projectId ?? proj.id,
+        title,
+        titleOptions: [title],
+        description: gen?.prompt ?? "",
+        hashtags: ["#cortaai", "#estudioia"],
+        startSeconds: 0,
+        endSeconds: dur,
+        viralScore: 0,
+        scoreBreakdown: { hook: 0, retention: 0, emotion: 0, nicheFit: 0 },
+        transcript: [],
+        mode: "manual",
+        suggestedSound: { track: "Sem trilha", reason: "adicione uma trilha no editor", trendVideoId: "" },
+        bestPostTime: "—",
+        status: "suggested",
         editState: null,
         createdAt: new Date().toISOString(),
+        ...(gen?.resultUrl ? { mediaUrl: gen.resultUrl } : {}),
       };
+      addUserCut(cut);
+      return cut;
     },
     { method: "POST", body: JSON.stringify({ projectId: projectId ?? null }) },
   );
