@@ -70,6 +70,12 @@ export function EditorPreview() {
   // --- real <video> playback (local upload / direct URL) ---------------------
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [muted, setMuted] = useState(true);
+  // When the browser can't decode the file (e.g. HEVC/H.265 from some phones),
+  // surface a clear message instead of a silent black frame.
+  const [mediaError, setMediaError] = useState(false);
+  useEffect(() => {
+    setMediaError(false);
+  }, [mediaUrl]);
   const hasVideo = !!mediaUrl && !doc.chroma.enabled;
   const startSeconds = cut?.startSeconds ?? 0;
   const endSeconds = cut?.endSeconds ?? 0;
@@ -263,6 +269,7 @@ export function EditorPreview() {
                   setPlaying(false);
                   seek(Math.max(0, endSeconds - startSeconds));
                 }}
+                onError={() => setMediaError(true)}
                 aria-hidden
               />
             ) : (
@@ -279,6 +286,20 @@ export function EditorPreview() {
                     playing && doc.layers.autoZoomPunch && "scale-110",
                   )}
                 />
+              </div>
+            )}
+            {mediaError && (
+              <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 bg-black/85 px-6 text-center">
+                <div className="text-3xl">🎞️</div>
+                <p className="text-sm font-semibold text-white">
+                  Não foi possível reproduzir este vídeo
+                </p>
+                <p className="max-w-xs text-xs leading-relaxed text-zinc-400">
+                  O navegador não conseguiu decodificar o formato/codec deste
+                  arquivo (ex.: HEVC/H.265 de alguns celulares). Tente exportar/
+                  converter para <span className="text-white">MP4 (H.264)</span> e
+                  subir de novo.
+                </p>
               </div>
             )}
           </div>
