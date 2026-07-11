@@ -872,11 +872,9 @@ function calcularGrade(dir) {
 
 // ---- FUNIL DE QUALIDADE ----
 // Materializa a cadeia de assertividade: 6 elos que precisam fechar juntos para
-// o sinal atual merecer dinheiro. Cada elo vira um chip ✓/✕ (tooltip explica o
-// que falta). Elo cinza (·) = ainda sem dado para julgar.
-function renderFunilQualidade(riscoNoticia) {
-    const box = document.getElementById('qualityFunnel');
-    if (!box || !confLive.fatores || !dados.length) return;
+// o sinal atual merecer dinheiro. avaliarFunil devolve os dados (usados também
+// pelo Registro e pelo Modo Sniper); renderFunilQualidade desenha os chips.
+function avaliarFunil(riscoNoticia) {
     const cl = confLive;
     const dir = cl.long >= cl.short ? 1 : -1;
     const dom = Math.max(cl.long, cl.short), en = cl.enabled || 1;
@@ -911,21 +909,28 @@ function renderFunilQualidade(riscoNoticia) {
     const payout = Math.max(0.01, (parseFloat(document.getElementById('payout').value) || 87) / 100);
     const execOk = razao >= 1 && razao <= 6 && payout >= 0.8;
 
+    const okCount = [regimeOk, confOk, portoesOk, evidOk, calibOk, execOk].filter(x => x === true).length;
+    return { okCount, dir, dom, en, g, reg, regimeOk, confOk, htfOk, srOk, portoesOk, evidOk, calibOk, execOk, razao, payout, riscoNoticia, sessaoForte: cl.sessaoForte, sessao: cl.sessao };
+}
+
+function renderFunilQualidade(riscoNoticia) {
+    const box = document.getElementById('qualityFunnel');
+    if (!box || !confLive.fatores || !dados.length) return;
+    const f = avaliarFunil(riscoNoticia);
     const elo = (ok, rot, dica) => {
         const cls = ok === null ? 'funil-nd' : ok ? 'funil-ok' : 'funil-no';
         const ico = ok === null ? '·' : ok ? '✓' : '✕';
         return `<span class="funil-elo ${cls}" title="${dica}">${ico} ${rot}</span>`;
     };
-    const okCount = [regimeOk, confOk, portoesOk, evidOk, calibOk, execOk].filter(x => x === true).length;
-    const faltasPortoes = (htfOk ? '' : 'contra o TF maior · ') + (srOk ? '' : 'colado em S/R · ')
-        + (cl.sessaoForte ? '' : 'sessão fraca (' + cl.sessao + ') · ') + (riscoNoticia ? 'notícia próxima · ' : '');
-    box.innerHTML = `<span class="funil-titulo">Funil de qualidade <strong>${okCount}/6</strong></span>` +
-        elo(regimeOk, 'Regime', reg ? (regimeOk ? 'fatores casam com o regime ' + (REGIME_ROTULO[reg] || reg) : 'fatores não casam com o regime ' + (REGIME_ROTULO[reg] || reg) + ' — clique no preset 🎯 Auto') : 'regime indisponível') +
-        elo(confOk, 'Confluência', confOk ? dom + '/' + en + ' fatores a favor' : 'score fraco (' + dom + '/' + en + ') — espere ≥4 fatores ou 70%') +
-        elo(portoesOk, 'Portões', portoesOk ? 'HTF · S/R · sessão · notícia OK' : faltasPortoes) +
-        elo(evidOk, 'Evidência', g.pN >= 10 ? (evidOk ? 'edge LB ≥ 0 com ' + g.pN + ' ops' : 'sem edge no limite inferior (95%)') : 'amostra ' + (g.pN || 0) + ' ops — precisa ≥10 (rode a 🤖 IA)') +
-        elo(calibOk, 'Calibração', calibOk === null ? 'aguardando 3+ resultados reais no Registro' : calibOk ? 'previsão da IA dentro do placar real' : 'IA otimista vs placar real — reotimize') +
-        elo(execOk, 'Execução', 'expiração ' + expMinutes() + 'm ÷ TF ' + tfMinutes() + 'm = ' + razao.toFixed(1) + '× (ideal 1–6×) · payout ' + Math.round(payout * 100) + '% (mín. 80%)');
+    const faltasPortoes = (f.htfOk ? '' : 'contra o TF maior · ') + (f.srOk ? '' : 'colado em S/R · ')
+        + (f.sessaoForte ? '' : 'sessão fraca (' + f.sessao + ') · ') + (f.riscoNoticia ? 'notícia próxima · ' : '');
+    box.innerHTML = `<span class="funil-titulo">Funil de qualidade <strong>${f.okCount}/6</strong></span>` +
+        elo(f.regimeOk, 'Regime', f.reg ? (f.regimeOk ? 'fatores casam com o regime ' + (REGIME_ROTULO[f.reg] || f.reg) : 'fatores não casam com o regime ' + (REGIME_ROTULO[f.reg] || f.reg) + ' — clique no preset 🎯 Auto') : 'regime indisponível') +
+        elo(f.confOk, 'Confluência', f.confOk ? f.dom + '/' + f.en + ' fatores a favor' : 'score fraco (' + f.dom + '/' + f.en + ') — espere ≥4 fatores ou 70%') +
+        elo(f.portoesOk, 'Portões', f.portoesOk ? 'HTF · S/R · sessão · notícia OK' : faltasPortoes) +
+        elo(f.evidOk, 'Evidência', f.g.pN >= 10 ? (f.evidOk ? 'edge LB ≥ 0 com ' + f.g.pN + ' ops' : 'sem edge no limite inferior (95%)') : 'amostra ' + (f.g.pN || 0) + ' ops — precisa ≥10 (rode a 🤖 IA)') +
+        elo(f.calibOk, 'Calibração', f.calibOk === null ? 'aguardando 3+ resultados reais no Registro' : f.calibOk ? 'previsão da IA dentro do placar real' : 'IA otimista vs placar real — reotimize') +
+        elo(f.execOk, 'Execução', 'expiração ' + expMinutes() + 'm ÷ TF ' + tfMinutes() + 'm = ' + f.razao.toFixed(1) + '× (ideal 1–6×) · payout ' + Math.round(f.payout * 100) + '% (mín. 80%)');
 }
 
 function atualizarDecisao() {
@@ -1010,25 +1015,29 @@ function atualizarDecisao() {
         const ehEntrada = (verdictKey === 'CALL' || verdictKey === 'PUT') && !treino;
         const dirN = verdictKey === 'CALL' ? 1 : -1;
         if (ehEntrada) reanimar(v, 'v-flash');   // pulse do veredito na virada p/ CALL/PUT
-        // Selo A/B/C da virada — calculado uma vez, usado no registro e no filtro
-        // da notificação (que dispara só para as entradas de maior qualidade).
+        // Selo A/B/C e FUNIL da virada — calculados uma vez; o funil fica gravado
+        // na entrada para o placar por funil provar (ou desmentir) a qualidade.
         const gGrade = ehEntrada && dados.length ? calcularGrade(dirN).grade : null;
+        let fn = null;
+        if (ehEntrada && dados.length) { try { fn = avaliarFunil(riscoNoticia); } catch (e) { } }
         // Registro em tempo real: a virada do veredito para CALL/PUT entra na
-        // timeline do Registro de Entradas com o selo A/B/C do momento
+        // timeline do Registro de Entradas com o selo A/B/C e o funil do momento
         if (ehEntrada && dados.length) {
             const lbl = PARES_YAHOO[symbolAtual()] ? PARES_YAHOO[symbolAtual()].label : symbolAtual();
-            registrarEntrada(lbl, dirN, Math.max(long, short), enabled, { grade: gGrade, live: 1, exp: parseInt(document.getElementById('expiracao').value) || 5, sym: symbolAtual(), fonte: fonte() });
+            registrarEntrada(lbl, dirN, Math.max(long, short), enabled, { grade: gGrade, funil: fn ? fn.okCount : null, live: 1, exp: parseInt(document.getElementById('expiracao').value) || 5, sym: symbolAtual(), fonte: fonte() });
             renderRegistro();
         }
         if (document.getElementById('somAtivo').checked && !treino) {
             if (verdictKey === 'CALL') tocarSom(1);
             else if (verdictKey === 'PUT') tocarSom(-1);
         }
-        // Notificação de navegador — SÓ para entradas nível A (as de maior
-        // qualidade). Evita spam: as viradas B/C não notificam.
-        if (ehEntrada && gGrade === 'A') {
+        // Notificação de navegador — SÓ nível A; no 🎯 Modo Sniper, exige também
+        // funil ≥5 (o topo do topo — pouquíssimas, mas as melhores).
+        const sniperEl = document.getElementById('modoSniper');
+        const sniper = sniperEl && sniperEl.checked;
+        if (ehEntrada && gGrade === 'A' && (!sniper || (fn && fn.okCount >= 5))) {
             const lbl = PARES_YAHOO[symbolAtual()] ? PARES_YAHOO[symbolAtual()].label : symbolAtual();
-            notificar(`🅰 ${verdictKey === 'CALL' ? '▲ CALL' : '▼ PUT'} — ${lbl}`, `Entrada nível A · confluência ${Math.max(long, short)}/${enabled} · exp ${document.getElementById('expiracao').value}m`);
+            notificar(`🅰 ${verdictKey === 'CALL' ? '▲ CALL' : '▼ PUT'} — ${lbl}`, `Nível A${fn ? ' · funil ' + fn.okCount + '/6' : ''} · ${Math.max(long, short)}/${enabled} fatores · exp ${document.getElementById('expiracao').value}m`);
         }
         ultimoVerdictSom = verdictKey;
     }

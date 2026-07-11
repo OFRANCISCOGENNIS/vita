@@ -59,6 +59,7 @@ function renderRegistro() {
         return `<div class="reg-row"><span class="reg-hora">${fmtHora(r.t)}</span>` +
             `<span class="reg-par">${r.par}${r.live ? ' <span class="reg-tag" title="IA ao vivo">IA</span>' : ''}</span>` +
             (r.grade ? `<span class="reg-grade grade-${r.grade}">${r.grade}</span>` : '') +
+            (r.funil != null ? `<span class="reg-funil" title="funil de qualidade no momento da entrada">${r.funil}/6</span>` : '') +
             `<span class="${r.dir === 1 ? 'chip-dir-up' : 'chip-dir-down'}">${r.dir === 1 ? '▲ CALL' : '▼ PUT'} ${r.score}/${r.enabled}</span>${res}</div>`;
     }).join('') : '<div class="metric-empty" style="padding:10px 4px;">Sem entradas A/B ainda · desmarque o filtro p/ ver todas.</div>';
     atualizarCalibracaoIA();
@@ -130,6 +131,14 @@ function atualizarCalibracaoIA() {
         // não apenas perto do ponto — julga contra a incerteza, não contra a sorte.
         const dentro = cc.wr >= lb - 0.02;
         txt += ` · IA previu ${pctTxt(cc.wr)}${cc.wrLB != null ? ' (LB ' + pctTxt(cc.wrLB) + ')' : ''} <span class="${dentro ? 'chip-dir-up' : 'chip-dir-down'}">${dentro ? 'calibrada ✓' : 'otimista ⚠'}</span>`;
+    }
+    // Placar POR FUNIL: prova empírica de que funil alto acerta mais (ou avisa
+    // quando não está acontecendo — aí o funil precisa de ajuste).
+    const comFunil = res.filter(r => r.funil != null);
+    if (comFunil.length >= 4) {
+        const alto = comFunil.filter(r => r.funil >= 5), baixo = comFunil.filter(r => r.funil <= 4);
+        const wrDe = a => { const w = a.filter(r => r.resultado === 'WIN').length; return a.length ? `${Math.round(w / a.length * 100)}% (${w}/${a.length})` : '—'; };
+        txt += `<br>🎯 Funil ≥5: <strong>${wrDe(alto)}</strong> · funil ≤4: <strong>${wrDe(baixo)}</strong>`;
     }
     cal.innerHTML = txt;
 }

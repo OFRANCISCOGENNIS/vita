@@ -175,6 +175,47 @@ const notif = await p.evaluate(() => {
 check('notificação NÃO dispara em nível C', notif.aposC === 0, 'C=' + notif.aposC);
 check('notificação dispara em nível A', notif.aposA === 1, 'A=' + notif.aposA);
 
+// 7.51) Funil gravado por entrada + Modo Sniper + placar por funil
+const funReg = await p.evaluate(() => {
+  const chamadas = [];
+  window.notificar = (t) => chamadas.push(t);
+  const gStub = () => ({ grade: 'A', estrelas: 4, score: 85, motivos: [], regime: null, pEst: null, pLB: null, pN: 0, expOp: null, expOpLB: null, kelly: null });
+  const origG = window.calcularGrade, origF = window.avaliarFunil;
+  window.calcularGrade = gStub;
+  const base = { long: 6, short: 0, enabled: 6, minScore: 3, confMode: 'score', fatores: confLive.fatores || [] };
+  // funil baixo (3/6) + Sniper ligado → grava funil e NÃO notifica
+  window.avaliarFunil = () => ({ okCount: 3 });
+  document.getElementById('modoSniper').checked = true;
+  confLive = Object.assign({}, base); ultimoVerdictSom = 'WAIT'; atualizarDecisao();
+  const gravouBaixo = registro[registro.length - 1].funil === 3;
+  const bloqueou = chamadas.length === 0;
+  // funil alto (6/6) + Sniper → notifica com o funil no corpo
+  window.avaliarFunil = () => ({ okCount: 6 });
+  confLive = Object.assign({}, base); ultimoVerdictSom = 'WAIT'; atualizarDecisao();
+  const notificou = chamadas.length === 1;
+  const gravouAlto = registro[registro.length - 1].funil === 6;
+  document.getElementById('modoSniper').checked = false;
+  window.calcularGrade = origG; window.avaliarFunil = origF;
+  // placar por funil na calibração (mistura WIN/LOSS por nível)
+  registro = [
+    { t: 1, par: 'X', dir: 1, score: 6, enabled: 6, funil: 6, resultado: 'WIN' },
+    { t: 2, par: 'X', dir: 1, score: 6, enabled: 6, funil: 5, resultado: 'WIN' },
+    { t: 3, par: 'X', dir: -1, score: 4, enabled: 6, funil: 3, resultado: 'LOSS' },
+    { t: 4, par: 'X', dir: -1, score: 4, enabled: 6, funil: 2, resultado: 'LOSS' }
+  ];
+  atualizarCalibracaoIA();
+  const placar = document.getElementById('iaCalib').textContent;
+  const badge = !!document.querySelector('#registroBody') ; // badge testado via renderRegistro
+  document.getElementById('regSoA').checked = false; renderRegistro();
+  const temBadge = /\d\/6/.test(document.getElementById('registroBody').textContent);
+  return { gravouBaixo, bloqueou, notificou, gravouAlto, placarFunil: /Funil ≥5/.test(placar) && /100%/.test(placar) && /0%/.test(placar), temBadge };
+});
+check('entrada grava o funil (X/6) no Registro', funReg.gravouBaixo && funReg.gravouAlto, JSON.stringify(funReg));
+check('Modo Sniper bloqueia A com funil <5', funReg.bloqueou);
+check('Modo Sniper notifica A com funil ≥5', funReg.notificou);
+check('placar por funil: ≥5 = 100% · ≤4 = 0% (prova empírica)', funReg.placarFunil);
+check('badge do funil aparece nas linhas do Registro', funReg.temBadge);
+
 // 7.6) Performance: coalescência de ticks (várias chamadas → 1 recompute/frame)
 const coal = await p.evaluate(() => new Promise(resolve => {
   const orig = window.atualizarUltimoCandle;

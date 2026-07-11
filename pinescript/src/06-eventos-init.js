@@ -245,6 +245,11 @@ document.getElementById('regSoA').addEventListener('change', function () {
     localStorage.setItem('regSoA', this.checked ? '1' : '0');
     renderRegistro();
 });
+// 🎯 Modo Sniper: notificar só nível A com funil ≥5 (persistente)
+document.getElementById('modoSniper').addEventListener('change', function () {
+    localStorage.setItem('modoSniper', this.checked ? '1' : '0');
+    if (this.checked) showToast('🎯 Modo Sniper: só notifica A com funil ≥5', 'ok');
+});
 
 // ---- Presets de estratégia por regime (fatores + portões mais assertivos) ----
 // Baseados nos pesos por regime (PESOS_REGIME): tendencial premia tendência/
@@ -368,6 +373,7 @@ function iniciar() {
     aplicarTema(localStorage.getItem('tema') === 'light' ? 'light' : 'dark');
     document.getElementById('autoReopt').checked = localStorage.getItem('autoReopt') === '1';
     document.getElementById('regSoA').checked = localStorage.getItem('regSoA') !== '0';   // padrão: só nível A
+    document.getElementById('modoSniper').checked = localStorage.getItem('modoSniper') === '1';
     configurarCardsRecolhiveis();
     configurarAutoReopt();
     carregar();

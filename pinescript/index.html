@@ -246,6 +246,7 @@
                     <h3>🔔 Alertas</h3>
                     <label><input type="checkbox" id="somAtivo" checked> <span>Som quando o veredito virar CALL/PUT</span></label>
                     <label><input type="checkbox" id="notifAtivo"> <span>Notificação do navegador — só entradas <strong>nível A</strong> (aba em 2º plano)</span></label>
+                    <label><input type="checkbox" id="modoSniper"> <span>🎯 <strong>Modo Sniper</strong> — notificar só A com funil ≥5</span></label>
                     <button id="btnTestarSom" class="btn-mini" style="width:100%; margin-top:4px;">🔊 Testar som</button>
                     <button id="btnScan" class="btn-primary" style="margin-top:8px;">🔎 Escanear melhores entradas</button>
                     <button id="btnIA" class="btn-primary" style="margin-top:6px;">🤖 IA: otimizar parâmetros</button>
@@ -576,6 +577,7 @@
                             <li><strong>Expectativa/op</strong> — R$ esperado por R$1 arriscado (ajustado ao payout): acerto×payout − (1−acerto). É o número que decide se o setup dá lucro no longo prazo.</li>
                             <li><strong>Break-even</strong> — acerto mínimo pra empatar dado o payout (87% → 53,5%). Abaixo disso, expectativa negativa.</li>
                             <li>O selo <strong>A</strong> exige expectativa positiva <em>no LB</em> e amostra ≥ 10 ops; senão cai pra B (pouca evidência).</li>
+                            <li><strong>Prova por funil</strong>: cada entrada grava o funil (X/6) do momento; o placar mostra o acerto real de funil ≥5 vs ≤4 — evidência empírica de que qualidade alta paga. O <strong>🎯 Modo Sniper</strong> só notifica A com funil ≥5.</li>
                         </ul>
                     </section>
                     <section>
