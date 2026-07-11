@@ -1,14 +1,31 @@
 "use client";
 
-// Project detail: processing pipeline status, then the grid of suggested cuts
-// with cut-mode selector + AI aggressiveness slider + regenerate per cut.
+// Project detail: processing pipeline status, then the grid of suggested cuts.
+// Generation is grounded in REAL in-browser analysis (lib/video-analysis +
+// lib/smart-cuts): the first "Gerar cortes" opens the "Assistente de cortes"
+// questionnaire; answers persist per project and show as a compact chip row on
+// subsequent runs. After generating, an "Análise do vídeo" card shows the
+// energy curve with the detected peaks/scenes/silences.
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useParams } from "next/navigation";
-import { ArrowLeft, CheckCircle2, Circle, Loader2, Sparkles, Wand2 } from "lucide-react";
+import {
+  Activity,
+  ArrowLeft,
+  CheckCircle2,
+  Circle,
+  Loader2,
+  SlidersHorizontal,
+  Sparkles,
+  Wand2,
+} from "lucide-react";
 import * as api from "@/lib/api";
 import { CUT_MODES } from "@/lib/presets";
+import { readWizardAnswers, saveWizardAnswers, summaryChips, type WizardAnswers } from "@/lib/cut-wizard";
+import { getCachedProfile } from "@/lib/smart-cuts";
+import type { AnalysisProfile, AnalysisProgress } from "@/lib/video-analysis";
 import type { Cut, CutMode, Project } from "@/lib/types";
 import { cn, formatDuration } from "@/lib/utils";
 import { toast } from "@/store/toast";
@@ -16,9 +33,16 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Progress } from "@/components/ui/progress";
 import { Skeleton, SkeletonCard } from "@/components/ui/skeleton";
 import { Slider } from "@/components/ui/slider";
 import { CutCard } from "@/components/cut-card";
+import { CutWizardModal } from "@/components/cut-wizard-modal";
+
+const AnalysisChart = dynamic(
+  () => import("@/components/analysis-chart").then((m) => m.AnalysisChart),
+  { ssr: false, loading: () => <Skeleton className="h-[170px] w-full" /> },
+);
 
 const PIPELINE_STEPS: { id: Project["status"] | "done"; label: string }[] = [
   { id: "importing", label: "Importando o vídeo" },
@@ -64,6 +88,41 @@ function Pipeline({ status }: { status: Project["status"] }) {
   );
 }
 
+/** Post-generation proof card: real energy curve + detected features. */
+function AnalysisCard({ profile }: { profile: AnalysisProfile }) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>
+          <Activity className="mr-2 inline h-4 w-4 text-fuchsia-400" aria-hidden />
+          Análise do vídeo
+        </CardTitle>
+        <p className="mt-1 text-xs text-zinc-500">
+          {profile.synthetic
+            ? "Mídia indisponível no navegador — curva simulada (determinística) usada na seleção dos trechos."
+            : "Curva de energia do áudio calculada no seu navegador. Os pontos são os picos usados para escolher os cortes."}
+        </p>
+      </CardHeader>
+      <CardContent>
+        <AnalysisChart profile={profile} />
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Badge variant="accent">{profile.peaks.length} picos de energia</Badge>
+          <Badge variant="info">{profile.scenes.length} mudanças de cena</Badge>
+          <Badge variant="outline">{profile.silences.length} silêncios (pontos de corte)</Badge>
+          {!profile.synthetic && (
+            <Badge variant={profile.hasAudio ? "success" : "warning"}>
+              {profile.hasAudio ? "áudio analisado" : "vídeo sem áudio"}
+            </Badge>
+          )}
+        </div>
+        <p className="mt-3 text-[11px] text-zinc-600">
+          Títulos gerados por heurística — refine com IA real quando o backend estiver conectado.
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function ProjectDetailPage({ id: propId }: { id?: string } = {}) {
   // Demo/mock projects arrive via the dynamic [id] route (useParams). User
   // projects (not pre-rendered) arrive via /app/projeto?id=<id> as a prop.
@@ -78,6 +137,12 @@ export default function ProjectDetailPage({ id: propId }: { id?: string } = {}) 
   const [aggressiveness, setAggressiveness] = useState(3);
   const [count, setCount] = useState(10);
   const [generating, setGenerating] = useState(false);
+  const [genProgress, setGenProgress] = useState<AnalysisProgress | null>(null);
+  const [genError, setGenError] = useState(false);
+
+  const [answers, setAnswers] = useState<WizardAnswers | null>(null);
+  const [wizardOpen, setWizardOpen] = useState(false);
+  const [profile, setProfile] = useState<AnalysisProfile | null>(null);
 
   function load() {
     setError(false);
@@ -96,21 +161,51 @@ export default function ProjectDetailPage({ id: propId }: { id?: string } = {}) 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(load, [id]);
 
-  async function handleGenerate() {
+  // Saved wizard answers + cached analysis are restored per project.
+  useEffect(() => {
+    setAnswers(readWizardAnswers(id));
+    setProfile(getCachedProfile(id));
+  }, [id]);
+
+  async function runGenerate(a: WizardAnswers) {
     setGenerating(true);
+    setGenError(false);
+    setGenProgress({ pct: 3, message: "Preparando análise…" });
     try {
-      await api.generateCuts(id, mode, aggressiveness, count);
+      await api.generateCuts(id, mode, aggressiveness, count, {
+        answers: a,
+        onProgress: (p) => setGenProgress(p),
+      });
       // Refresh the grid so the freshly generated cuts appear right away.
       const fresh = await api.getProjectCuts(id);
       setCuts(fresh);
-      toast("Cortes gerados", {
-        description: `Modo "${CUT_MODES.find((m) => m.id === mode)?.name}", agressividade ${aggressiveness}/5, até ${count} cortes. Seleção simulada — a IA real de cortes exige o backend conectado.`,
+      setProfile(getCachedProfile(id));
+      toast("Cortes gerados a partir da análise", {
+        description: `Modo "${CUT_MODES.find((m) => m.id === mode)?.name}" · trechos escolhidos por picos de energia e mudanças de cena. Títulos por heurística — refine com IA real quando o backend estiver conectado.`,
       });
     } catch {
-      toast("Falha ao gerar os cortes", { variant: "error" });
+      setGenError(true);
+      toast("Falha ao gerar os cortes", { description: "Tente novamente.", variant: "error" });
     } finally {
       setGenerating(false);
+      setGenProgress(null);
     }
+  }
+
+  function handleGenerateClick() {
+    // First run: open the questionnaire. Re-runs reuse the saved answers.
+    if (!answers) {
+      setWizardOpen(true);
+      return;
+    }
+    void runGenerate(answers);
+  }
+
+  function handleWizardSubmit(a: WizardAnswers) {
+    saveWizardAnswers(id, a);
+    setAnswers(a);
+    setWizardOpen(false);
+    void runGenerate(a);
   }
 
   if (error) {
@@ -177,6 +272,9 @@ export default function ProjectDetailPage({ id: propId }: { id?: string } = {}) 
                     <Wand2 className="mr-2 inline h-4 w-4 text-violet-400" aria-hidden />
                     Gerar novos cortes
                   </CardTitle>
+                  <p className="mt-1 text-xs text-zinc-500">
+                    A seleção analisa o vídeo no seu navegador: energia do áudio, silêncios e mudanças de cena.
+                  </p>
                 </CardHeader>
                 <CardContent>
                   <div className="grid gap-5 lg:grid-cols-[1fr_auto]">
@@ -201,6 +299,28 @@ export default function ProjectDetailPage({ id: propId }: { id?: string } = {}) 
                         ))}
                       </div>
                       <p className="mt-2 text-xs text-zinc-500">{CUT_MODES.find((m) => m.id === mode)?.description}</p>
+
+                      {/* Wizard answers: compact summary chips after the 1st run */}
+                      {answers && (
+                        <div className="mt-4">
+                          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                            Briefing dos cortes
+                          </p>
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            {summaryChips(answers).map((chip) => (
+                              <Badge key={chip} variant="outline">{chip}</Badge>
+                            ))}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setWizardOpen(true)}
+                              className="h-6 px-2 text-[11px]"
+                            >
+                              <SlidersHorizontal className="h-3 w-3" aria-hidden /> Editar respostas
+                            </Button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                     <div className="flex w-full flex-col gap-4 lg:w-72">
                       <Slider
@@ -211,13 +331,38 @@ export default function ProjectDetailPage({ id: propId }: { id?: string } = {}) 
                         onChange={setAggressiveness}
                       />
                       <Slider label="Quantidade de cortes" min={5} max={20} value={count} onChange={setCount} />
-                      <Button onClick={handleGenerate} loading={generating}>
+                      <Button onClick={handleGenerateClick} loading={generating}>
                         <Sparkles className="h-4 w-4" aria-hidden /> Gerar cortes
                       </Button>
+                      {genError && !generating && (
+                        <p className="text-xs text-rose-300">
+                          A geração falhou.{" "}
+                          <button
+                            onClick={handleGenerateClick}
+                            className="underline underline-offset-2 hover:text-rose-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+                          >
+                            Tentar novamente
+                          </button>
+                        </p>
+                      )}
                     </div>
                   </div>
+
+                  {/* Real analysis progress */}
+                  {generating && genProgress && (
+                    <div className="mt-5 rounded-xl border border-violet-500/30 bg-violet-500/5 p-4" role="status" aria-live="polite">
+                      <p className="mb-2 flex items-center gap-2 text-sm text-violet-200">
+                        <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                        {genProgress.message}
+                      </p>
+                      <Progress value={genProgress.pct} label="Progresso da análise do vídeo" />
+                    </div>
+                  )}
                 </CardContent>
               </Card>
+
+              {/* Analysis proof card */}
+              {profile && !generating && <AnalysisCard profile={profile} />}
 
               {/* Cuts grid */}
               <section aria-labelledby="cortes">
@@ -252,6 +397,13 @@ export default function ProjectDetailPage({ id: propId }: { id?: string } = {}) 
           )}
         </>
       )}
+
+      <CutWizardModal
+        open={wizardOpen}
+        onClose={() => setWizardOpen(false)}
+        initial={answers}
+        onSubmit={handleWizardSubmit}
+      />
     </div>
   );
 }

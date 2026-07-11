@@ -57,6 +57,9 @@ import { decodeGoogleJwt } from "./google";
 import { isAdminEmail } from "./admins";
 import { svgThumb, uid } from "./utils";
 import { addUserCut, addUserGeneration, addUserProject, isDemoSession, readUserData } from "./session-scope";
+import { ensureProjectProfile, generateSmartCuts } from "./smart-cuts";
+import type { WizardAnswers } from "./cut-wizard";
+import type { AnalysisProgress } from "./video-analysis";
 
 /** Dashboard stats for a real (non-demo) user who has no seeded activity. */
 function emptyDashboardStats(): DashboardStats {
@@ -532,74 +535,11 @@ export async function deleteProject(id: string): Promise<void> {
   return request(`/projects/${id}`, () => undefined, { method: "DELETE" });
 }
 
-// Magnetic pt-BR headlines used to seed simulated cut suggestions. Real cut
-// selection needs the connected backend (transcription + multimodal analysis);
-// these give the demo/offline flow believable, editable cuts.
-const MAGNETIC_TITLES = [
-  "O erro que 90% cometem sem perceber",
-  "Ninguém te contou isso antes",
-  "O segredo que mudou tudo pra mim",
-  "Faça isso antes de desistir",
-  "3 sinais que você não pode ignorar",
-  "A verdade que ninguém quer ouvir",
-  "Isso vai mudar sua forma de pensar",
-  "O momento exato em que o jogo virou",
-  "Pare de fazer isso agora mesmo",
-  "O que aprendi da forma mais difícil",
-  "Todo mundo erra nessa parte",
-  "O detalhe que faz toda a diferença",
-  "Como sair do zero em tempo recorde",
-  "A pergunta que travou todo mundo",
-  "Guarde este corte pra depois",
-  "Você faria diferente? Comenta aí",
-  "O gancho perfeito começa assim",
-  "Não pule os primeiros 3 segundos",
-  "A parte que ninguém esperava",
-  "Isso aqui viralizou por um motivo",
-];
-
-const GENERATED_HASHTAGS = ["#cortaai", "#viral", "#shorts", "#reels", "#fyp", "#brasil"];
-
-/** Builds N believable suggested Cuts spanning the project's media (simulated). */
-function buildGeneratedCuts(project: Project, mode: CutMode, count: number): Cut[] {
-  const n = Math.max(1, Math.min(20, Math.round(count || 1)));
-  const total = project.durationSeconds > 0 ? project.durationSeconds : n * 45;
-  const seg = total / n;
-  const clipLen = Math.max(8, Math.min(seg, 60));
-  const rnd = () => 55 + Math.floor(Math.random() * 44); // 55-98
-  return Array.from({ length: n }, (_, i) => {
-    const start = Math.round(i * seg);
-    const end = Math.min(total, Math.round(start + clipLen));
-    const title = MAGNETIC_TITLES[(i * 3) % MAGNETIC_TITLES.length];
-    const alt1 = MAGNETIC_TITLES[(i * 3 + 1) % MAGNETIC_TITLES.length];
-    const alt2 = MAGNETIC_TITLES[(i * 3 + 2) % MAGNETIC_TITLES.length];
-    const score = rnd();
-    return {
-      id: uid(),
-      projectId: project.id,
-      title,
-      titleOptions: [title, alt1, alt2],
-      description: `Corte gerado de "${project.title}".`,
-      hashtags: GENERATED_HASHTAGS.slice(0, 3 + (i % 3)),
-      startSeconds: start,
-      endSeconds: end > start ? end : start + clipLen,
-      viralScore: score,
-      scoreBreakdown: { hook: rnd(), retention: rnd(), emotion: rnd(), nicheFit: rnd() },
-      transcript: [],
-      mode,
-      suggestedSound: {
-        track: "Trilha em alta (sugestão)",
-        reason: "casa com o ritmo do corte",
-        trendVideoId: "",
-      },
-      bestPostTime: ["seg 19h", "ter 12h", "qua 20h", "qui 18h", "sex 21h"][i % 5],
-      status: "suggested" as const,
-      editState: null,
-      createdAt: new Date().toISOString(),
-      ...(project.mediaId ? { mediaId: project.mediaId } : {}),
-      ...(project.mediaUrl ? { mediaUrl: project.mediaUrl } : {}),
-    } satisfies Cut;
-  });
+export interface GenerateCutsOptions {
+  /** Wizard ("Assistente de cortes") answers steering segments + copy. */
+  answers?: WizardAnswers | null;
+  /** Real-time analysis progress (áudio → cenas → seleção). */
+  onProgress?: (p: AnalysisProgress) => void;
 }
 
 export async function generateCuts(
@@ -607,24 +547,39 @@ export async function generateCuts(
   mode: CutMode,
   aggressiveness: number,
   count: number,
+  opts: GenerateCutsOptions = {},
 ): Promise<{ jobId: string }> {
   return request(
     `/projects/${projectId}/generate-cuts`,
-    () => {
-      // Mock generation: for a real (non-demo) user, actually create + persist
-      // the cuts so they show up in the project grid and Biblioteca. The demo
-      // account keeps its curated seed cuts untouched.
-      if (!isDemoSession()) {
-        const project =
-          readUserData().projects.find((p) => p.id === projectId) ??
-          mockProjects.find((p) => p.id === projectId);
-        if (project) buildGeneratedCuts(project, mode, count).forEach(addUserCut);
+    async () => {
+      // Standalone generation: analyze the REAL media in the browser (audio
+      // energy + scene changes) and select/score segments from that signal —
+      // see lib/smart-cuts.ts. For a real (non-demo) user the cuts are
+      // persisted so they show up in the project grid and Biblioteca. The demo
+      // account keeps its curated seed cuts untouched (profile is still
+      // computed so the "Análise do vídeo" card works).
+      const project =
+        readUserData().projects.find((p) => p.id === projectId) ??
+        mockProjects.find((p) => p.id === projectId);
+      if (project) {
+        if (!isDemoSession()) {
+          const { cuts } = await generateSmartCuts(project, {
+            mode,
+            aggressiveness,
+            count,
+            answers: opts.answers ?? null,
+            onProgress: opts.onProgress,
+          });
+          cuts.forEach(addUserCut);
+        } else {
+          await ensureProjectProfile(project, opts.onProgress).catch(() => null);
+        }
       }
       return { jobId: uid() };
     },
     {
       method: "POST",
-      body: JSON.stringify({ mode, aggressiveness, count }),
+      body: JSON.stringify({ mode, aggressiveness, count, briefing: opts.answers ?? null }),
     },
   );
 }
