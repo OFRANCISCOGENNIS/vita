@@ -24,7 +24,7 @@ import {
 import * as api from "@/lib/api";
 import { CUT_MODES } from "@/lib/presets";
 import { readWizardAnswers, saveWizardAnswers, summaryChips, type WizardAnswers } from "@/lib/cut-wizard";
-import { getCachedProfile } from "@/lib/smart-cuts";
+import { getCachedProfile, getSpeechInfo, type SpeechGenInfo } from "@/lib/smart-cuts";
 import type { AnalysisProfile, AnalysisProgress } from "@/lib/video-analysis";
 import type { Cut, CutMode, Project } from "@/lib/types";
 import { cn, formatDuration } from "@/lib/utils";
@@ -116,7 +116,8 @@ function AnalysisCard({ profile }: { profile: AnalysisProfile }) {
           )}
         </div>
         <p className="mt-3 text-[11px] text-zinc-600">
-          Títulos gerados por heurística — refine com IA real quando o backend estiver conectado.
+          Com fala detectada, títulos e legendas citam a transcrição real feita no seu navegador;
+          sem fala, os títulos usam heurística por nicho.
         </p>
       </CardContent>
     </Card>
@@ -180,9 +181,30 @@ export default function ProjectDetailPage({ id: propId }: { id?: string } = {}) 
       const fresh = await api.getProjectCuts(id);
       setCuts(fresh);
       setProfile(getCachedProfile(id));
-      toast("Cortes gerados a partir da análise", {
-        description: `Modo "${CUT_MODES.find((m) => m.id === mode)?.name}" · trechos escolhidos por picos de energia e mudanças de cena. Títulos por heurística — refine com IA real quando o backend estiver conectado.`,
-      });
+      const speech = getSpeechInfo(id);
+      if (speech?.used) {
+        const partial =
+          project && speech.coverageSeconds > 0 && speech.coverageSeconds < project.durationSeconds - 10
+            ? ` Transcrevemos os primeiros ${formatDuration(speech.coverageSeconds)} — trechos além disso usam a análise de áudio/cenas.`
+            : "";
+        toast("Cortes gerados a partir do que foi FALADO no vídeo", {
+          description: `${speech.wordCount} palavras transcritas no seu navegador. Os trechos começam nas frases de gancho e os títulos citam a fala real.${partial}`,
+        });
+      } else {
+        const why: Record<SpeechGenInfo["reason"], string> = {
+          ok: "",
+          cache: "",
+          "no-media": "Este projeto não tem mídia analisável no navegador — usamos a análise de áudio/cenas.",
+          "no-speech": "Não detectamos fala suficiente no áudio — usamos a análise de energia e cenas.",
+          "model-failed": "O modelo de transcrição não pôde ser carregado (rede/dispositivo) — usamos a análise de áudio/cenas.",
+          unsupported: "Seu navegador não suporta a transcrição local — usamos a análise de áudio/cenas.",
+        };
+        toast("Cortes gerados a partir da análise do vídeo", {
+          description:
+            (speech ? why[speech.reason] : "") ||
+            `Modo "${CUT_MODES.find((m) => m.id === mode)?.name}" · trechos escolhidos por picos de energia e mudanças de cena.`,
+        });
+      }
     } catch {
       setGenError(true);
       toast("Falha ao gerar os cortes", { description: "Tente novamente.", variant: "error" });
@@ -273,7 +295,8 @@ export default function ProjectDetailPage({ id: propId }: { id?: string } = {}) 
                     Gerar novos cortes
                   </CardTitle>
                   <p className="mt-1 text-xs text-zinc-500">
-                    A seleção analisa o vídeo no seu navegador: energia do áudio, silêncios e mudanças de cena.
+                    A seleção transcreve a FALA e analisa o vídeo no seu navegador (energia, silêncios, cenas).
+                    Na primeira vez, um modelo de IA (~45 MB) é baixado e fica no cache do navegador.
                   </p>
                 </CardHeader>
                 <CardContent>

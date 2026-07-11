@@ -84,6 +84,7 @@ async function analyzeAudio(
   buffer: ArrayBuffer,
   onPct: (fraction: number) => void,
   signal?: AbortSignal,
+  captureAudioBuffer?: (b: AudioBuffer) => void,
 ): Promise<AudioAnalysis> {
   const empty: AudioAnalysis = { energy: [], duration: 0, hasAudio: false };
   if (typeof window === "undefined") return empty;
@@ -95,6 +96,8 @@ async function analyzeAudio(
   try {
     ctx = new Ctor();
     const audio = await ctx.decodeAudioData(buffer);
+    // Shared with the transcription stage so the file is decoded only once.
+    captureAudioBuffer?.(audio);
     const win = Math.max(1, Math.round(audio.sampleRate * WINDOW_SECONDS));
     const n = Math.max(1, Math.ceil(audio.length / win));
     const channels: Float32Array[] = [];
@@ -327,6 +330,8 @@ export interface AnalyzeOptions {
   signal?: AbortSignal;
   /** Known duration (seconds) used as fallback when metadata fails. */
   durationHint?: number;
+  /** Receives the decoded AudioBuffer so later stages can reuse it. */
+  captureAudioBuffer?: (b: AudioBuffer) => void;
 }
 
 /**
@@ -369,7 +374,7 @@ export async function analyzeMedia(
     throwIfAborted(signal);
 
     const audio = buffer
-      ? await analyzeAudio(buffer, (f) => report(4 + f * 44, "Analisando áudio…"), signal)
+      ? await analyzeAudio(buffer, (f) => report(4 + f * 44, "Analisando áudio…"), signal, opts.captureAudioBuffer)
       : { energy: [], duration: 0, hasAudio: false };
     throwIfAborted(signal);
 

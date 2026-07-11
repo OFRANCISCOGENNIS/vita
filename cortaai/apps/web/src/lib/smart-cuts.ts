@@ -20,7 +20,7 @@
 import { mockNichePatterns } from "./mock-data";
 import { getMedia } from "./media-store";
 import { seededRandom, uid } from "./utils";
-import type { Cut, CutMode, NichePattern, Project } from "./types";
+import type { Cut, CutMode, NichePattern, Project, TranscriptWord } from "./types";
 import { DEFAULT_ANSWERS, type WizardAnswers } from "./cut-wizard";
 import {
   analyzeMedia,
@@ -28,6 +28,15 @@ import {
   type AnalysisProfile,
   type AnalysisProgress,
 } from "./video-analysis";
+import { groupWords, type SpeechSentence } from "./sentences";
+import {
+  pickKeywordHashtag,
+  selectSpeechSegments,
+  titleFromSentence,
+  type SpeechSegment,
+} from "./speech-select";
+import { isTranscribeSupported, transcribeMedia } from "./transcribe";
+import { getTranscript, mediaKeyOf, saveTranscript } from "./transcript-store";
 
 // ---------------------------------------------------------------- profile cache
 
@@ -35,6 +44,23 @@ const profileCache = new Map<string, AnalysisProfile>();
 
 export function getCachedProfile(projectId: string): AnalysisProfile | null {
   return profileCache.get(projectId) ?? null;
+}
+
+// ---------------------------------------------------------------- speech info
+
+export interface SpeechGenInfo {
+  /** Whether the last generation used the real speech transcript. */
+  used: boolean;
+  reason: "ok" | "cache" | "no-media" | "no-speech" | "model-failed" | "unsupported";
+  wordCount: number;
+  coverageSeconds: number;
+  model?: string;
+}
+
+const speechInfoCache = new Map<string, SpeechGenInfo>();
+
+export function getSpeechInfo(projectId: string): SpeechGenInfo | null {
+  return speechInfoCache.get(projectId) ?? null;
 }
 
 function hashSeed(text: string): number {
@@ -54,6 +80,7 @@ function hashSeed(text: string): number {
 export async function ensureProjectProfile(
   project: Project,
   onProgress?: (p: AnalysisProgress) => void,
+  captureAudioBuffer?: (b: AudioBuffer) => void,
 ): Promise<AnalysisProfile> {
   const cached = profileCache.get(project.id);
   if (cached) {
@@ -73,6 +100,7 @@ export async function ensureProjectProfile(
       profile = await analyzeMedia(source, {
         onProgress,
         durationHint: project.durationSeconds,
+        captureAudioBuffer,
       });
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") throw err;
@@ -94,6 +122,86 @@ export async function ensureProjectProfile(
   profileCache.set(project.id, profile);
   onProgress?.({ pct: 100, message: "Análise concluída" });
   return profile;
+}
+
+// ------------------------------------------------------------- transcription
+
+/**
+ * Get (or produce) the project's REAL speech transcript. Uses the IndexedDB
+ * cache when the media hasn't changed; otherwise runs in-browser Whisper.
+ * Never throws — failures are reported via the SpeechGenInfo reason so the
+ * caller can fall back to the signal-only pipeline honestly.
+ */
+async function ensureProjectTranscript(
+  project: Project,
+  profile: AnalysisProfile,
+  onProgress: ((p: AnalysisProgress) => void) | undefined,
+  audioBuffer: AudioBuffer | null,
+): Promise<{ words: TranscriptWord[]; info: SpeechGenInfo }> {
+  const none = (reason: SpeechGenInfo["reason"]): { words: TranscriptWord[]; info: SpeechGenInfo } => ({
+    words: [],
+    info: { used: false, reason, wordCount: 0, coverageSeconds: 0 },
+  });
+
+  const hasMedia = Boolean(project.mediaId || project.mediaUrl);
+  if (!hasMedia || profile.synthetic || !profile.hasAudio) return none("no-media");
+
+  const key = mediaKeyOf(project);
+  const cached = await getTranscript(project.id, key);
+  if (cached && cached.words.length > 0) {
+    onProgress?.({ pct: 100, message: "Transcrição já pronta (cache)" });
+    return {
+      words: cached.words,
+      info: {
+        used: true,
+        reason: "cache",
+        wordCount: cached.words.length,
+        coverageSeconds: cached.coverageSeconds,
+        model: cached.model,
+      },
+    };
+  }
+
+  if (!isTranscribeSupported()) return none("unsupported");
+
+  let source: Blob | string | null = null;
+  if (project.mediaId) source = await getMedia(project.mediaId);
+  if (!source && project.mediaUrl) source = project.mediaUrl;
+  if (!source) return none("no-media");
+
+  try {
+    const result = await transcribeMedia(source, {
+      durationHint: profile.duration,
+      language: project.language,
+      audioBuffer,
+      onProgress,
+    });
+    if (result.words.length === 0) return none("no-speech");
+    await saveTranscript(project.id, {
+      words: result.words,
+      coverageSeconds: result.coverageSeconds,
+      model: result.model,
+      mediaKey: key,
+    });
+    return {
+      words: result.words,
+      info: {
+        used: true,
+        reason: "ok",
+        wordCount: result.words.length,
+        coverageSeconds: result.coverageSeconds,
+        model: result.model,
+      },
+    };
+  } catch (err) {
+    if (err instanceof DOMException && err.name === "AbortError") throw err;
+    return none("model-failed");
+  }
+}
+
+/** Words fully inside [start, end] (small tolerance for boundary rounding). */
+function sliceTranscript(words: TranscriptWord[], start: number, end: number): TranscriptWord[] {
+  return words.filter((w) => w.start >= start - 0.05 && w.end <= end + 0.05);
 }
 
 // ---------------------------------------------------------------- segments
@@ -388,6 +496,52 @@ const PLATFORM_TAG: Record<WizardAnswers["plataforma"], string> = {
   shorts: "#shorts",
 };
 
+const NICHE_EMOJI: Record<string, string> = {
+  "finanças": "💰",
+  fitness: "💪",
+  podcast: "🎙️",
+  humor: "😂",
+  "educação": "📚",
+  tecnologia: "🤖",
+  beleza: "✨",
+  games: "🎮",
+};
+
+/** Titles grounded in what was actually SAID: literal hook + variations. */
+function buildSpeechTitles(
+  seg: SpeechSegment,
+  answers: WizardAnswers,
+  ctx: CopyCtx,
+  pattern: NichePattern | null,
+  rnd: () => number,
+): string[] {
+  const literal = titleFromSentence(seg.hookText);
+  const emoji = NICHE_EMOJI[answers.nicho] ?? "🔥";
+  const variation = /\?$/.test(literal)
+    ? `${emoji} ${literal}`
+    : `${literal}${literal.endsWith("…") ? "" : " "}${emoji}`;
+  const template = buildTitles(answers, ctx, pattern, rnd)[0];
+  const titles: string[] = [];
+  for (const t of [literal, variation, template]) {
+    if (t && !titles.includes(t)) titles.push(t);
+    if (titles.length === 3) break;
+  }
+  return titles;
+}
+
+/** Description quoting the cut's own speech (≤160 chars) + range + CTA. */
+function buildSpeechDescription(seg: SpeechSegment, answers: WizardAnswers): string {
+  let quote = "";
+  for (const s of seg.sentences) {
+    const next = quote ? `${quote} ${s.text}` : s.text;
+    if (next.length > 160) break;
+    quote = next;
+  }
+  if (!quote) quote = seg.sentences[0]?.text.slice(0, 157).trimEnd() + "…";
+  const cta = CTA_PHRASE[answers.cta];
+  return `"${quote}" — trecho ${fmtTime(seg.start)}–${fmtTime(seg.end)}.${cta ? ` ${cta}` : ""}`;
+}
+
 function buildTitles(
   answers: WizardAnswers,
   ctx: CopyCtx,
@@ -441,15 +595,42 @@ export interface SmartCutsOptions {
 }
 
 /**
- * Full smart generation for a project: (re)uses the cached analysis profile,
- * selects segments, scores them from the real signal and writes the copy.
+ * Full smart generation for a project: analyzes the media, TRANSCRIBES the
+ * speech in-browser (Whisper) and selects segments/titles from what was SAID —
+ * falling back honestly to the signal-only pipeline when speech is unavailable.
  */
 export async function generateSmartCuts(
   project: Project,
   opts: SmartCutsOptions,
-): Promise<{ cuts: Cut[]; profile: AnalysisProfile }> {
+): Promise<{ cuts: Cut[]; profile: AnalysisProfile; speech: SpeechGenInfo }> {
   const answers = opts.answers ?? DEFAULT_ANSWERS;
-  const profile = await ensureProjectProfile(project, opts.onProgress);
+
+  // Progress budget: 0-30% signal analysis, 30-88% download+transcription,
+  // 88-99% selection/copy.
+  let audioBuffer: AudioBuffer | null = null;
+  const profile = await ensureProjectProfile(
+    project,
+    opts.onProgress ? (p) => opts.onProgress?.({ pct: Math.round(p.pct * 0.3), message: p.message }) : undefined,
+    (b) => {
+      audioBuffer = b;
+    },
+  );
+
+  const { words, info: speech } = await ensureProjectTranscript(
+    project,
+    profile,
+    opts.onProgress
+      ? (p) => {
+          const downloading = p.message.startsWith("Baixando");
+          const pct = downloading ? 30 + p.pct * 0.25 : 55 + p.pct * 0.33;
+          opts.onProgress?.({ pct: Math.round(pct), message: p.message });
+        }
+      : undefined,
+    audioBuffer,
+  );
+  audioBuffer = null; // release the decoded PCM as soon as possible
+  speechInfoCache.set(project.id, speech);
+
   const seed = hashSeed(project.id) + Math.floor(Date.now() / 60000);
   const rnd = seededRandom(seed);
 
@@ -464,21 +645,88 @@ export async function generateSmartCuts(
   );
 
   const count = clamp(Math.round(opts.count || 1), 1, 20);
-  opts.onProgress?.({ pct: 99, message: "Escolhendo os melhores momentos…" });
-  const segments = selectSegments(profile, idealDuration, count, opts.aggressiveness, seed);
+
+  // Speech route: enough real words → windows anchored on hook SENTENCES.
+  opts.onProgress?.({ pct: 90, message: "Analisando o que foi dito…" });
+  const sentences: SpeechSentence[] = words.length > 0 ? groupWords(words) : [];
+  const useSpeech = words.length >= 20 && sentences.length >= 3;
+  if (speech.used && !useSpeech) {
+    speech.used = false;
+    speech.reason = "no-speech";
+  }
+
+  opts.onProgress?.({ pct: 96, message: "Escolhendo os melhores trechos…" });
+
+  interface Picked {
+    candidate: Candidate;
+    speechSeg: SpeechSegment | null;
+  }
+  const picked: Picked[] = [];
+
+  if (useSpeech) {
+    const speechSegs = selectSpeechSegments(sentences, profile, idealDuration, count, opts.aggressiveness);
+    for (const seg of speechSegs) {
+      const segWords = sliceTranscript(words, seg.start, seg.end);
+      const text = segWords.map((w) => w.word).join(" ");
+      const punchCount = (text.match(/[!?]/g)?.length ?? 0) + (text.match(/\d/g)?.length ?? 0);
+      picked.push({
+        candidate: {
+          start: seg.start,
+          end: seg.end,
+          peakAt: seg.start,
+          snappedStart: true,
+          fromScene: false,
+          hookRaw: seg.hookScore,
+          retentionRaw: 0.5, // recomputed below from energy
+          emotionRaw: Math.min(1, punchCount / Math.max(6, segWords.length / 6)),
+        },
+        speechSeg: seg,
+      });
+    }
+    // Energy-based retention for the speech windows (same helper as the
+    // signal pipeline uses).
+    const { meanRange } = buildSignalHelpers(profile);
+    for (const p of picked) p.candidate.retentionRaw = meanRange(p.candidate.start, p.candidate.end);
+  }
+
+  // Complete with (or fully use) the signal pipeline, avoiding overlaps.
+  if (picked.length < count) {
+    const minGap = Math.max(1.5, idealDuration * 0.2);
+    const signalSegs = selectSegments(profile, idealDuration, count, opts.aggressiveness, seed);
+    for (const c of signalSegs) {
+      if (picked.length >= count) break;
+      const clash = picked.some(
+        (p) => !(c.end + minGap <= p.candidate.start || c.start >= p.candidate.end + minGap),
+      );
+      if (!clash) picked.push({ candidate: c, speechSeg: null });
+    }
+    picked.sort((a, b) => a.candidate.start - b.candidate.start);
+  }
+
+  const segments = picked.map((p) => p.candidate);
   const scores = scoreSegments(segments, idealDuration, opts.aggressiveness, seed);
 
   const bestTimes = pattern ? [...pattern.bestPostTimes].sort((a, b) => b.score - a.score) : [];
   const now = new Date().toISOString();
+  const keywordTag = words.length > 0 ? pickKeywordHashtag(words) : null;
 
-  const cuts = segments.map((seg, i): Cut => {
+  const cuts = picked.map(({ candidate: seg, speechSeg }, i): Cut => {
     const ctx: CopyCtx = {
       nicho: answers.nicho,
       mmss: fmtTime(seg.peakAt ?? seg.start),
       len: Math.round(seg.end - seg.start),
       index: i,
     };
-    const titles = buildTitles(answers, ctx, pattern, rnd);
+    const titles = speechSeg
+      ? buildSpeechTitles(speechSeg, answers, ctx, pattern, rnd)
+      : buildTitles(answers, ctx, pattern, rnd);
+    const description = speechSeg
+      ? buildSpeechDescription(speechSeg, answers)
+      : buildDescription(project, answers, seg);
+    const hashtags = buildHashtags(answers, i);
+    if (keywordTag && !hashtags.includes(keywordTag)) {
+      hashtags.splice(Math.min(2, hashtags.length), 0, keywordTag);
+    }
     const sound = pattern?.trendingSounds[i % Math.max(1, pattern.trendingSounds.length)];
     const post = bestTimes[i % Math.max(1, bestTimes.length)];
     return {
@@ -486,8 +734,8 @@ export async function generateSmartCuts(
       projectId: project.id,
       title: titles[0] ?? `Corte ${i + 1}`,
       titleOptions: titles.length ? titles : [`Corte ${i + 1}`],
-      description: buildDescription(project, answers, seg),
-      hashtags: buildHashtags(answers, i),
+      description,
+      hashtags: hashtags.slice(0, 6),
       startSeconds: seg.start,
       endSeconds: seg.end,
       viralScore: scores[i].viralScore,
@@ -497,7 +745,9 @@ export async function generateSmartCuts(
         emotion: scores[i].emotion,
         nicheFit: scores[i].nicheFit,
       },
-      transcript: [],
+      // REAL words spoken inside this cut (absolute source-video times) —
+      // powers live captions in the editor and the .srt export.
+      transcript: sliceTranscript(words, seg.start, seg.end),
       mode: opts.mode,
       suggestedSound: sound
         ? { track: sound.track, reason: `em alta no nicho ${answers.nicho} (+${sound.growthPct}%)`, trendVideoId: "" }
@@ -511,5 +761,5 @@ export async function generateSmartCuts(
     };
   });
 
-  return { cuts, profile };
+  return { cuts, profile, speech };
 }
