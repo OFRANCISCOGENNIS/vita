@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
+  Captions,
   Check,
   ChevronDown,
   ChevronLeft,
@@ -16,13 +17,24 @@ import {
   History,
   Image as ImageIcon,
   Keyboard,
+  Layers,
   Loader2,
+  MoreHorizontal,
+  Music2,
+  Pause,
+  Play,
+  Ratio,
   Redo2,
+  Scissors,
   Share2,
+  Sparkles,
+  Sticker,
+  Type,
   Undo2,
+  Wand2,
 } from "lucide-react";
 import * as api from "@/lib/api";
-import { cn, formatDate } from "@/lib/utils";
+import { cn, formatDate, formatTimecode } from "@/lib/utils";
 import { useEditorStore } from "@/store/editor";
 import { toast } from "@/store/toast";
 import { Button } from "@/components/ui/button";
@@ -39,10 +51,69 @@ import { OverlaysPanel } from "./overlays-panel";
 import { AudioPanel } from "./audio-panel";
 import { TextoPanel } from "./texto-panel";
 import { AutoPanel } from "./auto-panel";
+import { FormatPanel } from "./format-panel";
 import { ExportModal } from "./export-modal";
 import { ShortcutsModal } from "./shortcuts-modal";
 
-type PanelTab = "captions" | "effects" | "overlays" | "layers" | "audio" | "texto" | "auto";
+type PanelTab = "captions" | "effects" | "overlays" | "layers" | "audio" | "texto" | "auto" | "formato";
+
+const PANEL_TITLES: Record<PanelTab, string> = {
+  formato: "Formato",
+  captions: "Legendas",
+  effects: "Efeitos",
+  overlays: "Overlays",
+  layers: "Camadas",
+  audio: "Áudio",
+  texto: "Texto",
+  auto: "Auto",
+};
+
+// Barra inferior de ferramentas (mobile, estilo CapCut): ícone + label.
+const MOBILE_TOOLS: { id: PanelTab; label: string; icon: typeof Ratio }[] = [
+  { id: "formato", label: "Formato", icon: Ratio },
+  { id: "captions", label: "Legendas", icon: Captions },
+  { id: "effects", label: "Efeitos", icon: Sparkles },
+  { id: "texto", label: "Texto", icon: Type },
+  { id: "audio", label: "Áudio", icon: Music2 },
+  { id: "overlays", label: "Overlays", icon: Sticker },
+  { id: "layers", label: "Camadas", icon: Layers },
+  { id: "auto", label: "Auto", icon: Wand2 },
+];
+
+/** Conteúdo do histórico de versões — usado no dropdown desktop e no menu "⋯" mobile. */
+function VersionsList({ onRestored }: { onRestored?: () => void }) {
+  const { versions, markSaved, restoreVersion } = useEditorStore();
+  return (
+    <>
+      <button
+        className="mb-1 flex w-full items-center gap-2 rounded-lg bg-violet-500/10 px-3 py-2 text-left text-xs font-medium text-violet-300 hover:bg-violet-500/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+        onClick={() => {
+          markSaved(`Versão manual — ${new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`);
+          toast("Versão salva no histórico");
+        }}
+      >
+        <CloudUpload className="h-3.5 w-3.5" aria-hidden /> Salvar versão atual
+      </button>
+      <ul className="max-h-56 space-y-0.5 overflow-y-auto">
+        {versions.map((v, i) => (
+          <li key={i}>
+            <button
+              className="flex w-full flex-col rounded-lg px-3 py-2 text-left text-xs hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+              onClick={() => {
+                restoreVersion(i);
+                onRestored?.();
+                toast("Versão restaurada", { description: v.label, variant: "info" });
+              }}
+            >
+              <span className="font-medium text-zinc-200">{v.label}</span>
+              <span className="text-zinc-500">{formatDate(v.at)}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </>
+  );
+}
 
 export default function Editor({ cutId }: { cutId: string }) {
   const {
@@ -54,7 +125,6 @@ export default function Editor({ cutId }: { cutId: string }) {
     currentTime,
     dirty,
     savedAt,
-    versions,
     loadCut,
     apply,
     undo,
@@ -64,16 +134,17 @@ export default function Editor({ cutId }: { cutId: string }) {
     seek,
     splitAtPlayhead,
     markSaved,
-    restoreVersion,
     revokeMedia,
   } = useEditorStore();
 
   const [loadError, setLoadError] = useState(false);
   const [panel, setPanel] = useState<PanelTab>("captions");
-  const [panelOpen, setPanelOpen] = useState(true);
+  const [panelOpen, setPanelOpen] = useState(true); // desktop: coluna lateral
+  const [sheetOpen, setSheetOpen] = useState(false); // mobile: bottom-sheet
   const [exportOpen, setExportOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [versionsOpen, setVersionsOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -199,6 +270,7 @@ export default function Editor({ cutId }: { cutId: string }) {
           <Skeleton className="hidden h-full w-[340px] shrink-0 lg:block" />
         </div>
         <Skeleton className="h-44 w-full shrink-0" />
+        <Skeleton className="h-14 w-full shrink-0 lg:hidden" />
       </div>
     );
   }
@@ -219,7 +291,7 @@ export default function Editor({ cutId }: { cutId: string }) {
           <p className="truncate text-sm font-semibold text-white" title={cut.title}>{cut.title}</p>
         </div>
 
-        {/* Autosave indicator */}
+        {/* Autosave indicator — texto no desktop, só ícone no mobile */}
         <span className="hidden items-center gap-1.5 text-xs text-zinc-500 md:inline-flex" aria-live="polite">
           {saving || dirty ? (
             <>
@@ -232,9 +304,16 @@ export default function Editor({ cutId }: { cutId: string }) {
             </>
           )}
         </span>
+        <span className="inline-flex md:hidden" aria-live="polite" aria-label={saving || dirty ? "Salvando" : "Salvo"}>
+          {saving || dirty ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin text-violet-400" aria-hidden />
+          ) : (
+            <Check className="h-3.5 w-3.5 text-emerald-400" aria-hidden />
+          )}
+        </span>
 
-        {/* Version history */}
-        <div className="relative">
+        {/* Version history (desktop) */}
+        <div className="relative hidden md:block">
           <Button variant="ghost" size="sm" onClick={() => setVersionsOpen((v) => !v)} aria-expanded={versionsOpen} aria-label="Histórico de versões" title="Histórico de versões">
             <History className="h-4 w-4" aria-hidden />
             <span className="hidden sm:inline">Versões</span>
@@ -242,37 +321,12 @@ export default function Editor({ cutId }: { cutId: string }) {
           </Button>
           {versionsOpen && (
             <div className="absolute right-0 top-10 z-30 w-72 rounded-xl border border-line bg-surface-2 p-2 shadow-2xl animate-fade-up">
-              <button
-                className="mb-1 flex w-full items-center gap-2 rounded-lg bg-violet-500/10 px-3 py-2 text-left text-xs font-medium text-violet-300 hover:bg-violet-500/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
-                onClick={() => {
-                  markSaved(`Versão manual — ${new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`);
-                  toast("Versão salva no histórico");
-                }}
-              >
-                <CloudUpload className="h-3.5 w-3.5" aria-hidden /> Salvar versão atual
-              </button>
-              <ul className="max-h-56 space-y-0.5 overflow-y-auto">
-                {versions.map((v, i) => (
-                  <li key={i}>
-                    <button
-                      className="flex w-full flex-col rounded-lg px-3 py-2 text-left text-xs hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
-                      onClick={() => {
-                        restoreVersion(i);
-                        setVersionsOpen(false);
-                        toast("Versão restaurada", { description: v.label, variant: "info" });
-                      }}
-                    >
-                      <span className="font-medium text-zinc-200">{v.label}</span>
-                      <span className="text-zinc-500">{formatDate(v.at)}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
+              <VersionsList onRestored={() => setVersionsOpen(false)} />
             </div>
           )}
         </div>
 
-        <div className="flex items-center gap-1">
+        <div className="hidden items-center gap-1 lg:flex">
           <Button variant="ghost" size="icon" onClick={undo} disabled={past.length === 0} aria-label="Desfazer (Ctrl+Z)" title="Desfazer (Ctrl+Z)">
             <Undo2 className="h-4 w-4" />
           </Button>
@@ -287,15 +341,54 @@ export default function Editor({ cutId }: { cutId: string }) {
         <Link
           href={`/app/capa/editor?cut=${cut.id}`}
           title="Estúdio de Capa"
-          className="inline-flex h-10 items-center gap-2 rounded-xl border border-line bg-surface-3 px-4 text-sm font-medium text-zinc-100 transition-colors hover:bg-zinc-700/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+          className="hidden h-10 items-center gap-2 rounded-xl border border-line bg-surface-3 px-4 text-sm font-medium text-zinc-100 transition-colors hover:bg-zinc-700/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400 md:inline-flex"
         >
           <ImageIcon className="h-4 w-4" aria-hidden />
           <span className="hidden sm:inline">Capa</span>
         </Link>
-        <Button variant="secondary" onClick={() => setShareOpen(true)} title="Compartilhar">
+        <Button variant="secondary" className="hidden md:inline-flex" onClick={() => setShareOpen(true)} title="Compartilhar">
           <Share2 className="h-4 w-4" aria-hidden />
           <span className="hidden sm:inline">Compartilhar</span>
         </Button>
+
+        {/* Menu "⋯" (mobile) — abriga o que saiu da toolbar compacta */}
+        <div className="relative md:hidden">
+          <Button variant="ghost" size="icon" onClick={() => setMoreOpen((v) => !v)} aria-expanded={moreOpen} aria-label="Mais opções" title="Mais opções">
+            <MoreHorizontal className="h-4 w-4" />
+          </Button>
+          {moreOpen && (
+            <div className="absolute right-0 top-10 z-30 w-64 max-w-[calc(100vw-1rem)] rounded-xl border border-line bg-surface-2 p-2 shadow-2xl animate-fade-up">
+              <Link
+                href={`/app/capa/editor?cut=${cut.id}`}
+                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-zinc-200 hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+              >
+                <ImageIcon className="h-3.5 w-3.5" aria-hidden /> Estúdio de Capa
+              </Link>
+              <button
+                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-zinc-200 hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+                onClick={() => {
+                  setShareOpen(true);
+                  setMoreOpen(false);
+                }}
+              >
+                <Share2 className="h-3.5 w-3.5" aria-hidden /> Compartilhar
+              </button>
+              <button
+                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-zinc-200 hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+                onClick={() => {
+                  setShortcutsOpen(true);
+                  setMoreOpen(false);
+                }}
+              >
+                <Keyboard className="h-3.5 w-3.5" aria-hidden /> Atalhos de teclado
+              </button>
+              <div className="my-1 border-t border-line" />
+              <p className="px-3 py-1 text-[10px] uppercase tracking-wide text-zinc-500">Versões</p>
+              <VersionsList onRestored={() => setMoreOpen(false)} />
+            </div>
+          )}
+        </div>
+
         <Button onClick={() => setExportOpen(true)} title="Exportar">
           <Download className="h-4 w-4" aria-hidden /> Exportar
         </Button>
@@ -318,17 +411,38 @@ export default function Editor({ cutId }: { cutId: string }) {
           </button>
         </div>
 
-        {/* Side panels (collapsible) */}
+        {/* Side panels — bottom-sheet no mobile (sheetOpen), coluna lateral no desktop (panelOpen) */}
         <aside
           className={cn(
             "flex min-h-0 shrink-0 flex-col overflow-hidden bg-surface-1/40 transition-all duration-300 motion-reduce:transition-none",
+            sheetOpen ? "max-h-[42dvh] border-t border-line" : "max-h-0 border-t border-transparent",
             panelOpen
-              ? "max-h-[38dvh] border-t border-line lg:max-h-none lg:w-[340px] lg:border-l lg:border-t-0"
-              : "max-h-0 border-t border-transparent lg:max-h-none lg:w-0 lg:border-l",
+              ? "lg:max-h-none lg:w-[340px] lg:border-l lg:border-t-0"
+              : "lg:max-h-none lg:w-0 lg:border-l lg:border-t-0",
           )}
         >
           <div className="flex min-h-0 flex-1 flex-col lg:w-[340px]">
-            <div className="flex items-center gap-1 border-b border-line p-2.5">
+            {/* Header mobile da sheet: handle + título + fechar */}
+            <div className="relative flex items-center border-b border-line px-3 py-2 lg:hidden">
+              <span className="text-xs font-semibold text-white">{PANEL_TITLES[panel]}</span>
+              <button
+                onClick={() => setSheetOpen(false)}
+                aria-label="Fechar painel"
+                className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-lg px-8 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+              >
+                <span className="block h-1 w-9 rounded-full bg-zinc-600" aria-hidden />
+              </button>
+              <button
+                onClick={() => setSheetOpen(false)}
+                aria-label="Fechar painel"
+                title="Fechar painel"
+                className="ml-auto rounded-lg p-1.5 text-zinc-500 transition-colors hover:bg-white/5 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+              >
+                <ChevronDown className="h-4 w-4" />
+              </button>
+            </div>
+            {/* Header desktop: abas */}
+            <div className="hidden items-center gap-1 border-b border-line p-2.5 lg:flex">
               <Tabs
                 tabs={[
                   { id: "captions", label: "Legendas" },
@@ -343,16 +457,9 @@ export default function Editor({ cutId }: { cutId: string }) {
                 onChange={setPanel}
                 className="min-w-0 flex-1 [&>button]:min-w-0 [&>button]:flex-1 [&>button]:truncate [&>button]:px-1 [&>button]:text-[13px]"
               />
-              <button
-                onClick={() => setPanelOpen(false)}
-                aria-label="Recolher painel"
-                title="Recolher painel"
-                className="shrink-0 rounded-lg p-1.5 text-zinc-500 transition-colors hover:bg-white/5 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400 lg:hidden"
-              >
-                <ChevronDown className="h-4 w-4" />
-              </button>
             </div>
             <div key={panel} className="panel-fade editor-scroll min-h-0 flex-1 overflow-y-auto p-4">
+              {panel === "formato" && <FormatPanel />}
               {panel === "captions" && <CaptionsPanel />}
               {panel === "effects" && <EffectsPanel />}
               {panel === "overlays" && <OverlaysPanel />}
@@ -363,29 +470,96 @@ export default function Editor({ cutId }: { cutId: string }) {
             </div>
           </div>
         </aside>
+      </div>
 
-        {/* Mobile: reopen the collapsed panel */}
-        {!panelOpen && (
+      {/* Linha de transporte mobile (estilo CapCut): timecode | dividir | play | undo/redo */}
+      <div className="flex shrink-0 items-center gap-1 border-t border-line bg-surface-1/60 px-3 py-1 lg:hidden">
+        <span className="min-w-0 flex-1 truncate font-mono text-[11px] tabular-nums text-zinc-400">
+          {formatTimecode(currentTime)} <span className="text-zinc-600">/ {formatTimecode(duration)}</span>
+        </span>
+        <button
+          onClick={splitAtPlayhead}
+          aria-label="Dividir no playhead"
+          title="Dividir no playhead"
+          className="rounded-lg p-2 text-zinc-400 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+        >
+          <Scissors className="h-4 w-4" />
+        </button>
+        <button
+          onClick={togglePlay}
+          aria-label={playing ? "Pausar" : "Reproduzir"}
+          className="mx-1 flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white shadow-glow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+        >
+          {playing ? <Pause className="h-4 w-4" /> : <Play className="ml-0.5 h-4 w-4" />}
+        </button>
+        <div className="flex flex-1 items-center justify-end gap-0.5">
           <button
-            onClick={() => setPanelOpen(true)}
-            aria-label="Expandir painel"
-            title="Expandir painel"
-            className="flex shrink-0 items-center justify-center gap-1.5 border-t border-line bg-surface-1/60 py-1.5 text-xs font-medium text-zinc-400 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400 lg:hidden"
+            onClick={undo}
+            disabled={past.length === 0}
+            aria-label="Desfazer"
+            className="rounded-lg p-2 text-zinc-400 transition-colors hover:text-white disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
           >
-            <ChevronDown className="h-3.5 w-3.5 rotate-180" /> Painéis
+            <Undo2 className="h-4 w-4" />
           </button>
-        )}
+          <button
+            onClick={redo}
+            disabled={future.length === 0}
+            aria-label="Refazer"
+            className="rounded-lg p-2 text-zinc-400 transition-colors hover:text-white disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+          >
+            <Redo2 className="h-4 w-4" />
+          </button>
+        </div>
       </div>
 
       {/* Full-width timeline dock */}
       <EditorTimeline />
 
+      {/* Barra inferior de ferramentas (mobile, estilo CapCut) */}
+      <nav
+        aria-label="Ferramentas"
+        className="flex shrink-0 items-stretch gap-0.5 overflow-x-auto border-t border-line bg-surface-1/95 px-1 pt-1 pb-[calc(0.25rem+env(safe-area-inset-bottom))] lg:hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
+        {MOBILE_TOOLS.map(({ id, label, icon: Icon }) => {
+          const active = sheetOpen && panel === id;
+          return (
+            <button
+              key={id}
+              onClick={() => {
+                if (active) {
+                  setSheetOpen(false);
+                } else {
+                  setPanel(id);
+                  setSheetOpen(true);
+                }
+              }}
+              aria-pressed={active}
+              className={cn(
+                "flex min-w-[60px] flex-col items-center justify-center gap-1 rounded-lg px-2 py-1.5 text-[10px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400",
+                active ? "text-violet-300" : "text-zinc-400 hover:text-zinc-200",
+              )}
+            >
+              <Icon className="h-5 w-5" aria-hidden />
+              {label}
+            </button>
+          );
+        })}
+      </nav>
+
       <ExportModal open={exportOpen} onClose={() => setExportOpen(false)} />
       <ShareModal open={shareOpen} onClose={() => setShareOpen(false)} cut={cut} />
       <ShortcutsModal open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
-      {/* click-away for versions dropdown */}
-      {versionsOpen && (
-        <button className="fixed inset-0 z-20 cursor-default" aria-hidden tabIndex={-1} onClick={() => setVersionsOpen(false)} />
+      {/* click-away for the versions/more dropdowns */}
+      {(versionsOpen || moreOpen) && (
+        <button
+          className="fixed inset-0 z-20 cursor-default"
+          aria-hidden
+          tabIndex={-1}
+          onClick={() => {
+            setVersionsOpen(false);
+            setMoreOpen(false);
+          }}
+        />
       )}
       <span className="sr-only" aria-live="polite">
         {playing ? "Reproduzindo" : "Pausado"} — {Math.round(currentTime)} de {Math.round(duration)} segundos

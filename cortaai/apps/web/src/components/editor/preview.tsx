@@ -33,7 +33,7 @@ import { useEditorStore, type AspectRatio, type PlatformPresetId } from "@/store
 import { ChromaCanvas } from "./chroma-canvas";
 import { RegionOverlay, type Rect } from "./region-overlay";
 
-const ASPECTS: { id: AspectRatio; label: string; ratio: number }[] = [
+export const ASPECTS: { id: AspectRatio; label: string; ratio: number }[] = [
   { id: "9:16", label: "9:16", ratio: 9 / 16 },
   { id: "1:1", label: "1:1", ratio: 1 },
   { id: "16:9", label: "16:9", ratio: 16 / 9 },
@@ -246,8 +246,10 @@ export function EditorPreview() {
 
   return (
     <div ref={stageRef} className="relative flex h-full min-h-0 w-full items-center justify-center overflow-hidden bg-[#050508]">
-      {/* Aspect + platform preset switchers — floating over the stage top */}
-      <div className="absolute inset-x-0 top-2 z-30 flex flex-wrap items-center justify-center gap-2 px-2">
+      {/* Aspect + platform preset switchers — floating over the stage top.
+          No mobile ficam ocultos (viram o painel "Formato" da barra inferior)
+          para o vídeo dominar a tela sem nada sobreposto. */}
+      <div className="absolute inset-x-0 top-2 z-30 hidden flex-wrap items-center justify-center gap-2 px-2 lg:flex">
         <div role="group" aria-label="Proporção do vídeo" className="flex gap-1 rounded-xl bg-black/55 p-1 ring-1 ring-[rgba(255,255,255,0.12)] backdrop-blur">
           {ASPECTS.map((a) => (
             <button
@@ -656,10 +658,27 @@ export function EditorPreview() {
             chroma {doc.chroma.showBefore ? "· antes" : "· depois"}
           </span>
         )}
+
+        {/* Mute (mobile) — o pill flutuante some no mobile, e o estado `muted`
+            é local do preview, então o controle mora aqui, discreto no canto. */}
+        {hasVideo && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setMuted((m) => !m);
+            }}
+            aria-label={muted ? "Ativar som" : "Silenciar"}
+            title={muted ? "Ativar som" : "Silenciar"}
+            className="absolute right-2 top-2 z-20 flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-zinc-50/80 backdrop-blur transition-colors hover:text-zinc-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400 lg:hidden"
+          >
+            {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+          </button>
+        )}
       </div>
 
-      {/* Floating transport pill (CapCut-style) */}
-      <div className="absolute bottom-3 left-1/2 z-30 flex -translate-x-1/2 items-center gap-2.5 rounded-full bg-black/60 py-1.5 pl-1.5 pr-4 ring-1 ring-[rgba(255,255,255,0.12)] backdrop-blur">
+      {/* Floating transport pill (CapCut-style) — desktop; no mobile a linha de
+          transporte fica abaixo do preview (editor.tsx), sem sobrepor o vídeo */}
+      <div className="absolute bottom-3 left-1/2 z-30 hidden -translate-x-1/2 items-center gap-2.5 rounded-full bg-black/60 py-1.5 pl-1.5 pr-4 ring-1 ring-[rgba(255,255,255,0.12)] backdrop-blur lg:flex">
         <button
           onClick={togglePlay}
           aria-label={playing ? "Pausar (Espaço)" : "Reproduzir (Espaço)"}
