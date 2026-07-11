@@ -77,12 +77,27 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   const isEditor = pathname?.startsWith("/app/editor");
 
+  // Editor route is full-bleed (CapCut-style): no sidebar/topbar — the editor
+  // owns the whole viewport. Command palette + shortcuts stay available; the
+  // onboarding tour targets sidebar items, so it only renders with the shell.
+  if (isEditor) {
+    return (
+      <div className="h-[100dvh] overflow-hidden">
+        {children}
+        <div className="no-print">
+          <CommandPalette isEditor />
+          <GlobalShortcuts isEditor />
+        </div>
+      </div>
+    );
+  }
+
   const sidebar = (
     <div className="flex h-full flex-col">
       <div className="flex h-16 items-center justify-between px-5">
         <Logo href="/app" />
         <button
-          className="rounded-lg p-1.5 text-zinc-400 hover:text-white lg:hidden"
+          className="rounded-lg p-1.5 text-zinc-400 transition-colors hover:text-white lg:hidden"
           onClick={() => setMobileOpen(false)}
           aria-label="Fechar menu"
         >
@@ -159,7 +174,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             }}
             aria-label="Sair da conta"
             title="Sair"
-            className="rounded-lg p-2 text-zinc-500 hover:bg-white/5 hover:text-rose-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+            className="rounded-lg p-2 text-zinc-500 transition-colors hover:bg-white/5 hover:text-rose-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
           >
             <LogOut className="h-4 w-4" />
           </button>
@@ -191,7 +206,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         {/* Topbar */}
         <header className="no-print sticky top-0 z-20 flex h-16 items-center gap-4 border-b border-line bg-surface/80 px-4 backdrop-blur sm:px-6">
           <button
-            className="rounded-lg p-2 text-zinc-400 hover:text-white lg:hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+            className="rounded-lg p-2 text-zinc-400 transition-colors hover:text-white lg:hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
             onClick={() => setMobileOpen(true)}
             aria-label="Abrir menu"
           >
@@ -206,14 +221,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <PlusCircle className="h-4 w-4" aria-hidden /> Novo projeto
           </Link>
         </header>
-        <main className={cn("flex-1", isEditor ? "" : "px-4 py-6 sm:px-6 lg:px-8")}>{children}</main>
+        <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8">{children}</main>
       </div>
 
       {/* App-wide overlays (client-only, hidden in print) */}
       <div className="no-print">
         <OnboardingTour />
-        <CommandPalette isEditor={!!isEditor} />
-        <GlobalShortcuts isEditor={!!isEditor} />
+        <CommandPalette isEditor={false} />
+        <GlobalShortcuts isEditor={false} />
       </div>
     </div>
   );

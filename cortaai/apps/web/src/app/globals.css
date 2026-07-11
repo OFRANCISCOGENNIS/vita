@@ -91,6 +91,40 @@ input[type="range"]::-moz-range-thumb {
   cursor: pointer;
 }
 
+/* ---------------------------------------------------------------------------
+   Editor (CapCut-style) — thin scrollbars for internal panel/timeline scroll
+   areas and a subtle fade when switching side-panel tabs. The fade respects
+   prefers-reduced-motion (only defined inside the no-preference query).
+   --------------------------------------------------------------------------- */
+.editor-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+.editor-scroll::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.editor-scroll::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 8px;
+  border: 0;
+  background-clip: padding-box;
+}
+.editor-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+  border: 0;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes panel-fade {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: none; }
+  }
+  .panel-fade {
+    animation: panel-fade 0.18s ease-out both;
+  }
+}
+
 @keyframes caret-blink {
   0%, 50% { border-color: transparent; }
   51%, 100% { border-color: #34d399; }

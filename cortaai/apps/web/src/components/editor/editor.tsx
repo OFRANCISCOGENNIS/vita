@@ -9,6 +9,8 @@ import {
   ArrowLeft,
   Check,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   CloudUpload,
   Download,
   History,
@@ -68,6 +70,7 @@ export default function Editor({ cutId }: { cutId: string }) {
 
   const [loadError, setLoadError] = useState(false);
   const [panel, setPanel] = useState<PanelTab>("captions");
+  const [panelOpen, setPanelOpen] = useState(true);
   const [exportOpen, setExportOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [versionsOpen, setVersionsOpen] = useState(false);
@@ -189,24 +192,25 @@ export default function Editor({ cutId }: { cutId: string }) {
 
   if (!cut) {
     return (
-      <div className="space-y-4 p-6" role="status" aria-label="Carregando corte">
-        <Skeleton className="h-12 w-full" />
-        <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
-          <Skeleton className="h-[420px] w-full" />
-          <Skeleton className="h-[420px] w-full" />
+      <div className="flex h-[100dvh] flex-col gap-3 overflow-hidden p-3" role="status" aria-label="Carregando corte">
+        <Skeleton className="h-12 w-full shrink-0" />
+        <div className="flex min-h-0 flex-1 gap-3">
+          <Skeleton className="h-full min-w-0 flex-1" />
+          <Skeleton className="hidden h-full w-[340px] shrink-0 lg:block" />
         </div>
-        <Skeleton className="h-48 w-full" />
+        <Skeleton className="h-44 w-full shrink-0" />
       </div>
     );
   }
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] flex-col">
+    <div className="flex h-[100dvh] flex-col overflow-hidden">
       {/* Editor toolbar */}
-      <div className="flex items-center gap-2 border-b border-line bg-surface-1/60 px-4 py-2.5">
+      <div className="flex shrink-0 items-center gap-2 border-b border-line bg-surface-1/60 px-4 py-2">
         <Link
           href={`/app/projeto?id=${cut.projectId}`}
-          className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-sm text-zinc-400 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+          title="Voltar ao projeto"
+          className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-sm text-zinc-400 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
         >
           <ArrowLeft className="h-4 w-4" aria-hidden />
           <span className="hidden sm:inline">Voltar</span>
@@ -231,7 +235,7 @@ export default function Editor({ cutId }: { cutId: string }) {
 
         {/* Version history */}
         <div className="relative">
-          <Button variant="ghost" size="sm" onClick={() => setVersionsOpen((v) => !v)} aria-expanded={versionsOpen} aria-label="Histórico de versões">
+          <Button variant="ghost" size="sm" onClick={() => setVersionsOpen((v) => !v)} aria-expanded={versionsOpen} aria-label="Histórico de versões" title="Histórico de versões">
             <History className="h-4 w-4" aria-hidden />
             <span className="hidden sm:inline">Versões</span>
             <ChevronDown className="h-3 w-3" aria-hidden />
@@ -282,58 +286,99 @@ export default function Editor({ cutId }: { cutId: string }) {
 
         <Link
           href={`/app/capa/editor?cut=${cut.id}`}
+          title="Estúdio de Capa"
           className="inline-flex h-10 items-center gap-2 rounded-xl border border-line bg-surface-3 px-4 text-sm font-medium text-zinc-100 transition-colors hover:bg-zinc-700/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
         >
           <ImageIcon className="h-4 w-4" aria-hidden />
           <span className="hidden sm:inline">Capa</span>
         </Link>
-        <Button variant="secondary" onClick={() => setShareOpen(true)}>
+        <Button variant="secondary" onClick={() => setShareOpen(true)} title="Compartilhar">
           <Share2 className="h-4 w-4" aria-hidden />
           <span className="hidden sm:inline">Compartilhar</span>
         </Button>
-        <Button onClick={() => setExportOpen(true)}>
+        <Button onClick={() => setExportOpen(true)} title="Exportar">
           <Download className="h-4 w-4" aria-hidden /> Exportar
         </Button>
       </div>
 
-      {/* Main area */}
-      <div className="grid min-h-0 flex-1 lg:grid-cols-[1fr_380px]">
-        <div className="flex min-h-0 flex-col overflow-hidden">
-          <div className="flex min-h-0 flex-1 items-center justify-center overflow-auto p-4">
-            <EditorPreview />
-          </div>
-          <EditorTimeline />
+      {/* Main area — CapCut grid: stage (flex-1) + collapsible right panel; timeline spans full width below */}
+      <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
+        {/* Preview stage */}
+        <div className="relative min-h-0 min-w-0 flex-1">
+          <EditorPreview />
+          {/* Panel collapse/expand toggle */}
+          <button
+            onClick={() => setPanelOpen((v) => !v)}
+            aria-expanded={panelOpen}
+            aria-label={panelOpen ? "Recolher painel" : "Expandir painel"}
+            title={panelOpen ? "Recolher painel" : "Expandir painel"}
+            className="absolute right-2 top-1/2 z-30 hidden h-12 w-6 -translate-y-1/2 items-center justify-center rounded-lg bg-black/55 text-zinc-400 ring-1 ring-[rgba(255,255,255,0.12)] backdrop-blur transition-colors hover:text-zinc-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400 lg:flex"
+          >
+            {panelOpen ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+          </button>
         </div>
 
-        {/* Side panels */}
-        <aside className="flex min-h-0 flex-col border-t border-line bg-surface-1/40 lg:border-l lg:border-t-0">
-          <div className="border-b border-line p-3">
-            <Tabs
-              tabs={[
-                { id: "captions", label: "Legendas" },
-                { id: "effects", label: "Efeitos" },
-                { id: "overlays", label: "Overlays" },
-                { id: "layers", label: "Camadas" },
-                { id: "audio", label: "Áudio" },
-                { id: "texto", label: "Texto" },
-                { id: "auto", label: "Auto" },
-              ]}
-              value={panel}
-              onChange={setPanel}
-              className="w-full [&>button]:min-w-0 [&>button]:flex-1 [&>button]:truncate [&>button]:px-1 [&>button]:text-[13px]"
-            />
-          </div>
-          <div className={cn("min-h-0 flex-1 overflow-y-auto p-4")}>
-            {panel === "captions" && <CaptionsPanel />}
-            {panel === "effects" && <EffectsPanel />}
-            {panel === "overlays" && <OverlaysPanel />}
-            {panel === "layers" && <LayersPanel />}
-            {panel === "audio" && <AudioPanel />}
-            {panel === "texto" && <TextoPanel />}
-            {panel === "auto" && <AutoPanel />}
+        {/* Side panels (collapsible) */}
+        <aside
+          className={cn(
+            "flex min-h-0 shrink-0 flex-col overflow-hidden bg-surface-1/40 transition-all duration-300 motion-reduce:transition-none",
+            panelOpen
+              ? "max-h-[38dvh] border-t border-line lg:max-h-none lg:w-[340px] lg:border-l lg:border-t-0"
+              : "max-h-0 border-t border-transparent lg:max-h-none lg:w-0 lg:border-l",
+          )}
+        >
+          <div className="flex min-h-0 flex-1 flex-col lg:w-[340px]">
+            <div className="flex items-center gap-1 border-b border-line p-2.5">
+              <Tabs
+                tabs={[
+                  { id: "captions", label: "Legendas" },
+                  { id: "effects", label: "Efeitos" },
+                  { id: "overlays", label: "Overlays" },
+                  { id: "layers", label: "Camadas" },
+                  { id: "audio", label: "Áudio" },
+                  { id: "texto", label: "Texto" },
+                  { id: "auto", label: "Auto" },
+                ]}
+                value={panel}
+                onChange={setPanel}
+                className="min-w-0 flex-1 [&>button]:min-w-0 [&>button]:flex-1 [&>button]:truncate [&>button]:px-1 [&>button]:text-[13px]"
+              />
+              <button
+                onClick={() => setPanelOpen(false)}
+                aria-label="Recolher painel"
+                title="Recolher painel"
+                className="shrink-0 rounded-lg p-1.5 text-zinc-500 transition-colors hover:bg-white/5 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400 lg:hidden"
+              >
+                <ChevronDown className="h-4 w-4" />
+              </button>
+            </div>
+            <div key={panel} className="panel-fade editor-scroll min-h-0 flex-1 overflow-y-auto p-4">
+              {panel === "captions" && <CaptionsPanel />}
+              {panel === "effects" && <EffectsPanel />}
+              {panel === "overlays" && <OverlaysPanel />}
+              {panel === "layers" && <LayersPanel />}
+              {panel === "audio" && <AudioPanel />}
+              {panel === "texto" && <TextoPanel />}
+              {panel === "auto" && <AutoPanel />}
+            </div>
           </div>
         </aside>
+
+        {/* Mobile: reopen the collapsed panel */}
+        {!panelOpen && (
+          <button
+            onClick={() => setPanelOpen(true)}
+            aria-label="Expandir painel"
+            title="Expandir painel"
+            className="flex shrink-0 items-center justify-center gap-1.5 border-t border-line bg-surface-1/60 py-1.5 text-xs font-medium text-zinc-400 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400 lg:hidden"
+          >
+            <ChevronDown className="h-3.5 w-3.5 rotate-180" /> Painéis
+          </button>
+        )}
       </div>
+
+      {/* Full-width timeline dock */}
+      <EditorTimeline />
 
       <ExportModal open={exportOpen} onClose={() => setExportOpen(false)} />
       <ShareModal open={shareOpen} onClose={() => setShareOpen(false)} cut={cut} />
