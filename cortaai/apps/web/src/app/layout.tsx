@@ -46,6 +46,10 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: "#0a0a0f",
+  width: "device-width",
+  initialScale: 1,
+  // "cover" habilita env(safe-area-inset-*) no iOS (barra inferior do editor).
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

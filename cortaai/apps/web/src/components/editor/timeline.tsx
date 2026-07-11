@@ -11,7 +11,11 @@ import { useEditorStore } from "@/store/editor";
 import { Slider } from "@/components/ui/slider";
 import { groupSentences } from "./sentences";
 
+// Altura desktop das trilhas (px) — usada só na matemática do waveform SVG.
+// O tamanho visual dos rows vem das classes h-9 lg:h-11 (36px mobile / 44px
+// desktop) para a timeline roubar menos altura do vídeo no celular.
 const TRACK_H = 44;
+const TRACK_CLS = "h-9 lg:h-11";
 
 export function EditorTimeline() {
   const {
@@ -59,8 +63,8 @@ export function EditorTimeline() {
 
   return (
     <div className="shrink-0 border-t border-line bg-surface-1/80">
-      {/* Transport controls */}
-      <div className="flex items-center gap-2 px-4 py-1.5">
+      {/* Transport controls — desktop; no mobile a linha de transporte fica acima da timeline */}
+      <div className="hidden items-center gap-2 px-4 py-1.5 lg:flex">
         <button
           onClick={() => seek(0)}
           aria-label="Voltar ao início"
@@ -103,25 +107,25 @@ export function EditorTimeline() {
 
       {/* Tracks */}
       <div className="flex">
-        {/* Track labels */}
-        <div className="w-24 shrink-0 border-r border-line text-[10px] font-medium uppercase tracking-wide text-zinc-500">
+        {/* Track labels (desktop) */}
+        <div className="hidden w-24 shrink-0 border-r border-line text-[10px] font-medium uppercase tracking-wide text-zinc-500 lg:block">
           <div className="flex h-6 items-center px-3" aria-hidden />
-          <div className="flex items-center gap-1.5 px-3" style={{ height: TRACK_H }}>
+          <div className={cn("flex items-center gap-1.5 px-3", TRACK_CLS)}>
             <Film className="h-3 w-3" aria-hidden /> Vídeo
           </div>
-          <div className="flex items-center gap-1.5 px-3" style={{ height: TRACK_H }}>
+          <div className={cn("flex items-center gap-1.5 px-3", TRACK_CLS)}>
             <Captions className="h-3 w-3" aria-hidden /> Legendas
           </div>
-          <div className="flex items-center gap-1.5 px-3" style={{ height: TRACK_H }}>
+          <div className={cn("flex items-center gap-1.5 px-3", TRACK_CLS)}>
             <Music2 className="h-3 w-3" aria-hidden /> Áudio
           </div>
-          <div className="flex items-center gap-1.5 px-3" style={{ height: TRACK_H }}>
+          <div className={cn("flex items-center gap-1.5 px-3", TRACK_CLS)}>
             <Layers className="h-3 w-3" aria-hidden /> Camadas
           </div>
         </div>
 
         {/* Scrollable timeline */}
-        <div ref={scrollRef} className="editor-scroll min-w-0 flex-1 overflow-x-auto pb-2">
+        <div ref={scrollRef} className="editor-scroll min-w-0 flex-1 overflow-x-auto pb-1 lg:pb-2">
           <div
             className="relative cursor-crosshair"
             style={{ width }}
@@ -152,7 +156,7 @@ export function EditorTimeline() {
             </div>
 
             {/* Video track */}
-            <div className="relative border-b border-line/50" style={{ height: TRACK_H }}>
+            <div className={cn("relative border-b border-line/50", TRACK_CLS)}>
               <div className="absolute inset-1 overflow-hidden rounded-lg bg-gradient-to-r from-violet-800/60 to-fuchsia-800/40 ring-1 ring-inset ring-white/10">
                 <div className="flex h-full items-center gap-1 px-2" aria-hidden>
                   {Array.from({ length: Math.max(3, Math.floor(width / 64)) }).map((_, i) => (
@@ -233,12 +237,12 @@ export function EditorTimeline() {
             </div>
 
             {/* Captions track */}
-            <div className="relative border-b border-line/50" style={{ height: TRACK_H }}>
+            <div className={cn("relative border-b border-line/50", TRACK_CLS)}>
               {sentences.map((s) => (
                 <div
                   key={s.key}
                   className={cn(
-                    "absolute inset-y-1.5 overflow-hidden whitespace-nowrap rounded-md px-1.5 text-[9px] leading-[30px] ring-1 ring-inset",
+                    "absolute inset-y-1.5 flex items-center overflow-hidden whitespace-nowrap rounded-md px-1.5 text-[9px] ring-1 ring-inset",
                     doc.removedSentenceKeys.includes(s.key)
                       ? "bg-zinc-800/60 text-zinc-600 ring-zinc-700 line-through"
                       : "bg-sky-500/20 text-sky-200 ring-sky-400/30",
@@ -255,8 +259,8 @@ export function EditorTimeline() {
             </div>
 
             {/* Audio track (waveform) */}
-            <div className="relative border-b border-line/50" style={{ height: TRACK_H }}>
-              <svg width={width} height={TRACK_H} className="absolute inset-0" aria-hidden preserveAspectRatio="none">
+            <div className={cn("relative border-b border-line/50", TRACK_CLS)}>
+              <svg viewBox={`0 0 ${width} ${TRACK_H}`} className="absolute inset-0 h-full w-full" aria-hidden preserveAspectRatio="none">
                 {waveform.map((v, i) => {
                   const x = (i / waveform.length) * width;
                   const h = v * (TRACK_H - 12);
@@ -312,15 +316,15 @@ export function EditorTimeline() {
               )}
             </div>
 
-            {/* Layers track */}
-            <div className="relative" style={{ height: TRACK_H }}>
+            {/* Layers track (desktop — no mobile a timeline segue o padrão CapCut: vídeo + legendas + áudio) */}
+            <div className={cn("relative hidden lg:block", TRACK_CLS)}>
               {doc.layers.headlineEnabled && (
-                <div className="absolute inset-y-1.5 left-0 rounded-md bg-amber-500/20 px-1.5 text-[9px] leading-[30px] text-amber-200 ring-1 ring-inset ring-amber-400/30" style={{ width: width * 0.35 }}>
+                <div className="absolute inset-y-1.5 left-0 flex items-center rounded-md bg-amber-500/20 px-1.5 text-[9px] text-amber-200 ring-1 ring-inset ring-amber-400/30" style={{ width: width * 0.35 }}>
                   Headline
                 </div>
               )}
               {doc.layers.progressBarEnabled && (
-                <div className="absolute inset-y-1.5 rounded-md bg-violet-500/20 px-1.5 text-[9px] leading-[30px] text-violet-200 ring-1 ring-inset ring-violet-400/30" style={{ left: 0, width }}>
+                <div className="absolute inset-y-1.5 flex items-center rounded-md bg-violet-500/20 px-1.5 text-[9px] text-violet-200 ring-1 ring-inset ring-violet-400/30" style={{ left: 0, width }}>
                   Barra de progresso
                 </div>
               )}
