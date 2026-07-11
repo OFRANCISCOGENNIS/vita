@@ -67,6 +67,27 @@ export function EditorPreview() {
     setSelectedMaskId,
   } = useEditorStore();
 
+  // --- responsive stage sizing (CapCut-style big preview) ---------------------
+  // The letterbox stage is measured with a ResizeObserver; the frame then takes
+  // the largest size that fits the stage while preserving the selected aspect.
+  const stageRef = useRef<HTMLDivElement | null>(null);
+  const [stageSize, setStageSize] = useState<{ w: number; h: number } | null>(null);
+  useEffect(() => {
+    const el = stageRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      const r = entries[0]?.contentRect;
+      if (!r) return;
+      setStageSize((prev) =>
+        prev && Math.abs(prev.w - r.width) < 1 && Math.abs(prev.h - r.height) < 1
+          ? prev
+          : { w: r.width, h: r.height },
+      );
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   // --- real <video> playback (local upload / direct URL) ---------------------
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [muted, setMuted] = useState(true);
@@ -173,7 +194,13 @@ export function EditorPreview() {
   const transiClass =
     segTransition === "zoom" ? "transi-zoom" : segTransition === "slide" ? "transi-slide" : "transi-whip";
 
-  const previewHeight = 420;
+  // Responsive frame: largest size that fits the measured stage (small margin),
+  // preserving the aspect. Falls back to the legacy 420px before first measure.
+  const STAGE_MARGIN = 12;
+  const availW = Math.max(0, (stageSize?.w ?? 0) - STAGE_MARGIN * 2);
+  const availH = Math.max(0, (stageSize?.h ?? 0) - STAGE_MARGIN * 2);
+  const fitH = Math.floor(Math.min(availH, availW / aspect.ratio));
+  const previewHeight = stageSize ? Math.max(180, fitH) : 420;
   const previewWidth = Math.round(previewHeight * aspect.ratio);
 
   // --- advanced effect derivations ---
@@ -218,25 +245,26 @@ export function EditorPreview() {
   }
 
   return (
-    <div className="flex flex-col items-center gap-3">
-      {/* Aspect + platform preset switchers */}
-      <div className="flex flex-wrap items-center justify-center gap-2">
-        <div role="group" aria-label="Proporção do vídeo" className="flex gap-1 rounded-xl border border-line bg-surface-1 p-1">
+    <div ref={stageRef} className="relative flex h-full min-h-0 w-full items-center justify-center overflow-hidden bg-[#050508]">
+      {/* Aspect + platform preset switchers — floating over the stage top */}
+      <div className="absolute inset-x-0 top-2 z-30 flex flex-wrap items-center justify-center gap-2 px-2">
+        <div role="group" aria-label="Proporção do vídeo" className="flex gap-1 rounded-xl bg-black/55 p-1 ring-1 ring-[rgba(255,255,255,0.12)] backdrop-blur">
           {ASPECTS.map((a) => (
             <button
               key={a.id}
               onClick={() => apply({ aspect: a.id })}
               aria-pressed={doc.aspect === a.id}
+              title={`Proporção ${a.label}`}
               className={cn(
                 "rounded-lg px-2.5 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400",
-                doc.aspect === a.id ? "bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white" : "text-zinc-400 hover:text-white",
+                doc.aspect === a.id ? "bg-gradient-to-r from-violet-600 to-fuchsia-600 text-zinc-50" : "text-zinc-400 hover:text-zinc-50",
               )}
             >
               {a.label}
             </button>
           ))}
         </div>
-        <div role="group" aria-label="Preset de plataforma (safe zones)" className="flex gap-1 rounded-xl border border-line bg-surface-1 p-1">
+        <div role="group" aria-label="Preset de plataforma (safe zones)" className="flex gap-1 rounded-xl bg-black/55 p-1 ring-1 ring-[rgba(255,255,255,0.12)] backdrop-blur">
           {PLATFORM_PRESETS.map((p) => (
             <button
               key={p.id}
@@ -245,7 +273,7 @@ export function EditorPreview() {
               title={`${p.resolution} · máx ${p.maxDuration}`}
               className={cn(
                 "rounded-lg px-2.5 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400",
-                doc.platformPreset === p.id ? "bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white" : "text-zinc-400 hover:text-white",
+                doc.platformPreset === p.id ? "bg-gradient-to-r from-violet-600 to-fuchsia-600 text-zinc-50" : "text-zinc-400 hover:text-zinc-50",
               )}
             >
               {p.name}
@@ -256,8 +284,8 @@ export function EditorPreview() {
 
       {/* Preview canvas */}
       <div
-        className="relative overflow-hidden rounded-2xl border border-line bg-black shadow-2xl transition-all duration-300"
-        style={{ width: previewWidth, height: previewHeight, maxWidth: "100%" }}
+        className="relative overflow-hidden rounded-xl border border-[rgba(255,255,255,0.08)] bg-black shadow-2xl shadow-black/60"
+        style={{ width: previewWidth, height: previewHeight, maxWidth: "100%", maxHeight: "100%" }}
       >
         {/* Graded + reframed MEDIA layer (wrapped by motion FX, se houver) */}
         <MotionFx fx={doc.fx} active={motionFx}>
@@ -614,21 +642,6 @@ export function EditorPreview() {
           </span>
         </button>
 
-        {/* Mute toggle (only for real video) */}
-        {hasVideo && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setMuted((m) => !m);
-            }}
-            aria-label={muted ? "Ativar som" : "Silenciar"}
-            title={muted ? "Ativar som" : "Silenciar"}
-            className="absolute bottom-2 right-2 z-20 flex h-8 w-8 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur transition-colors hover:bg-black/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
-          >
-            {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
-          </button>
-        )}
-
         {/* Speed indicator */}
         {(Math.abs(currentRate - 1) > 0.001 || doc.speed.keyframes.length > 0) && (
           <span
@@ -645,11 +658,41 @@ export function EditorPreview() {
         )}
       </div>
 
-      <p className="font-mono text-xs text-zinc-500" aria-hidden>
-        {formatTimecode(currentTime)} / {formatTimecode(duration)}
-        {Math.abs(currentRate - 1) > 0.001 && <span className="ml-3 text-amber-400">{currentRate.toFixed(2)}x</span>}
-        {preset && <span className="ml-3 text-zinc-600">{preset.resolution} · máx {preset.maxDuration}</span>}
-      </p>
+      {/* Floating transport pill (CapCut-style) */}
+      <div className="absolute bottom-3 left-1/2 z-30 flex -translate-x-1/2 items-center gap-2.5 rounded-full bg-black/60 py-1.5 pl-1.5 pr-4 ring-1 ring-[rgba(255,255,255,0.12)] backdrop-blur">
+        <button
+          onClick={togglePlay}
+          aria-label={playing ? "Pausar (Espaço)" : "Reproduzir (Espaço)"}
+          title={playing ? "Pausar (Espaço)" : "Reproduzir (Espaço)"}
+          className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-600 text-zinc-50 transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400 motion-reduce:transition-none"
+        >
+          {playing ? <Pause className="h-4 w-4" /> : <Play className="ml-0.5 h-4 w-4" />}
+        </button>
+        <span className="font-mono text-xs tabular-nums text-zinc-50/90" aria-hidden>
+          {formatTimecode(currentTime)} <span className="text-zinc-50/40">/ {formatTimecode(duration)}</span>
+        </span>
+        {Math.abs(currentRate - 1) > 0.001 && (
+          <span className="font-mono text-[10px] font-bold text-amber-300" aria-hidden>{currentRate.toFixed(2)}x</span>
+        )}
+        {preset && (
+          <span className="hidden text-[10px] text-zinc-50/45 sm:inline" aria-hidden>
+            {preset.resolution} · máx {preset.maxDuration}
+          </span>
+        )}
+        {hasVideo && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setMuted((m) => !m);
+            }}
+            aria-label={muted ? "Ativar som" : "Silenciar"}
+            title={muted ? "Ativar som" : "Silenciar"}
+            className="flex h-7 w-7 items-center justify-center rounded-full text-zinc-50/80 transition-colors hover:bg-[rgba(255,255,255,0.12)] hover:text-zinc-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+          >
+            {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+          </button>
+        )}
+      </div>
     </div>
   );
 }

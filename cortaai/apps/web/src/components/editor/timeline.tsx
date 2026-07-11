@@ -11,7 +11,7 @@ import { useEditorStore } from "@/store/editor";
 import { Slider } from "@/components/ui/slider";
 import { groupSentences } from "./sentences";
 
-const TRACK_H = 40;
+const TRACK_H = 44;
 
 export function EditorTimeline() {
   const {
@@ -58,20 +58,22 @@ export function EditorTimeline() {
   for (let t = 0; t <= duration; t += tickStep) ticks.push(t);
 
   return (
-    <div className="border-t border-line bg-surface-1/70">
+    <div className="shrink-0 border-t border-line bg-surface-1/80">
       {/* Transport controls */}
-      <div className="flex items-center gap-2 px-4 py-2">
+      <div className="flex items-center gap-2 px-4 py-1.5">
         <button
           onClick={() => seek(0)}
           aria-label="Voltar ao início"
-          className="rounded-lg p-1.5 text-zinc-400 hover:bg-white/5 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+          title="Voltar ao início"
+          className="rounded-lg p-2 text-zinc-400 transition-colors hover:bg-white/5 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
         >
           <SkipBack className="h-4 w-4" />
         </button>
         <button
           onClick={togglePlay}
           aria-label={playing ? "Pausar (Espaço)" : "Reproduzir (Espaço)"}
-          className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white shadow-glow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+          title={playing ? "Pausar (Espaço)" : "Reproduzir (Espaço)"}
+          className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white shadow-glow transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400 motion-reduce:transition-none"
         >
           {playing ? <Pause className="h-4 w-4" /> : <Play className="ml-0.5 h-4 w-4" />}
         </button>
@@ -79,7 +81,7 @@ export function EditorTimeline() {
           onClick={splitAtPlayhead}
           aria-label="Dividir no playhead (S)"
           title="Dividir no playhead (S)"
-          className="rounded-lg p-1.5 text-zinc-400 hover:bg-white/5 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+          className="rounded-lg p-2 text-zinc-400 transition-colors hover:bg-white/5 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
         >
           <Scissors className="h-4 w-4" />
         </button>
@@ -119,7 +121,7 @@ export function EditorTimeline() {
         </div>
 
         {/* Scrollable timeline */}
-        <div ref={scrollRef} className="min-w-0 flex-1 overflow-x-auto pb-3">
+        <div ref={scrollRef} className="editor-scroll min-w-0 flex-1 overflow-x-auto pb-2">
           <div
             className="relative cursor-crosshair"
             style={{ width }}
@@ -236,7 +238,7 @@ export function EditorTimeline() {
                 <div
                   key={s.key}
                   className={cn(
-                    "absolute inset-y-1.5 overflow-hidden whitespace-nowrap rounded-md px-1.5 text-[9px] leading-[26px] ring-1 ring-inset",
+                    "absolute inset-y-1.5 overflow-hidden whitespace-nowrap rounded-md px-1.5 text-[9px] leading-[30px] ring-1 ring-inset",
                     doc.removedSentenceKeys.includes(s.key)
                       ? "bg-zinc-800/60 text-zinc-600 ring-zinc-700 line-through"
                       : "bg-sky-500/20 text-sky-200 ring-sky-400/30",
@@ -313,12 +315,12 @@ export function EditorTimeline() {
             {/* Layers track */}
             <div className="relative" style={{ height: TRACK_H }}>
               {doc.layers.headlineEnabled && (
-                <div className="absolute inset-y-1.5 left-0 rounded-md bg-amber-500/20 px-1.5 text-[9px] leading-[26px] text-amber-200 ring-1 ring-inset ring-amber-400/30" style={{ width: width * 0.35 }}>
+                <div className="absolute inset-y-1.5 left-0 rounded-md bg-amber-500/20 px-1.5 text-[9px] leading-[30px] text-amber-200 ring-1 ring-inset ring-amber-400/30" style={{ width: width * 0.35 }}>
                   Headline
                 </div>
               )}
               {doc.layers.progressBarEnabled && (
-                <div className="absolute inset-y-1.5 rounded-md bg-violet-500/20 px-1.5 text-[9px] leading-[26px] text-violet-200 ring-1 ring-inset ring-violet-400/30" style={{ left: 0, width }}>
+                <div className="absolute inset-y-1.5 rounded-md bg-violet-500/20 px-1.5 text-[9px] leading-[30px] text-violet-200 ring-1 ring-inset ring-violet-400/30" style={{ left: 0, width }}>
                   Barra de progresso
                 </div>
               )}
