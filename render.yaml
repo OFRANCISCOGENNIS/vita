@@ -1,0 +1,79 @@
+# Blueprint do Render na RAIZ do repositório (o Render só detecta render.yaml aqui).
+# O projeto TrafegoAI fica na subpasta trafegoai/, então os caminhos abaixo
+# apontam para ./trafegoai/apps/*. Guia completo em trafegoai/DEPLOY.md.
+#
+# Uso: https://dashboard.render.com/blueprints → New Blueprint Instance →
+#      escolha este repo → Apply. Depois defina NEXT_PUBLIC_API_URL no
+#      serviço trafegoai-web (ver comentário no serviço) e faça um deploy limpo.
+
+databases:
+  - name: trafegoai-db
+    databaseName: trafegoai
+    user: trafegoai
+    plan: free
+
+services:
+  - type: redis
+    name: trafegoai-redis
+    plan: free
+    ipAllowList: []
+
+  - type: web
+    name: trafegoai-api
+    runtime: docker
+    dockerfilePath: ./trafegoai/apps/api/Dockerfile
+    dockerContext: ./trafegoai/apps/api
+    plan: free
+    dockerCommand: sh -c "npx prisma migrate deploy && npm run seed:ifempty && node dist/src/main.js"
+    healthCheckPath: /billing/plans
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase: { name: trafegoai-db, property: connectionString }
+      - key: REDIS_URL
+        fromService: { type: redis, name: trafegoai-redis, property: connectionString }
+      - key: JWT_SECRET
+        generateValue: true
+      - key: TOKEN_ENCRYPTION_KEY
+        generateValue: true
+      - key: PORT
+        value: "4000"
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: GOOGLE_ADS_CLIENT_ID
+        sync: false
+      - key: META_APP_ID
+        sync: false
+      - key: TIKTOK_APP_ID
+        sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+
+  - type: worker
+    name: trafegoai-worker
+    runtime: docker
+    dockerfilePath: ./trafegoai/apps/api/Dockerfile
+    dockerContext: ./trafegoai/apps/api
+    plan: free
+    dockerCommand: node dist/src/jobs/worker.main.js
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase: { name: trafegoai-db, property: connectionString }
+      - key: REDIS_URL
+        fromService: { type: redis, name: trafegoai-redis, property: connectionString }
+      - key: TOKEN_ENCRYPTION_KEY
+        fromService: { type: web, name: trafegoai-api, envVarKey: TOKEN_ENCRYPTION_KEY }
+
+  # Frontend Next.js. NEXT_PUBLIC_API_URL é embutido em BUILD time; a URL da API
+  # só existe após o 1º deploy. Depois de aplicar o blueprint:
+  #   1. Copie a URL de trafegoai-api (ex.: https://trafegoai-api.onrender.com)
+  #   2. trafegoai-web → Environment → NEXT_PUBLIC_API_URL = essa URL
+  #   3. Manual Deploy → Clear build cache & deploy
+  - type: web
+    name: trafegoai-web
+    runtime: docker
+    dockerfilePath: ./trafegoai/apps/web/Dockerfile
+    dockerContext: ./trafegoai/apps/web
+    plan: free
+    envVars:
+      - key: NEXT_PUBLIC_API_URL
+        sync: false
