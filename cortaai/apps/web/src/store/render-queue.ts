@@ -36,6 +36,15 @@ interface RenderQueueState {
     codec: "h264" | "h265";
     preset: string;
   }) => Promise<void>;
+  addCompleted: (params: {
+    cutId: string;
+    cutTitle: string;
+    projectTitle: string;
+    resolution: string;
+    fps: number;
+    codec: "h264" | "h265";
+    preset: string;
+  }) => void;
   remove: (id: string) => void;
   resumeSimulations: () => void;
 }
@@ -118,6 +127,25 @@ export const useRenderQueueStore = create<RenderQueueState>()(
           description: `"${params.cutTitle}" entrou na fila em ${params.resolution} ${params.fps}fps.`,
           variant: "info",
         });
+      },
+      // Exportação REAL feita no navegador (WebCodecs): registra o item já
+      // concluído — o arquivo foi baixado na hora, sem simulação de fila.
+      addCompleted: (params) => {
+        const item: RenderItem = {
+          id: `local-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+          cutId: params.cutId,
+          cutTitle: params.cutTitle,
+          projectTitle: params.projectTitle,
+          resolution: params.resolution,
+          fps: params.fps,
+          codec: params.codec,
+          preset: params.preset,
+          status: "done",
+          progress: 100,
+          etaSeconds: 0,
+          createdAt: new Date().toISOString(),
+        };
+        set((s) => ({ items: [item, ...s.items] }));
       },
       remove: (id) => {
         const timer = timers.get(id);
