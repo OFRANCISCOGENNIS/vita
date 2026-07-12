@@ -170,7 +170,7 @@ export default function LibraryPage() {
           {filtered.slice(0, 40).map((item) => (
             <Link
               key={item.cut.id}
-              href={`/app/editor/${item.cut.id.split("-v")[0]}`}
+              href={`/app/editor?cut=${item.cut.id.split("-v")[0]}`}
               onMouseEnter={() => setHovered(item.cut.id)}
               onMouseLeave={() => setHovered(null)}
               onFocus={() => setHovered(item.cut.id)}
@@ -222,7 +222,7 @@ export default function LibraryPage() {
               return (
                 <Link
                   key={item.cut.id}
-                  href={`/app/editor/${item.cut.id.split("-v")[0]}`}
+                  href={`/app/editor?cut=${item.cut.id.split("-v")[0]}`}
                   role="listitem"
                   className="absolute inset-x-0 flex items-center gap-4 border-b border-line/50 px-4 hover:bg-white/[0.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-violet-400"
                   style={{ top: index * ROW_HEIGHT, height: ROW_HEIGHT }}

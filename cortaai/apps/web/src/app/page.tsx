@@ -16,6 +16,7 @@ import {
 import { Logo } from "@/components/logo";
 import { Accordion } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export const metadata: Metadata = {
   title: "CortaAí — Descubra o que viraliza. Corte. Exporte em 4K.",
@@ -184,6 +185,7 @@ export default function LandingPage() {
             <a href="#faq" className="hover:text-white">Dúvidas</a>
           </nav>
           <div className="flex items-center gap-2">
+            <ThemeToggle />
             <Link
               href="/entrar"
               className="rounded-xl px-4 py-2 text-sm font-medium text-zinc-300 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"

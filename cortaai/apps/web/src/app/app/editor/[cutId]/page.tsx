@@ -1,26 +1,20 @@
-"use client";
+// Server wrapper: fornece generateStaticParams para o export estático (GitHub Pages).
+// O conteúdo interativo vive em client.tsx (client component com useParams()).
 
-// Editor route — the heavy editor bundle is lazy-loaded (next/dynamic).
+import { mockCuts, mockGenerations } from "@/lib/mock-data";
+import EditorPage from "./client";
 
-import dynamic from "next/dynamic";
-import { useParams } from "next/navigation";
-import { Skeleton } from "@/components/ui/skeleton";
+// Pré-gera as rotas de editor conhecidas (cortes + gerações do Estúdio) no build.
+export function generateStaticParams() {
+  const ids = new Set<string>();
+  mockCuts.forEach((c) => ids.add(c.id));
+  mockGenerations.forEach((g) => ids.add(g.id));
+  return Array.from(ids).map((cutId) => ({ cutId }));
+}
 
-const Editor = dynamic(() => import("@/components/editor/editor"), {
-  ssr: false,
-  loading: () => (
-    <div className="space-y-4 p-6" role="status" aria-label="Carregando editor">
-      <Skeleton className="h-12 w-full" />
-      <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
-        <Skeleton className="h-[420px] w-full" />
-        <Skeleton className="h-[420px] w-full" />
-      </div>
-      <Skeleton className="h-48 w-full" />
-    </div>
-  ),
-});
+// No export estático, só os params acima são gerados (demonstração).
+export const dynamicParams = false;
 
-export default function EditorPage() {
-  const params = useParams<{ cutId: string }>();
-  return <Editor cutId={params.cutId} />;
+export default function Page() {
+  return <EditorPage />;
 }

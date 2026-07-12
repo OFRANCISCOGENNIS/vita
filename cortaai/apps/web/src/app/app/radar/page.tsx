@@ -10,6 +10,7 @@ import { CAPTION_PRESETS, NICHES } from "@/lib/presets";
 import type { Niche, NicheAlert, NichePattern, TrendPeriod, TrendVideo } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { toast } from "@/store/toast";
+import { useFavoritesStore } from "@/store/favorites";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -69,7 +70,10 @@ function Chip({ active, onClick, children, ariaLabel }: { active: boolean; onCli
 }
 
 export default function RadarPage() {
-  const [tab, setTab] = useState<"trends" | "patterns">("trends");
+  const [tab, setTab] = useState<"trends" | "favorites" | "patterns">("trends");
+  const favIds = useFavoritesStore((s) => s.ids);
+  const favHydrated = useFavoritesStore((s) => s.hydrated);
+  const [allVideos, setAllVideos] = useState<TrendVideo[] | null>(null);
   const [niche, setNiche] = useState<Niche | "">("");
   const [query, setQuery] = useState("");
   const [period, setPeriod] = useState<TrendPeriod>("7d");
@@ -110,6 +114,14 @@ export default function RadarPage() {
   useEffect(() => {
     api.getNicheAlerts().then(setAlerts).catch(() => setAlerts([]));
   }, []);
+
+  // Unfiltered pool so the Favoritos tab shows every saved video, independent
+  // of the active trend filters.
+  useEffect(() => {
+    api.getTrends({ period: "30d" }).then((r) => setAllVideos(r.items)).catch(() => setAllVideos([]));
+  }, []);
+
+  const favVideos = (allVideos ?? []).filter((v) => favIds.includes(v.id));
 
   const patternNiche: Niche = (niche || "finanças") as Niche;
   useEffect(() => {
@@ -152,6 +164,7 @@ export default function RadarPage() {
         <Tabs
           tabs={[
             { id: "trends", label: "Tendências" },
+            { id: "favorites", label: favHydrated && favIds.length > 0 ? `Favoritos (${favIds.length})` : "Favoritos" },
             { id: "patterns", label: "Padrões do nicho" },
           ]}
           value={tab}
@@ -215,7 +228,26 @@ export default function RadarPage() {
         </div>
       </div>
 
-      {tab === "trends" ? (
+      {tab === "favorites" ? (
+        !favHydrated || allVideos === null ? (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {Array.from({ length: 3 }).map((_, i) => <SkeletonCard key={i} />)}
+          </div>
+        ) : favVideos.length === 0 ? (
+          <EmptyState
+            variant="radar"
+            title="Você ainda não favoritou nenhum vídeo"
+            description="Toque no coração de qualquer tendência para salvá-la aqui e acompanhar de perto."
+            action={<Button variant="secondary" onClick={() => setTab("trends")}>Explorar tendências</Button>}
+          />
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {favVideos.map((v) => (
+              <TrendCard key={v.id} video={v} />
+            ))}
+          </div>
+        )
+      ) : tab === "trends" ? (
         error ? (
           <EmptyState
             variant="radar"

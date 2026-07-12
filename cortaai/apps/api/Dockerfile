@@ -19,4 +19,5 @@ EXPOSE 8000
 
 # docker-compose overrides the command for worker (celery -A app.workers.celery_app worker)
 # and radar (celery -A app.workers.celery_app beat) containers.
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# ${PORT} é injetado por PaaS (Render/Railway); localmente cai no 8000.
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]

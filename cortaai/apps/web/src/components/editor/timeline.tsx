@@ -6,11 +6,16 @@
 import { useMemo, useRef, type MouseEvent } from "react";
 import { Captions, Film, Layers, Music2, Pause, Play, Scissors, SkipBack, ZoomIn, ZoomOut } from "lucide-react";
 import { cn, formatDuration, seededRandom } from "@/lib/utils";
+import { beatTimes, speedAt, TRANSITION_META } from "@/lib/edit-visuals";
 import { useEditorStore } from "@/store/editor";
 import { Slider } from "@/components/ui/slider";
 import { groupSentences } from "./sentences";
 
-const TRACK_H = 40;
+// Altura desktop das trilhas (px) — usada só na matemática do waveform SVG.
+// O tamanho visual dos rows vem das classes h-9 lg:h-11 (36px mobile / 44px
+// desktop) para a timeline roubar menos altura do vídeo no celular.
+const TRACK_H = 44;
+const TRACK_CLS = "h-9 lg:h-11";
 
 export function EditorTimeline() {
   const {
@@ -49,25 +54,30 @@ export function EditorTimeline() {
     return Math.min(duration, Math.max(0, x / timelineZoom));
   }
 
+  // Marcadores de batida (beat sync) na trilha de áudio.
+  const beats = doc.audioCapcut.beatSync ? beatTimes(doc.audioCapcut.bpm, duration) : [];
+
   const tickStep = timelineZoom >= 24 ? 1 : timelineZoom >= 10 ? 5 : 10;
   const ticks: number[] = [];
   for (let t = 0; t <= duration; t += tickStep) ticks.push(t);
 
   return (
-    <div className="border-t border-line bg-surface-1/70">
-      {/* Transport controls */}
-      <div className="flex items-center gap-2 px-4 py-2">
+    <div className="shrink-0 border-t border-line bg-surface-1/80">
+      {/* Transport controls — desktop; no mobile a linha de transporte fica acima da timeline */}
+      <div className="hidden items-center gap-2 px-4 py-1.5 lg:flex">
         <button
           onClick={() => seek(0)}
           aria-label="Voltar ao início"
-          className="rounded-lg p-1.5 text-zinc-400 hover:bg-white/5 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+          title="Voltar ao início"
+          className="rounded-lg p-2 text-zinc-400 transition-colors hover:bg-white/5 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
         >
           <SkipBack className="h-4 w-4" />
         </button>
         <button
           onClick={togglePlay}
           aria-label={playing ? "Pausar (Espaço)" : "Reproduzir (Espaço)"}
-          className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white shadow-glow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+          title={playing ? "Pausar (Espaço)" : "Reproduzir (Espaço)"}
+          className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white shadow-glow transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400 motion-reduce:transition-none"
         >
           {playing ? <Pause className="h-4 w-4" /> : <Play className="ml-0.5 h-4 w-4" />}
         </button>
@@ -75,7 +85,7 @@ export function EditorTimeline() {
           onClick={splitAtPlayhead}
           aria-label="Dividir no playhead (S)"
           title="Dividir no playhead (S)"
-          className="rounded-lg p-1.5 text-zinc-400 hover:bg-white/5 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+          className="rounded-lg p-2 text-zinc-400 transition-colors hover:bg-white/5 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
         >
           <Scissors className="h-4 w-4" />
         </button>
@@ -97,25 +107,25 @@ export function EditorTimeline() {
 
       {/* Tracks */}
       <div className="flex">
-        {/* Track labels */}
-        <div className="w-24 shrink-0 border-r border-line text-[10px] font-medium uppercase tracking-wide text-zinc-500">
+        {/* Track labels (desktop) */}
+        <div className="hidden w-24 shrink-0 border-r border-line text-[10px] font-medium uppercase tracking-wide text-zinc-500 lg:block">
           <div className="flex h-6 items-center px-3" aria-hidden />
-          <div className="flex items-center gap-1.5 px-3" style={{ height: TRACK_H }}>
+          <div className={cn("flex items-center gap-1.5 px-3", TRACK_CLS)}>
             <Film className="h-3 w-3" aria-hidden /> Vídeo
           </div>
-          <div className="flex items-center gap-1.5 px-3" style={{ height: TRACK_H }}>
+          <div className={cn("flex items-center gap-1.5 px-3", TRACK_CLS)}>
             <Captions className="h-3 w-3" aria-hidden /> Legendas
           </div>
-          <div className="flex items-center gap-1.5 px-3" style={{ height: TRACK_H }}>
+          <div className={cn("flex items-center gap-1.5 px-3", TRACK_CLS)}>
             <Music2 className="h-3 w-3" aria-hidden /> Áudio
           </div>
-          <div className="flex items-center gap-1.5 px-3" style={{ height: TRACK_H }}>
+          <div className={cn("flex items-center gap-1.5 px-3", TRACK_CLS)}>
             <Layers className="h-3 w-3" aria-hidden /> Camadas
           </div>
         </div>
 
         {/* Scrollable timeline */}
-        <div ref={scrollRef} className="min-w-0 flex-1 overflow-x-auto pb-3">
+        <div ref={scrollRef} className="editor-scroll min-w-0 flex-1 overflow-x-auto pb-1 lg:pb-2">
           <div
             className="relative cursor-crosshair"
             style={{ width }}
@@ -146,7 +156,7 @@ export function EditorTimeline() {
             </div>
 
             {/* Video track */}
-            <div className="relative border-b border-line/50" style={{ height: TRACK_H }}>
+            <div className={cn("relative border-b border-line/50", TRACK_CLS)}>
               <div className="absolute inset-1 overflow-hidden rounded-lg bg-gradient-to-r from-violet-800/60 to-fuchsia-800/40 ring-1 ring-inset ring-white/10">
                 <div className="flex h-full items-center gap-1 px-2" aria-hidden>
                   {Array.from({ length: Math.max(3, Math.floor(width / 64)) }).map((_, i) => (
@@ -168,9 +178,54 @@ export function EditorTimeline() {
                     }}
                   />
                 ))}
-              {/* splits */}
-              {doc.splits.map((s) => (
-                <span key={s} className="absolute inset-y-0 z-10 w-0.5 bg-amber-300" style={{ left: s * timelineZoom }} title={`Divisão em ${formatDuration(s)}`} />
+              {/* splits + transitions */}
+              {doc.splits.map((s) => {
+                const tr = doc.transitions.find((t) => t.at === s);
+                const meta = tr ? TRANSITION_META.find((m) => m.id === tr.type) : null;
+                return (
+                  <span key={s} className="absolute inset-y-0 z-10" style={{ left: s * timelineZoom }} title={meta ? `${meta.label} em ${formatDuration(s)}` : `Divisão em ${formatDuration(s)}`}>
+                    <span className="absolute inset-y-0 w-0.5 bg-amber-300" />
+                    {meta && (
+                      <span className="absolute -top-0.5 -left-2 rounded bg-fuchsia-600/90 px-0.5 text-[8px] leading-tight text-white" aria-hidden>
+                        {meta.emoji}
+                      </span>
+                    )}
+                  </span>
+                );
+              })}
+              {/* reframe keyframes */}
+              {doc.reframe.keyframes.map((k) => (
+                <span
+                  key={`rf-${k.t}`}
+                  className="absolute top-0.5 z-10 h-2 w-2 -translate-x-1/2 rotate-45 bg-fuchsia-400"
+                  style={{ left: k.t * timelineZoom }}
+                  title={`Reenquadrar ${k.zoom.toFixed(2)}x em ${formatDuration(k.t)}`}
+                />
+              ))}
+              {/* speed keyframes + ramp */}
+              {doc.speed.keyframes.length > 0 && (
+                <svg className="pointer-events-none absolute inset-x-0 bottom-0 z-[9] h-3" width={width} height={12} aria-hidden preserveAspectRatio="none">
+                  <polyline
+                    points={Array.from({ length: Math.max(2, Math.round(width / 8)) }, (_, i) => {
+                      const x = (i / Math.max(1, Math.round(width / 8) - 1)) * width;
+                      const t = x / timelineZoom;
+                      const rate = speedAt(doc.speed, t);
+                      const y = 12 - ((rate - 0.25) / (4 - 0.25)) * 12;
+                      return `${x.toFixed(1)},${y.toFixed(1)}`;
+                    }).join(" ")}
+                    fill="none"
+                    stroke="#fbbf24"
+                    strokeWidth={1.5}
+                  />
+                </svg>
+              )}
+              {doc.speed.keyframes.map((k) => (
+                <span
+                  key={`sp-${k.t}`}
+                  className="absolute bottom-0.5 z-10 h-2 w-2 -translate-x-1/2 rotate-45 bg-amber-400"
+                  style={{ left: k.t * timelineZoom }}
+                  title={`${k.rate.toFixed(2)}x em ${formatDuration(k.t)}`}
+                />
               ))}
               {/* in/out shading */}
               {doc.inPoint != null && (
@@ -182,12 +237,12 @@ export function EditorTimeline() {
             </div>
 
             {/* Captions track */}
-            <div className="relative border-b border-line/50" style={{ height: TRACK_H }}>
+            <div className={cn("relative border-b border-line/50", TRACK_CLS)}>
               {sentences.map((s) => (
                 <div
                   key={s.key}
                   className={cn(
-                    "absolute inset-y-1.5 overflow-hidden whitespace-nowrap rounded-md px-1.5 text-[9px] leading-[26px] ring-1 ring-inset",
+                    "absolute inset-y-1.5 flex items-center overflow-hidden whitespace-nowrap rounded-md px-1.5 text-[9px] ring-1 ring-inset",
                     doc.removedSentenceKeys.includes(s.key)
                       ? "bg-zinc-800/60 text-zinc-600 ring-zinc-700 line-through"
                       : "bg-sky-500/20 text-sky-200 ring-sky-400/30",
@@ -204,8 +259,8 @@ export function EditorTimeline() {
             </div>
 
             {/* Audio track (waveform) */}
-            <div className="relative border-b border-line/50" style={{ height: TRACK_H }}>
-              <svg width={width} height={TRACK_H} className="absolute inset-0" aria-hidden preserveAspectRatio="none">
+            <div className={cn("relative border-b border-line/50", TRACK_CLS)}>
+              <svg viewBox={`0 0 ${width} ${TRACK_H}`} className="absolute inset-0 h-full w-full" aria-hidden preserveAspectRatio="none">
                 {waveform.map((v, i) => {
                   const x = (i / waveform.length) * width;
                   const h = v * (TRACK_H - 12);
@@ -222,22 +277,54 @@ export function EditorTimeline() {
                   );
                 })}
               </svg>
+              {/* fade in/out handles */}
+              {doc.audioAdvanced.fadeInSec > 0 && (
+                <div
+                  className="pointer-events-none absolute inset-y-0 left-0 z-10"
+                  style={{ width: Math.min(width, doc.audioAdvanced.fadeInSec * timelineZoom), background: "linear-gradient(to right, rgba(0,0,0,0.7), transparent)" }}
+                  title={`Fade in ${doc.audioAdvanced.fadeInSec.toFixed(1)}s`}
+                  aria-hidden
+                />
+              )}
+              {doc.audioAdvanced.fadeOutSec > 0 && (
+                <div
+                  className="pointer-events-none absolute inset-y-0 right-0 z-10"
+                  style={{ width: Math.min(width, doc.audioAdvanced.fadeOutSec * timelineZoom), background: "linear-gradient(to left, rgba(0,0,0,0.7), transparent)" }}
+                  title={`Fade out ${doc.audioAdvanced.fadeOutSec.toFixed(1)}s`}
+                  aria-hidden
+                />
+              )}
+              {/* Beat markers (beat sync) */}
+              {beats.map((b, i) => (
+                <span
+                  key={`beat-${i}`}
+                  className="pointer-events-none absolute inset-y-0 z-10 w-px bg-fuchsia-400/70"
+                  style={{ left: b * timelineZoom }}
+                  title={`Batida em ${formatDuration(b)}`}
+                  aria-hidden
+                />
+              ))}
               {doc.audio.musicTrack && (
-                <span className="absolute left-2 top-1 rounded bg-black/60 px-1.5 text-[9px] text-emerald-200">
+                <span className="absolute left-2 top-1 z-20 rounded bg-black/60 px-1.5 text-[9px] text-emerald-200">
                   🎵 {doc.audio.musicTrack}
+                </span>
+              )}
+              {doc.audioCapcut.beatSync && (
+                <span className="absolute right-2 top-1 z-20 rounded bg-fuchsia-500/20 px-1.5 text-[9px] font-medium text-fuchsia-200">
+                  ♪ {beats.length} batidas
                 </span>
               )}
             </div>
 
-            {/* Layers track */}
-            <div className="relative" style={{ height: TRACK_H }}>
+            {/* Layers track (desktop — no mobile a timeline segue o padrão CapCut: vídeo + legendas + áudio) */}
+            <div className={cn("relative hidden lg:block", TRACK_CLS)}>
               {doc.layers.headlineEnabled && (
-                <div className="absolute inset-y-1.5 left-0 rounded-md bg-amber-500/20 px-1.5 text-[9px] leading-[26px] text-amber-200 ring-1 ring-inset ring-amber-400/30" style={{ width: width * 0.35 }}>
+                <div className="absolute inset-y-1.5 left-0 flex items-center rounded-md bg-amber-500/20 px-1.5 text-[9px] text-amber-200 ring-1 ring-inset ring-amber-400/30" style={{ width: width * 0.35 }}>
                   Headline
                 </div>
               )}
               {doc.layers.progressBarEnabled && (
-                <div className="absolute inset-y-1.5 rounded-md bg-violet-500/20 px-1.5 text-[9px] leading-[26px] text-violet-200 ring-1 ring-inset ring-violet-400/30" style={{ left: 0, width }}>
+                <div className="absolute inset-y-1.5 flex items-center rounded-md bg-violet-500/20 px-1.5 text-[9px] text-violet-200 ring-1 ring-inset ring-violet-400/30" style={{ left: 0, width }}>
                   Barra de progresso
                 </div>
               )}

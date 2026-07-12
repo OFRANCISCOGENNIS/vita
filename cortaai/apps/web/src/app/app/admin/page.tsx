@@ -1,198 +1,180 @@
 "use client";
 
-// Admin area: metric cards, users table and jobs queue table.
+// Painel do ADM · Visão geral — KPIs da plataforma + gráficos (Recharts).
 
 import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import {
-  Activity,
-  AlertOctagon,
+  AlertTriangle,
+  ArrowDownRight,
+  ArrowUpRight,
+  CalendarClock,
   Clock,
+  ListChecks,
+  Scissors,
+  TrendingUp,
   UserCheck,
   Users,
+  Wand2,
 } from "lucide-react";
-import * as api from "@/lib/api";
-import { MOCK_NOW } from "@/lib/mock-data";
-import type { AdminMetrics, AdminUserRow, Job } from "@/lib/types";
-import { formatCompact, timeAgo } from "@/lib/utils";
-import { useAuthStore } from "@/store/auth";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import {
+  adminUsageSeries,
+  cutsByNiche,
+  cutsByPlatform,
+  platformMetrics,
+  type AdminUsagePoint,
+  type BreakdownSlice,
+  type PlatformMetric,
+} from "@/lib/admin-data";
+import { cn, formatCompact } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 
-const jobTypeLabels: Record<Job["type"], string> = {
-  import: "Importação",
-  transcribe: "Transcrição",
-  analyze: "Análise",
-  render: "Render",
-  radar_scan: "Varredura do Radar",
+const AdminUsageChart = dynamic(() => import("@/components/admin-charts").then((m) => m.AdminUsageChart), {
+  ssr: false,
+  loading: () => <Skeleton className="h-[280px] w-full" />,
+});
+const AdminBreakdownChart = dynamic(() => import("@/components/admin-charts").then((m) => m.AdminBreakdownChart), {
+  ssr: false,
+  loading: () => <Skeleton className="h-[280px] w-full" />,
+});
+const AdminPlatformChart = dynamic(() => import("@/components/admin-charts").then((m) => m.AdminPlatformChart), {
+  ssr: false,
+  loading: () => <Skeleton className="h-[220px] w-full" />,
+});
+
+const METRIC_ICONS: Record<string, typeof Users> = {
+  totalUsers: Users,
+  activeToday: UserCheck,
+  active7d: CalendarClock,
+  cutsGenerated: Scissors,
+  minutesProcessed: Clock,
+  jobsQueued: ListChecks,
+  generations: Wand2,
+  errorRate: AlertTriangle,
 };
 
-const jobStatusBadge: Record<Job["status"], { label: string; variant: "default" | "info" | "success" | "danger" }> = {
-  queued: { label: "Na fila", variant: "default" },
-  running: { label: "Rodando", variant: "info" },
-  done: { label: "Concluído", variant: "success" },
-  error: { label: "Erro", variant: "danger" },
-};
+function metricValue(m: PlatformMetric): string {
+  if (m.key === "errorRate") return `${m.value.toFixed(1).replace(".", ",")}%`;
+  return formatCompact(m.value);
+}
 
-export default function AdminPage() {
-  const user = useAuthStore((s) => s.user);
-  const [metrics, setMetrics] = useState<AdminMetrics | null>(null);
-  const [users, setUsers] = useState<AdminUserRow[] | null>(null);
-  const [jobs, setJobs] = useState<Job[] | null>(null);
+interface Data {
+  metrics: PlatformMetric[];
+  usage: AdminUsagePoint[];
+  niche: BreakdownSlice[];
+  platform: BreakdownSlice[];
+}
+
+export default function AdminOverviewPage() {
+  const [data, setData] = useState<Data | null>(null);
   const [error, setError] = useState(false);
 
   function load() {
     setError(false);
-    setMetrics(null);
-    setUsers(null);
-    setJobs(null);
-    Promise.all([api.adminMetrics(), api.adminUsers(), api.adminJobs()])
-      .then(([m, u, j]) => {
-        setMetrics(m);
-        setUsers(u);
-        setJobs(j);
-      })
-      .catch(() => setError(true));
+    setData(null);
+    const t = setTimeout(() => {
+      try {
+        setData({
+          metrics: platformMetrics,
+          usage: adminUsageSeries,
+          niche: cutsByNiche,
+          platform: cutsByPlatform,
+        });
+      } catch {
+        setError(true);
+      }
+    }, 380);
+    return () => clearTimeout(t);
   }
   useEffect(load, []);
-
-  if (user && !user.isAdmin) {
-    return (
-      <EmptyState
-        variant="queue"
-        title="Acesso restrito"
-        description="Esta área é exclusiva para administradores da plataforma."
-      />
-    );
-  }
 
   if (error) {
     return (
       <EmptyState
         variant="queue"
-        title="Falha ao carregar os dados de admin"
+        title="Falha ao carregar a visão geral"
+        description="Não foi possível montar os indicadores da plataforma."
         action={<Button onClick={load}>Tentar novamente</Button>}
       />
     );
   }
 
-  const statCards = metrics
-    ? [
-        { label: "Usuários", value: formatCompact(metrics.totalUsers), icon: <Users className="h-4 w-4 text-violet-400" /> },
-        { label: "Usuários ativos", value: formatCompact(metrics.activeUsers), icon: <UserCheck className="h-4 w-4 text-fuchsia-400" /> },
-        { label: "Minutos hoje", value: formatCompact(metrics.minutesProcessedToday), icon: <Clock className="h-4 w-4 text-sky-400" /> },
-        { label: "Renders na fila", value: String(metrics.rendersQueued), icon: <Activity className="h-4 w-4 text-amber-400" /> },
-        { label: "Taxa de erro", value: `${metrics.errorRatePct.toFixed(1).replace(".", ",")}%`, icon: <AlertOctagon className="h-4 w-4 text-rose-400" /> },
-      ]
-    : [];
-
   return (
-    <div className="mx-auto max-w-6xl space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-white">Admin</h1>
-        <p className="mt-1 text-sm text-zinc-500">Métricas da plataforma, usuários e fila de jobs.</p>
-      </div>
+    <div className="space-y-6">
+      {/* KPIs */}
+      <section aria-label="Indicadores da plataforma" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {data === null
+          ? Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-[104px] w-full rounded-2xl" />)
+          : data.metrics.map((m) => {
+              const Icon = METRIC_ICONS[m.key] ?? TrendingUp;
+              const positive = m.deltaPct >= 0;
+              // Para taxa de erro, cair é bom → inverte a cor.
+              const good = m.key === "errorRate" ? !positive : positive;
+              return (
+                <Card key={m.key} className="transition-colors hover:border-amber-500/30">
+                  <CardContent className="pt-4">
+                    <div className="flex items-center justify-between">
+                      <p className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-zinc-500">
+                        <Icon className="h-4 w-4 text-amber-400" aria-hidden /> {m.label}
+                      </p>
+                      <span
+                        className={cn(
+                          "inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold",
+                          good ? "bg-emerald-500/15 text-emerald-300" : "bg-rose-500/15 text-rose-300",
+                        )}
+                      >
+                        {positive ? <ArrowUpRight className="h-3 w-3" aria-hidden /> : <ArrowDownRight className="h-3 w-3" aria-hidden />}
+                        {Math.abs(m.deltaPct).toFixed(1).replace(".", ",")}%
+                      </span>
+                    </div>
+                    <p className="mt-2 text-2xl font-extrabold text-white">{metricValue(m)}</p>
+                    <p className="mt-0.5 text-[11px] text-zinc-500">{m.hint}</p>
+                  </CardContent>
+                </Card>
+              );
+            })}
+      </section>
 
-      <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-5">
-        {metrics === null
-          ? Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-24 w-full" />)
-          : statCards.map((s) => (
-              <Card key={s.label}>
-                <CardContent className="pt-4">
-                  <p className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-zinc-500">
-                    {s.icon} {s.label}
-                  </p>
-                  <p className="mt-2 text-xl font-extrabold text-white">{s.value}</p>
-                </CardContent>
-              </Card>
-            ))}
-      </div>
-
+      {/* Uso ao longo do tempo */}
       <Card>
-        <CardHeader>
-          <CardTitle>Usuários</CardTitle>
+        <CardHeader className="flex-row items-center justify-between">
+          <CardTitle>
+            <TrendingUp className="mr-2 inline h-4 w-4 text-amber-400" aria-hidden />
+            Uso da plataforma — últimos 14 dias
+          </CardTitle>
+          <div className="hidden items-center gap-4 text-xs text-zinc-500 sm:flex">
+            <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-amber-500" aria-hidden /> Minutos</span>
+            <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-violet-500" aria-hidden /> Gerações</span>
+            <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-fuchsia-500" aria-hidden /> Cortes</span>
+          </div>
         </CardHeader>
         <CardContent>
-          {users === null ? (
-            <Skeleton className="h-56 w-full" />
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead>
-                  <tr className="border-b border-line text-xs uppercase tracking-wide text-zinc-500">
-                    <th className="py-2.5 pr-4 font-medium">Usuário</th>
-                    <th className="py-2.5 pr-4 font-medium">Projetos</th>
-                    <th className="py-2.5 font-medium">Cadastro</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {users.map((u) => (
-                    <tr key={u.id} className="border-b border-line/50 hover:bg-white/[0.02]">
-                      <td className="py-3 pr-4">
-                        <p className="font-medium text-zinc-100">{u.name}</p>
-                        <p className="text-xs text-zinc-500">{u.email}</p>
-                      </td>
-                      <td className="py-3 pr-4 font-mono text-zinc-300">{u.projectsCount.toLocaleString("pt-BR")}</td>
-                      <td className="py-3 text-xs text-zinc-500">{timeAgo(u.createdAt, MOCK_NOW)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+          {data === null ? <Skeleton className="h-[280px] w-full" /> : <AdminUsageChart data={data.usage} />}
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Fila de jobs</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {jobs === null ? (
-            <Skeleton className="h-56 w-full" />
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead>
-                  <tr className="border-b border-line text-xs uppercase tracking-wide text-zinc-500">
-                    <th className="py-2.5 pr-4 font-medium">Job</th>
-                    <th className="py-2.5 pr-4 font-medium">Status</th>
-                    <th className="py-2.5 pr-4 font-medium">Progresso</th>
-                    <th className="py-2.5 font-medium">Criado</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {jobs.map((j) => {
-                    const st = jobStatusBadge[j.status];
-                    return (
-                      <tr key={j.id} className="border-b border-line/50 hover:bg-white/[0.02]">
-                        <td className="py-3 pr-4">
-                          <p className="font-medium text-zinc-100">{jobTypeLabels[j.type]}</p>
-                          <p className="font-mono text-[11px] text-zinc-600">{j.id.slice(0, 12)}…</p>
-                          {j.errorMessage && <p className="mt-0.5 text-xs text-rose-400">{j.errorMessage}</p>}
-                        </td>
-                        <td className="py-3 pr-4">
-                          <Badge variant={st.variant}>{st.label}</Badge>
-                        </td>
-                        <td className="w-48 py-3 pr-4">
-                          <Progress value={j.progress} label={`Progresso do job ${jobTypeLabels[j.type]}`} />
-                          <p className="mt-1 text-[11px] text-zinc-500">
-                            {j.progress}%{j.etaSeconds != null && j.status === "running" ? ` · ETA ${Math.round(j.etaSeconds / 60)} min` : ""}
-                          </p>
-                        </td>
-                        <td className="py-3 text-xs text-zinc-500">{timeAgo(j.createdAt, MOCK_NOW)}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      {/* Quebra por nicho + plataforma */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Cortes por nicho</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {data === null ? <Skeleton className="h-[280px] w-full" /> : <AdminBreakdownChart data={data.niche} kind="niche" />}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Cortes por plataforma de destino</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {data === null ? <Skeleton className="h-[220px] w-full" /> : <AdminPlatformChart data={data.platform} />}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

@@ -1,0 +1,73 @@
+name: Deploy CortaAí (frontend) to GitHub Pages
+
+# Publica o frontend estático (apps/web) no GitHub Pages a cada push na main.
+# O build roda nos runners do GitHub — não depende da rede do ambiente de dev.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "cortaai/apps/web/**"
+      - ".github/workflows/deploy-pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Um deploy por vez; não cancela um deploy em andamento.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cortaai/apps/web
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: cortaai/apps/web/package-lock.json
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Build estático (Next.js export)
+        env:
+          PAGES_EXPORT: "1"
+          PAGES_BASE_PATH: "/anonymousKS"
+          # Client ID público do Google OAuth (login pelo navegador via GIS).
+          # Client IDs não são segredo — podem ficar no repositório.
+          NEXT_PUBLIC_GOOGLE_CLIENT_ID: "37663642014-g9tdm5ctfqn465ta627a5oe3127idk1l.apps.googleusercontent.com"
+        run: |
+          npm run build
+          touch out/.nojekyll
+
+      - name: Configurar Pages
+        uses: actions/configure-pages@v5
+        with:
+          # Habilita o GitHub Pages automaticamente na primeira execução.
+          enablement: true
+
+      - name: Upload do artefato
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: cortaai/apps/web/out
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy no GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

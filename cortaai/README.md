@@ -20,6 +20,25 @@ Interface 100% em português do Brasil.
 
 ---
 
+## Backend real em 1 clique (Render, grátis)
+
+O site publicado (GitHub Pages) roda em modo demonstração. Para ligar o Radar
+com dados ao vivo, transcrição no servidor, renderização final e o Estúdio IA
+de verdade:
+
+1. Crie uma conta em [render.com](https://render.com) (dá para entrar com o GitHub).
+2. Clique em **[Deploy no Render](https://render.com/deploy?repo=https://github.com/OFRANCISCOGENNIS/anonymousKS)**
+   (New → Blueprint → este repositório). O `render.yaml` da raiz configura tudo
+   sozinho — plano **grátis**, contêiner único com SQLite/tarefas inline/ffmpeg.
+3. Ao terminar (~5 min), copie a URL do serviço (ex.:
+   `https://cortaai-api.onrender.com`).
+4. No site do CortaAí, abra **Configurações → Backend real** e cole a URL em
+   **Testar e conectar**. Pronto.
+
+Notas do plano grátis: o serviço hiberna após ~15 min ocioso (a primeira
+chamada demora ~1 min para acordar) e o disco é efêmero. Para dados
+persistentes, aponte `DATABASE_URL` para um Postgres.
+
 ## Subindo tudo com um comando
 
 Pré-requisitos: Docker + Docker Compose.

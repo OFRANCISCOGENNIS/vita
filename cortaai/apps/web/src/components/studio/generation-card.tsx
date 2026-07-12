@@ -48,7 +48,7 @@ export function GenerationCard({ gen }: { gen: Generation }) {
     try {
       const cut = await api.studioGenerationToCut(gen.id, gen.projectId);
       toast("Geração enviada ao editor", { description: "Abrindo o corte no editor…", variant: "success" });
-      router.push(`/app/editor/${cut.id}`);
+      router.push(`/app/editor?cut=${cut.id}`);
     } catch {
       toast("Não foi possível abrir no editor", { variant: "error" });
       setBusy(null);

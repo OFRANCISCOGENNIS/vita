@@ -36,6 +36,7 @@ import type {
   GenerationParams,
   ImageToVideoParams,
   Job,
+  Language,
   LipSyncParams,
   MotionBrushParams,
   Niche,
@@ -52,10 +53,39 @@ import type {
   UrlPreview,
   User,
 } from "./types";
-import { svgThumb, uid } from "./utils";
+import { decodeGoogleJwt } from "./google";
+import { getBackendUrl } from "./backend";
+import { isAdminEmail } from "./admins";
+import { friendlyMediaTitle, svgThumb, uid } from "./utils";
+import { addUserCut, addUserGeneration, addUserProject, isDemoSession, readUserData } from "./session-scope";
+import { ensureProjectProfile, generateSmartCuts } from "./smart-cuts";
+import type { WizardAnswers } from "./cut-wizard";
+import type { AnalysisProgress } from "./video-analysis";
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
-const TIMEOUT_MS = 1500;
+/** Dashboard stats for a real (non-demo) user who has no seeded activity. */
+function emptyDashboardStats(): DashboardStats {
+  const { projects } = readUserData();
+  return {
+    minutesProcessed: 0,
+    cutsGenerated: 0,
+    recentProjects: projects.slice(0, 6),
+    usageSeries: [],
+    nicheHighlights: [],
+  };
+}
+
+// URL base: um backend REAL conectado em Configurações (localStorage) tem
+// prioridade; sem ele, a env de build; sem ambos, localhost (dev). Com backend
+// conectado o timeout é maior — a intenção é usar a API de verdade, não cair
+// no mock por lentidão de rede.
+function apiBase(): string {
+  const custom = getBackendUrl();
+  if (custom) return `${custom}/api/v1`;
+  return process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
+}
+function timeoutMs(): number {
+  return getBackendUrl() ? 12_000 : 1500;
+}
 
 let authToken: string | null = null;
 export function setAuthToken(token: string | null) {
@@ -74,8 +104,8 @@ async function request<T>(
 ): Promise<T> {
   try {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
-    const res = await fetch(`${BASE_URL}${path}`, {
+    const timer = setTimeout(() => controller.abort(), timeoutMs());
+    const res = await fetch(`${apiBase()}${path}`, {
       ...init,
       signal: controller.signal,
       headers: {
@@ -97,27 +127,71 @@ async function request<T>(
 
 // ---------------------------------------------------------------- auth
 
+/**
+ * Deriva um nome amigável a partir do e-mail — para o login demo não gerar
+ * todos os usuários com o mesmo nome. Ex.: "joao.silva@gmail.com" → "Joao Silva".
+ */
+export function nameFromEmail(email: string): string {
+  const local = (email.split("@")[0] ?? "").trim();
+  const words = local
+    .split(/[._-]+/)
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+  return words.length ? words.join(" ") : "Usuário";
+}
+
 export async function login(email: string, _password: string): Promise<{ token: string; user: User }> {
-  return request(`/auth/login`, () => ({ token: `mock-token-${uid()}`, user: { ...mockUser, email } }), {
-    method: "POST",
-    body: JSON.stringify({ email, password: _password }),
-  });
+  return request(
+    `/auth/login`,
+    () => ({
+      token: `mock-token-${uid()}`,
+      // Demo: usuário fresco derivado do e-mail — não é a Marina nem admin.
+      user: { ...mockUser, id: uid(), email, name: nameFromEmail(email), isAdmin: isAdminEmail(email) },
+    }),
+    {
+      method: "POST",
+      body: JSON.stringify({ email, password: _password }),
+    },
+  );
 }
 
 export async function register(name: string, email: string, password: string): Promise<{ token: string; user: User }> {
   return request(
     `/auth/register`,
-    () => ({ token: `mock-token-${uid()}`, user: { ...mockUser, name, email } }),
+    () => ({
+      token: `mock-token-${uid()}`,
+      user: { ...mockUser, id: uid(), name, email, isAdmin: isAdminEmail(email) },
+    }),
     { method: "POST", body: JSON.stringify({ name, email, password }) },
   );
 }
 
-// INTEGRAÇÃO PAGA/EXTERNA: Google OAuth — o id_token real viria do SDK do Google.
+// INTEGRAÇÃO EXTERNA: Google Sign-In (GIS). O idToken é um JWT real assinado
+// pelo Google. Sem backend, decodificamos o payload no cliente para montar o
+// usuário com nome/e-mail/foto REAIS. Com backend, o idToken é validado lá.
 export async function loginGoogle(idToken: string): Promise<{ token: string; user: User }> {
-  return request(`/auth/google`, () => ({ token: `mock-google-${uid()}`, user: mockUser }), {
-    method: "POST",
-    body: JSON.stringify({ id_token: idToken }),
-  });
+  return request(
+    `/auth/google`,
+    () => {
+      const { sub, email, name, picture } = decodeGoogleJwt(idToken);
+      if (!sub || !email) throw new Error("Perfil do Google incompleto");
+      const user: User = {
+        id: sub,
+        email,
+        name: name || nameFromEmail(email),
+        avatarUrl: picture || null,
+        googleId: sub,
+        brandingKit: mockUser.brandingKit,
+        isAdmin: isAdminEmail(email),
+        createdAt: new Date().toISOString(),
+      };
+      return { token: `mock-google-${uid()}`, user };
+    },
+    {
+      method: "POST",
+      body: JSON.stringify({ id_token: idToken }),
+    },
+  );
 }
 
 export async function passwordReset(email: string): Promise<void> {
@@ -290,34 +364,149 @@ export async function uploadInit(
   );
 }
 
-export async function uploadComplete(uploadId: string, filename: string): Promise<Project> {
+/**
+ * Builds ONE default Cut spanning the whole source (0 → duration) so a freshly
+ * created project is immediately editable. Carries the media reference
+ * (mediaId/mediaUrl) so the editor can replay the real video.
+ */
+function makeDefaultCut(
+  projectId: string,
+  opts: { title: string; durationSeconds: number; mediaId?: string; mediaUrl?: string },
+): Cut {
+  const dur = opts.durationSeconds > 0 ? Math.round(opts.durationSeconds * 100) / 100 : 0;
+  return {
+    id: uid(),
+    projectId,
+    title: opts.title,
+    titleOptions: [opts.title],
+    description: "",
+    hashtags: [],
+    startSeconds: 0,
+    endSeconds: dur,
+    viralScore: 0,
+    scoreBreakdown: { hook: 0, retention: 0, emotion: 0, nicheFit: 0 },
+    transcript: [],
+    mode: "manual",
+    suggestedSound: { track: "Sem trilha", reason: "adicione uma trilha no editor", trendVideoId: "" },
+    bestPostTime: "—",
+    status: "suggested",
+    editState: null,
+    createdAt: new Date().toISOString(),
+    ...(opts.mediaId ? { mediaId: opts.mediaId } : {}),
+    ...(opts.mediaUrl ? { mediaUrl: opts.mediaUrl } : {}),
+  };
+}
+
+export interface UploadCompleteMeta {
+  mediaId?: string;
+  durationSeconds?: number;
+  thumbnailUrl?: string;
+  language?: Language;
+}
+
+export async function uploadComplete(
+  uploadId: string,
+  filename: string,
+  meta: UploadCompleteMeta = {},
+): Promise<Project> {
   return request(
     `/projects/upload-complete`,
-    () => ({
-      ...mockProjects[1],
-      id: uid(),
-      title: filename.replace(/\.[a-z0-9]+$/i, ""),
-      originalFilename: filename,
-      sourceType: "upload" as const,
-      status: "transcribing" as const,
-      thumbnailUrl: svgThumb(filename, "tecnologia"),
-      createdAt: new Date().toISOString(),
-    }),
+    () => {
+      const title = friendlyMediaTitle(filename);
+      const durationSeconds =
+        meta.durationSeconds && meta.durationSeconds > 0 ? Math.round(meta.durationSeconds) : 0;
+      const project: Project = {
+        ...mockProjects[1],
+        id: uid(),
+        title,
+        originalFilename: filename,
+        sourceType: "upload" as const,
+        sourceUrl: null,
+        durationSeconds,
+        // Real local upload → media is available now, so it's editable at once.
+        status: "ready" as const,
+        language: meta.language && meta.language !== "auto" ? meta.language : mockProjects[1].language,
+        thumbnailUrl: meta.thumbnailUrl || svgThumb(title, "tecnologia"),
+        storageKey: `local/${meta.mediaId ?? uid()}`,
+        createdAt: new Date().toISOString(),
+        ...(meta.mediaId ? { mediaId: meta.mediaId } : {}),
+      };
+      addUserProject(project);
+      // Default full-length cut so the editor opens on real playable media.
+      const cut = makeDefaultCut(project.id, {
+        title,
+        durationSeconds,
+        mediaId: meta.mediaId,
+      });
+      addUserCut(cut);
+      return project;
+    },
     { method: "POST", body: JSON.stringify({ uploadId }) },
+  );
+}
+
+/**
+ * Import a DIRECT playable video URL (.mp4/.webm). 100% client-side: the URL is
+ * stored as the project/cut mediaUrl and the editor streams it directly.
+ */
+export async function importDirectUrl(
+  url: string,
+  quality: Resolution,
+  meta: { title?: string; durationSeconds?: number; thumbnailUrl?: string } = {},
+): Promise<Project> {
+  return request(
+    `/projects/import-url`,
+    () => {
+      const title = meta.title || friendlyMediaTitle(url.split("/").pop() ?? "") || "Vídeo importado";
+      const durationSeconds =
+        meta.durationSeconds && meta.durationSeconds > 0 ? Math.round(meta.durationSeconds) : 0;
+      const project: Project = {
+        ...mockProjects[0],
+        id: uid(),
+        title,
+        sourceType: "upload" as const,
+        sourceUrl: url,
+        originalFilename: null,
+        durationSeconds,
+        resolution: quality,
+        status: "ready" as const,
+        thumbnailUrl: meta.thumbnailUrl || svgThumb(title, "tecnologia"),
+        storageKey: `remote/${uid()}`,
+        createdAt: new Date().toISOString(),
+        mediaUrl: url,
+      };
+      addUserProject(project);
+      const cut = makeDefaultCut(project.id, { title, durationSeconds, mediaUrl: url });
+      addUserCut(cut);
+      return project;
+    },
+    { method: "POST", body: JSON.stringify({ url, quality, direct: true }) },
   );
 }
 
 export async function importUrl(url: string, quality: Resolution): Promise<Project> {
   return request(
     `/projects/import-url`,
-    () => ({
-      ...mockProjects[0],
-      id: uid(),
-      sourceUrl: url,
-      resolution: quality,
-      status: "importing" as const,
-      createdAt: new Date().toISOString(),
-    }),
+    () => {
+      const project: Project = {
+        ...mockProjects[0],
+        id: uid(),
+        sourceUrl: url,
+        resolution: quality,
+        // No backend at runtime: we can't download/transcode YouTube/Twitch/Vimeo
+        // in the browser. Create the project (so navigation works) but flag that
+        // real download + processing needs the connected backend — no fake play.
+        status: "ready" as const,
+        storageKey: `remote/${uid()}`,
+        createdAt: new Date().toISOString(),
+        processingNote:
+          "Este link exige o backend conectado para baixar e processar o vídeo. " +
+          "No modo demo (site estático), a reprodução do vídeo real não está disponível — " +
+          "envie um arquivo local ou cole um link direto .mp4/.webm para editar com o vídeo de verdade.",
+      };
+      addUserProject(project);
+      return project;
+    },
     { method: "POST", body: JSON.stringify({ url, quality }) },
   );
 }
@@ -342,12 +531,12 @@ export async function urlPreview(url: string): Promise<UrlPreview> {
 }
 
 export async function listProjects(): Promise<Project[]> {
-  return request(`/projects`, () => mockProjects);
+  return request(`/projects`, () => (isDemoSession() ? mockProjects : readUserData().projects));
 }
 
 export async function getProject(id: string): Promise<Project> {
   return request(`/projects/${id}`, () => {
-    const found = mockProjects.find((p) => p.id === id);
+    const found = readUserData().projects.find((p) => p.id === id) ?? mockProjects.find((p) => p.id === id);
     if (!found) throw new Error("Projeto não encontrado");
     return found;
   });
@@ -357,28 +546,71 @@ export async function deleteProject(id: string): Promise<void> {
   return request(`/projects/${id}`, () => undefined, { method: "DELETE" });
 }
 
+export interface GenerateCutsOptions {
+  /** Wizard ("Assistente de cortes") answers steering segments + copy. */
+  answers?: WizardAnswers | null;
+  /** Real-time analysis progress (áudio → cenas → seleção). */
+  onProgress?: (p: AnalysisProgress) => void;
+}
+
 export async function generateCuts(
   projectId: string,
   mode: CutMode,
   aggressiveness: number,
   count: number,
+  opts: GenerateCutsOptions = {},
 ): Promise<{ jobId: string }> {
-  return request(`/projects/${projectId}/generate-cuts`, () => ({ jobId: uid() }), {
-    method: "POST",
-    body: JSON.stringify({ mode, aggressiveness, count }),
-  });
+  return request(
+    `/projects/${projectId}/generate-cuts`,
+    async () => {
+      // Standalone generation: analyze the REAL media in the browser (audio
+      // energy + scene changes) and select/score segments from that signal —
+      // see lib/smart-cuts.ts. For a real (non-demo) user the cuts are
+      // persisted so they show up in the project grid and Biblioteca. The demo
+      // account keeps its curated seed cuts untouched (profile is still
+      // computed so the "Análise do vídeo" card works).
+      const project =
+        readUserData().projects.find((p) => p.id === projectId) ??
+        mockProjects.find((p) => p.id === projectId);
+      if (project) {
+        if (!isDemoSession()) {
+          const { cuts } = await generateSmartCuts(project, {
+            mode,
+            aggressiveness,
+            count,
+            answers: opts.answers ?? null,
+            onProgress: opts.onProgress,
+          });
+          cuts.forEach(addUserCut);
+        } else {
+          await ensureProjectProfile(project, opts.onProgress).catch(() => null);
+        }
+      }
+      return { jobId: uid() };
+    },
+    {
+      method: "POST",
+      body: JSON.stringify({ mode, aggressiveness, count, briefing: opts.answers ?? null }),
+    },
+  );
 }
 
 export async function getProjectCuts(projectId: string): Promise<Cut[]> {
   return request(`/projects/${projectId}/cuts`, () =>
-    mockCuts.filter((c) => c.projectId === projectId),
+    (isDemoSession() ? mockCuts : readUserData().cuts).filter((c) => c.projectId === projectId),
   );
+}
+
+/** All cuts available to the current session (demo → seed; else the user's own). */
+export async function listCuts(): Promise<Cut[]> {
+  return request(`/cuts`, () => (isDemoSession() ? mockCuts : readUserData().cuts));
 }
 
 export async function getCut(cutId: string): Promise<Cut> {
   // Convenience for the editor: SPEC exposes cuts via project listing + PATCH by id.
+  // Reads the current user's own cuts first, then falls back to the demo seed.
   return request(`/cuts/${cutId}`, () => {
-    const found = mockCuts.find((c) => c.id === cutId);
+    const found = readUserData().cuts.find((c) => c.id === cutId) ?? mockCuts.find((c) => c.id === cutId);
     if (!found) throw new Error("Corte não encontrado");
     return found;
   });
@@ -388,7 +620,8 @@ export async function patchCut(cutId: string, patch: Partial<Cut>): Promise<Cut>
   return request(
     `/cuts/${cutId}`,
     () => {
-      const found = mockCuts.find((c) => c.id === cutId) ?? mockCuts[0];
+      const found =
+        readUserData().cuts.find((c) => c.id === cutId) ?? mockCuts.find((c) => c.id === cutId) ?? mockCuts[0];
       return { ...found, ...patch };
     },
     { method: "PATCH", body: JSON.stringify(patch) },
@@ -399,7 +632,8 @@ export async function regenerateCut(cutId: string): Promise<Cut> {
   return request(
     `/cuts/${cutId}/regenerate`,
     () => {
-      const found = mockCuts.find((c) => c.id === cutId) ?? mockCuts[0];
+      const found =
+        readUserData().cuts.find((c) => c.id === cutId) ?? mockCuts.find((c) => c.id === cutId) ?? mockCuts[0];
       const bump = (n: number) => Math.min(99, Math.max(40, n + Math.round(Math.random() * 14 - 6)));
       return {
         ...found,
@@ -469,7 +703,7 @@ export async function batchZip(jobIds: string[]): Promise<{ zipUrl: string }> {
 // ---------------------------------------------------------------- dashboard / admin
 
 export async function dashboardStats(): Promise<DashboardStats> {
-  return request(`/dashboard/stats`, () => mockDashboardStats);
+  return request(`/dashboard/stats`, () => (isDemoSession() ? mockDashboardStats : emptyDashboardStats()));
 }
 
 export async function adminMetrics(): Promise<AdminMetrics> {
@@ -519,7 +753,7 @@ function newMockGeneration(
     duration?: number;
   },
 ): Generation {
-  return {
+  const generation: Generation = {
     id: uid(),
     userId: mockUser.id,
     projectId: opts.projectId ?? null,
@@ -541,6 +775,9 @@ function newMockGeneration(
     createdAt: new Date().toISOString(),
     finishedAt: null,
   };
+  // For real (non-demo) users, persist so it shows in their own library.
+  addUserGeneration(generation);
+  return generation;
 }
 
 export async function studioTextToVideo(prompt: string, params: TextToVideoParams): Promise<Generation> {
@@ -676,7 +913,7 @@ export async function studioEffect(
 }
 
 export async function studioGenerations(): Promise<Generation[]> {
-  return request(`/studio/generations`, () => mockGenerations);
+  return request(`/studio/generations`, () => (isDemoSession() ? mockGenerations : readUserData().generations));
 }
 
 export async function studioGeneration(id: string): Promise<Generation> {
@@ -691,6 +928,33 @@ export async function studioEffectTemplates(): Promise<{ templates: EffectTempla
   return request(`/studio/effect-templates`, () => ({ templates: mockEffectTemplates }));
 }
 
+// Stable id for the per-user "Estúdio IA" library project that collects cuts
+// created from studio generations, so they surface in Biblioteca (which lists
+// cuts grouped by the user's projects).
+const STUDIO_PROJECT_ID = "studio-ia-library";
+
+/** Ensure the current (non-demo) user has an "Estúdio IA" project; returns it. */
+function ensureStudioProject(): Project {
+  const existing = readUserData().projects.find((p) => p.id === STUDIO_PROJECT_ID);
+  if (existing) return existing;
+  const project: Project = {
+    ...mockProjects[1],
+    id: STUDIO_PROJECT_ID,
+    userId: mockUser.id,
+    title: "Estúdio IA",
+    sourceType: "upload" as const,
+    sourceUrl: null,
+    originalFilename: null,
+    durationSeconds: 0,
+    status: "ready" as const,
+    thumbnailUrl: svgThumb("Estúdio IA", "tecnologia"),
+    storageKey: `studio/${STUDIO_PROJECT_ID}`,
+    createdAt: new Date().toISOString(),
+  };
+  addUserProject(project);
+  return project;
+}
+
 /** Cria um Cut a partir de uma geração (integra com editor/biblioteca). */
 export async function studioGenerationToCut(
   generationId: string,
@@ -699,17 +963,51 @@ export async function studioGenerationToCut(
   return request(
     `/studio/generations/${generationId}/to-cut`,
     () => {
-      // Mock: reuse an existing loadable cut id so the editor opens cleanly
-      // in offline/demo mode. In production this returns a brand-new Cut.
-      const base = mockCuts[0];
-      return {
-        ...base,
-        projectId: projectId ?? base.projectId,
-        title: "Geração do Estúdio IA",
-        status: "suggested" as const,
+      const gen =
+        (isDemoSession() ? mockGenerations : readUserData().generations).find(
+          (g) => g.id === generationId,
+        ) ?? null;
+      const title = gen?.prompt?.trim() ? gen.prompt.trim().slice(0, 70) : "Geração do Estúdio IA";
+
+      // Demo: reuse an existing loadable cut id so the editor opens cleanly and
+      // the seed library stays curated (demo data is read-only by design).
+      if (isDemoSession()) {
+        return {
+          ...mockCuts[0],
+          projectId: projectId ?? mockCuts[0].projectId,
+          title,
+          status: "suggested" as const,
+          editState: null,
+          createdAt: new Date().toISOString(),
+        };
+      }
+
+      // Real user: build a brand-new Cut and persist it so it appears in the
+      // editor (via ?cut=<id>) and in Biblioteca (under the Estúdio IA project).
+      const proj = ensureStudioProject();
+      const dur = gen?.durationSeconds && gen.durationSeconds > 0 ? gen.durationSeconds : 5;
+      const cut: Cut = {
+        id: uid(),
+        projectId: projectId ?? proj.id,
+        title,
+        titleOptions: [title],
+        description: gen?.prompt ?? "",
+        hashtags: ["#cortaai", "#estudioia"],
+        startSeconds: 0,
+        endSeconds: dur,
+        viralScore: 0,
+        scoreBreakdown: { hook: 0, retention: 0, emotion: 0, nicheFit: 0 },
+        transcript: [],
+        mode: "manual",
+        suggestedSound: { track: "Sem trilha", reason: "adicione uma trilha no editor", trendVideoId: "" },
+        bestPostTime: "—",
+        status: "suggested",
         editState: null,
         createdAt: new Date().toISOString(),
+        ...(gen?.resultUrl ? { mediaUrl: gen.resultUrl } : {}),
       };
+      addUserCut(cut);
+      return cut;
     },
     { method: "POST", body: JSON.stringify({ projectId: projectId ?? null }) },
   );

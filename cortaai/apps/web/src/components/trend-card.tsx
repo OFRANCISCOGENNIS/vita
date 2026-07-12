@@ -4,7 +4,9 @@ import Link from "next/link";
 import { Clock, Eye, Heart, MessageCircle, TrendingUp } from "lucide-react";
 import type { TrendVideo } from "@/lib/types";
 import { MOCK_NOW } from "@/lib/mock-data";
-import { formatCompact, formatDuration, timeAgo } from "@/lib/utils";
+import { cn, formatCompact, formatDuration, timeAgo } from "@/lib/utils";
+import { useFavoritesStore } from "@/store/favorites";
+import { toast } from "@/store/toast";
 import { Badge } from "./ui/badge";
 import { ScoreBadge } from "./score-badge";
 
@@ -15,6 +17,21 @@ const platformLabels: Record<TrendVideo["platform"], string> = {
 };
 
 export function TrendCard({ video, rank }: { video: TrendVideo; rank?: number }) {
+  const hydrated = useFavoritesStore((s) => s.hydrated);
+  const isFav = useFavoritesStore((s) => s.ids.includes(video.id));
+  const toggle = useFavoritesStore((s) => s.toggle);
+
+  function onToggleFavorite(e: React.MouseEvent) {
+    // The whole card is a <Link> — don't navigate when hitting the heart.
+    e.preventDefault();
+    e.stopPropagation();
+    toggle(video.id);
+    toast(isFav ? "Removido dos favoritos" : "Salvo nos favoritos", {
+      description: isFav ? undefined : "Veja em Radar → Favoritos.",
+      variant: isFav ? "info" : "success",
+    });
+  }
+
   return (
     <Link
       href={`/app/radar/${video.id}`}
@@ -36,6 +53,19 @@ export function TrendCard({ video, rank }: { video: TrendVideo; rank?: number })
           <Clock className="mr-1 inline h-3 w-3" aria-hidden />
           {formatDuration(video.durationSeconds)}
         </span>
+        <button
+          type="button"
+          onClick={onToggleFavorite}
+          aria-pressed={hydrated ? isFav : undefined}
+          aria-label={isFav ? "Remover dos favoritos" : "Salvar nos favoritos"}
+          title={isFav ? "Remover dos favoritos" : "Salvar nos favoritos"}
+          className="absolute bottom-3 left-3 inline-flex h-8 w-8 items-center justify-center rounded-full bg-black/70 text-white backdrop-blur transition-colors hover:bg-black/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+        >
+          <Heart
+            className={cn("h-4 w-4 transition-colors", hydrated && isFav ? "fill-rose-500 text-rose-500" : "text-white")}
+            aria-hidden
+          />
+        </button>
         <div className="absolute right-3 top-3">
           <ScoreBadge score={video.retentionIndex} label="Índice de Retenção" />
         </div>

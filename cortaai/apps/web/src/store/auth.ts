@@ -13,7 +13,7 @@ interface AuthState {
   token: string | null;
   hydrated: boolean;
   login: (email: string, password: string) => Promise<void>;
-  loginGoogle: () => Promise<void>;
+  loginGoogle: (idToken: string) => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<void>;
   logout: () => void;
   updateUser: (patch: Partial<User>) => void;
@@ -32,10 +32,10 @@ export const useAuthStore = create<AuthState>()(
         api.setAuthToken(token);
         set({ token, user });
       },
-      loginGoogle: async () => {
-        // INTEGRAÇÃO PAGA/EXTERNA: Google OAuth — aqui abriríamos o popup do
-        // Google Identity Services e enviaríamos o id_token real para a API.
-        const { token, user } = await api.loginGoogle("mock-google-id-token");
+      loginGoogle: async (idToken: string) => {
+        // idToken é o JWT real do Google Identity Services (GIS). Sem backend,
+        // lib/api.ts decodifica o perfil real no cliente.
+        const { token, user } = await api.loginGoogle(idToken);
         api.setAuthToken(token);
         set({ token, user });
       },

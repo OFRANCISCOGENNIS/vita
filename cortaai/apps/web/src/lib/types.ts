@@ -64,6 +64,13 @@ export interface Project {
   thumbnailUrl: string;
   storageKey: string;
   createdAt: string;
+  // --- client-side media (static export, no backend at runtime) ---
+  /** IndexedDB key (cortaai-media) for a locally-uploaded video Blob. */
+  mediaId?: string;
+  /** Direct playable video URL (e.g. a pasted .mp4/.webm link). */
+  mediaUrl?: string;
+  /** pt-BR note shown when real processing needs the connected backend. */
+  processingNote?: string;
 }
 
 export interface TranscriptWord {
@@ -104,6 +111,11 @@ export interface Cut {
   status: CutStatus;
   editState: Record<string, unknown> | null;
   createdAt: string;
+  // --- client-side media (mirrors Project) so the editor can replay it ---
+  /** IndexedDB key (cortaai-media) for the underlying video Blob. */
+  mediaId?: string;
+  /** Direct playable video URL for this cut's source. */
+  mediaUrl?: string;
 }
 
 export interface Job {
