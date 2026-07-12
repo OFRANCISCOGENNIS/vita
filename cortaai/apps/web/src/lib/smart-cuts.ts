@@ -30,6 +30,7 @@ import {
 } from "./video-analysis";
 import { groupWords, type SpeechSentence } from "./sentences";
 import {
+  extractKeywords,
   pickKeywordHashtag,
   selectSpeechSegments,
   titleFromSentence,
@@ -664,7 +665,16 @@ export async function generateSmartCuts(
   const picked: Picked[] = [];
 
   if (useSpeech) {
-    const speechSegs = selectSpeechSegments(sentences, profile, idealDuration, count, opts.aggressiveness);
+    // Palavras do pedido em texto livre do usuário puxam as frases certas.
+    const requestKeywords = extractKeywords(answers.pedido ?? "");
+    const speechSegs = selectSpeechSegments(
+      sentences,
+      profile,
+      idealDuration,
+      count,
+      opts.aggressiveness,
+      requestKeywords,
+    );
     for (const seg of speechSegs) {
       const segWords = sliceTranscript(words, seg.start, seg.end);
       const text = segWords.map((w) => w.word).join(" ");

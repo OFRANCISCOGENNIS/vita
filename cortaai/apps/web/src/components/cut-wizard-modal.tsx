@@ -39,6 +39,7 @@ export function CutWizardModal({ open, onClose, initial, onSubmit }: CutWizardMo
   const current = WIZARD_STEPS[step];
   const isLast = step === WIZARD_STEPS.length - 1;
   const selected = answers[current.key];
+  const pedidoLen = answers.pedido.trim().length;
 
   function choose(optionId: string) {
     setAnswers((a) => ({ ...a, [current.key]: optionId }) as WizardAnswers);
@@ -70,10 +71,35 @@ export function CutWizardModal({ open, onClose, initial, onSubmit }: CutWizardMo
       <h3 className="text-base font-semibold text-white">{current.title}</h3>
       <p className="mt-1 text-xs text-zinc-500">{current.subtitle}</p>
 
+      {/* Free-text step: describe in your own words what you want in the cuts */}
+      {current.input && (
+        <div className="mt-4">
+          <textarea
+            rows={4}
+            value={answers.pedido}
+            onChange={(e) => setAnswers((a) => ({ ...a, pedido: e.target.value }))}
+            maxLength={400}
+            aria-label={current.title}
+            placeholder={
+              "Ex.: foca nos momentos em que falamos de preço; corta a introdução; quero os momentos engraçados com o convidado…"
+            }
+            className="w-full resize-none rounded-xl border border-line bg-surface-1 px-3.5 py-3 text-sm text-zinc-100 placeholder:text-zinc-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+          />
+          <p className="mt-1.5 flex items-center justify-between text-[11px] text-zinc-600">
+            <span>Pode deixar em branco — os cortes seguem só o briefing acima.</span>
+            <span>{pedidoLen}/400</span>
+          </p>
+        </div>
+      )}
+
       <div
         role="radiogroup"
         aria-label={current.title}
-        className={cn("mt-4 grid gap-2", current.options.length > 4 ? "grid-cols-2" : "grid-cols-1 sm:grid-cols-2")}
+        className={cn(
+          "mt-4 grid gap-2",
+          current.input && "hidden",
+          current.options.length > 4 ? "grid-cols-2" : "grid-cols-1 sm:grid-cols-2",
+        )}
       >
         {current.options.map((opt) => {
           const active = selected === opt.id;

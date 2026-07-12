@@ -22,6 +22,8 @@ export interface WizardAnswers {
   duracao: WizardDuracao;
   gancho: WizardGancho;
   cta: WizardCta;
+  /** Pedido em texto livre — as palavras puxam os trechos certos na fala. */
+  pedido: string;
 }
 
 export const DEFAULT_ANSWERS: WizardAnswers = {
@@ -32,6 +34,7 @@ export const DEFAULT_ANSWERS: WizardAnswers = {
   duracao: "auto",
   gancho: "promessa",
   cta: "comentar",
+  pedido: "",
 };
 
 export interface WizardOption {
@@ -45,6 +48,8 @@ export interface WizardStep {
   title: string;
   subtitle: string;
   options: WizardOption[];
+  /** Etapa de texto livre (textarea) em vez de múltipla escolha. */
+  input?: boolean;
 }
 
 export const WIZARD_STEPS: WizardStep[] = [
@@ -119,10 +124,18 @@ export const WIZARD_STEPS: WizardStep[] = [
       { id: "nenhum", label: "Nenhum", hint: "sem CTA explícito" },
     ],
   },
+  {
+    key: "pedido",
+    title: "Descreva o que você quer nos cortes",
+    subtitle:
+      "Opcional — escreva com suas palavras. Usamos o que você digitar para achar os trechos certos na fala do vídeo.",
+    options: [],
+    input: true,
+  },
 ];
 
-/** Short pt-BR labels for the compact summary chips. */
-export const ANSWER_LABELS: Record<keyof WizardAnswers, Record<string, string>> = {
+/** Short pt-BR labels for the compact summary chips (choice steps only). */
+export const ANSWER_LABELS: Record<Exclude<keyof WizardAnswers, "pedido">, Record<string, string>> = {
   objetivo: { viralizar: "Viralizar", vender: "Vender", educar: "Educar", entreter: "Entreter" },
   plataforma: { tiktok: "TikTok", reels: "Reels", shorts: "Shorts" },
   nicho: Object.fromEntries(NICHES.map((n) => [n, n.charAt(0).toUpperCase() + n.slice(1)])),
@@ -133,9 +146,14 @@ export const ANSWER_LABELS: Record<keyof WizardAnswers, Record<string, string>> 
 };
 
 export function summaryChips(a: WizardAnswers): string[] {
-  return (Object.keys(ANSWER_LABELS) as Array<keyof WizardAnswers>).map(
+  const chips = (Object.keys(ANSWER_LABELS) as Array<Exclude<keyof WizardAnswers, "pedido">>).map(
     (k) => ANSWER_LABELS[k][a[k]] ?? String(a[k]),
   );
+  const pedido = a.pedido?.trim();
+  if (pedido) {
+    chips.push(`Pedido: "${pedido.length > 28 ? `${pedido.slice(0, 28).trimEnd()}…` : pedido}"`);
+  }
+  return chips;
 }
 
 // ---------------------------------------------------------------- persistence
