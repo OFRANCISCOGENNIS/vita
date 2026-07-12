@@ -20,6 +20,8 @@ export interface SpeechSegment {
   hookScore: number;
   hookText: string;
   sentences: SpeechSentence[];
+  /** The anchor sentence contains words from the user's written request. */
+  matchesRequest: boolean;
 }
 
 const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));
@@ -57,9 +59,33 @@ const STOPWORDS = new Set([
   "tinha", "tenho", "podem", "vamos", "onde", "depois", "antes", "assim",
 ]);
 
+/** Lowercase + strip accents + drop non-alphanumerics (shared normalizer). */
+function normalizeWord(word: string): string {
+  return word
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]/g, "");
+}
+
+/**
+ * Meaningful keywords from the user's free-text request ("pedido"): normalized
+ * words ≥4 chars outside the stoplist, deduped, capped at 12.
+ */
+export function extractKeywords(text: string): string[] {
+  const out: string[] = [];
+  for (const raw of text.split(/\s+/)) {
+    const w = normalizeWord(raw);
+    if (w.length < 4 || STOPWORDS.has(w) || out.includes(w)) continue;
+    out.push(w);
+    if (out.length >= 12) break;
+  }
+  return out;
+}
+
 // -------------------------------------------------------------- hook scoring
 
-export function scoreHook(text: string): HookScore {
+export function scoreHook(text: string, keywords?: string[]): HookScore {
   const t = text.trim();
   let score = 0;
   const reasons: string[] = [];
@@ -73,6 +99,15 @@ export function scoreHook(text: string): HookScore {
   if (NUMBER_CUE.test(t)) add(0.2, "número/valor concreto");
   if (IMPERATIVE_START.test(t)) add(0.15, "chamada direta");
   if (SUPERLATIVE.test(t)) add(0.15, "superlativo");
+
+  // Sentence matches the user's written request → strongest pull: what the
+  // user ASKED FOR must outrank any generic hook pattern.
+  if (keywords && keywords.length > 0) {
+    const norm = t.split(/\s+/).map(normalizeWord);
+    let hits = 0;
+    for (const k of keywords) if (norm.includes(k)) hits++;
+    if (hits > 0) add(Math.min(0.6, 0.4 + (hits - 1) * 0.15), "combina com o seu pedido");
+  }
 
   const lower = t.toLowerCase();
   let impact = 0;
@@ -100,6 +135,7 @@ export function selectSpeechSegments(
   idealDuration: number,
   count: number,
   aggressiveness: number,
+  keywords?: string[],
 ): SpeechSegment[] {
   if (sentences.length === 0 || count < 1) return [];
   const aggr = clamp(aggressiveness, 1, 5);
@@ -109,7 +145,7 @@ export function selectSpeechSegments(
   // Long silences act as hard window stops (speaker pause / topic change).
   const hardStops = profile.silences.filter(([a, b]) => b - a > 1.5).map(([a]) => a);
 
-  const scored = sentences.map((s, i) => ({ s, i, hook: scoreHook(s.text) }));
+  const scored = sentences.map((s, i) => ({ s, i, hook: scoreHook(s.text, keywords) }));
   let candidates = scored.filter((c) => c.hook.score >= 0.25);
   if (candidates.length < count) {
     candidates = [...scored].sort((a, b) => b.hook.score - a.hook.score).slice(0, count * 3);
@@ -140,6 +176,7 @@ export function selectSpeechSegments(
       hookScore: cand.hook.score,
       hookText: cand.s.text,
       sentences: included,
+      matchesRequest: cand.hook.reasons.includes("combina com o seu pedido"),
     });
   }
 
@@ -156,7 +193,10 @@ export function selectSpeechSegments(
   const rank = (seg: SpeechSegment): number => {
     const len = seg.end - seg.start;
     const durationFit = clamp(1 - Math.abs(len - idealDuration) / Math.max(1, idealDuration), 0, 1);
-    return seg.hookScore * 0.45 + energyMean(seg.start, seg.end) * 0.3 + durationFit * 0.25;
+    // A window ANCHORED on the user's request always outranks generic hooks —
+    // "o que a pessoa pediu" vira o começo do corte, não um trecho no meio.
+    const requestBonus = seg.matchesRequest ? 0.35 : 0;
+    return seg.hookScore * 0.45 + energyMean(seg.start, seg.end) * 0.3 + durationFit * 0.25 + requestBonus;
   };
   segments.sort((a, b) => rank(b) - rank(a));
 
@@ -192,11 +232,7 @@ export function titleFromSentence(text: string, max = 60): string {
 export function pickKeywordHashtag(words: TranscriptWord[]): string | null {
   const freq = new Map<string, number>();
   for (const w of words) {
-    const clean = w.word
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/[^a-z0-9]/g, "");
+    const clean = normalizeWord(w.word);
     if (clean.length < 5 || STOPWORDS.has(clean)) continue;
     freq.set(clean, (freq.get(clean) ?? 0) + 1);
   }
