@@ -3,7 +3,7 @@
 // Settings: profile (name + avatar), preferences (theme + onboarding),
 // password change and account deletion — all persisted to localStorage.
 
-import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
+import { useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
@@ -12,20 +12,12 @@ import {
   Moon,
   RotateCcw,
   Save,
-  Server,
   SlidersHorizontal,
   Sun,
   Trash2,
   Upload,
   UserRound,
 } from "lucide-react";
-import {
-  clearBackendUrl,
-  getBackendUrl,
-  normalizeBackendUrl,
-  setBackendUrl,
-  testBackend,
-} from "@/lib/backend";
 import { useAuthStore } from "@/store/auth";
 import { useThemeStore, type Theme } from "@/store/theme";
 import { useOnboardingStore } from "@/store/onboarding";
@@ -66,48 +58,6 @@ export default function SettingsPage() {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [deleting, setDeleting] = useState(false);
-
-  // Backend real (opcional): URL da API hospedada pelo dono do site.
-  const [backendInput, setBackendInput] = useState("");
-  const [backendConnected, setBackendConnected] = useState<string | null>(null);
-  const [backendTesting, setBackendTesting] = useState(false);
-
-  useEffect(() => {
-    const saved = getBackendUrl();
-    setBackendConnected(saved);
-    setBackendInput(saved ?? "");
-  }, []);
-
-  async function connectBackend(e: FormEvent) {
-    e.preventDefault();
-    const url = normalizeBackendUrl(backendInput);
-    if (!url) {
-      toast("URL inválida", { description: "Cole a URL do seu backend (ex.: https://cortaai-api.onrender.com).", variant: "error" });
-      return;
-    }
-    setBackendTesting(true);
-    const ok = await testBackend(url);
-    setBackendTesting(false);
-    if (!ok) {
-      toast("Backend não respondeu", {
-        description:
-          "Confira a URL e se o serviço está no ar (no plano grátis do Render ele hiberna — a primeira chamada pode levar ~1 min; tente de novo).",
-        variant: "error",
-      });
-      return;
-    }
-    setBackendUrl(url);
-    setBackendConnected(url);
-    toast("Backend conectado!", {
-      description: "Radar, transcrição no servidor, render final e Estúdio IA passam a usar a sua API.",
-    });
-  }
-
-  function disconnectBackend() {
-    clearBackendUrl();
-    setBackendConnected(null);
-    toast("Backend desconectado", { description: "O app voltou ao modo demonstração.", variant: "info" });
-  }
 
   function onPickAvatar(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -272,47 +222,6 @@ export default function SettingsPage() {
               <RotateCcw className="h-3.5 w-3.5" aria-hidden /> Refazer tour
             </Button>
           </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>
-            <Server className="mr-2 inline h-4 w-4 text-emerald-400" aria-hidden /> Backend real (avançado)
-          </CardTitle>
-          <p className="mt-1 text-xs text-zinc-500">
-            Conecte a API do CortaAí hospedada por você (ex.: Render, grátis) para ligar o Radar com dados ao vivo,
-            transcrição no servidor, renderização final dos cortes e o Estúdio IA de verdade. Instruções no README do projeto.
-          </p>
-        </CardHeader>
-        <CardContent>
-          {backendConnected ? (
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="min-w-0">
-                <p className="flex items-center gap-2 text-sm font-medium text-emerald-300">
-                  <span className="h-2 w-2 rounded-full bg-emerald-400" aria-hidden /> Conectado
-                </p>
-                <p className="mt-0.5 truncate font-mono text-xs text-zinc-500">{backendConnected}</p>
-              </div>
-              <Button type="button" variant="outline" size="sm" onClick={disconnectBackend}>
-                Desconectar
-              </Button>
-            </div>
-          ) : (
-            <form onSubmit={connectBackend} className="flex flex-wrap items-end gap-3">
-              <div className="min-w-0 flex-1 basis-64">
-                <Input
-                  label="URL do seu backend"
-                  placeholder="https://cortaai-api.onrender.com"
-                  value={backendInput}
-                  onChange={(e) => setBackendInput(e.target.value)}
-                />
-              </div>
-              <Button type="submit" loading={backendTesting}>
-                Testar e conectar
-              </Button>
-            </form>
-          )}
         </CardContent>
       </Card>
 

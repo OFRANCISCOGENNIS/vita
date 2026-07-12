@@ -99,7 +99,7 @@ export function CaptionsPanel() {
             checked={style.highlightKeywords}
             onChange={(v) => setStyle({ highlightKeywords: v })}
             label="Destacar palavras-chave"
-            description="A IA destaca automaticamente números e termos fortes"
+            description="Destaca automaticamente números e termos fortes"
           />
           <Switch
             checked={style.censorProfanity}

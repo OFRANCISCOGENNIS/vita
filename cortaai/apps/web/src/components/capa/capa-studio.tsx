@@ -480,7 +480,7 @@ export function CapaStudio({ cutId }: { cutId: string }) {
               <div className="space-y-3 border-t border-line pt-3">
                 <Input label="Conteúdo" value={selText.text} onChange={(e) => updateText(selText.id, { text: e.target.value })} />
                 <div>
-                  <p className="mb-1.5 text-xs text-zinc-400">Estilo viral</p>
+                  <p className="mb-1.5 text-xs text-zinc-400">Estilo de texto</p>
                   <div className="flex flex-wrap gap-1.5" role="group" aria-label="Estilo do texto">
                     {CAPA_TEXT_STYLES.map((st) => (
                       <button

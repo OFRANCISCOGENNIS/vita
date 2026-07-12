@@ -102,7 +102,6 @@ export default function AdminContentPage() {
                       {item.kind === "cut" ? "Corte" : "Projeto"}
                     </Badge>
                     <Badge variant="default">{item.niche}</Badge>
-                    {item.viralScore != null && <Badge variant="info">Viral {item.viralScore}</Badge>}
                     {item.flagged && <Badge variant="danger"><Flag className="h-3 w-3" aria-hidden /> Sinalizado</Badge>}
                   </div>
                   <h3 className="mt-1.5 line-clamp-2 text-sm font-semibold text-zinc-100">{item.title}</h3>

@@ -45,7 +45,7 @@ function slug(s: string): string {
       .normalize("NFD")
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-+|-+$/g, "")
-      .slice(0, 40) || "corte"
+      .slice(0, 40) || "clipe"
   );
 }
 
@@ -95,7 +95,7 @@ function buildSrt(cut: ExportCut): string {
 
 /** Description .txt: title + description + hashtags. */
 function buildDescription(cut: ExportCut): string {
-  const parts: string[] = [cut.title || "Corte"];
+  const parts: string[] = [cut.title || "Clipe"];
   if (cut.description) parts.push("", cut.description);
   if (cut.hashtags && cut.hashtags.length) parts.push("", cut.hashtags.join(" "));
   return parts.join("\n") + "\n";
@@ -168,7 +168,7 @@ export default function ExportsPage() {
     // The final rendered video is encoded server-side (FFmpeg) — not available
     // on the static build. Be honest instead of faking a download.
     toast("Vídeo final indisponível no modo demo", {
-      description: `"${item.cutTitle}": o vídeo final renderizado requer o backend conectado.`,
+      description: `"${item.cutTitle}": o vídeo final renderizado não está disponível nesta versão de demonstração.`,
       variant: "info",
     });
   }
@@ -190,7 +190,7 @@ export default function ExportsPage() {
         await new Promise((r) => setTimeout(r, 350)); // space out browser downloads
       }
       toast("Artefatos baixados", {
-        description: `${done.length} corte(s): .srt, descrição .txt e thumbnail .png de cada. O vídeo final renderizado requer o backend conectado.`,
+        description: `${done.length} clipe(s): .srt, descrição .txt e thumbnail .png de cada. O vídeo final renderizado não está disponível nesta versão de demonstração.`,
         variant: "success",
       });
     } catch {
@@ -222,7 +222,7 @@ export default function ExportsPage() {
         <EmptyState
           variant="queue"
           title="Nenhuma exportação ainda"
-          description="Abra um corte no editor e clique em Exportar para começar a fila de renderização."
+          description="Abra um clipe no editor e clique em Exportar para começar a fila de renderização."
           action={
             <Link
               href="/app/projetos"

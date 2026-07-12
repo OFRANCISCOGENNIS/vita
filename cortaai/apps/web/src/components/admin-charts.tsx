@@ -35,7 +35,6 @@ const PLATFORM_COLORS = ["#f59e0b", "#8b5cf6", "#d946ef"];
 function label(name: string): string {
   if (name === "minutes") return "Minutos";
   if (name === "cuts") return "Cortes";
-  if (name === "generations") return "Gerações";
   return name;
 }
 
@@ -48,10 +47,6 @@ export function AdminUsageChart({ data }: { data: AdminUsagePoint[] }) {
             <stop offset="0%" stopColor="#f59e0b" stopOpacity={0.5} />
             <stop offset="100%" stopColor="#f59e0b" stopOpacity={0} />
           </linearGradient>
-          <linearGradient id="adm-gen" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#8b5cf6" stopOpacity={0.35} />
-            <stop offset="100%" stopColor="#8b5cf6" stopOpacity={0} />
-          </linearGradient>
         </defs>
         <CartesianGrid stroke="rgba(255,255,255,0.05)" vertical={false} />
         <XAxis dataKey="date" {...AXIS} tickFormatter={(d: string) => d.slice(8, 10) + "/" + d.slice(5, 7)} />
@@ -62,7 +57,6 @@ export function AdminUsageChart({ data }: { data: AdminUsagePoint[] }) {
           formatter={(value: number, name: string) => [`${Number(value).toLocaleString("pt-BR")}`, label(name)]}
         />
         <Area type="monotone" dataKey="minutes" stroke="#f59e0b" strokeWidth={2} fill="url(#adm-minutes)" name="minutes" />
-        <Area type="monotone" dataKey="generations" stroke="#8b5cf6" strokeWidth={2} fill="url(#adm-gen)" name="generations" />
         <Area type="monotone" dataKey="cuts" stroke="#d946ef" strokeWidth={2} fill="transparent" name="cuts" />
       </AreaChart>
     </ResponsiveContainer>

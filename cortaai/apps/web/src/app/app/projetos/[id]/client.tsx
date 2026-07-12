@@ -1,54 +1,28 @@
 "use client";
 
-// Project detail: processing pipeline status, then the grid of suggested cuts.
-// Generation is grounded in REAL in-browser analysis (lib/video-analysis +
-// lib/smart-cuts): the first "Gerar cortes" opens the "Assistente de cortes"
-// questionnaire; answers persist per project and show as a compact chip row on
-// subsequent runs. After generating, an "Análise do vídeo" card shows the
-// energy curve with the detected peaks/scenes/silences.
+// Project detail: infos do projeto + grade dos clipes existentes. Daqui o
+// usuário abre o clipe no editor ou cria um novo clipe do vídeo inteiro.
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import dynamic from "next/dynamic";
 import { useParams } from "next/navigation";
-import {
-  Activity,
-  ArrowLeft,
-  CheckCircle2,
-  Circle,
-  Loader2,
-  SlidersHorizontal,
-  Sparkles,
-  Wand2,
-} from "lucide-react";
+import { ArrowLeft, CheckCircle2, Circle, Loader2, Pencil, Plus } from "lucide-react";
 import * as api from "@/lib/api";
-import { CUT_MODES } from "@/lib/presets";
-import { readWizardAnswers, saveWizardAnswers, summaryChips, type WizardAnswers } from "@/lib/cut-wizard";
-import { getCachedProfile, getSpeechInfo, type SpeechGenInfo } from "@/lib/smart-cuts";
-import type { AnalysisProfile, AnalysisProgress } from "@/lib/video-analysis";
-import type { Cut, CutMode, Project } from "@/lib/types";
+import type { Cut, Project } from "@/lib/types";
 import { cn, formatDuration } from "@/lib/utils";
 import { toast } from "@/store/toast";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Progress } from "@/components/ui/progress";
 import { Skeleton, SkeletonCard } from "@/components/ui/skeleton";
-import { Slider } from "@/components/ui/slider";
 import { CutCard } from "@/components/cut-card";
-import { CutWizardModal } from "@/components/cut-wizard-modal";
-
-const AnalysisChart = dynamic(
-  () => import("@/components/analysis-chart").then((m) => m.AnalysisChart),
-  { ssr: false, loading: () => <Skeleton className="h-[170px] w-full" /> },
-);
 
 const PIPELINE_STEPS: { id: Project["status"] | "done"; label: string }[] = [
   { id: "importing", label: "Importando o vídeo" },
-  { id: "transcribing", label: "Transcrevendo com Whisper" },
-  { id: "analyzing", label: "Análise multimodal (achando os melhores momentos)" },
-  { id: "ready", label: "Cortes prontos" },
+  { id: "transcribing", label: "Preparando o arquivo" },
+  { id: "analyzing", label: "Finalizando o processamento" },
+  { id: "ready", label: "Pronto para editar" },
 ];
 
 function Pipeline({ status }: { status: Project["status"] }) {
@@ -58,7 +32,7 @@ function Pipeline({ status }: { status: Project["status"] }) {
       <CardHeader>
         <CardTitle>Processando seu vídeo</CardTitle>
         <p className="mt-1 text-xs text-zinc-500">
-          Você pode fechar esta página — avisamos quando os cortes estiverem prontos.
+          Você pode fechar esta página — avisamos quando o vídeo estiver pronto.
         </p>
       </CardHeader>
       <CardContent>
@@ -88,42 +62,6 @@ function Pipeline({ status }: { status: Project["status"] }) {
   );
 }
 
-/** Post-generation proof card: real energy curve + detected features. */
-function AnalysisCard({ profile }: { profile: AnalysisProfile }) {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>
-          <Activity className="mr-2 inline h-4 w-4 text-fuchsia-400" aria-hidden />
-          Análise do vídeo
-        </CardTitle>
-        <p className="mt-1 text-xs text-zinc-500">
-          {profile.synthetic
-            ? "Mídia indisponível no navegador — curva simulada (determinística) usada na seleção dos trechos."
-            : "Curva de energia do áudio calculada no seu navegador. Os pontos são os picos usados para escolher os cortes."}
-        </p>
-      </CardHeader>
-      <CardContent>
-        <AnalysisChart profile={profile} />
-        <div className="mt-3 flex flex-wrap gap-2">
-          <Badge variant="accent">{profile.peaks.length} picos de energia</Badge>
-          <Badge variant="info">{profile.scenes.length} mudanças de cena</Badge>
-          <Badge variant="outline">{profile.silences.length} silêncios (pontos de corte)</Badge>
-          {!profile.synthetic && (
-            <Badge variant={profile.hasAudio ? "success" : "warning"}>
-              {profile.hasAudio ? "áudio analisado" : "vídeo sem áudio"}
-            </Badge>
-          )}
-        </div>
-        <p className="mt-3 text-[11px] text-zinc-600">
-          Com fala detectada, títulos e legendas citam a transcrição real feita no seu navegador;
-          sem fala, os títulos usam heurística por nicho.
-        </p>
-      </CardContent>
-    </Card>
-  );
-}
-
 export default function ProjectDetailPage({ id: propId }: { id?: string } = {}) {
   // Demo/mock projects arrive via the dynamic [id] route (useParams). User
   // projects (not pre-rendered) arrive via /app/projeto?id=<id> as a prop.
@@ -133,17 +71,6 @@ export default function ProjectDetailPage({ id: propId }: { id?: string } = {}) 
   const [project, setProject] = useState<Project | null>(null);
   const [cuts, setCuts] = useState<Cut[] | null>(null);
   const [error, setError] = useState(false);
-
-  const [mode, setMode] = useState<CutMode>("viral");
-  const [aggressiveness, setAggressiveness] = useState(3);
-  const [count, setCount] = useState(10);
-  const [generating, setGenerating] = useState(false);
-  const [genProgress, setGenProgress] = useState<AnalysisProgress | null>(null);
-  const [genError, setGenError] = useState(false);
-
-  const [answers, setAnswers] = useState<WizardAnswers | null>(null);
-  const [wizardOpen, setWizardOpen] = useState(false);
-  const [profile, setProfile] = useState<AnalysisProfile | null>(null);
 
   function load() {
     setError(false);
@@ -162,73 +89,16 @@ export default function ProjectDetailPage({ id: propId }: { id?: string } = {}) 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(load, [id]);
 
-  // Saved wizard answers + cached analysis are restored per project.
-  useEffect(() => {
-    setAnswers(readWizardAnswers(id));
-    setProfile(getCachedProfile(id));
-  }, [id]);
-
-  async function runGenerate(a: WizardAnswers) {
-    setGenerating(true);
-    setGenError(false);
-    setGenProgress({ pct: 3, message: "Preparando análise…" });
-    try {
-      await api.generateCuts(id, mode, aggressiveness, count, {
-        answers: a,
-        onProgress: (p) => setGenProgress(p),
-      });
-      // Refresh the grid so the freshly generated cuts appear right away.
-      const fresh = await api.getProjectCuts(id);
-      setCuts(fresh);
-      setProfile(getCachedProfile(id));
-      const speech = getSpeechInfo(id);
-      if (speech?.used) {
-        const partial =
-          project && speech.coverageSeconds > 0 && speech.coverageSeconds < project.durationSeconds - 10
-            ? ` Transcrevemos os primeiros ${formatDuration(speech.coverageSeconds)} — trechos além disso usam a análise de áudio/cenas.`
-            : "";
-        toast("Cortes gerados a partir do que foi FALADO no vídeo", {
-          description: `${speech.wordCount} palavras transcritas no seu navegador. Os trechos começam nas frases de gancho e os títulos citam a fala real.${partial}`,
-        });
-      } else {
-        const why: Record<SpeechGenInfo["reason"], string> = {
-          ok: "",
-          cache: "",
-          "no-media": "Este projeto não tem mídia analisável no navegador — usamos a análise de áudio/cenas.",
-          "no-speech": "Não detectamos fala suficiente no áudio — usamos a análise de energia e cenas.",
-          "model-failed": "O modelo de transcrição não pôde ser carregado (rede/dispositivo) — usamos a análise de áudio/cenas.",
-          unsupported: "Seu navegador não suporta a transcrição local — usamos a análise de áudio/cenas.",
-        };
-        toast("Cortes gerados a partir da análise do vídeo", {
-          description:
-            (speech ? why[speech.reason] : "") ||
-            `Modo "${CUT_MODES.find((m) => m.id === mode)?.name}" · trechos escolhidos por picos de energia e mudanças de cena.`,
-        });
-      }
-    } catch {
-      setGenError(true);
-      toast("Falha ao gerar os cortes", { description: "Tente novamente.", variant: "error" });
-    } finally {
-      setGenerating(false);
-      setGenProgress(null);
-    }
+  function newClip() {
+    if (!project) return;
+    const n = (cuts?.length ?? 0) + 1;
+    const cut = api.createProjectClip(project, `Clipe ${n}`);
+    setCuts((prev) => [...(prev ?? []), cut]);
+    toast("Clipe criado", { description: `"${cut.title}" cobre o vídeo inteiro — abra no editor para recortar.` });
   }
 
-  function handleGenerateClick() {
-    // First run: open the questionnaire. Re-runs reuse the saved answers.
-    if (!answers) {
-      setWizardOpen(true);
-      return;
-    }
-    void runGenerate(answers);
-  }
-
-  function handleWizardSubmit(a: WizardAnswers) {
-    saveWizardAnswers(id, a);
-    setAnswers(a);
-    setWizardOpen(false);
-    void runGenerate(a);
-  }
+  // Clipe padrão do projeto (o mais antigo) para o botão "Abrir no editor".
+  const defaultCut = cuts && cuts.length > 0 ? cuts[0] : null;
 
   if (error) {
     return (
@@ -274,11 +144,26 @@ export default function ProjectDetailPage({ id: propId }: { id?: string } = {}) 
                 </p>
               </div>
             </div>
+            {project.status === "ready" && (
+              <div className="flex flex-wrap items-center gap-2">
+                {defaultCut && (
+                  <Link
+                    href={`/app/editor?cut=${defaultCut.id}`}
+                    className="inline-flex h-10 items-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 px-4 text-sm font-semibold text-white shadow-glow transition-all hover:from-violet-500 hover:to-fuchsia-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+                  >
+                    <Pencil className="h-4 w-4" aria-hidden /> Abrir no editor
+                  </Link>
+                )}
+                <Button variant="secondary" onClick={newClip} disabled={cuts === null}>
+                  <Plus className="h-4 w-4" aria-hidden /> Novo clipe
+                </Button>
+              </div>
+            )}
           </div>
 
           {project.processingNote && (
             <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
-              <p className="font-semibold text-amber-100">Processamento requer backend conectado</p>
+              <p className="font-semibold text-amber-100">Aviso do projeto</p>
               <p className="mt-1 text-amber-200/90">{project.processingNote}</p>
             </div>
           )}
@@ -286,147 +171,39 @@ export default function ProjectDetailPage({ id: propId }: { id?: string } = {}) 
           {project.status !== "ready" ? (
             <Pipeline status={project.status} />
           ) : (
-            <>
-              {/* Generation controls */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>
-                    <Wand2 className="mr-2 inline h-4 w-4 text-violet-400" aria-hidden />
-                    Gerar novos cortes
-                  </CardTitle>
-                  <p className="mt-1 text-xs text-zinc-500">
-                    A seleção transcreve a FALA e analisa o vídeo no seu navegador (energia, silêncios, cenas).
-                    Na primeira vez, um modelo de IA (~45 MB) é baixado e fica no cache do navegador.
-                  </p>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid gap-5 lg:grid-cols-[1fr_auto]">
-                    <div>
-                      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">Modo de corte</p>
-                      <div className="flex flex-wrap gap-2" role="group" aria-label="Selecionar modo de corte">
-                        {CUT_MODES.map((m) => (
-                          <button
-                            key={m.id}
-                            onClick={() => setMode(m.id as CutMode)}
-                            aria-pressed={mode === m.id}
-                            title={m.description}
-                            className={cn(
-                              "rounded-xl border px-3.5 py-2 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400",
-                              mode === m.id
-                                ? "border-transparent bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white shadow-glow"
-                                : "border-line bg-surface-2 text-zinc-400 hover:border-violet-500/50 hover:text-white",
-                            )}
-                          >
-                            {m.name}
-                          </button>
-                        ))}
-                      </div>
-                      <p className="mt-2 text-xs text-zinc-500">{CUT_MODES.find((m) => m.id === mode)?.description}</p>
-
-                      {/* Wizard answers: compact summary chips after the 1st run */}
-                      {answers && (
-                        <div className="mt-4">
-                          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">
-                            Briefing dos cortes
-                          </p>
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            {summaryChips(answers).map((chip) => (
-                              <Badge key={chip} variant="outline">{chip}</Badge>
-                            ))}
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setWizardOpen(true)}
-                              className="h-6 px-2 text-[11px]"
-                            >
-                              <SlidersHorizontal className="h-3 w-3" aria-hidden /> Editar respostas
-                            </Button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex w-full flex-col gap-4 lg:w-72">
-                      <Slider
-                        label="Agressividade da IA (1 = conservadora, 5 = ousada)"
-                        min={1}
-                        max={5}
-                        value={aggressiveness}
-                        onChange={setAggressiveness}
-                      />
-                      <Slider label="Quantidade de cortes" min={5} max={20} value={count} onChange={setCount} />
-                      <Button onClick={handleGenerateClick} loading={generating}>
-                        <Sparkles className="h-4 w-4" aria-hidden /> Gerar cortes
-                      </Button>
-                      {genError && !generating && (
-                        <p className="text-xs text-rose-300">
-                          A geração falhou.{" "}
-                          <button
-                            onClick={handleGenerateClick}
-                            className="underline underline-offset-2 hover:text-rose-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
-                          >
-                            Tentar novamente
-                          </button>
-                        </p>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Real analysis progress */}
-                  {generating && genProgress && (
-                    <div className="mt-5 rounded-xl border border-violet-500/30 bg-violet-500/5 p-4" role="status" aria-live="polite">
-                      <p className="mb-2 flex items-center gap-2 text-sm text-violet-200">
-                        <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-                        {genProgress.message}
-                      </p>
-                      <Progress value={genProgress.pct} label="Progresso da análise do vídeo" />
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Analysis proof card */}
-              {profile && !generating && <AnalysisCard profile={profile} />}
-
-              {/* Cuts grid */}
-              <section aria-labelledby="cortes">
-                <div className="mb-4 flex items-center justify-between">
-                  <h2 id="cortes" className="text-lg font-bold text-white">
-                    Cortes sugeridos{" "}
-                    {cuts && <span className="text-sm font-normal text-zinc-500">({cuts.length})</span>}
-                  </h2>
-                  <p className="text-xs text-zinc-500">Ordenados por score viral</p>
+            <section aria-labelledby="clipes">
+              <div className="mb-4 flex items-center justify-between">
+                <h2 id="clipes" className="text-lg font-bold text-white">
+                  Clipes do projeto{" "}
+                  {cuts && <span className="text-sm font-normal text-zinc-500">({cuts.length})</span>}
+                </h2>
+              </div>
+              {cuts === null ? (
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  <SkeletonCard /><SkeletonCard /><SkeletonCard />
                 </div>
-                {cuts === null ? (
-                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                    <SkeletonCard /><SkeletonCard /><SkeletonCard />
-                  </div>
-                ) : cuts.length === 0 ? (
-                  <EmptyState
-                    variant="clapper"
-                    title="Nenhum corte gerado ainda"
-                    description="Use o painel acima para escolher o modo e gerar os primeiros cortes."
-                  />
-                ) : (
-                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                    {[...cuts]
-                      .sort((a, b) => b.viralScore - a.viralScore)
-                      .map((c) => (
-                        <CutCard key={c.id} cut={c} />
-                      ))}
-                  </div>
-                )}
-              </section>
-            </>
+              ) : cuts.length === 0 ? (
+                <EmptyState
+                  variant="clapper"
+                  title="Nenhum clipe ainda"
+                  description='Clique em "Novo clipe" para criar um clipe do vídeo inteiro e recortar no editor.'
+                  action={
+                    <Button onClick={newClip}>
+                      <Plus className="h-4 w-4" aria-hidden /> Novo clipe
+                    </Button>
+                  }
+                />
+              ) : (
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  {cuts.map((c) => (
+                    <CutCard key={c.id} cut={c} />
+                  ))}
+                </div>
+              )}
+            </section>
           )}
         </>
       )}
-
-      <CutWizardModal
-        open={wizardOpen}
-        onClose={() => setWizardOpen(false)}
-        initial={answers}
-        onSubmit={handleWizardSubmit}
-      />
     </div>
   );
 }

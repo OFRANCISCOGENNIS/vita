@@ -24,7 +24,6 @@ const TYPE_LABELS: Record<AdminJobType, string> = {
   transcribe: "Transcrição",
   analyze: "Análise",
   render: "Render",
-  generation: "Geração IA",
 };
 
 const STATUS_BADGE: Record<AdminJobStatus, { label: string; variant: "default" | "info" | "success" | "danger" }> = {

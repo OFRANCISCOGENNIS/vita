@@ -80,7 +80,7 @@ export default function AdminSystemPage() {
             ))
           )}
           <p className="pt-2 text-[11px] text-zinc-500">
-            As flags são salvas em <code className="text-zinc-400">localStorage</code> (sem backend neste ambiente).
+            As flags são salvas em <code className="text-zinc-400">localStorage</code> (neste ambiente de demonstração).
           </p>
         </CardContent>
       </Card>

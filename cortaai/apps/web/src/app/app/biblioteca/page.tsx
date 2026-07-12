@@ -9,25 +9,15 @@ import { LayoutGrid, List, Play, Search } from "lucide-react";
 import * as api from "@/lib/api";
 import type { Cut, Project } from "@/lib/types";
 import { cn, formatDuration, svgThumb } from "@/lib/utils";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { SkeletonCard } from "@/components/ui/skeleton";
-import { ScoreBadge } from "@/components/score-badge";
 
 interface LibraryItem {
   cut: Cut;
   project: Project;
   thumb: string;
 }
-
-const MODE_FILTERS = [
-  { id: "", label: "Todos" },
-  { id: "viral", label: "Virais" },
-  { id: "qa", label: "Q&A" },
-  { id: "tutorial", label: "Tutoriais" },
-  { id: "quotes", label: "Frases" },
-];
 
 const ROW_HEIGHT = 76;
 const OVERSCAN = 6;
@@ -36,7 +26,6 @@ export default function LibraryPage() {
   const [items, setItems] = useState<LibraryItem[] | null>(null);
   const [error, setError] = useState(false);
   const [query, setQuery] = useState("");
-  const [mode, setMode] = useState("");
   const [view, setView] = useState<"grid" | "list">("grid");
   const [hovered, setHovered] = useState<string | null>(null);
 
@@ -83,11 +72,10 @@ export default function LibraryPage() {
   const filtered = useMemo(
     () =>
       (items ?? []).filter((i) => {
-        if (mode && i.cut.mode !== mode) return false;
         if (query && !`${i.cut.title} ${i.project.title}`.toLowerCase().includes(query.toLowerCase())) return false;
         return true;
       }),
-    [items, mode, query],
+    [items, query],
   );
 
   // simple windowing math
@@ -101,7 +89,7 @@ export default function LibraryPage() {
         <div>
           <h1 className="text-2xl font-bold text-white">Biblioteca</h1>
           <p className="mt-1 text-sm text-zinc-500">
-            Todos os seus cortes em um só lugar{items && ` · ${filtered.length} itens`}.
+            Todos os seus clipes em um só lugar{items && ` · ${filtered.length} itens`}.
           </p>
         </div>
         <div className="flex gap-1 rounded-xl border border-line bg-surface-1 p-1" role="group" aria-label="Modo de visualização">
@@ -131,25 +119,10 @@ export default function LibraryPage() {
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Buscar corte..."
+            placeholder="Buscar clipe..."
             aria-label="Buscar na biblioteca"
             className="h-10 w-full rounded-xl border border-line bg-surface-1 pl-9 pr-3 text-sm text-zinc-100 placeholder:text-zinc-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
           />
-        </div>
-        <div className="flex gap-2" role="group" aria-label="Filtrar por modo">
-          {MODE_FILTERS.map((f) => (
-            <button
-              key={f.id}
-              onClick={() => setMode(f.id)}
-              aria-pressed={mode === f.id}
-              className={cn(
-                "rounded-full border px-3.5 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400",
-                mode === f.id ? "border-transparent bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white" : "border-line text-zinc-400 hover:text-white",
-              )}
-            >
-              {f.label}
-            </button>
-          ))}
         </div>
       </div>
 
@@ -164,7 +137,7 @@ export default function LibraryPage() {
           {Array.from({ length: 5 }).map((_, i) => <SkeletonCard key={i} />)}
         </div>
       ) : filtered.length === 0 ? (
-        <EmptyState variant="search" title="Nada encontrado" description="Ajuste a busca ou o filtro de modo." />
+        <EmptyState variant="search" title="Nada encontrado" description="Ajuste o texto da busca." />
       ) : view === "grid" ? (
         <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-5">
           {filtered.slice(0, 40).map((item) => (
@@ -178,7 +151,7 @@ export default function LibraryPage() {
               className="group relative overflow-hidden rounded-2xl border border-line bg-surface-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
             >
               <div className="relative aspect-[9/16] overflow-hidden">
-                <img src={item.thumb} alt={`Corte: ${item.cut.title}`} className="h-full w-full object-cover" />
+                <img src={item.thumb} alt={`Clipe: ${item.cut.title}`} className="h-full w-full object-cover" />
                 {/* animated hover preview placeholder */}
                 <div
                   className={cn(
@@ -194,9 +167,6 @@ export default function LibraryPage() {
                     <span className="block h-full w-1/2 rounded bg-white/70 animate-bar-grow" />
                   </span>
                 </div>
-                <span className="absolute left-2 top-2">
-                  <ScoreBadge score={item.cut.viralScore} label="Score viral" />
-                </span>
                 <span className="absolute bottom-2 right-2 rounded bg-black/70 px-1.5 py-0.5 text-[10px] text-white">
                   {formatDuration(item.cut.endSeconds - item.cut.startSeconds)}
                 </span>
@@ -214,7 +184,7 @@ export default function LibraryPage() {
           ref={listRef}
           className="h-[560px] overflow-y-auto rounded-2xl border border-line bg-surface-1"
           role="list"
-          aria-label={`Lista de ${filtered.length} cortes`}
+          aria-label={`Lista de ${filtered.length} clipes`}
         >
           <div style={{ height: filtered.length * ROW_HEIGHT, position: "relative" }}>
             {visible.map((item, i) => {
@@ -233,11 +203,9 @@ export default function LibraryPage() {
                     <p className="truncate text-sm font-medium text-zinc-100">{item.cut.title}</p>
                     <p className="truncate text-xs text-zinc-500">{item.project.title}</p>
                   </div>
-                  <Badge variant="outline" className="hidden sm:inline-flex capitalize">{item.cut.mode}</Badge>
                   <span className="hidden font-mono text-xs text-zinc-500 sm:block">
                     {formatDuration(item.cut.endSeconds - item.cut.startSeconds)}
                   </span>
-                  <ScoreBadge score={item.cut.viralScore} label="Score viral" />
                 </Link>
               );
             })}

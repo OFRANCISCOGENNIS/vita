@@ -291,7 +291,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       doc: {
         ...DEFAULT_DOC,
         layers: { ...DEFAULT_DOC.layers, headlineText: cut.title },
-        audio: { ...DEFAULT_DOC.audio, musicTrack: cut.suggestedSound.track },
       },
       past: [],
       future: [],
@@ -307,7 +306,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       mediaMissing: false,
       versions: [
         {
-          label: "Versão inicial (sugestão da IA)",
+          label: "Versão inicial",
           at: new Date().toISOString(),
           doc: DEFAULT_DOC,
         },

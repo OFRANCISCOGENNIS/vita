@@ -1,7 +1,7 @@
 "use client";
 
-// New project: drag-and-drop chunked upload (simulated) + URL import with
-// instant preview, quality selector and parallel import queue.
+// New project: drag-and-drop chunked upload (simulated) with parallel queue
+// and optional client-side merge of multiple videos into one.
 
 import { useCallback, useEffect, useRef, useState, type DragEvent } from "react";
 import Link from "next/link";
@@ -10,7 +10,6 @@ import {
   Combine,
   FileVideo,
   Languages,
-  LinkIcon,
   Loader2,
   Pause,
   Play,
@@ -19,32 +18,28 @@ import {
   X,
 } from "lucide-react";
 import * as api from "@/lib/api";
-import type { Language, Resolution, UrlPreview } from "@/lib/types";
-import { probeVideoFile, probeVideoSrc, saveMedia } from "@/lib/media-store";
+import type { Language } from "@/lib/types";
+import { probeVideoFile, saveMedia } from "@/lib/media-store";
 import {
   MergeTooLongError,
   MergeUnsupportedError,
   mergeVideos,
   type MergeProgress,
 } from "@/lib/video-merge";
-import { cn, formatBytes, formatDuration, svgThumb, uid } from "@/lib/utils";
+import { cn, formatBytes, formatDuration, uid } from "@/lib/utils";
 import { toast } from "@/store/toast";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input, Select } from "@/components/ui/input";
+import { Select } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 
 const ACCEPTED = [".mp4", ".mov", ".mkv", ".webm"];
 const MAX_BYTES = 10 * 1024 ** 3; // 10 GB
-/** Direct, browser-playable video links (streamed as-is, no backend needed). */
-const DIRECT_VIDEO_RE = /\.(mp4|webm)(\?.*)?$/i;
 
 interface QueueItem {
   id: string;
-  kind: "upload" | "url";
   name: string;
   sizeBytes: number;
   progress: number; // 0-100
@@ -91,15 +86,6 @@ export default function NewProjectPage() {
   const [mergeOn, setMergeOn] = useState(true);
   const [mergeUi, setMergeUi] = useState<MergeUi | null>(null);
   const mergeAbortRef = useRef<AbortController | null>(null);
-
-  // URL import state
-  const [url, setUrl] = useState("");
-  const [urlError, setUrlError] = useState<string | undefined>();
-  const [previewLoading, setPreviewLoading] = useState(false);
-  const [preview, setPreview] = useState<UrlPreview | null>(null);
-  const [previewIsDirect, setPreviewIsDirect] = useState(false);
-  const [quality, setQuality] = useState<Resolution>("1080p");
-  const [importing, setImporting] = useState(false);
 
   useEffect(() => {
     const timers = timersRef.current;
@@ -169,9 +155,9 @@ export default function NewProjectPage() {
     [updateItem],
   );
 
-  /** Simulated chunked upload/import with realistic speed jitter, pause/resume. */
+  /** Simulated chunked upload with realistic speed jitter, pause/resume. */
   const startSimulation = useCallback(
-    (id: string, kind: "upload" | "url", sizeBytes: number, filename: string) => {
+    (id: string, sizeBytes: number, filename: string) => {
       const timer = setInterval(() => {
         setQueue((q) => {
           const item = q.find((i) => i.id === id);
@@ -188,13 +174,7 @@ export default function NewProjectPage() {
             clearInterval(timer);
             timersRef.current.delete(id);
             // finish: register project with the API
-            if (kind === "upload") {
-              void finalizeUpload(id, filename, item.language);
-            } else {
-              // URL projects were already created in startImport (projectId set).
-              updateItem(id, { status: "concluído", progress: 100, etaSeconds: 0 });
-              toast("Importação concluída!", { description: `"${filename}" está pronto.` });
-            }
+            void finalizeUpload(id, filename, item.language);
             return q.map((i) =>
               i.id === id ? { ...i, progress: 100, status: "processando" as const, etaSeconds: 0 } : i,
             );
@@ -215,7 +195,7 @@ export default function NewProjectPage() {
       }, 700);
       timersRef.current.set(id, timer);
     },
-    [updateItem, finalizeUpload],
+    [finalizeUpload],
   );
 
   async function enqueueUpload(file: File) {
@@ -226,7 +206,6 @@ export default function NewProjectPage() {
     filesRef.current.set(uploadId, file);
     const item: QueueItem = {
       id: uploadId,
-      kind: "upload",
       name: file.name,
       sizeBytes: file.size || 1.2 * 1024 ** 3,
       progress: 0,
@@ -236,7 +215,7 @@ export default function NewProjectPage() {
       language: defaultLanguage,
     };
     setQueue((q) => [item, ...q]);
-    startSimulation(uploadId, "upload", item.sizeBytes, file.name);
+    startSimulation(uploadId, item.sizeBytes, file.name);
   }
 
   async function addFiles(files: FileList | File[]) {
@@ -377,94 +356,12 @@ export default function NewProjectPage() {
     setQueue((q) => q.filter((i) => i.id !== id));
   }
 
-  async function fetchPreview() {
-    const trimmed = url.trim();
-    const isDirect = DIRECT_VIDEO_RE.test(trimmed);
-    const validPlatform = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be|twitch\.tv|vimeo\.com)\/.+/i.test(trimmed);
-    if (!isDirect && !validPlatform) {
-      setUrlError("Cole um link do YouTube, Twitch, Vimeo ou um link direto .mp4/.webm.");
-      return;
-    }
-    setUrlError(undefined);
-    setPreviewLoading(true);
-    setPreview(null);
-    setPreviewIsDirect(isDirect);
-    try {
-      if (isDirect) {
-        // Direct video: read real duration + poster in the browser (no backend).
-        const probe = await probeVideoSrc(trimmed);
-        const filename = trimmed.split("/").pop()?.split("?")[0] ?? "Vídeo";
-        setPreview({
-          title: filename.replace(/\.[a-z0-9]+$/i, "") || "Vídeo importado",
-          channel: "Link direto (.mp4/.webm)",
-          durationSeconds: probe.durationSeconds,
-          thumbnailUrl: probe.posterDataUrl ?? svgThumb(filename, "tecnologia"),
-          availableResolutions: ["1080p"] as Resolution[],
-        });
-        setQuality("1080p");
-      } else {
-        const p = await api.urlPreview(trimmed);
-        setPreview(p);
-        // Suggest the maximum available resolution by default.
-        const max = [...p.availableResolutions].sort((a, b) => parseInt(b) - parseInt(a))[0];
-        setQuality(max);
-      }
-    } catch {
-      setUrlError("Não conseguimos ler este link. Verifique se o vídeo é público.");
-    } finally {
-      setPreviewLoading(false);
-    }
-  }
-
-  async function startImport() {
-    if (!preview) return;
-    setImporting(true);
-    try {
-      const trimmed = url.trim();
-      const project = previewIsDirect
-        ? await api.importDirectUrl(trimmed, quality, {
-            title: preview.title,
-            durationSeconds: preview.durationSeconds,
-            thumbnailUrl: preview.thumbnailUrl,
-          })
-        : await api.importUrl(trimmed, quality);
-      const fakeSize = Math.max(1, preview.durationSeconds) * 2.2 * 1024 * 1024;
-      const item: QueueItem = {
-        id: uid(),
-        kind: "url",
-        name: preview.title,
-        sizeBytes: fakeSize,
-        progress: 0,
-        speedMBps: 0,
-        etaSeconds: 0,
-        status: "enviando",
-        language: defaultLanguage,
-        projectId: project.id,
-      };
-      setQueue((q) => [item, ...q]);
-      startSimulation(item.id, "url", fakeSize, preview.title);
-      setPreview(null);
-      setPreviewIsDirect(false);
-      setUrl("");
-      toast(previewIsDirect ? "Vídeo direto importado" : "Importação iniciada", {
-        description: previewIsDirect
-          ? "Link pronto — abra o projeto para editar com o vídeo real."
-          : `Baixar e transcodar em ${quality} exige o backend conectado. O projeto foi criado, mas a reprodução do vídeo real não está disponível no modo demo.`,
-        variant: "info",
-      });
-    } catch {
-      toast("Falha ao iniciar a importação", { variant: "error" });
-    } finally {
-      setImporting(false);
-    }
-  }
-
   return (
     <div className="mx-auto max-w-4xl space-y-8">
       <div>
-        <h1 className="text-2xl font-bold text-white">Novo projeto</h1>
+        <h1 className="text-2xl font-bold text-white">Novo vídeo</h1>
         <p className="mt-1 text-sm text-zinc-500">
-          Envie um arquivo ou importe por link. A IA cuida do resto.
+          Envie um ou mais vídeos do seu dispositivo para começar a editar.
         </p>
       </div>
 
@@ -575,7 +472,7 @@ export default function NewProjectPage() {
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium text-zinc-100">{mergeUi.title}</p>
                   <p className="text-xs text-zinc-500">
-                    {mergeUi.fileCount} clipes unidos em um único vídeo — pronto para gerar cortes.
+                    {mergeUi.fileCount} clipes unidos em um único vídeo — pronto para editar.
                   </p>
                 </div>
                 {mergeUi.projectId && (
@@ -642,78 +539,9 @@ export default function NewProjectPage() {
               ))}
             </Select>
             <p className="text-xs leading-relaxed text-zinc-500 sm:max-w-xs">
-              Em &ldquo;automático&rdquo;, o Whisper identifica o idioma nos primeiros 30 segundos e você pode corrigir depois.
+              O idioma fica salvo como metadado do projeto e você pode corrigir depois.
             </p>
           </div>
-        </CardContent>
-      </Card>
-
-      {/* URL import */}
-      <Card>
-        <CardHeader>
-          <CardTitle>
-            <LinkIcon className="mr-2 inline h-4 w-4 text-fuchsia-400" aria-hidden />
-            Importar por link
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <Input
-              label="URL do vídeo (YouTube, Twitch, Vimeo ou link direto .mp4/.webm)"
-              placeholder="https://youtube.com/watch?v=...  ou  https://.../video.mp4"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && fetchPreview()}
-              error={urlError}
-            />
-            <Button className="sm:mt-7 shrink-0" variant="secondary" onClick={fetchPreview} loading={previewLoading}>
-              Buscar prévia
-            </Button>
-          </div>
-
-          {previewLoading && (
-            <div className="flex gap-4 rounded-xl border border-line bg-surface-2/60 p-4">
-              <Skeleton className="h-24 w-40 shrink-0 rounded-lg" />
-              <div className="flex-1 space-y-2">
-                <Skeleton className="h-4 w-3/4" />
-                <Skeleton className="h-3 w-1/3" />
-                <Skeleton className="h-8 w-40" />
-              </div>
-            </div>
-          )}
-
-          {preview && (
-            <div className="flex flex-col gap-4 rounded-xl border border-violet-500/30 bg-violet-500/5 p-4 sm:flex-row">
-              <img
-                src={preview.thumbnailUrl}
-                alt={`Prévia: ${preview.title}`}
-                className="h-24 w-40 shrink-0 rounded-lg object-cover"
-              />
-              <div className="min-w-0 flex-1">
-                <h3 className="truncate text-sm font-semibold text-white">{preview.title}</h3>
-                <p className="mt-0.5 text-xs text-zinc-500">
-                  {preview.channel} · {formatDuration(preview.durationSeconds)}
-                </p>
-                <div className="mt-3 flex flex-wrap items-end gap-3">
-                  <div className="w-44">
-                    <Select label="Qualidade de importação" value={quality} onChange={(e) => setQuality(e.target.value as Resolution)}>
-                      {preview.availableResolutions.map((r) => (
-                        <option key={r} value={r}>
-                          {r === "2160p" ? "2160p (4K) — recomendado" : r}
-                        </option>
-                      ))}
-                    </Select>
-                  </div>
-                  <Button onClick={startImport} loading={importing}>
-                    Importar vídeo
-                  </Button>
-                  <Button variant="ghost" size="sm" onClick={() => setPreview(null)} aria-label="Descartar prévia">
-                    <X className="h-4 w-4" aria-hidden /> Descartar
-                  </Button>
-                </div>
-              </div>
-            </div>
-          )}
         </CardContent>
       </Card>
 
@@ -721,7 +549,7 @@ export default function NewProjectPage() {
       {queue.length > 0 && (
         <section aria-labelledby="fila">
           <h2 id="fila" className="mb-4 text-lg font-bold text-white">
-            Fila de importação{" "}
+            Fila de envio{" "}
             <span className="text-sm font-normal text-zinc-500">({queue.length} {queue.length === 1 ? "item" : "itens em paralelo"})</span>
           </h2>
           <ul className="space-y-3">
@@ -738,7 +566,7 @@ export default function NewProjectPage() {
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium text-zinc-100">{item.name}</p>
                     <p className="text-xs text-zinc-500">
-                      {item.kind === "upload" ? formatBytes(item.sizeBytes) : "importação por link"} ·{" "}
+                      {formatBytes(item.sizeBytes)} ·{" "}
                       {item.status === "enviando" && `${item.speedMBps} MB/s · resta ${formatDuration(item.etaSeconds)}`}
                       {item.status === "pausado" && "pausado"}
                       {item.status === "processando" && "processando no servidor..."}

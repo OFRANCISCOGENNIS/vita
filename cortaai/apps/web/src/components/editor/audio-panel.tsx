@@ -1,30 +1,25 @@
 "use client";
 
 // Audio panel: -14 LUFS normalization, silence/filler removal, ducking and a
-// music library including the Radar-suggested trending sound.
+// music library.
 
-import { Music2, Sparkles } from "lucide-react";
+import { Music2 } from "lucide-react";
 import { mockMusicLibrary } from "@/lib/mock-data";
 import { cn, formatDuration } from "@/lib/utils";
 import { useEditorStore } from "@/store/editor";
-import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { AudioAdvanced } from "./audio-advanced";
 import { AudioCapcutPanel } from "./audio-capcut";
 
 export function AudioPanel() {
-  const { cut, doc, apply } = useEditorStore();
+  const { doc, apply } = useEditorStore();
   const audio = doc.audio;
 
   function setAudio(patch: Partial<typeof audio>) {
     apply({ audio: { ...audio, ...patch } });
   }
 
-  const suggested = cut?.suggestedSound;
-  const library = [
-    ...(suggested ? [{ track: suggested.track, mood: "sugestão do Radar", bpm: 0, duration: 0, radar: true as const }] : []),
-    ...mockMusicLibrary.filter((m) => m.track !== suggested?.track).map((m) => ({ ...m, radar: false as const })),
-  ];
+  const library = mockMusicLibrary;
 
   return (
     <div className="space-y-5">
@@ -84,18 +79,13 @@ export function AudioPanel() {
                     : "border-line bg-surface-2 hover:border-violet-500/40",
                 )}
               >
-                <Music2 className={cn("h-4 w-4 shrink-0", m.radar ? "text-fuchsia-400" : "text-zinc-500")} aria-hidden />
+                <Music2 className="h-4 w-4 shrink-0 text-zinc-500" aria-hidden />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-medium text-zinc-100">{m.track}</span>
                   <span className="text-xs text-zinc-500">
-                    {m.radar ? suggested?.reason : `${m.mood} · ${m.bpm} BPM · ${formatDuration(m.duration)}`}
+                    {`${m.mood} · ${m.bpm} BPM · ${formatDuration(m.duration)}`}
                   </span>
                 </span>
-                {m.radar && (
-                  <Badge variant="success">
-                    <Sparkles className="h-3 w-3" /> em alta
-                  </Badge>
-                )}
               </button>
             </li>
           ))}

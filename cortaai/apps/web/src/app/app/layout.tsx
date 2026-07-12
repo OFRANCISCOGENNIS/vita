@@ -16,10 +16,8 @@ import {
   Menu,
   Palette,
   PlusCircle,
-  Radar,
   Settings,
   ShieldCheck,
-  Wand2,
   X,
 } from "lucide-react";
 import { Logo } from "@/components/logo";
@@ -34,10 +32,8 @@ import { useRenderQueueStore } from "@/store/render-queue";
 
 const NAV = [
   { href: "/app", label: "Painel", icon: LayoutDashboard, exact: true },
-  { href: "/app/radar", label: "Radar Viral", icon: Radar, tour: "radar" },
-  { href: "/app/novo", label: "Novo projeto", icon: PlusCircle, tour: "novo" },
-  { href: "/app/estudio", label: "Estúdio IA", icon: Wand2, tour: "estudio" },
-  { href: "/app/capa", label: "Estúdio de Capa", icon: ImageIcon },
+  { href: "/app/novo", label: "Novo vídeo", icon: PlusCircle, tour: "novo" },
+  { href: "/app/capa", label: "Estúdio de Capa", icon: ImageIcon, tour: "capa" },
   { href: "/app/fotos", label: "Editor de Fotos", icon: ImagePlus },
   { href: "/app/projetos", label: "Projetos", icon: FolderOpen },
   { href: "/app/exportacoes", label: "Exportações", icon: Download, tour: "exportacoes" },
@@ -218,7 +214,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             href="/app/novo"
             className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 px-4 text-sm font-semibold text-white shadow-glow transition-all hover:from-violet-500 hover:to-fuchsia-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
           >
-            <PlusCircle className="h-4 w-4" aria-hidden /> Novo projeto
+            <PlusCircle className="h-4 w-4" aria-hidden /> Novo vídeo
           </Link>
         </header>
         <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8">{children}</main>

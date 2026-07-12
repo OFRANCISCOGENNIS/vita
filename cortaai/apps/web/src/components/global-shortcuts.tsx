@@ -1,6 +1,6 @@
 "use client";
 
-// Global keyboard chords for the app shell: `g r/e/p/n` navigation, `t` theme,
+// Global keyboard chords for the app shell: `g p/n` navigation, `t` theme,
 // `?` help. Typing-guarded and scoped to non-editor routes (the editor owns its
 // own keydown handler incl. "?"). Also hosts the app-level shortcuts help modal,
 // which the command palette can open via a "cortaai:open-help" event.
@@ -11,8 +11,6 @@ import { useThemeStore } from "@/store/theme";
 import { ShortcutsHelpModal } from "@/components/shortcuts-help-modal";
 
 const CHORD_ROUTES: Record<string, string> = {
-  r: "/app/radar",
-  e: "/app/estudio",
   p: "/app/projetos",
   n: "/app/novo",
 };

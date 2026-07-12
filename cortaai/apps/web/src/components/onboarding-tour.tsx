@@ -6,7 +6,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useState } from "react";
 import { usePathname } from "next/navigation";
-import { ArrowRight, Radar, PlusCircle, Wand2, Download, X } from "lucide-react";
+import { ArrowRight, Image as ImageIcon, PlusCircle, Download, X } from "lucide-react";
 import { useOnboardingStore } from "@/store/onboarding";
 import { Button } from "@/components/ui/button";
 
@@ -14,32 +14,26 @@ interface Step {
   target: string;
   title: string;
   desc: string;
-  icon: typeof Radar;
+  icon: typeof PlusCircle;
 }
 
 const STEPS: Step[] = [
   {
-    target: "radar",
-    title: "Radar Viral",
-    desc: "Descubra o que está explodindo no seu nicho e abra o Raio-X de cada tendência.",
-    icon: Radar,
-  },
-  {
     target: "novo",
-    title: "Novo projeto",
-    desc: "Suba um vídeo longo ou cole um link — a IA encontra os melhores cortes por você.",
+    title: "Novo vídeo",
+    desc: "Envie um ou mais vídeos do seu dispositivo — dá até para juntar tudo em um vídeo só.",
     icon: PlusCircle,
   },
   {
-    target: "estudio",
-    title: "Estúdio IA",
-    desc: "Gere e dirija vídeo por IA: do texto ao efeito pronto, no nosso próprio motor.",
-    icon: Wand2,
+    target: "capa",
+    title: "Estúdio de Capa",
+    desc: "Desenhe capas e thumbnails com texto, formas e a identidade do seu kit de marca.",
+    icon: ImageIcon,
   },
   {
     target: "exportacoes",
     title: "Exportações",
-    desc: "Acompanhe suas renderizações e baixe os cortes em até 4K, com legenda e capa.",
+    desc: "Acompanhe suas renderizações e baixe os clipes com legenda (.srt), capa e descrição.",
     icon: Download,
   },
 ];

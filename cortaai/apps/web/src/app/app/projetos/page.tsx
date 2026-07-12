@@ -71,7 +71,7 @@ export default function ProjectsPage() {
       const mediaIds = deleteUserProject(confirmDelete.id);
       await Promise.all(mediaIds.map((mid) => deleteMedia(mid)));
       setProjects((prev) => (prev ?? []).filter((p) => p.id !== confirmDelete.id));
-      toast("Projeto excluído", { description: `"${confirmDelete.title}" e seus cortes foram removidos.` });
+      toast("Projeto excluído", { description: `"${confirmDelete.title}" e seus clipes foram removidos.` });
     } catch {
       toast("Falha ao excluir", { variant: "error" });
     } finally {
@@ -141,7 +141,7 @@ export default function ProjectsPage() {
         <EmptyState
           variant={query ? "search" : "clapper"}
           title={query ? "Nenhum projeto encontrado" : "Nenhum projeto ainda"}
-          description={query ? "Tente outra busca." : "Importe seu primeiro vídeo longo para gerar cortes."}
+          description={query ? "Tente outra busca." : "Envie seu primeiro vídeo para começar a editar."}
           action={
             !query && (
               <Link href="/app/novo" className="inline-flex h-10 items-center rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 px-4 text-sm font-semibold text-white">
@@ -193,7 +193,7 @@ export default function ProjectsPage() {
         open={confirmDelete !== null}
         onClose={() => setConfirmDelete(null)}
         title="Excluir projeto?"
-        description={`"${confirmDelete?.title}" e todos os cortes gerados serão removidos permanentemente.`}
+        description={`"${confirmDelete?.title}" e todos os clipes serão removidos permanentemente.`}
       >
         <div className="flex justify-end gap-2">
           <Button variant="secondary" onClick={() => setConfirmDelete(null)}>Cancelar</Button>

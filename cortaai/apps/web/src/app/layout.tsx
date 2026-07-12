@@ -13,33 +13,33 @@ const SITE_URL = "https://cortaai.com.br";
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: "CortaAí — Descubra o que viraliza. Corte. Exporte em 4K.",
+    default: "CortaAí — Editor de vídeo profissional 100% no navegador",
     template: "%s | CortaAí",
   },
   description:
-    "A máquina de cortes com Radar Viral: pesquise tendências, transforme vídeos longos em cortes com score viral e exporte em até 4K com legendas, capa e descrição. Tudo em um só lugar.",
+    "Editor de vídeo completo no navegador: timeline multi-trilha, legendas com estilo, correção de cor, editor de fotos e estúdio de capa — com exportação em até 4K, .srt e descrição. Sem instalar nada.",
   keywords: [
-    "cortes de vídeo",
-    "vídeos virais",
+    "editor de vídeo",
+    "editor de vídeo online",
     "shorts",
     "reels",
     "tiktok",
-    "editor de vídeo com IA",
-    "radar viral",
+    "legendas de vídeo",
+    "editor no navegador",
   ],
   openGraph: {
     type: "website",
     locale: "pt_BR",
     url: SITE_URL,
     siteName: "CortaAí",
-    title: "CortaAí — Descubra o que viraliza. Corte. Exporte em 4K.",
+    title: "CortaAí — Editor de vídeo profissional 100% no navegador",
     description:
-      "Radar Viral + cortes com IA + editor no navegador + exportação 4K. A máquina de cortes completa, em português.",
+      "Timeline multi-trilha, legendas, cores e exportação 4K — tudo no navegador, em português.",
   },
   twitter: {
     card: "summary_large_image",
-    title: "CortaAí — a máquina de cortes com Radar Viral",
-    description: "Descubra o que viraliza. Corte. Exporte em 4K. Tudo em um só lugar.",
+    title: "CortaAí — editor de vídeo no navegador",
+    description: "Edite. Legende. Exporte em 4K. Sem instalar nada.",
   },
   robots: { index: true, follow: true },
 };

@@ -12,16 +12,16 @@ import {
   HelpCircle,
   LayoutDashboard,
   Library,
+  ImagePlus,
+  Image as ImageIcon,
   LogOut,
   Palette,
   PlusCircle,
-  Radar,
   RotateCcw,
   Search,
   Settings,
   ShieldCheck,
   SunMoon,
-  Wand2,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -94,12 +94,12 @@ export function CommandPalette({ isEditor = false }: { isEditor?: boolean }) {
     });
     const list: Command[] = [
       nav("/app", "Painel", "Ir para o painel", LayoutDashboard, "dashboard inicio home"),
-      nav("/app/radar", "Radar Viral", "Tendências e Raio-X", Radar, "tendencias virais"),
-      nav("/app/novo", "Novo projeto", "Importar vídeo / link", PlusCircle, "criar upload importar"),
-      nav("/app/estudio", "Estúdio IA", "Gerar vídeo por IA", Wand2, "studio geracao"),
+      nav("/app/novo", "Novo vídeo", "Enviar um vídeo para editar", PlusCircle, "criar upload novo projeto"),
+      nav("/app/fotos", "Editor de Fotos", "Editar e retocar imagens", ImagePlus, "fotos imagem retoque"),
+      nav("/app/capa", "Estúdio de Capa", "Desenhar capas e thumbnails", ImageIcon, "capa thumbnail"),
       nav("/app/projetos", "Projetos", "Seus projetos", FolderOpen, "obras"),
       nav("/app/exportacoes", "Exportações", "Renderizações e downloads", Download, "renders downloads"),
-      nav("/app/biblioteca", "Biblioteca", "Seus cortes salvos", Library, "cortes"),
+      nav("/app/biblioteca", "Biblioteca", "Seus clipes salvos", Library, "clipes"),
       nav("/app/marca", "Kit de marca", "Logo, fontes e cores", Palette, "branding marca"),
       nav("/app/configuracoes", "Configurações", "Perfil e preferências", Settings, "perfil ajustes conta"),
     ];

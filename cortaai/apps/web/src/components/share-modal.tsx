@@ -4,7 +4,7 @@
 // + WhatsApp / Telegram / X share intents. Reuses the Modal primitive.
 
 import { useEffect, useState } from "react";
-import { Check, Copy, Send } from "lucide-react";
+import { Check, Clapperboard, Copy, Send } from "lucide-react";
 import type { Cut } from "@/lib/types";
 import { buildShareText, cutShareUrl } from "@/lib/share";
 import { formatDuration } from "@/lib/utils";
@@ -48,7 +48,7 @@ export function ShareModal({ open, onClose, cut }: ShareModalProps) {
         document.body.removeChild(ta);
       }
       setCopied(true);
-      toast("Link copiado!", { description: "Cole onde quiser para compartilhar o corte." });
+      toast("Link copiado!", { description: "Cole onde quiser para compartilhar o clipe." });
       setTimeout(() => setCopied(false), 2000);
     } catch {
       toast("Não foi possível copiar", { description: "Copie o link manualmente.", variant: "error" });
@@ -76,18 +76,18 @@ export function ShareModal({ open, onClose, cut }: ShareModalProps) {
   ];
 
   return (
-    <Modal open={open} onClose={onClose} title="Compartilhar corte" description="Envie um link direto para o editor deste corte.">
+    <Modal open={open} onClose={onClose} title="Compartilhar clipe" description="Envie um link direto para o editor deste clipe.">
       <div className="space-y-4">
         {/* Preview card */}
         <div className="overflow-hidden rounded-xl border border-line bg-surface-1">
           <div className="flex items-center gap-3 p-3.5">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-violet-600 to-fuchsia-600 text-sm font-bold text-white">
-              {cut.viralScore}
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-violet-600 to-fuchsia-600 text-white">
+              <Clapperboard className="h-5 w-5" aria-hidden />
             </span>
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-semibold text-white">{cut.title}</p>
               <p className="text-xs text-zinc-500">
-                Score viral {cut.viralScore} · {formatDuration(cut.endSeconds - cut.startSeconds)}
+                Clipe · {formatDuration(cut.endSeconds - cut.startSeconds)}
               </p>
             </div>
           </div>
@@ -107,7 +107,7 @@ export function ShareModal({ open, onClose, cut }: ShareModalProps) {
           <input
             readOnly
             value={url}
-            aria-label="Link do corte"
+            aria-label="Link do clipe"
             onFocus={(e) => e.currentTarget.select()}
             className="h-10 min-w-0 flex-1 rounded-xl border border-line bg-surface-2 px-3.5 text-sm text-zinc-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
           />

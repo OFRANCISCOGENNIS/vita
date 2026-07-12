@@ -67,7 +67,7 @@ export function TextoPanel() {
       <section className="space-y-2">
         <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Texto</h3>
         <Button size="sm" variant="secondary" className="w-full" onClick={addText}>
-          <Plus className="h-3.5 w-3.5" aria-hidden /> Adicionar texto viral
+          <Plus className="h-3.5 w-3.5" aria-hidden /> Adicionar texto de destaque
         </Button>
       </section>
 
@@ -138,7 +138,7 @@ export function TextoPanel() {
             <>
               <Input label="Conteúdo" value={selected.text} onChange={(e) => updateLayer(selected.id, { text: e.target.value } as Partial<TextLayer>)} />
               <div>
-                <p className="mb-1.5 text-xs text-zinc-400">Estilo viral (do Estúdio de Capa)</p>
+                <p className="mb-1.5 text-xs text-zinc-400">Estilo de texto (do Estúdio de Capa)</p>
                 <div className="flex flex-wrap gap-1.5" role="group" aria-label="Estilo do texto">
                   {CAPA_TEXT_STYLES.map((st) => (
                     <button

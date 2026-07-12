@@ -109,11 +109,3 @@ export const CAPTION_PRESETS: CaptionPresetDef[] = [
     sample: "gradiente em movimento",
   },
 ];
-
-export const CUT_MODES: { id: string; name: string; description: string }[] = [
-  { id: "viral", name: "Momentos virais", description: "IA busca picos de emoção e ganchos fortes" },
-  { id: "qa", name: "Perguntas e respostas", description: "Detecta pares de pergunta → resposta" },
-  { id: "tutorial", name: "Tutorial em passos", description: "Divide instruções em passos numerados" },
-  { id: "quotes", name: "Melhores frases", description: "Frases de efeito e citações marcantes" },
-  { id: "manual", name: "Corte manual", description: "Você define os pontos de entrada e saída" },
-];

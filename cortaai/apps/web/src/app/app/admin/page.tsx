@@ -15,7 +15,6 @@ import {
   TrendingUp,
   UserCheck,
   Users,
-  Wand2,
 } from "lucide-react";
 import {
   adminUsageSeries,
@@ -52,7 +51,6 @@ const METRIC_ICONS: Record<string, typeof Users> = {
   cutsGenerated: Scissors,
   minutesProcessed: Clock,
   jobsQueued: ListChecks,
-  generations: Wand2,
   errorRate: AlertTriangle,
 };
 
@@ -147,7 +145,6 @@ export default function AdminOverviewPage() {
           </CardTitle>
           <div className="hidden items-center gap-4 text-xs text-zinc-500 sm:flex">
             <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-amber-500" aria-hidden /> Minutos</span>
-            <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-violet-500" aria-hidden /> Gerações</span>
             <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-fuchsia-500" aria-hidden /> Cortes</span>
           </div>
         </CardHeader>

@@ -14,10 +14,8 @@ function Kbd({ children }: { children: React.ReactNode }) {
 
 const SHORTCUTS: { keys: React.ReactNode; label: string }[] = [
   { keys: <><Kbd>Ctrl</Kbd> / <Kbd>⌘</Kbd> <Kbd>K</Kbd></>, label: "Abrir a paleta de comandos" },
-  { keys: <><Kbd>g</Kbd> <Kbd>r</Kbd></>, label: "Ir para o Radar Viral" },
-  { keys: <><Kbd>g</Kbd> <Kbd>e</Kbd></>, label: "Ir para o Estúdio IA" },
   { keys: <><Kbd>g</Kbd> <Kbd>p</Kbd></>, label: "Ir para os Projetos" },
-  { keys: <><Kbd>g</Kbd> <Kbd>n</Kbd></>, label: "Novo projeto" },
+  { keys: <><Kbd>g</Kbd> <Kbd>n</Kbd></>, label: "Novo vídeo" },
   { keys: <Kbd>t</Kbd>, label: "Alternar o tema (claro/escuro/sistema)" },
   { keys: <Kbd>?</Kbd>, label: "Abrir esta ajuda de atalhos" },
 ];

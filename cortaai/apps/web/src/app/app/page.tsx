@@ -1,50 +1,58 @@
 "use client";
 
-// Dashboard: minutes processed, cuts generated, usage chart, recent projects,
-// Radar highlights for the user's niche.
+// Home do editor: saudação, botão grande "Novo vídeo", projetos recentes e
+// atalhos para o Editor de Fotos e o Estúdio de Capa.
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import dynamic from "next/dynamic";
-import { ArrowRight, Clock, FolderOpen, Radar, Scissors, ShieldAlert, TrendingUp } from "lucide-react";
+import { ArrowRight, Image as ImageIcon, ImagePlus, PlusCircle, ShieldAlert } from "lucide-react";
 import * as api from "@/lib/api";
-import type { DashboardStats } from "@/lib/types";
+import type { Project } from "@/lib/types";
 import { formatDuration, timeAgo } from "@/lib/utils";
 import { MOCK_NOW } from "@/lib/mock-data";
 import { useAuthStore } from "@/store/auth";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Skeleton, SkeletonCard } from "@/components/ui/skeleton";
+import { SkeletonCard } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { TrendCard } from "@/components/trend-card";
-
-const UsageChart = dynamic(() => import("@/components/charts").then((m) => m.UsageChart), {
-  ssr: false,
-  loading: () => <Skeleton className="h-[220px] w-full" />,
-});
 
 const statusLabels: Record<string, { label: string; variant: "success" | "info" | "warning" | "danger" }> = {
   ready: { label: "Pronto", variant: "success" },
   importing: { label: "Importando", variant: "info" },
-  transcribing: { label: "Transcrevendo", variant: "info" },
-  analyzing: { label: "Analisando", variant: "warning" },
+  transcribing: { label: "Processando", variant: "info" },
+  analyzing: { label: "Processando", variant: "warning" },
   error: { label: "Erro", variant: "danger" },
 };
 
+const TOOLS = [
+  {
+    href: "/app/fotos",
+    title: "Editor de Fotos",
+    desc: "Ajustes, filtros, curvas, retoque e elementos — direto no navegador.",
+    icon: ImagePlus,
+  },
+  {
+    href: "/app/capa",
+    title: "Estúdio de Capa",
+    desc: "Desenhe capas e thumbnails com texto, formas e seu kit de marca.",
+    icon: ImageIcon,
+  },
+];
+
 export default function DashboardPage() {
   const user = useAuthStore((s) => s.user);
-  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [projects, setProjects] = useState<Project[] | null>(null);
   const [error, setError] = useState(false);
 
   function load() {
     setError(false);
-    setStats(null);
-    api.dashboardStats().then(setStats).catch(() => setError(true));
+    setProjects(null);
+    api
+      .listProjects()
+      .then((list) => setProjects(list.slice(0, 6)))
+      .catch(() => setError(true));
   }
   useEffect(load, []);
-
-  const used = stats?.minutesProcessed ?? 0;
 
   if (error) {
     return (
@@ -64,7 +72,7 @@ export default function DashboardPage() {
           Olá, {user?.name.split(" ")[0]} 👋
         </h1>
         <p className="mt-1 text-sm text-zinc-500">
-          Aqui está o resumo da sua fábrica de cortes.
+          Tudo pronto para editar seu próximo vídeo.
         </p>
       </div>
 
@@ -88,85 +96,49 @@ export default function DashboardPage() {
         </Link>
       )}
 
-      {/* Stat cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <Card>
-          <CardHeader className="flex-row items-center justify-between pb-2">
-            <CardTitle className="text-zinc-400">Minutos processados no mês</CardTitle>
-            <Clock className="h-4 w-4 text-violet-400" aria-hidden />
-          </CardHeader>
-          <CardContent>
-            {stats === null ? (
-              <Skeleton className="h-9 w-32" />
-            ) : (
-              <>
-                <p className="text-3xl font-extrabold text-white">
-                  {used}
-                  <span className="ml-1 text-sm font-normal text-zinc-500">min</span>
-                </p>
-                <p className="mt-1.5 text-xs text-zinc-500">nos últimos 30 dias · sem limite</p>
-              </>
-            )}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex-row items-center justify-between pb-2">
-            <CardTitle className="text-zinc-400">Cortes gerados</CardTitle>
-            <Scissors className="h-4 w-4 text-fuchsia-400" aria-hidden />
-          </CardHeader>
-          <CardContent>
-            {stats === null ? (
-              <Skeleton className="h-9 w-20" />
-            ) : (
-              <>
-                <p className="text-3xl font-extrabold text-white">{stats.cutsGenerated}</p>
-                <p className="mt-1.5 text-xs text-zinc-500">nos últimos 30 dias</p>
-              </>
-            )}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex-row items-center justify-between pb-2">
-            <CardTitle className="text-zinc-400">Projetos ativos</CardTitle>
-            <FolderOpen className="h-4 w-4 text-emerald-400" aria-hidden />
-          </CardHeader>
-          <CardContent>
-            {stats === null ? (
-              <Skeleton className="h-9 w-16" />
-            ) : (
-              <>
-                <p className="text-3xl font-extrabold text-white">{stats.recentProjects.length}</p>
-                <p className="mt-1.5 text-xs text-zinc-500">
-                  {stats.recentProjects.filter((p) => p.status !== "ready").length} em processamento
-                </p>
-              </>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+      {/* CTA principal: novo vídeo */}
+      <Link
+        href="/app/novo"
+        className="group flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-violet-500/40 bg-gradient-to-b from-violet-600/10 to-fuchsia-600/5 px-6 py-12 text-center transition-colors hover:border-violet-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+      >
+        <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white shadow-glow transition-transform group-hover:scale-105" aria-hidden>
+          <PlusCircle className="h-7 w-7" />
+        </span>
+        <span className="text-xl font-bold text-white">Novo vídeo</span>
+        <span className="max-w-md text-sm text-zinc-400">
+          Envie um vídeo (ou vários, juntando tudo em um só) e abra direto no editor — timeline, legendas, cores e exportação.
+        </span>
+      </Link>
 
-      {/* Usage chart */}
-      <Card>
-        <CardHeader className="flex-row items-center justify-between">
-          <CardTitle>
-            <TrendingUp className="mr-2 inline h-4 w-4 text-violet-400" aria-hidden />
-            Uso nos últimos 14 dias
-          </CardTitle>
-          <div className="flex items-center gap-4 text-xs text-zinc-500">
-            <span className="flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full bg-violet-500" aria-hidden /> Minutos
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full bg-fuchsia-500" aria-hidden /> Cortes
-            </span>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {stats === null ? <Skeleton className="h-[220px] w-full" /> : <UsageChart data={stats.usageSeries} />}
-        </CardContent>
-      </Card>
+      {/* Atalhos para as outras ferramentas */}
+      <section aria-labelledby="ferramentas">
+        <h2 id="ferramentas" className="mb-4 text-lg font-bold text-white">Outras ferramentas</h2>
+        <div className="grid gap-4 sm:grid-cols-2">
+          {TOOLS.map((t) => {
+            const Icon = t.icon;
+            return (
+              <Link
+                key={t.href}
+                href={t.href}
+                className="group flex items-start gap-4 rounded-2xl border border-line bg-surface-1 p-5 shadow-card transition-all hover:-translate-y-0.5 hover:border-violet-500/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+              >
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-violet-500/15 text-violet-300" aria-hidden>
+                  <Icon className="h-5 w-5" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-center gap-1 text-sm font-semibold text-white">
+                    {t.title}
+                    <ArrowRight className="h-3.5 w-3.5 text-violet-400 opacity-0 transition-opacity group-hover:opacity-100" aria-hidden />
+                  </span>
+                  <span className="mt-1 block text-xs leading-relaxed text-zinc-500">{t.desc}</span>
+                </span>
+              </Link>
+            );
+          })}
+        </div>
+      </section>
 
-      {/* Recent projects */}
+      {/* Projetos recentes */}
       <section aria-labelledby="recentes">
         <div className="mb-4 flex items-center justify-between">
           <h2 id="recentes" className="text-lg font-bold text-white">Projetos recentes</h2>
@@ -174,24 +146,24 @@ export default function DashboardPage() {
             Ver todos <ArrowRight className="h-3.5 w-3.5" aria-hidden />
           </Link>
         </div>
-        {stats === null ? (
+        {projects === null ? (
           <div className="grid gap-4 sm:grid-cols-3">
             <SkeletonCard /><SkeletonCard /><SkeletonCard />
           </div>
-        ) : stats.recentProjects.length === 0 ? (
+        ) : projects.length === 0 ? (
           <EmptyState
             variant="clapper"
             title="Nenhum projeto ainda"
-            description="Importe seu primeiro vídeo longo e deixe a IA encontrar os melhores momentos."
+            description="Envie seu primeiro vídeo e comece a editar em segundos."
             action={
               <Link href="/app/novo" className="inline-flex h-10 items-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 px-4 text-sm font-semibold text-white">
-                Criar primeiro projeto
+                Enviar primeiro vídeo
               </Link>
             }
           />
         ) : (
           <div className="grid gap-4 sm:grid-cols-3">
-            {stats.recentProjects.map((p) => {
+            {projects.map((p) => {
               const st = statusLabels[p.status] ?? statusLabels.ready;
               return (
                 <Link
@@ -215,41 +187,6 @@ export default function DashboardPage() {
                 </Link>
               );
             })}
-          </div>
-        )}
-      </section>
-
-      {/* Radar highlights */}
-      <section aria-labelledby="destaques">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 id="destaques" className="text-lg font-bold text-white">
-            <Radar className="mr-2 inline h-5 w-5 text-fuchsia-400" aria-hidden />
-            Destaques do Radar no seu nicho
-          </h2>
-          <Link href="/app/radar" className="inline-flex items-center gap-1 text-sm text-violet-400 hover:text-violet-300">
-            Abrir Radar Viral <ArrowRight className="h-3.5 w-3.5" aria-hidden />
-          </Link>
-        </div>
-        {stats === null ? (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <SkeletonCard /><SkeletonCard /><SkeletonCard /><SkeletonCard />
-          </div>
-        ) : stats.nicheHighlights.length === 0 ? (
-          <EmptyState
-            variant="search"
-            title="Sem destaques ainda"
-            description="Explore o Radar Viral para descobrir vídeos em alta no seu nicho."
-            action={
-              <Link href="/app/radar" className="inline-flex h-10 items-center gap-2 rounded-xl border border-line px-4 text-sm font-medium text-zinc-200 hover:border-violet-500/50 hover:text-white">
-                Abrir Radar Viral
-              </Link>
-            }
-          />
-        ) : (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {stats.nicheHighlights.map((t) => (
-              <TrendCard key={t.id} video={t} />
-            ))}
           </div>
         )}
       </section>

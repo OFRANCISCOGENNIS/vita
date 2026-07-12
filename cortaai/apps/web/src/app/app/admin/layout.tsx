@@ -10,7 +10,6 @@ import {
   Flag,
   Gauge,
   ListChecks,
-  Radar,
   ShieldAlert,
   ShieldX,
   SlidersHorizontal,
@@ -25,7 +24,6 @@ const SUBNAV = [
   { href: "/app/admin/usuarios", label: "Usuários", icon: Users },
   { href: "/app/admin/jobs", label: "Fila de jobs", icon: ListChecks },
   { href: "/app/admin/conteudo", label: "Conteúdo", icon: Flag },
-  { href: "/app/admin/nichos", label: "Radar & nichos", icon: Radar },
   { href: "/app/admin/sistema", label: "Sistema", icon: SlidersHorizontal },
 ];
 

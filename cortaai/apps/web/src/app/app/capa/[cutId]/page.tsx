@@ -1,15 +1,12 @@
 // Server wrapper: generateStaticParams for the static export (GitHub Pages).
 // The interactive canvas studio lives in client.tsx.
 
-import { mockCuts, mockGenerations } from "@/lib/mock-data";
+import { mockCuts } from "@/lib/mock-data";
 import CapaPage from "./client";
 
-// Pre-generate the known cover routes (cuts + studio generations) at build time.
+// Pre-generate the known cover routes (cuts) at build time.
 export function generateStaticParams() {
-  const ids = new Set<string>();
-  mockCuts.forEach((c) => ids.add(c.id));
-  mockGenerations.forEach((g) => ids.add(g.id));
-  return Array.from(ids).map((cutId) => ({ cutId }));
+  return mockCuts.map((c) => ({ cutId: c.id }));
 }
 
 // Static export only emits the params above (demo).

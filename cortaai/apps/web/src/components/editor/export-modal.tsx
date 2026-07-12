@@ -71,7 +71,7 @@ export function ExportModal({ open, onClose }: { open: boolean; onClose: () => v
     <Modal
       open={open}
       onClose={onClose}
-      title="Exportar corte"
+      title="Exportar clipe"
       description={`"${cut.title}" será renderizado com legendas, capa e descrição.`}
     >
       <div className="space-y-5">
@@ -151,7 +151,7 @@ export function ExportModal({ open, onClose }: { open: boolean; onClose: () => v
           </span>
         </button>
 
-        {/* Pós-processamento vindo da aba "Auto" (estabilização + enhance/upscale) */}
+        {/* Pós-processamento salvo no documento (estabilização + enhance/upscale) */}
         {(processing.stabilize || processing.enhance) && (
           <div className="space-y-1 rounded-xl border border-fuchsia-500/30 bg-fuchsia-500/5 p-3 text-xs text-fuchsia-100">
             <p className="flex items-center gap-2 font-semibold">
@@ -167,9 +167,9 @@ export function ExportModal({ open, onClose }: { open: boolean; onClose: () => v
         <p className="flex items-start gap-2 rounded-xl bg-sky-500/10 p-3 text-xs leading-relaxed text-sky-200">
           <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
           {processing.enhance ? (
-            <>Com o Enhance ligado, a origem é ampliada por IA até {processing.upscaleTarget} (upscale reprocessado no render).</>
+            <>Com o Enhance ligado, a origem é ampliada até {processing.upscaleTarget} (upscale reprocessado no render).</>
           ) : (
-            <>A origem nunca é ampliada (sem upscale): se o vídeo original for 1080p, a exportação 4K entrega o melhor 1080p possível dentro do container escolhido. Ative o Enhance na aba &ldquo;Auto&rdquo; para upscale por IA.</>
+            <>A origem nunca é ampliada (sem upscale): se o vídeo original for 1080p, a exportação 4K entrega o melhor 1080p possível dentro do container escolhido.</>
           )}
         </p>
 

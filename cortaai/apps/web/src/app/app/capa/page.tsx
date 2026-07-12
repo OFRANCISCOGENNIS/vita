@@ -27,7 +27,7 @@ export default function CapaIndexPage() {
     return (
       <EmptyState
         variant="queue"
-        title="Não foi possível carregar os cortes"
+        title="Não foi possível carregar os clipes"
         description="Verifique sua conexão e tente novamente."
         action={<Button onClick={load}>Tentar novamente</Button>}
       />
@@ -42,7 +42,7 @@ export default function CapaIndexPage() {
           Estúdio de Capa
         </h1>
         <p className="mt-1 text-sm text-zinc-500">
-          Crie capas e thumbnails virais para seus cortes: recorte por proporção,
+          Crie capas e thumbnails para seus clipes: recorte por proporção,
           texto com estilo, stickers, remoção de fundo e comparação A/B.
         </p>
       </div>
@@ -54,8 +54,8 @@ export default function CapaIndexPage() {
       ) : cuts.length === 0 ? (
         <EmptyState
           variant="clapper"
-          title="Nenhum corte para gerar capa"
-          description="Crie um projeto e gere cortes — depois volte aqui para desenhar a capa perfeita."
+          title="Nenhum clipe para gerar capa"
+          description="Envie um vídeo e crie um clipe — depois volte aqui para desenhar a capa perfeita."
           action={
             <Link href="/app/novo" className="inline-flex h-10 items-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 px-4 text-sm font-semibold text-white">
               Criar primeiro projeto
@@ -71,7 +71,6 @@ export default function CapaIndexPage() {
               className="group flex flex-col rounded-2xl border border-line bg-surface-1 p-4 shadow-card transition-all hover:-translate-y-0.5 hover:border-violet-500/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
             >
               <div className="flex items-center gap-2 text-xs text-zinc-500">
-                <span className="rounded bg-white/5 px-1.5 py-0.5 text-violet-300">Score {c.viralScore}</span>
                 <span>{formatDuration(c.endSeconds - c.startSeconds)}</span>
               </div>
               <h2 className="mt-2 line-clamp-2 flex-1 text-sm font-semibold text-white">{c.title}</h2>

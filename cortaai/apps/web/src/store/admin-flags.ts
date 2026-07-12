@@ -8,8 +8,6 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
 export interface AdminFlags {
-  studioIA: boolean;
-  radarAoVivo: boolean;
   registroAberto: boolean;
   marcaDagua: boolean;
   moderacaoAuto: boolean;
@@ -17,8 +15,6 @@ export interface AdminFlags {
 }
 
 export const DEFAULT_FLAGS: AdminFlags = {
-  studioIA: true,
-  radarAoVivo: true,
   registroAberto: true,
   marcaDagua: false,
   moderacaoAuto: true,
@@ -32,8 +28,6 @@ export interface FlagMeta {
 }
 
 export const FLAG_META: FlagMeta[] = [
-  { key: "studioIA", label: "Estúdio IA", description: "Habilita a geração de vídeo por IA para todos os usuários." },
-  { key: "radarAoVivo", label: "Radar ao vivo", description: "Coleta contínua de tendências virais em tempo real." },
   { key: "registroAberto", label: "Registro aberto", description: "Permite novos cadastros sem convite." },
   { key: "marcaDagua", label: "Marca d'água", description: "Aplica a marca CortaAí nas exportações do plano Free." },
   { key: "moderacaoAuto", label: "Moderação automática", description: "Sinaliza conteúdo sensível automaticamente para revisão." },
