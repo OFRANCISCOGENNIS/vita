@@ -83,6 +83,26 @@ export function uid(): string {
   return `${hex(8)}-${hex(4)}-4${hex(3)}-a${hex(3)}-${hex(12)}`;
 }
 
+/**
+ * Friendly project title from an uploaded filename. Gallery uploads often come
+ * with machine names (iOS uses a raw UUID like "D6982D14-….mov") — those become
+ * "Vídeo de DD/MM às HH:mm" instead of leaking the code into the UI.
+ */
+export function friendlyMediaTitle(filename: string, now = new Date()): string {
+  const base = filename.replace(/\.[a-z0-9]+$/i, "").trim();
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(base);
+  const isMachine = /^[0-9a-f_-]{16,}$/i.test(base) && !/[g-z]/i.test(base.replace(/[_-]/g, ""));
+  if (!base || isUuid || isMachine) {
+    const dd = String(now.getDate()).padStart(2, "0");
+    const mm = String(now.getMonth() + 1).padStart(2, "0");
+    const hh = String(now.getHours()).padStart(2, "0");
+    const mi = String(now.getMinutes()).padStart(2, "0");
+    return `Vídeo de ${dd}/${mm} às ${hh}:${mi}`;
+  }
+  const pretty = base.replace(/[-_]+/g, " ").replace(/\s+/g, " ").trim();
+  return pretty.charAt(0).toUpperCase() + pretty.slice(1);
+}
+
 const NICHE_HUES: Record<string, [number, number]> = {
   "finanças": [152, 190],
   fitness: [14, 40],

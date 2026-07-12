@@ -144,6 +144,8 @@ interface EditorState {
   mediaUrl: string | null;
   /** Object URL we created (must be revoked). Null when mediaUrl is a direct URL. */
   ownedObjectUrl: string | null;
+  /** The cut HAS a mediaId but the blob is gone from this browser (quota/other device). */
+  mediaMissing: boolean;
 
   loadCut: (cut: Cut) => void;
   revokeMedia: () => void;
@@ -272,6 +274,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   selectedMaskId: null,
   mediaUrl: null,
   ownedObjectUrl: null,
+  mediaMissing: false,
 
   loadCut: (cut) => {
     // Free any object URL from a previously-loaded cut before switching.
@@ -301,6 +304,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       // Direct URL is playable immediately; an IndexedDB blob resolves async below.
       mediaUrl: cut.mediaUrl ?? null,
       ownedObjectUrl: null,
+      mediaMissing: false,
       versions: [
         {
           label: "Versão inicial (sugestão da IA)",
@@ -312,7 +316,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     // Resolve a locally-stored blob (IndexedDB) into an object URL.
     if (!cut.mediaUrl && cut.mediaId) {
       void getMediaObjectUrl(cut.mediaId).then((url) => {
-        if (!url) return;
+        if (!url) {
+          // The cut references media this browser doesn't have (storage was
+          // denied/evicted, or another device) — surface it instead of a
+          // silent placeholder.
+          if (get().cut?.id === cut.id) set({ mediaMissing: true });
+          return;
+        }
         // Ignore if the user already navigated to a different cut.
         if (get().cut?.id !== cut.id) {
           try {
@@ -336,7 +346,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         /* ignore */
       }
     }
-    set({ mediaUrl: null, ownedObjectUrl: null });
+    set({ mediaUrl: null, ownedObjectUrl: null, mediaMissing: false });
   },
 
   apply: (patch) =>

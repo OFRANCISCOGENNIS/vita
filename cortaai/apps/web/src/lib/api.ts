@@ -55,7 +55,7 @@ import type {
 } from "./types";
 import { decodeGoogleJwt } from "./google";
 import { isAdminEmail } from "./admins";
-import { svgThumb, uid } from "./utils";
+import { friendlyMediaTitle, svgThumb, uid } from "./utils";
 import { addUserCut, addUserGeneration, addUserProject, isDemoSession, readUserData } from "./session-scope";
 import { ensureProjectProfile, generateSmartCuts } from "./smart-cuts";
 import type { WizardAnswers } from "./cut-wizard";
@@ -401,7 +401,7 @@ export async function uploadComplete(
   return request(
     `/projects/upload-complete`,
     () => {
-      const title = filename.replace(/\.[a-z0-9]+$/i, "");
+      const title = friendlyMediaTitle(filename);
       const durationSeconds =
         meta.durationSeconds && meta.durationSeconds > 0 ? Math.round(meta.durationSeconds) : 0;
       const project: Project = {
@@ -446,7 +446,7 @@ export async function importDirectUrl(
   return request(
     `/projects/import-url`,
     () => {
-      const title = meta.title || url.split("/").pop()?.replace(/\.[a-z0-9]+$/i, "") || "Vídeo importado";
+      const title = meta.title || friendlyMediaTitle(url.split("/").pop() ?? "") || "Vídeo importado";
       const durationSeconds =
         meta.durationSeconds && meta.durationSeconds > 0 ? Math.round(meta.durationSeconds) : 0;
       const project: Project = {

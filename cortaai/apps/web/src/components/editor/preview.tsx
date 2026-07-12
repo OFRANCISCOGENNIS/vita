@@ -58,6 +58,7 @@ export function EditorPreview() {
     overlayMode,
     selectedMaskId,
     mediaUrl,
+    mediaMissing,
     togglePlay,
     setPlaying,
     seek,
@@ -368,6 +369,23 @@ export function EditorPreview() {
                   arquivo (ex.: HEVC/H.265 de alguns celulares). Tente exportar/
                   converter para <span className="text-white">MP4 (H.264)</span> e
                   subir de novo.
+                </p>
+              </div>
+            )}
+            {/* O corte referencia uma mídia que ESTE navegador não tem (o
+                aparelho negou/limpou o armazenamento, ou é outro dispositivo). */}
+            {!mediaUrl && mediaMissing && (
+              <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 bg-black/85 px-6 text-center">
+                <div className="text-3xl">🎞️</div>
+                <p className="text-sm font-semibold text-white">
+                  O vídeo deste corte não está salvo neste navegador
+                </p>
+                <p className="max-w-xs text-xs leading-relaxed text-zinc-400">
+                  Isso acontece quando o aparelho nega o armazenamento local
+                  (pouco espaço ou modo privado) ou quando você abre em outro
+                  dispositivo. Envie o arquivo de novo em{" "}
+                  <span className="text-white">Novo projeto</span> para editar
+                  com o vídeo real.
                 </p>
               </div>
             )}

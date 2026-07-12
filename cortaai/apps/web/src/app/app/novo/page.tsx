@@ -125,6 +125,7 @@ export default function NewProjectPage() {
     async (uploadId: string, filename: string, language: Language) => {
       const file = filesRef.current.get(uploadId);
       let mediaId: string | undefined;
+      let persisted = false;
       let durationSeconds = 0;
       let thumbnailUrl: string | undefined;
       if (file) {
@@ -133,9 +134,12 @@ export default function NewProjectPage() {
         thumbnailUrl = probe.posterDataUrl ?? undefined;
         mediaId = uid();
         try {
-          await saveMedia(mediaId, file);
+          // false = o IndexedDB recusou (quota/modo privado, comum no iPhone);
+          // o vídeo ainda fica no cache de sessão em memória, então dá para
+          // editar agora — só não sobrevive a recarregar a página.
+          persisted = await saveMedia(mediaId, file);
         } catch {
-          mediaId = undefined; // storage blocked (private mode/quota) — no playable media
+          persisted = false;
         }
       }
       const project = await api.uploadComplete(uploadId, filename, {
@@ -146,11 +150,21 @@ export default function NewProjectPage() {
       });
       filesRef.current.delete(uploadId);
       updateItem(uploadId, { status: "concluído", progress: 100, etaSeconds: 0, projectId: project.id });
-      toast("Upload concluído!", {
-        description: mediaId
-          ? `"${filename}" está pronto — abra o projeto para editar com o vídeo real.`
-          : `"${filename}" foi registrado (armazenamento local indisponível para o vídeo).`,
-      });
+      if (mediaId && persisted) {
+        toast("Upload concluído!", {
+          description: `"${filename}" está pronto — abra o projeto para editar com o vídeo real.`,
+        });
+      } else if (mediaId) {
+        toast("Vídeo disponível só nesta sessão", {
+          description:
+            "O navegador negou o armazenamento local (espaço ou modo privado). Você pode editar agora, mas o vídeo some se recarregar a página — libere espaço ou saia do modo privado para guardar de vez.",
+          variant: "info",
+        });
+      } else {
+        toast("Upload concluído!", {
+          description: `"${filename}" foi registrado (armazenamento local indisponível para o vídeo).`,
+        });
+      }
     },
     [updateItem],
   );
