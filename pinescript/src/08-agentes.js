@@ -100,9 +100,11 @@ async function agenteOtimizador() {
     if (iaRodando || agOcupado || treino) return;
     const isSim = fonte() === 'sim';
     if (isSim && (!dados || dados.length < 210)) return;
-    if (!agFilaOtim.length) agFilaOtim = isSim ? [symbolAtual()] : scanUniverse().filter(scanChecked);
+    if (!agFilaOtim.length) agFilaOtim = isSim ? [symbolAtual()] : filtrarMercadoAberto(scanUniverse().filter(scanChecked)).lista;
     const sym = agFilaOtim.shift();
     if (!sym) return;
+    // Forex com mercado fechado (fim de semana): não estuda velas congeladas
+    if (PARES_YAHOO[sym] && forexFechado()) { agentesLog('🧪 Otimizador', scanLabel(sym) + ': pulado — mercado real fechado'); return; }
     agOcupado = true; iaRodando = true; iaCancelar = false; renderAgentes();
     const el = id => document.getElementById(id);
     const ids = ['minScore', 'rsiSobrevenda', 'rsiSobrecompra', 'estruturaLookback', 'cooldownVelas', 'confMode', 'timeframe', 'useHtf', 'usePesoIA', 'symbol', 'fonte'];

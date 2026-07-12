@@ -401,6 +401,29 @@ check('agente otimizador estuda a moeda e atualiza o iaCache', ag.otimizou && ag
 check('agente sentinela detecta virada de regime', ag.viuVirada);
 check('log dos agentes renderiza no painel', ag.linhasLog >= 2, 'linhas=' + ag.linhasLog);
 
+// 7.996) Fim de semana / OTC: detector, filtro de mercado aberto e aviso
+const otc = await p.evaluate(() => {
+  const sab = Date.UTC(2026, 6, 11, 12);      // sábado 11/jul/2026
+  const qua = Date.UTC(2026, 6, 8, 12);       // quarta
+  const sexNoite = Date.UTC(2026, 6, 10, 22); // sexta 22h UTC (fechado)
+  const domNoite = Date.UTC(2026, 6, 12, 22); // domingo 22h UTC (reaberto)
+  return { sab: forexFechado(sab), qua: forexFechado(qua), sexN: forexFechado(sexNoite), domN: forexFechado(domNoite) };
+});
+check('forexFechado: sáb/sex-noite fechado · qua/dom-noite aberto', otc.sab && otc.sexN && !otc.qua && !otc.domN, JSON.stringify(otc));
+const fmOtc = await p.evaluate(() => {
+  const orig = window.forexFechado;
+  window.forexFechado = () => true;   // força fim de semana
+  const r = filtrarMercadoAberto(['BTCUSDT', 'EURUSD', 'ETHUSDT', 'XAUUSD']);
+  document.getElementById('fonte').value = 'ambos3'; atualizarAvisoOTC();
+  const banner = document.getElementById('otcAviso').style.display !== 'none';
+  window.forexFechado = orig;
+  document.getElementById('fonte').value = 'sim'; atualizarAvisoOTC();
+  const bannerSim = document.getElementById('otcAviso').style.display === 'none';
+  return { puladas: r.puladas, sobraram: r.lista.join(','), banner, bannerSim };
+});
+check('fim de semana: forex sai da análise, cripto fica', fmOtc.puladas === 2 && fmOtc.sobraram === 'BTCUSDT,ETHUSDT', JSON.stringify(fmOtc));
+check('aviso OTC aparece com fonte forex no fim de semana (e some no sim)', fmOtc.banner && fmOtc.bannerSim);
+
 // 8) PWA manifest
 check('PWA manifest presente', await p.$eval('link[rel=manifest]', e => e.href.startsWith('data:application/manifest')));
 

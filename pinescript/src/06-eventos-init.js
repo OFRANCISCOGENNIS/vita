@@ -26,6 +26,7 @@ document.getElementById('btnRecalcular').addEventListener('click', recalcularSin
 document.getElementById('fonte').addEventListener('change', function () {
     montarWidgetTV();   // sincroniza o widget oficial (prefixo BINANCE:/FX:/TVC: muda com a fonte)
     renderScanFiltro(); // a lista de moedas do scanner muda entre cripto e forex
+    atualizarAvisoOTC(); // aviso de fim de semana segue a fonte
     carregar();
 });
 document.getElementById('scanFilTodas').addEventListener('click', function () {
@@ -251,6 +252,21 @@ document.getElementById('modoSniper').addEventListener('change', function () {
     if (this.checked) showToast('🎯 Modo Sniper: só notifica A com funil ≥5', 'ok');
 });
 
+// ---- Aviso OTC / fim de semana: forex real fechado, sem espelho do OTC ----
+function atualizarAvisoOTC() {
+    const el = document.getElementById('otcAviso');
+    if (!el) return;
+    const usaForex = ehForex() || modoCombinado();
+    el.style.display = (usaForex && forexFechado()) ? 'flex' : 'none';
+}
+document.getElementById('btnIrCripto').addEventListener('click', () => {
+    document.getElementById('fonte').value = 'binance';
+    document.getElementById('symbol').value = 'BTCUSDT';
+    document.getElementById('fonte').dispatchEvent(new Event('change'));
+    showToast('₿ Cripto: mercado real 24/7', 'ok');
+});
+setInterval(atualizarAvisoOTC, 60000);   // revalida a cada minuto (vira o dia/hora)
+
 // ---- Presets de estratégia por regime (fatores + portões mais assertivos) ----
 // Baseados nos pesos por regime (PESOS_REGIME): tendencial premia tendência/
 // estrutura/MACD; lateral premia reversão (RSI/Bollinger/padrão); volátil premia
@@ -371,6 +387,7 @@ function iniciar() {
     const ctrlPref = localStorage.getItem('ctrlVisivel');
     aplicarControles(ctrlPref == null ? window.innerWidth > 900 : ctrlPref !== '0');
     aplicarTema(localStorage.getItem('tema') === 'light' ? 'light' : 'dark');
+    atualizarAvisoOTC();
     document.getElementById('autoReopt').checked = localStorage.getItem('autoReopt') === '1';
     document.getElementById('regSoA').checked = localStorage.getItem('regSoA') !== '0';   // padrão: só nível A
     document.getElementById('modoSniper').checked = localStorage.getItem('modoSniper') === '1';

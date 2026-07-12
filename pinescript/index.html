@@ -288,6 +288,12 @@
 
             <!-- MAIN CHART AREA -->
             <section class="charts-area">
+                <!-- Aviso de fim de semana: forex real fechado / OTC sem espelho -->
+                <div id="otcAviso" class="otc-aviso" style="display:none;">
+                    <span>🛑 <strong>Forex real fechado</strong> (fim de semana) · OTC da Binomo = feed proprietário, sem espelho público · cripto segue 24/7</span>
+                    <button id="btnIrCripto" class="btn-mini" type="button">→ Ir para cripto</button>
+                </div>
+
                 <!-- PAINEL DE DECISÃO (assertividade: entrar ou aguardar, e por quê) -->
                 <div class="chart-container decision-panel">
                     <div class="decision-main">
@@ -587,6 +593,7 @@
                             <li><strong>Yahoo</strong> — Forex/Índices/Ouro, sem chave.</li>
                             <li><strong>Twelve Data</strong> — Forex estável (chave grátis; "demo" só EUR/USD).</li>
                             <li><strong>Simulado</strong> — offline, dados sintéticos.</li>
+                            <li><strong>Fim de semana</strong>: forex real fecha (sex 21h → dom 21h UTC) — o app avisa e pula esses pares (o "OTC" da Binomo é feed proprietário, sem espelho público). Cripto segue 24/7.</li>
                         </ul>
                     </section>
                 </div>

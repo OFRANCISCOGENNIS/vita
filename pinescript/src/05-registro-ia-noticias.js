@@ -313,8 +313,12 @@ async function otimizarIA() {
     if (isSim) symbols = [symbolAtual()];
     else {
         symbols = scanUniverse().filter(scanChecked);
+        // Fim de semana: pula forex (velas congeladas geram parâmetros falsos)
+        const fmIA = filtrarMercadoAberto(symbols);
+        if (fmIA.puladas) showToast(`⏸ ${fmIA.puladas} par(es) de forex pulado(s) — mercado real fechado`, 'info');
+        symbols = fmIA.lista;
         if (!symbols.length) {
-            showToast('Marque ao menos uma moeda em "🎯 Moedas p/ análise" (ou troque a Fonte para Simulado).', 'err');
+            showToast('Sem moedas com mercado aberto — marque pares de cripto (24/7).', 'err');
             return;
         }
     }

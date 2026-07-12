@@ -274,6 +274,23 @@ function fonteEfetiva() {
 // Fonte "Forex-like" (Forex/índices/ouro): sem volume agressor real
 function ehForex() { const f = fonteEfetiva(); return f === 'yahoo' || f === 'twelvedata'; }
 
+// ---- MERCADO FECHADO (fim de semana) ----
+// Forex real fecha sex ~21h UTC e reabre dom ~21h UTC. Nesse vão, o "OTC" das
+// corretoras (Binomo etc.) é feed PROPRIETÁRIO — não existe espelho público.
+// Analisar as velas congeladas de sexta geraria sinais falsos; por isso o app
+// avisa e pula os pares de forex até o mercado reabrir. Cripto segue 24/7.
+function forexFechado(ms) {
+    const d = new Date(ms || Date.now());
+    const dia = d.getUTCDay(), h = d.getUTCHours();
+    return dia === 6 || (dia === 5 && h >= 21) || (dia === 0 && h < 21);
+}
+// Remove os pares de forex de uma lista quando o mercado real está fechado.
+function filtrarMercadoAberto(lista) {
+    if (!forexFechado()) return { lista, puladas: 0 };
+    const aberta = lista.filter(s => !PARES_YAHOO[s]);
+    return { lista: aberta, puladas: lista.length - aberta.length };
+}
+
 // ---- Twelve Data (Forex/Índices/Ouro com chave grátis; tem CORS próprio) ----
 function tdIntervalStr(min) { return min === 60 ? '1h' : min + 'min'; }
 function tdKey() { return (document.getElementById('tdKey').value || 'demo').trim(); }
@@ -542,9 +559,11 @@ function atualizarScanFiltroMeta() {
 function renderScanFiltro() {
     const box = document.getElementById('scanFiltro');
     if (!box) return;
-    box.innerHTML = scanUniverse().map(s =>
-        `<label class="scan-fil"><input type="checkbox" data-sym="${s}"${scanChecked(s) ? ' checked' : ''}> <span>${scanLabel(s)}</span></label>`
-    ).join('');
+    const fxFechado = forexFechado();
+    box.innerHTML = scanUniverse().map(s => {
+        const fech = fxFechado && PARES_YAHOO[s];   // forex esmaecido no fim de semana
+        return `<label class="scan-fil${fech ? ' scan-fil-fechado' : ''}"${fech ? ' title="mercado real fechado (fim de semana) — será pulado"' : ''}><input type="checkbox" data-sym="${s}"${scanChecked(s) ? ' checked' : ''}> <span>${scanLabel(s)}</span></label>`;
+    }).join('');
     box.querySelectorAll('input[data-sym]').forEach(cb => cb.addEventListener('change', function () {
         scanSel[this.dataset.sym] = this.checked;
         salvarScanSel();
@@ -560,8 +579,12 @@ async function escanear() {
     btn.disabled = true; btn.textContent = 'Escaneando…';
     // Universo do scanner (no modo combinado = cripto + forex); cada símbolo é
     // carregado pela sua fonte via carregarHistoricoTF (roteamento por símbolo).
-    const lista = scanUniverse().filter(scanChecked);
-    if (!lista.length) { showToast('Marque ao menos uma moeda no filtro "🎯 Moedas p/ análise".', 'err'); btn.disabled = false; btn.textContent = '🔎 Escanear melhores entradas'; return; }
+    let lista = scanUniverse().filter(scanChecked);
+    // Fim de semana: pula forex (velas congeladas = sinal falso); cripto segue
+    const fmScan = filtrarMercadoAberto(lista);
+    if (fmScan.puladas) showToast(`⏸ ${fmScan.puladas} par(es) de forex pulado(s) — mercado real fechado`, 'info');
+    lista = fmScan.lista;
+    if (!lista.length) { showToast('Sem moedas com mercado aberto — marque pares de cripto (24/7).', 'err'); btn.disabled = false; btn.textContent = '🔎 Escanear melhores entradas'; return; }
     const confMode = document.getElementById('confMode').value;
     const minScoreG = parseInt(document.getElementById('minScore').value);
     const dSave = dados;

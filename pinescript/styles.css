@@ -1631,3 +1631,14 @@ button:focus-visible, .scan-item:focus-visible, .ia-row:focus-visible {
     padding: 0 5px; white-space: nowrap;
     font-variant-numeric: tabular-nums;
 }
+
+/* Aviso OTC / fim de semana (forex fechado) + forex esmaecido no checklist */
+.otc-aviso {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 10px 14px; border-radius: var(--radius-sm);
+    background: rgba(245, 158, 11, 0.10);
+    border: 1px solid rgba(245, 158, 11, 0.35);
+    color: var(--warning); font-size: 13px;
+}
+.otc-aviso .btn-mini { flex-shrink: 0; }
+.scan-fil-fechado { opacity: 0.45; }
