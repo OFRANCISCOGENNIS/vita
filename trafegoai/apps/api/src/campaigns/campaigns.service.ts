@@ -67,15 +67,23 @@ export class CampaignsService {
       addInto(byRef.get(m.refId)!, m);
     }
     const totals = (id: string) => derive(byRef.get(id) ?? emptyTotals());
-    return campaign.adSets.map((s) => ({
-      id: s.id, name: s.name, status: s.status, targeting: s.targeting,
-      ...totals(s.id),
-      ads: s.ads.map((a) => ({
-        id: a.id, name: a.name, status: a.status,
-        creative: a.creative ? { headline: a.creative.headline, imageUrl: a.creative.imageUrl } : null,
-        ...totals(a.id),
-      })),
-    }));
+    return campaign.adSets.map((s) => {
+      // Totais do conjunto = soma dos seus anúncios (o seed tem métricas no nível AD)
+      const setAgg = emptyTotals();
+      for (const a of s.ads) {
+        const t = byRef.get(a.id);
+        if (t) addInto(setAgg, t);
+      }
+      return {
+        id: s.id, name: s.name, status: s.status, targeting: s.targeting,
+        ...derive(setAgg),
+        ads: s.ads.map((a) => ({
+          id: a.id, name: a.name, status: a.status,
+          creative: a.creative ? { headline: a.creative.headline, imageUrl: a.creative.imageUrl } : null,
+          ...totals(a.id),
+        })),
+      };
+    });
   }
 
   async setStatus(auth: JwtPayload, id: string, status: 'ACTIVE' | 'PAUSED') {

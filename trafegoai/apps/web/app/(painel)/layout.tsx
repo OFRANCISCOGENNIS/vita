@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Sidebar } from '@/components/Sidebar';
+import { NotificationBell } from '@/components/NotificationBell';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/lib/store';
 
@@ -34,7 +35,12 @@ export default function PainelLayout({ children }: { children: React.ReactNode }
   return (
     <div className="flex">
       <Sidebar />
-      <main className="min-h-screen flex-1 overflow-x-hidden p-6 lg:p-8">{children}</main>
+      <div className="flex min-h-screen flex-1 flex-col overflow-x-hidden">
+        <header className="flex items-center justify-end gap-3 border-b border-border px-6 py-2.5">
+          <NotificationBell />
+        </header>
+        <main className="flex-1 p-6 lg:p-8">{children}</main>
+      </div>
     </div>
   );
 }

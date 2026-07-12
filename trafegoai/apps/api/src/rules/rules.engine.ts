@@ -1,8 +1,10 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { AutomationRule, Platform } from '@prisma/client';
 import { PrismaService } from '../common/prisma.service';
 import { addInto, derive, emptyTotals, round } from '../common/metrics.util';
 import { AuditService } from '../audit/audit.service';
+import { RealtimeGateway } from '../realtime/realtime.gateway';
+import { nextBudget as computeNextBudget } from './rules.guardrails';
 
 /**
  * Motor das regras de automação "se → então".
@@ -24,12 +26,10 @@ import { AuditService } from '../audit/audit.service';
 export class RulesEngine {
   private readonly logger = new Logger(RulesEngine.name);
 
-  private static readonly MIN_BUDGET = 5; // R$/dia
-  private static readonly MAX_BUDGET = 100_000;
-  private static readonly MAX_STEP_PCT = 50; // teto de variação por disparo
   private static readonly MAX_ACTIONS_PER_RUN = 50;
 
-  constructor(private prisma: PrismaService, private audit: AuditService) {}
+  // gateway opcional: presente na API (emite em tempo real), ausente no worker
+  constructor(private prisma: PrismaService, private audit: AuditService, @Optional() private realtime?: RealtimeGateway) {}
 
   async runForAllOrgs() {
     const orgs = await this.prisma.organization.findMany({ select: { id: true } });
@@ -110,6 +110,7 @@ export class RulesEngine {
             data: { ruleId: rule.id, targetType: 'CAMPAIGN', targetId: campaign.id, targetName: campaign.name, detail: `${detail} Ação: ${rule.action}.` },
           });
           await this.audit.log({ orgId }, 'RULE_FIRED', 'CAMPAIGN', campaign.id, from !== undefined ? { budgetDaily: from } : null, { rule: rule.name, action: rule.action, ...(to !== undefined ? { budgetDaily: to } : {}) });
+          this.realtime?.emitToOrg(orgId, 'notification', { type: 'rule', severity: 'INFO', title: `Regra disparada: ${rule.name}`, message: `${campaign.name} — ${detail} Ação: ${rule.action}.`, at: new Date() });
           actions++;
         }
         fired.push({ rule: rule.name, target: campaign.name, action: rule.action, detail, from, to });
@@ -129,10 +130,7 @@ export class RulesEngine {
 
   /** Próximo orçamento respeitando teto de variação, piso e teto absolutos. */
   private nextBudget(rule: AutomationRule, current: number): number {
-    const rawPct = Number(rule.actionValue ?? 10);
-    const pct = Math.min(Math.abs(rawPct), RulesEngine.MAX_STEP_PCT) * (rule.action === 'INCREASE_BUDGET' ? 1 : -1);
-    const next = current * (1 + pct / 100);
-    return round(Math.min(Math.max(next, RulesEngine.MIN_BUDGET), RulesEngine.MAX_BUDGET));
+    return computeNextBudget(rule.action as 'INCREASE_BUDGET' | 'DECREASE_BUDGET', current, Number(rule.actionValue ?? 10));
   }
 
   private async applyAction(rule: AutomationRule, campaign: { id: string; accountId: string; name: string }, orgId: string, from?: number, to?: number) {

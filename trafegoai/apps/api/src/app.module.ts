@@ -27,6 +27,7 @@ import { ReportsController } from './reports/reports.controller';
 import { ClientsController } from './clients/clients.controller';
 import { BillingController } from './billing/billing.controller';
 import { BillingService } from './billing/billing.service';
+import { NotificationsController } from './notifications/notifications.controller';
 import { SyncService } from './jobs/sync.service';
 import { RealtimeGateway } from './realtime/realtime.gateway';
 
@@ -52,6 +53,7 @@ import { RealtimeGateway } from './realtime/realtime.gateway';
     ReportsController,
     ClientsController,
     BillingController,
+    NotificationsController,
   ],
   providers: [
     PrismaService,

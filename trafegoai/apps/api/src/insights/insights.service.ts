@@ -6,6 +6,7 @@ import { DIAGNOSIS_PROMPT } from '../ai/prompts';
 import { JwtPayload } from '../auth/auth.service';
 import { AuditService } from '../audit/audit.service';
 import { CampaignsService } from '../campaigns/campaigns.service';
+import { RealtimeGateway } from '../realtime/realtime.gateway';
 
 @Injectable()
 export class InsightsService {
@@ -14,6 +15,7 @@ export class InsightsService {
     private llm: LlmService,
     private audit: AuditService,
     private campaigns: CampaignsService,
+    private realtime: RealtimeGateway,
   ) {}
 
   /** Snapshot compacto das métricas por campanha, usado como contexto da IA. */
@@ -177,14 +179,18 @@ export class InsightsService {
         const sd = Math.sqrt(values.reduce((a, b) => a + (b - mean) ** 2, 0) / values.length) || 1;
         const z = (last[metric] - mean) / sd;
         if (metric === 'spend' && z > 3) {
-          created.push((await this.prisma.anomaly.create({
+          const a = await this.prisma.anomaly.create({
             data: { orgId, accountId: acc.id, severity: 'CRITICAL', metric: 'SPEND_SPIKE', message: `Pico de gasto em ${acc.name}: R$ ${round(last.spend)} vs média de R$ ${round(mean)} (z=${round(z, 1)}).` },
-          })).id);
+          });
+          created.push(a.id);
+          this.realtime.emitToOrg(orgId, 'notification', { type: 'anomaly', severity: a.severity, title: 'Pico de gasto detectado', message: a.message, at: a.detectedAt });
         }
         if (metric === 'conversions' && z < -3) {
-          created.push((await this.prisma.anomaly.create({
+          const a = await this.prisma.anomaly.create({
             data: { orgId, accountId: acc.id, severity: 'WARNING', metric: 'CONVERSION_DROP', message: `Queda de conversões em ${acc.name}: ${last.conversions} vs média de ${round(mean, 0)}. Verifique o tracking.` },
-          })).id);
+          });
+          created.push(a.id);
+          this.realtime.emitToOrg(orgId, 'notification', { type: 'anomaly', severity: a.severity, title: 'Queda de conversões', message: a.message, at: a.detectedAt });
         }
       }
     }

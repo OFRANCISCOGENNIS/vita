@@ -4,6 +4,7 @@ import { useApi } from '@/lib/useApi';
 import { api, qs } from '@/lib/api';
 import { useFilterStore } from '@/lib/store';
 import { FilterBar } from '@/components/FilterBar';
+import { Onboarding } from '@/components/Onboarding';
 import { Badge, ErrorState, PageHeader, Skeleton, Trend } from '@/components/ui';
 import { FunnelChart, Heatmap, PlatformDonut, SpendRevenueChart } from '@/components/charts';
 import { brl, num, pct, ratio, PLATFORM_LABEL } from '@/lib/format';
@@ -47,6 +48,7 @@ export default function DashboardPage() {
   return (
     <div>
       <PageHeader title="Dashboard unificado" subtitle="Google + Meta + TikTok consolidados, com comparação vs. período anterior." />
+      <Onboarding />
       <FilterBar />
 
       {/* Alertas de anomalias */}
