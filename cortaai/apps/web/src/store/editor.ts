@@ -218,7 +218,9 @@ const DEFAULT_DOC: EditorDoc = {
     censorProfanity: false,
   },
   layers: {
-    headlineEnabled: true,
+    // Nada de texto automático por cima do vídeo do usuário — a headline é
+    // opcional e começa desligada; quem quiser liga e escreve em Camadas.
+    headlineEnabled: false,
     headlineText: "",
     watermarkEnabled: true,
     progressBarEnabled: true,
@@ -304,10 +306,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       }
       initialDoc = merged as unknown as EditorDoc;
     } else {
-      initialDoc = {
-        ...DEFAULT_DOC,
-        layers: { ...DEFAULT_DOC.layers, headlineText: cut.title },
-      };
+      initialDoc = { ...DEFAULT_DOC };
     }
     set({
       cut,

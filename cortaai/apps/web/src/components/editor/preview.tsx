@@ -164,7 +164,9 @@ export function EditorPreview() {
 
   const absTime = cut.startSeconds + currentTime;
   const activeWords = cut.transcript.filter((w) => Math.abs(w.start - absTime) < 1.6).slice(0, 5);
-  const captionText = activeWords.length > 0 ? activeWords.map((w) => w.word).join(" ") : "Sua legenda aparece aqui";
+  // Sem legenda ativa → NADA é desenhado (nada de texto placeholder por cima
+  // do vídeo do usuário; legendas vêm da transcrição do clipe ou da aba Texto).
+  const captionText = activeWords.length > 0 ? activeWords.map((w) => w.word).join(" ") : "";
 
   // --- caption controls (wired to the preview) ---
   const displayCaption = doc.captionStyle.censorProfanity
@@ -464,7 +466,8 @@ export function EditorPreview() {
           </p>
         )}
 
-        {/* Caption preview */}
+        {/* Caption preview (só quando há legenda ativa neste instante) */}
+        {displayCaption.length > 0 && (
         <p
           key={`cap-${captionAnim}-${displayCaption}`}
           className={cn(
@@ -501,6 +504,7 @@ export function EditorPreview() {
               ))
             : displayCaption}
         </p>
+        )}
 
         {/* Watermark (keyframeable) */}
         {doc.layers.watermarkEnabled && (
