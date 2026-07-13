@@ -1454,3 +1454,115 @@ export function makeSampleImage(): HTMLCanvasElement {
   ctx.stroke();
   return c;
 }
+
+// --------------------------------------------------------------------------
+// Auto-melhoria (1 clique) e ampliação — funções puras/testáveis.
+// --------------------------------------------------------------------------
+
+interface PixelSource {
+  data: Uint8ClampedArray;
+  width: number;
+  height: number;
+}
+
+/**
+ * Deriva ajustes automáticos a partir dos pixels: alonga o contraste pelos
+ * percentis (evita clipar ruído), equilibra o branco pelo "mundo cinza" e dá
+ * um leve toque de vibração/nitidez. Retorna um patch para mesclar em
+ * `params.adjustments`. Puro — não toca em canvas.
+ */
+export function autoEnhanceAdjustments(img: PixelSource): Partial<Adjustments> {
+  const d = img.data;
+  const luma = new Uint32Array(256);
+  let sumR = 0;
+  let sumG = 0;
+  let sumB = 0;
+  let n = 0;
+  for (let i = 0; i < d.length; i += 16) {
+    // stride 4px para velocidade
+    const r = d[i];
+    const g = d[i + 1];
+    const b = d[i + 2];
+    luma[Math.round(0.2126 * r + 0.7152 * g + 0.0722 * b)]++;
+    sumR += r;
+    sumG += g;
+    sumB += b;
+    n++;
+  }
+  if (n === 0) return {};
+
+  const total = n;
+  const pct = (p: number): number => {
+    const target = total * p;
+    let acc = 0;
+    for (let v = 0; v < 256; v++) {
+      acc += luma[v];
+      if (acc >= target) return v;
+    }
+    return 255;
+  };
+  const lo = pct(0.005);
+  const hi = pct(0.995);
+  const range = Math.max(1, hi - lo);
+
+  // contraste: quanto mais comprimido o histograma, mais alongamos (cap +45)
+  const contrast = clampAdj(Math.round(((255 - range) / 255) * 70));
+  // brilho: centraliza o meio-tom em ~118 (leve preferência por imagem clara)
+  const mid = (lo + hi) / 2;
+  const brightness = clampAdj(Math.round((118 - mid) * 0.55));
+
+  // balanço de branco pelo mundo cinza
+  const meanR = sumR / n;
+  const meanG = sumG / n;
+  const meanB = sumB / n;
+  const meanRGB = (meanR + meanG + meanB) / 3;
+  // temperatura: se a imagem puxa azul (meanB alto), esquenta (+); se puxa vermelho, esfria (−)
+  const temperature = clampAdj(Math.round(((meanB - meanR) / Math.max(1, meanRGB)) * 60));
+  const tint = clampAdj(Math.round((((meanR + meanB) / 2 - meanG) / Math.max(1, meanRGB)) * 60));
+
+  return {
+    contrast,
+    brightness,
+    temperature,
+    tint,
+    vibrance: 16,
+    clarity: 8,
+  };
+}
+
+function clampAdj(v: number): number {
+  return Math.max(-100, Math.min(100, v));
+}
+
+/**
+ * Amplia um canvas por `factor` (ex.: 2) com reamostragem de alta qualidade do
+ * navegador, em passos de 2× (melhor que um único salto). Limita o total de
+ * pixels de saída para não estourar memória.
+ */
+export function upscaleCanvas(src: HTMLCanvasElement, factor: number, maxOutPixels = 40_000_000): HTMLCanvasElement {
+  const f = Math.max(1, Math.min(4, factor));
+  let targetW = Math.round(src.width * f);
+  let targetH = Math.round(src.height * f);
+  if (targetW * targetH > maxOutPixels) {
+    const s = Math.sqrt(maxOutPixels / (targetW * targetH));
+    targetW = Math.max(1, Math.round(targetW * s));
+    targetH = Math.max(1, Math.round(targetH * s));
+  }
+  let cur: HTMLCanvasElement = src;
+  // dobra progressivamente enquanto ainda falta pelo menos 2×
+  while (cur.width * 2 <= targetW && cur.height * 2 <= targetH) {
+    const step = makeCanvas(cur.width * 2, cur.height * 2);
+    const sctx = step.getContext("2d")!;
+    sctx.imageSmoothingEnabled = true;
+    sctx.imageSmoothingQuality = "high";
+    sctx.drawImage(cur, 0, 0, step.width, step.height);
+    cur = step;
+  }
+  if (cur.width === targetW && cur.height === targetH) return cur;
+  const out = makeCanvas(targetW, targetH);
+  const ctx = out.getContext("2d")!;
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(cur, 0, 0, targetW, targetH);
+  return out;
+}

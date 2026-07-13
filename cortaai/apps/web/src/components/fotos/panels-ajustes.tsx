@@ -4,13 +4,13 @@
 // persisted slice of the photo editor: localStorage "cortaai-photo-presets").
 
 import { useState } from "react";
-import { RotateCcw, Save, Trash2, Wand2 } from "lucide-react";
+import { Maximize2, RotateCcw, Save, Sparkles, Trash2, Wand2 } from "lucide-react";
 import { toast } from "@/store/toast";
-import { usePhotoEditorStore, usePhotoPresetsStore } from "@/store/photo-editor";
+import { getBaseCanvas, usePhotoEditorStore, usePhotoPresetsStore } from "@/store/photo-editor";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import type { Adjustments } from "@/lib/photo-engine";
+import { autoEnhanceAdjustments, upscaleCanvas, type Adjustments } from "@/lib/photo-engine";
 
 const GROUPS: { title: string; items: { key: keyof Adjustments; label: string; min?: number }[] }[] = [
   {
@@ -47,11 +47,43 @@ const GROUPS: { title: string; items: { key: keyof Adjustments; label: string; m
 export function AjustesPanel() {
   const adj = usePhotoEditorStore((s) => s.params.adj);
   const params = usePhotoEditorStore((s) => s.params);
+  const hasImage = usePhotoEditorStore((s) => s.hasImage);
+  const imgW = usePhotoEditorStore((s) => s.imgW);
+  const imgH = usePhotoEditorStore((s) => s.imgH);
+  const busy = usePhotoEditorStore((s) => s.busy);
   const setAdj = usePhotoEditorStore((s) => s.setAdj);
   const resetAdjustments = usePhotoEditorStore((s) => s.resetAdjustments);
   const applyPreset = usePhotoEditorStore((s) => s.applyPreset);
+  const applyPixelOp = usePhotoEditorStore((s) => s.applyPixelOp);
+  const clearMask = usePhotoEditorStore((s) => s.clearMask);
+  const setBusy = usePhotoEditorStore((s) => s.setBusy);
   const { presets, hydrated, save, remove } = usePhotoPresetsStore();
   const [presetName, setPresetName] = useState("");
+
+  function autoEnhance() {
+    const base = getBaseCanvas();
+    if (!base) return;
+    const ctx = base.getContext("2d");
+    if (!ctx) return;
+    const img = ctx.getImageData(0, 0, base.width, base.height);
+    setAdj(autoEnhanceAdjustments(img));
+    toast("Auto-melhoria aplicada", { description: "Contraste, brilho e balanço de branco automáticos.", variant: "success" });
+  }
+
+  function upscale2x() {
+    if (busy) return;
+    setBusy("Ampliando a imagem…");
+    // deixa o busy pintar antes da operação pesada
+    setTimeout(() => {
+      try {
+        applyPixelOp((base) => upscaleCanvas(base, 2));
+        clearMask();
+        toast("Imagem ampliada 2×", { description: "Reamostragem de alta qualidade (bicúbica do navegador).", variant: "success" });
+      } finally {
+        setBusy(null);
+      }
+    }, 30);
+  }
 
   return (
     <div className="space-y-5">
@@ -61,6 +93,24 @@ export function AjustesPanel() {
           <RotateCcw className="h-3.5 w-3.5" aria-hidden /> Resetar tudo
         </Button>
       </div>
+
+      {/* Auto: 1 clique */}
+      <section className="space-y-2 rounded-xl border border-violet-500/30 bg-violet-500/5 p-3">
+        <h4 className="text-[11px] font-semibold uppercase tracking-wider text-violet-300">Automático</h4>
+        <div className="grid grid-cols-2 gap-2">
+          <Button size="sm" variant="secondary" disabled={!hasImage || !!busy} onClick={autoEnhance}>
+            <Sparkles className="h-3.5 w-3.5" aria-hidden /> Auto-melhoria
+          </Button>
+          <Button size="sm" variant="secondary" disabled={!hasImage || !!busy} onClick={upscale2x}>
+            <Maximize2 className="h-3.5 w-3.5" aria-hidden /> Ampliar 2×
+          </Button>
+        </div>
+        {hasImage && (
+          <p className="text-[10px] text-zinc-500">
+            Tamanho atual: {imgW}×{imgH}px. Ampliar dobra a resolução com reamostragem de alta qualidade (não é super-resolução por IA).
+          </p>
+        )}
+      </section>
 
       {GROUPS.map((g) => (
         <section key={g.title} className="space-y-3">
