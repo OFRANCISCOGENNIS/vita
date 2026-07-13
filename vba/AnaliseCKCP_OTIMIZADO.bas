@@ -287,9 +287,9 @@ Private Sub MostrarTelaFuturista(ByVal nLin As Long, ByVal seg As Double)
         .ParagraphFormat.Alignment = msoAlignCenter
     End With
     ok.TextFrame2.VerticalAnchor = msoAnchorMiddle
-    ok.OnAction = "FecharSplash"
+    ok.OnAction = "FecharSplashCKCP"
 
-    ' O painel permanece na tela; o botao OK (FecharSplash) apaga as formas.
+    ' O painel permanece na tela; o botao OK (FecharSplashCKCP) apaga as formas.
     On Error GoTo 0
 End Sub
 
@@ -333,7 +333,7 @@ Private Sub LimparSplash()
     On Error GoTo 0
 End Sub
 
-Public Sub FecharSplash(Optional ByVal ignorar As Variant)
+Public Sub FecharSplashCKCP(Optional ByVal ignorar As Variant)
     gSplashOK = True
     LimparSplash
 End Sub
