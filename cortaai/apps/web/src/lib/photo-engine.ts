@@ -1766,35 +1766,47 @@ export const LIGHTING_PRESETS: LightingPreset[] = [
   },
 ];
 
-/** Aplica um preset de iluminação (destrutivo, com undo) e devolve novo canvas. */
-export function applyLightingCanvas(src: HTMLCanvasElement, presetId: string): HTMLCanvasElement {
+/**
+ * Aplica um preset de iluminação (destrutivo, com undo) e devolve novo canvas.
+ * `intensity` 0..100 dosa o efeito: a camada com o filtro de cor é misturada
+ * proporcionalmente sobre o original, e brilhos/vinheta escalam junto.
+ */
+export function applyLightingCanvas(src: HTMLCanvasElement, presetId: string, intensity = 100): HTMLCanvasElement {
   const preset = LIGHTING_PRESETS.find((p) => p.id === presetId);
   if (!preset) return src;
+  const k = Math.max(0, Math.min(1, intensity / 100));
   const w = src.width;
   const h = src.height;
   const out = makeCanvas(w, h);
   const ctx = out.getContext("2d")!;
-  ctx.filter = preset.css;
+
+  // base original + camada filtrada com alpha proporcional (mistura linear)
   ctx.drawImage(src, 0, 0);
-  ctx.filter = "none";
+  if (k > 0) {
+    ctx.globalAlpha = k;
+    ctx.filter = preset.css;
+    ctx.drawImage(src, 0, 0);
+    ctx.filter = "none";
+    ctx.globalAlpha = 1;
+  }
 
   // brilhos (screen)
   ctx.globalCompositeOperation = "screen";
   for (const spot of preset.spots) {
     const r = Math.max(w, h) * spot.r;
     const grad = ctx.createRadialGradient(spot.x * w, spot.y * h, 0, spot.x * w, spot.y * h, r);
-    grad.addColorStop(0, `rgba(${spot.color},${spot.alpha})`);
+    grad.addColorStop(0, `rgba(${spot.color},${(spot.alpha * k).toFixed(3)})`);
     grad.addColorStop(1, `rgba(${spot.color},0)`);
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, w, h);
   }
 
   // vinheta
-  if (preset.vignette > 0) {
+  if (preset.vignette > 0 && k > 0) {
     ctx.globalCompositeOperation = "source-over";
     const grad = ctx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.35, w / 2, h / 2, Math.max(w, h) * 0.75);
     grad.addColorStop(0, "rgba(0,0,0,0)");
-    grad.addColorStop(1, `rgba(0,0,0,${(0.75 * preset.vignette).toFixed(3)})`);
+    grad.addColorStop(1, `rgba(0,0,0,${(0.75 * preset.vignette * k).toFixed(3)})`);
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, w, h);
   }
