@@ -8,12 +8,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, ChevronDown, FolderOpen, Redo2, Undo2 } from "lucide-react";
+import { ArrowLeft, ChevronDown, FolderOpen, Music2, Redo2, Undo2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { makeProject } from "@/lib/video-editor/model";
 import { useVideoEditor } from "@/store/video-editor";
 import { TimelineTracks } from "@/components/video-editor/TimelineTracks";
 import { MediaBin } from "@/components/video-editor/MediaBin";
+import { MusicPanel } from "@/components/video-editor/MusicPanel";
 import { PreviewStage } from "@/components/video-editor/PreviewStage";
 
 export default function EstudioPage() {
@@ -25,6 +26,7 @@ export default function EstudioPage() {
   const sourceCount = useVideoEditor((s) => Object.keys(s.sources).length);
   const seeded = useRef(false);
   const [binOpen, setBinOpen] = useState(false);
+  const [musicOpen, setMusicOpen] = useState(false);
 
   useEffect(() => {
     if (seeded.current) return;
@@ -67,8 +69,14 @@ export default function EstudioPage() {
 
       {/* Área principal: mídia (desktop) + preview */}
       <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
-        <aside className="hidden shrink-0 overflow-y-auto border-r border-line p-3 lg:block lg:w-[300px]">
+        <aside className="hidden shrink-0 space-y-5 overflow-y-auto border-r border-line p-3 lg:block lg:w-[300px]">
           <MediaBin />
+          <div>
+            <p className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+              <Music2 className="h-3.5 w-3.5" aria-hidden /> Música
+            </p>
+            <MusicPanel />
+          </div>
         </aside>
         <div className="min-h-0 flex-1 p-2 sm:p-3">
           <PreviewStage />
@@ -89,7 +97,14 @@ export default function EstudioPage() {
           <FolderOpen className="h-5 w-5" aria-hidden />
           Mídia{sourceCount > 0 ? ` (${sourceCount})` : ""}
         </button>
-        {/* Próximas ferramentas (cortar, texto, áudio…) entram nas próximas fatias */}
+        <button
+          onClick={() => setMusicOpen(true)}
+          className="flex min-w-[64px] flex-col items-center justify-center gap-1 rounded-lg px-3 py-1.5 text-[10px] font-medium text-zinc-300 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+        >
+          <Music2 className="h-5 w-5" aria-hidden />
+          Música
+        </button>
+        {/* Próximas ferramentas (cortar, texto…) entram nas próximas fatias */}
       </nav>
 
       {/* Gaveta de mídia (mobile) */}
@@ -111,6 +126,26 @@ export default function EstudioPage() {
         </div>
       </div>
       {binOpen && <button aria-hidden tabIndex={-1} onClick={() => setBinOpen(false)} className="fixed inset-0 z-30 bg-black/50 lg:hidden" />}
+
+      {/* Gaveta de música (mobile) */}
+      <div
+        className={cn(
+          "fixed inset-x-0 bottom-0 z-40 rounded-t-2xl border-t border-line bg-surface-2 shadow-2xl transition-transform duration-300 lg:hidden",
+          musicOpen ? "translate-y-0" : "translate-y-full",
+        )}
+        style={{ maxHeight: "70dvh" }}
+      >
+        <div className="flex items-center justify-between border-b border-line px-4 py-2">
+          <span className="text-sm font-semibold text-white">Música</span>
+          <button onClick={() => setMusicOpen(false)} aria-label="Fechar" className="rounded-lg p-1.5 text-zinc-500 hover:text-white">
+            <ChevronDown className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="max-h-[calc(70dvh-3rem)] overflow-y-auto p-3">
+          <MusicPanel />
+        </div>
+      </div>
+      {musicOpen && <button aria-hidden tabIndex={-1} onClick={() => setMusicOpen(false)} className="fixed inset-0 z-30 bg-black/50 lg:hidden" />}
     </div>
   );
 }

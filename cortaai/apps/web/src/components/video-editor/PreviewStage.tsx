@@ -31,6 +31,7 @@ export function PreviewStage() {
   const stageRef = useRef<HTMLDivElement | null>(null);
   const videosRef = useRef<Map<string, HTMLVideoElement>>(new Map());
   const imagesRef = useRef<Map<string, HTMLImageElement>>(new Map());
+  const audiosRef = useRef<Map<string, HTMLAudioElement>>(new Map());
   const rafRef = useRef<number | null>(null);
   const [playing, setPlaying] = useState(false);
   const [stageSize, setStageSize] = useState<{ w: number; h: number } | null>(null);
@@ -73,13 +74,52 @@ export function PreviewStage() {
     [],
   );
 
+  const ensureAudio = useCallback(async (source: MediaSource): Promise<HTMLAudioElement | null> => {
+    let el = audiosRef.current.get(source.id);
+    if (el) return el;
+    const url = await sourceObjectUrl(source);
+    if (!url) return null;
+    el = document.createElement("audio");
+    el.preload = "auto";
+    el.src = url;
+    audiosRef.current.set(source.id, el);
+    return el;
+  }, []);
+
   // pré-carrega os elementos das fontes usadas
   useEffect(() => {
     for (const source of Object.values(sources)) {
       if (source.kind === "video") void ensureVideo(source);
       else if (source.kind === "image") void ensureImage(source);
+      else if (source.kind === "audio") void ensureAudio(source);
     }
-  }, [sources, ensureVideo, ensureImage]);
+  }, [sources, ensureVideo, ensureImage, ensureAudio]);
+
+  // sincroniza as trilhas de ÁUDIO (música) ao playhead durante a reprodução
+  const syncAudio = useCallback(
+    (head: number, isPlaying: boolean) => {
+      const activeBySource = new Map<string, { timeSec: number; speed: number }>();
+      if (isPlaying) {
+        for (const track of project.tracks) {
+          if (track.type !== "audio" || track.muted || track.hidden) continue;
+          const clip = clipAtTime(track, head);
+          if (!clip) continue;
+          activeBySource.set(clip.sourceId, { timeSec: sourceTimeForClip(clip, head) / 1000, speed: clip.speed });
+        }
+      }
+      audiosRef.current.forEach((el, sourceId) => {
+        const active = activeBySource.get(sourceId);
+        if (active) {
+          el.playbackRate = Math.min(4, Math.max(0.25, active.speed));
+          if (Math.abs(el.currentTime - active.timeSec) > 0.25) el.currentTime = Math.max(0, active.timeSec);
+          if (el.paused) void el.play().catch(() => undefined);
+        } else if (!el.paused) {
+          el.pause();
+        }
+      });
+    },
+    [project.tracks],
+  );
 
   // resolvedor para o motor: devolve o elemento já apresentando o frame certo
   const resolve = useCallback(
@@ -159,22 +199,24 @@ export function PreviewStage() {
 
   // --- reprodução (trilha primária) ------------------------------------------
   const play = useCallback(async () => {
-    if (!primaryTrack) return;
-    let clip = clipAtTime(primaryTrack, useVideoEditor.getState().playheadMs);
-    if (!clip) {
-      // nada sob o playhead → começa do primeiro clipe
-      clip = [...primaryTrack.clips].sort((a, b) => a.startInTimeline - b.startInTimeline)[0] ?? null;
-      if (clip) setPlayhead(clip.startInTimeline);
+    const st = useVideoEditor.getState();
+    const head = st.playheadMs;
+    const anyActive = st.project.tracks.some((t) => (t.type === "video" || t.type === "audio") && clipAtTime(t, head));
+    if (!anyActive) {
+      // nada sob o playhead → começa do clipe mais antigo (vídeo ou áudio)
+      const starts = st.project.tracks.flatMap((t) => t.clips.map((c) => c.startInTimeline));
+      if (starts.length === 0) return;
+      setPlayhead(Math.min(...starts));
     }
-    if (!clip) return;
     setPlaying(true);
-  }, [primaryTrack, setPlayhead]);
+  }, [setPlayhead]);
 
   useEffect(() => {
     if (!playing || !primaryTrack) return;
     let stopped = false;
     let currentClipId: string | null = null;
     let el: HTMLVideoElement | null = null;
+    const audios = audiosRef.current;
 
     async function startClip(clip: Clip) {
       const source = sources[clip.sourceId];
@@ -185,47 +227,70 @@ export function PreviewStage() {
       el = await ensureVideo(source);
       if (!el) return;
       currentClipId = clip.id;
+      el.muted = false; // ao reproduzir, o som original do vídeo toca junto da música
       el.playbackRate = Math.min(4, Math.max(0.25, clip.speed));
       const target = sourceTimeForClip(clip, useVideoEditor.getState().playheadMs) / 1000;
       if (Math.abs(el.currentTime - target) > 0.08) await seekVideo(el, target);
       await el.play().catch(() => undefined);
     }
 
+    let lastTs = performance.now();
     function loop() {
       if (stopped) return;
+      const now = performance.now();
+      const dt = now - lastTs;
+      lastTs = now;
       const head = useVideoEditor.getState().playheadMs;
       const clip = clipAtTime(primaryTrack!, head);
-      if (!clip) {
-        // fim ou buraco → para
+      const audioActive = project.tracks.some((t) => t.type === "audio" && !t.muted && clipAtTime(t, head));
+
+      if (clip) {
+        if (clip.id !== currentClipId) {
+          if (el) el.pause();
+          void startClip(clip);
+        } else if (el && el.readyState >= 2) {
+          // deriva o playhead do tempo real do vídeo
+          const newHead = clip.startInTimeline + (el.currentTime * 1000 - clip.trimIn) / clip.speed;
+          setPlayhead(newHead >= clipEndMs(clip) ? clipEndMs(clip) : newHead);
+        }
+      } else if (audioActive) {
+        // sem vídeo sob o playhead, mas há música tocando → relógio de parede
+        if (el) el.pause();
+        currentClipId = null;
+        setPlayhead(head + dt);
+      } else {
         setPlaying(false);
         return;
       }
-      if (clip.id !== currentClipId) {
-        if (el) el.pause();
-        void startClip(clip);
-      } else if (el && el.readyState >= 2) {
-        // deriva o playhead do tempo real do vídeo
-        const newHead = clip.startInTimeline + ((el.currentTime * 1000 - clip.trimIn) / clip.speed);
-        if (newHead >= clipEndMs(clip)) {
-          setPlayhead(clipEndMs(clip));
-        } else {
-          setPlayhead(newHead);
-        }
-      }
-      draw(useVideoEditor.getState().playheadMs);
+
+      const head2 = useVideoEditor.getState().playheadMs;
+      syncAudio(head2, true);
+      draw(head2);
       rafRef.current = requestAnimationFrame(loop);
     }
 
+    // toca também trilhas de áudio quando NÃO há trilha de vídeo (só música)
     const first = clipAtTime(primaryTrack, useVideoEditor.getState().playheadMs);
     if (first) void startClip(first);
+    else void ensureAudioStart();
     rafRef.current = requestAnimationFrame(loop);
+
+    async function ensureAudioStart() {
+      // pré-carrega os áudios ativos para começar sem atraso
+      for (const track of project.tracks) {
+        if (track.type !== "audio") continue;
+        const clip = clipAtTime(track, useVideoEditor.getState().playheadMs);
+        if (clip) await ensureAudio(sources[clip.sourceId] ?? ({} as MediaSource)).catch(() => null);
+      }
+    }
 
     return () => {
       stopped = true;
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       if (el) el.pause();
+      audios.forEach((a) => a.pause());
     };
-  }, [playing, primaryTrack, sources, ensureVideo, setPlayhead, draw]);
+  }, [playing, primaryTrack, sources, project.tracks, ensureVideo, ensureAudio, syncAudio, setPlayhead, draw]);
 
   function toggle() {
     if (playing) setPlaying(false);

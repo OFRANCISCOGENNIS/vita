@@ -154,6 +154,19 @@ function probeAudio(name: string, mediaId: string, url: string): Promise<MediaSo
   });
 }
 
+/** Registra um Blob já em memória (ex.: trilha gerada) como MediaSource. */
+export async function registerBlob(
+  blob: Blob,
+  name: string,
+  kind: SourceKind,
+  durationMs: number,
+  dims: { width: number; height: number } = { width: 0, height: 0 },
+): Promise<MediaSource> {
+  const mediaId = newId("media");
+  await saveMedia(mediaId, blob);
+  return { id: newId("src"), kind, name, mediaId, durationMs, width: dims.width, height: dims.height, posterDataUrl: null };
+}
+
 // ------------------------------------------------------- object URL cache
 
 const urlCache = new Map<string, string>();
