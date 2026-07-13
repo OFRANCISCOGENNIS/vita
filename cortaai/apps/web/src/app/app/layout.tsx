@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
+  Clapperboard,
   Download,
   FolderOpen,
   LayoutDashboard,
@@ -33,6 +34,7 @@ import { useRenderQueueStore } from "@/store/render-queue";
 const NAV = [
   { href: "/app", label: "Painel", icon: LayoutDashboard, exact: true },
   { href: "/app/novo", label: "Novo vídeo", icon: PlusCircle, tour: "novo" },
+  { href: "/app/estudio", label: "Estúdio de vídeo", icon: Clapperboard },
   { href: "/app/capa", label: "Estúdio de Capa", icon: ImageIcon, tour: "capa" },
   { href: "/app/fotos", label: "Editor de Fotos", icon: ImagePlus },
   { href: "/app/projetos", label: "Projetos", icon: FolderOpen },
@@ -71,11 +73,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     );
   }
 
-  const isEditor = pathname?.startsWith("/app/editor");
+  // Editor e Estúdio multitrilha são full-bleed (estilo CapCut): sem sidebar/
+  // topbar — a tela de edição ocupa a viewport inteira.
+  const isEditor = pathname?.startsWith("/app/editor") || pathname?.startsWith("/app/estudio");
 
-  // Editor route is full-bleed (CapCut-style): no sidebar/topbar — the editor
-  // owns the whole viewport. Command palette + shortcuts stay available; the
-  // onboarding tour targets sidebar items, so it only renders with the shell.
   if (isEditor) {
     return (
       <div className="h-[100dvh] overflow-hidden">

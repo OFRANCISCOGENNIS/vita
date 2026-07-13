@@ -235,8 +235,8 @@ export function PreviewStage() {
   const hasMedia = Object.keys(sources).length > 0;
 
   return (
-    <div className="flex flex-col gap-2">
-      <div ref={stageRef} className="relative flex aspect-[9/16] max-h-[52vh] w-full items-center justify-center overflow-hidden rounded-xl bg-[#050508]">
+    <div className="flex h-full min-h-0 flex-col gap-2">
+      <div ref={stageRef} className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-xl bg-[#050508]">
         <canvas
           ref={canvasRef}
           width={pw}
@@ -251,7 +251,7 @@ export function PreviewStage() {
         )}
       </div>
 
-      <div className="flex items-center gap-3 rounded-xl border border-line bg-surface-1/60 px-3 py-2">
+      <div className="flex shrink-0 items-center gap-3 rounded-xl border border-line bg-surface-1/60 px-3 py-2">
         <button
           onClick={toggle}
           aria-label={playing ? "Pausar" : "Reproduzir"}

@@ -1,11 +1,15 @@
 "use client";
 
-// Editor de vídeo multitrilha (em construção). Rota nova e aditiva; o editor
-// atual (/app/editor) segue intacto.
-// Fatia B: importar mídia + preview de 1 trilha + timeline.
+// Estúdio de vídeo multitrilha — layout full-bleed estilo CapCut, mobile-first.
+// Desktop (lg): coluna de mídia à esquerda + preview, timeline embaixo.
+// Mobile: preview dominante, timeline compacta, barra inferior de ferramentas;
+// a biblioteca de mídia abre como gaveta inferior.
+// (Rota nova e aditiva — o editor atual /app/editor segue intacto.)
 
-import { useEffect, useRef } from "react";
-import { Info } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { ArrowLeft, ChevronDown, FolderOpen, Redo2, Undo2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { makeProject } from "@/lib/video-editor/model";
 import { useVideoEditor } from "@/store/video-editor";
 import { TimelineTracks } from "@/components/video-editor/TimelineTracks";
@@ -14,9 +18,14 @@ import { PreviewStage } from "@/components/video-editor/PreviewStage";
 
 export default function EstudioPage() {
   const loadProject = useVideoEditor((s) => s.loadProject);
+  const undo = useVideoEditor((s) => s.undo);
+  const redo = useVideoEditor((s) => s.redo);
+  const canUndo = useVideoEditor((s) => s.past.length > 0);
+  const canRedo = useVideoEditor((s) => s.future.length > 0);
+  const sourceCount = useVideoEditor((s) => Object.keys(s.sources).length);
   const seeded = useRef(false);
+  const [binOpen, setBinOpen] = useState(false);
 
-  // Começa com um projeto vazio (trilhas Vídeo/Áudio). O usuário importa mídia.
   useEffect(() => {
     if (seeded.current) return;
     seeded.current = true;
@@ -24,26 +33,84 @@ export default function EstudioPage() {
   }, [loadProject]);
 
   return (
-    <div className="mx-auto max-w-6xl space-y-4">
-      <div>
-        <h1 className="text-2xl font-bold text-white">Estúdio de vídeo</h1>
-        <p className="mt-1 text-sm text-zinc-500">Novo editor multitrilha — em construção.</p>
+    <div className="flex h-[100dvh] flex-col overflow-hidden bg-surface">
+      {/* Topo */}
+      <header className="flex shrink-0 items-center gap-2 border-b border-line bg-surface-1/60 px-3 py-2">
+        <Link
+          href="/app"
+          title="Sair do estúdio"
+          className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-sm text-zinc-400 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+        >
+          <ArrowLeft className="h-4 w-4" aria-hidden />
+          <span className="hidden sm:inline">Sair</span>
+        </Link>
+        <p className="min-w-0 flex-1 truncate text-sm font-semibold text-white">Estúdio de vídeo</p>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={undo}
+            disabled={!canUndo}
+            aria-label="Desfazer"
+            className="rounded-lg p-2 text-zinc-400 hover:text-white disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+          >
+            <Undo2 className="h-4 w-4" />
+          </button>
+          <button
+            onClick={redo}
+            disabled={!canRedo}
+            aria-label="Refazer"
+            className="rounded-lg p-2 text-zinc-400 hover:text-white disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+          >
+            <Redo2 className="h-4 w-4" />
+          </button>
+        </div>
+      </header>
+
+      {/* Área principal: mídia (desktop) + preview */}
+      <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
+        <aside className="hidden shrink-0 overflow-y-auto border-r border-line p-3 lg:block lg:w-[300px]">
+          <MediaBin />
+        </aside>
+        <div className="min-h-0 flex-1 p-2 sm:p-3">
+          <PreviewStage />
+        </div>
       </div>
 
-      <p className="flex items-start gap-2 rounded-xl bg-sky-500/10 p-3 text-xs leading-relaxed text-sky-200">
-        <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
-        Prévia técnica (Fatia B): importe uma mídia (botão ou arraste) e ela entra na timeline e toca no preview.
-        Arrastar/cortar clipes, compor várias trilhas e exportar entram nas próximas etapas.
-      </p>
+      {/* Timeline */}
+      <div className="shrink-0 px-2 pb-1 sm:px-3">
+        <TimelineTracks />
+      </div>
 
-      <div className="grid gap-4 lg:grid-cols-[300px_1fr]">
-        <div className="space-y-4">
+      {/* Barra inferior (mobile) */}
+      <nav aria-label="Ferramentas" className="flex shrink-0 items-stretch gap-1 border-t border-line bg-surface-1/95 px-2 pt-1 pb-[calc(0.35rem+env(safe-area-inset-bottom))] lg:hidden">
+        <button
+          onClick={() => setBinOpen(true)}
+          className="flex min-w-[64px] flex-col items-center justify-center gap-1 rounded-lg px-3 py-1.5 text-[10px] font-medium text-zinc-300 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+        >
+          <FolderOpen className="h-5 w-5" aria-hidden />
+          Mídia{sourceCount > 0 ? ` (${sourceCount})` : ""}
+        </button>
+        {/* Próximas ferramentas (cortar, texto, áudio…) entram nas próximas fatias */}
+      </nav>
+
+      {/* Gaveta de mídia (mobile) */}
+      <div
+        className={cn(
+          "fixed inset-x-0 bottom-0 z-40 rounded-t-2xl border-t border-line bg-surface-2 shadow-2xl transition-transform duration-300 lg:hidden",
+          binOpen ? "translate-y-0" : "translate-y-full",
+        )}
+        style={{ maxHeight: "70dvh" }}
+      >
+        <div className="flex items-center justify-between border-b border-line px-4 py-2">
+          <span className="text-sm font-semibold text-white">Mídia</span>
+          <button onClick={() => setBinOpen(false)} aria-label="Fechar" className="rounded-lg p-1.5 text-zinc-500 hover:text-white">
+            <ChevronDown className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="max-h-[calc(70dvh-3rem)] overflow-y-auto p-3">
           <MediaBin />
         </div>
-        <PreviewStage />
       </div>
-
-      <TimelineTracks />
+      {binOpen && <button aria-hidden tabIndex={-1} onClick={() => setBinOpen(false)} className="fixed inset-0 z-30 bg-black/50 lg:hidden" />}
     </div>
   );
 }
