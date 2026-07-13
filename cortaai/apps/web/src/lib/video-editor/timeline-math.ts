@@ -231,3 +231,17 @@ export function applyEasing(easing: Easing, t: number): number {
       return x;
   }
 }
+
+/**
+ * Multiplicador de volume dos FADES de áudio do clipe no instante
+ * `clipTimeMs` (relativo ao início do clipe na timeline). 1 = sem fade.
+ */
+export function audioGainAt(clip: Clip, clipTimeMs: number): number {
+  let g = 1;
+  const fadeIn = Math.min(clip.fadeInMs ?? 0, clip.duration);
+  if (fadeIn > 0 && clipTimeMs < fadeIn) g *= Math.max(0, clipTimeMs / fadeIn);
+  const fadeOut = Math.min(clip.fadeOutMs ?? 0, clip.duration);
+  const fromEnd = clip.duration - clipTimeMs;
+  if (fadeOut > 0 && fromEnd < fadeOut) g *= Math.max(0, fromEnd / fadeOut);
+  return Math.min(1, Math.max(0, g));
+}

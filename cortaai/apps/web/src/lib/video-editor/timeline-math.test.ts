@@ -16,6 +16,7 @@ import {
   projectDurationMs,
   applyEasing,
   boundaryCandidates,
+  audioGainAt,
 } from "./timeline-math";
 
 const clip = (over: Partial<Parameters<typeof makeClip>[0]> = {}) =>
@@ -164,5 +165,30 @@ describe("validação de projeto", () => {
     expect(validateProject({ tracks: "x" })).toBeNull();
     const fixed = validateProject({ resolution: { w: 1080, h: 1920 }, fps: 30, tracks: [] });
     expect(fixed?.tracks.length).toBe(2); // repõe trilhas padrão
+  });
+});
+
+describe("audioGainAt", () => {
+  it("sem fades é sempre 1", () => {
+    const clip = makeClip({ trackId: "t", sourceId: "s", startInTimeline: 0, duration: 2000 });
+    expect(audioGainAt(clip, 0)).toBe(1);
+    expect(audioGainAt(clip, 1999)).toBe(1);
+  });
+
+  it("fade de entrada sobe 0→1 e fade de saída desce 1→0", () => {
+    const clip = makeClip({ trackId: "t", sourceId: "s", startInTimeline: 0, duration: 4000 });
+    clip.fadeInMs = 1000;
+    clip.fadeOutMs = 1000;
+    expect(audioGainAt(clip, 0)).toBe(0);
+    expect(audioGainAt(clip, 500)).toBeCloseTo(0.5, 5);
+    expect(audioGainAt(clip, 2000)).toBe(1);
+    expect(audioGainAt(clip, 3500)).toBeCloseTo(0.5, 5);
+    expect(audioGainAt(clip, 4000)).toBe(0);
+  });
+
+  it("fades maiores que o clipe são limitados", () => {
+    const clip = makeClip({ trackId: "t", sourceId: "s", startInTimeline: 0, duration: 1000 });
+    clip.fadeInMs = 99_000;
+    expect(audioGainAt(clip, 500)).toBeCloseTo(0.5, 5);
   });
 });

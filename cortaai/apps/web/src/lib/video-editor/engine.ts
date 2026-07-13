@@ -135,6 +135,11 @@ export function drawComposite(
       ctx.fillRect(0, 0, canvasW, canvasH);
       ctx.restore();
     }
+
+    // efeitos de sobreposição (vinheta / grão / VHS)
+    if (clip.effects.length > 0 && opacity > 0) {
+      applyOverlayEffects(ctx, canvasW, canvasH, clip, playheadMs);
+    }
   }
 
   ctx.restore();
@@ -171,4 +176,88 @@ function drawText(ctx: CanvasRenderingContext2D, canvasW: number, canvasH: numbe
 
 function clamp01(v: number): number {
   return Math.min(1, Math.max(0, v));
+}
+
+// -------------------------------------------------- efeitos de sobreposição
+
+let noiseCanvas: HTMLCanvasElement | null = null;
+function getNoiseCanvas(): HTMLCanvasElement | null {
+  if (noiseCanvas) return noiseCanvas;
+  if (typeof document === "undefined") return null;
+  const c = document.createElement("canvas");
+  c.width = 256;
+  c.height = 256;
+  const nctx = c.getContext("2d");
+  if (!nctx) return null;
+  const img = nctx.createImageData(256, 256);
+  for (let i = 0; i < img.data.length; i += 4) {
+    const v = Math.floor(Math.random() * 255);
+    img.data[i] = v;
+    img.data[i + 1] = v;
+    img.data[i + 2] = v;
+    img.data[i + 3] = 255;
+  }
+  nctx.putImageData(img, 0, 0);
+  noiseCanvas = c;
+  return c;
+}
+
+function applyOverlayEffects(
+  ctx: CanvasRenderingContext2D,
+  canvasW: number,
+  canvasH: number,
+  clip: Clip,
+  playheadMs: number,
+): void {
+  for (const fx of clip.effects) {
+    const k = Math.min(1, Math.max(0, fx.intensity));
+    if (k <= 0) continue;
+
+    if (fx.id === "vignette") {
+      const grad = ctx.createRadialGradient(
+        canvasW / 2,
+        canvasH / 2,
+        Math.min(canvasW, canvasH) * 0.35,
+        canvasW / 2,
+        canvasH / 2,
+        Math.max(canvasW, canvasH) * 0.75,
+      );
+      grad.addColorStop(0, "rgba(0,0,0,0)");
+      grad.addColorStop(1, `rgba(0,0,0,${(0.85 * k).toFixed(3)})`);
+      ctx.save();
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, canvasW, canvasH);
+      ctx.restore();
+    } else if (fx.id === "grain") {
+      const noise = getNoiseCanvas();
+      if (!noise) continue;
+      // desloca o padrão a cada frame para o grão "viver"
+      const ox = (playheadMs * 7) % 256;
+      const oy = (playheadMs * 13) % 256;
+      ctx.save();
+      ctx.globalAlpha = 0.28 * k;
+      ctx.globalCompositeOperation = "overlay";
+      for (let y = -oy; y < canvasH; y += 256) {
+        for (let x = -ox; x < canvasW; x += 256) {
+          ctx.drawImage(noise, x, y);
+        }
+      }
+      ctx.restore();
+    } else if (fx.id === "vhs") {
+      ctx.save();
+      // scanlines
+      ctx.globalAlpha = 0.22 * k;
+      ctx.fillStyle = "#000";
+      const step = Math.max(3, Math.round(canvasH / 240));
+      for (let y = 0; y < canvasH; y += step * 2) {
+        ctx.fillRect(0, y, canvasW, step);
+      }
+      // faixa de tracking que percorre a tela
+      const bandY = ((playheadMs * 0.12) % (canvasH + 80)) - 40;
+      ctx.globalAlpha = 0.12 * k;
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(0, bandY, canvasW, 26);
+      ctx.restore();
+    }
+  }
 }

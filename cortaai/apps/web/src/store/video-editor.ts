@@ -67,6 +67,9 @@ interface VideoEditorState {
   setClipSpeed: (clipId: string, speed: number) => void;
   /** Adiciona um clipe de texto no playhead (cria a trilha de texto se preciso). */
   addTextClip: (content: string) => string;
+  /** Importa cues de legenda como clipes de texto numa trilha "Legendas" (1 ação no histórico). */
+  addCaptionCues: (cues: { startMs: number; endMs: number; text: string }[]) => number;
+  renameProject: (name: string) => void;
   setTrackFlag: (trackId: string, flag: "muted" | "locked" | "hidden", value: boolean) => void;
 
   undo: () => void;
@@ -295,6 +298,37 @@ export const useVideoEditor = create<VideoEditorState>()((set, get) => ({
     );
     set({ selectedClipId: clip.id });
     return clip.id;
+  },
+
+  addCaptionCues: (cues) => {
+    if (cues.length === 0) return 0;
+    const s0 = get();
+    let project = s0.project;
+    let track = project.tracks.find((t) => t.type === "text" && t.name === "Legendas");
+    if (!track) {
+      track = makeTrack("text", "Legendas");
+      project = { ...project, tracks: [...project.tracks, track] };
+    }
+    const clips = [...track.clips];
+    let added = 0;
+    for (const cue of cues) {
+      const duration = Math.max(200, cue.endMs - cue.startMs);
+      const clip = makeClip({ trackId: track.id, sourceId: "", startInTimeline: cue.startMs, duration });
+      clip.text = { content: cue.text, fontFamily: "Inter", color: "#ffffff", fontWeight: 700, background: "rgba(0,0,0,0.6)" };
+      clip.transform = { ...clip.transform, y: 0.36, scale: 0.75 }; // posição de legenda (embaixo)
+      clips.push(clip);
+      added++;
+    }
+    const trackId = track.id;
+    const next = { ...project, tracks: project.tracks.map((t) => (t.id === trackId ? { ...t, clips } : t)) };
+    set((s) => withHistory(s, next));
+    return added;
+  },
+
+  renameProject: (name) => {
+    const clean = name.trim();
+    if (!clean || clean === get().project.name) return;
+    set((s) => withHistory(s, { ...s.project, name: clean }));
   },
 
   setTrackFlag: (trackId, flag, value) => {

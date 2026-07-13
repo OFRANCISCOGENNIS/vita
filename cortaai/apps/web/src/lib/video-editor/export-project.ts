@@ -184,7 +184,21 @@ async function mixProjectAudio(
     src.buffer = buffer;
     src.playbackRate.value = Math.min(4, Math.max(0.25, clip.speed));
     const gain = offline.createGain();
-    gain.gain.value = Math.min(1, Math.max(0, clip.volume));
+    const vol = Math.min(1, Math.max(0, clip.volume));
+    const startSec = clip.startInTimeline / 1000;
+    const endSec = (clip.startInTimeline + clip.duration) / 1000;
+    const fadeInSec = Math.min(clip.fadeInMs ?? 0, clip.duration) / 1000;
+    const fadeOutSec = Math.min(clip.fadeOutMs ?? 0, clip.duration) / 1000;
+    if (fadeInSec > 0) {
+      gain.gain.setValueAtTime(0.0001, startSec);
+      gain.gain.linearRampToValueAtTime(vol, startSec + fadeInSec);
+    } else {
+      gain.gain.setValueAtTime(vol, startSec);
+    }
+    if (fadeOutSec > 0) {
+      gain.gain.setValueAtTime(vol, Math.max(startSec, endSec - fadeOutSec));
+      gain.gain.linearRampToValueAtTime(0.0001, endSec);
+    }
     src.connect(gain).connect(master);
     const when = clip.startInTimeline / 1000;
     const offset = clip.trimIn / 1000;

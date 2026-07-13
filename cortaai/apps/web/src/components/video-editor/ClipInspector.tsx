@@ -5,18 +5,28 @@
 // modo de mesclagem, filtros/looks, animações de entrada/saída e texto.
 // Cada mudança vira uma ação no store (histórico undo/redo).
 
-import { Copy, Trash2 } from "lucide-react";
+import { Copy, Diamond, Trash2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ANIM_PRESETS } from "@/lib/video-editor/animations";
-import { CLIP_FILTERS } from "@/lib/video-editor/filters";
-import type { BlendMode, Clip } from "@/lib/video-editor/model";
+import { valueAt } from "@/lib/video-editor/engine";
+import { CLIP_FILTERS, OVERLAY_EFFECTS } from "@/lib/video-editor/filters";
+import type { AnimatableProperty, BlendMode, Clip, Keyframe } from "@/lib/video-editor/model";
 import { useVideoEditor } from "@/store/video-editor";
+
+const KF_PROPS: { prop: AnimatableProperty; label: string }[] = [
+  { prop: "scale", label: "Escala" },
+  { prop: "x", label: "X" },
+  { prop: "y", label: "Y" },
+  { prop: "rotation", label: "Rot" },
+  { prop: "opacity", label: "Opac" },
+];
 
 const BLEND_MODES: BlendMode[] = ["normal", "multiply", "screen", "overlay", "lighten", "darken", "difference"];
 
 export function ClipInspector() {
   const project = useVideoEditor((s) => s.project);
   const selectedClipId = useVideoEditor((s) => s.selectedClipId);
+  const playheadMs = useVideoEditor((s) => s.playheadMs);
   const updateClip = useVideoEditor((s) => s.updateClip);
   const setClipSpeed = useVideoEditor((s) => s.setClipSpeed);
   const deleteClip = useVideoEditor((s) => s.deleteClip);
@@ -42,6 +52,30 @@ export function ClipInspector() {
 
   function patchTransform(patch: Partial<Clip["transform"]>) {
     updateClip(clip.id, { transform: { ...clip.transform, ...patch } });
+  }
+
+  function toggleEffect(fxId: string) {
+    const has = clip.effects.some((e) => e.id === fxId);
+    updateClip(clip.id, {
+      effects: has ? clip.effects.filter((e) => e.id !== fxId) : [...clip.effects, { id: fxId, intensity: 0.6 }],
+    });
+  }
+
+  function setEffectIntensity(fxId: string, intensity: number) {
+    updateClip(clip.id, { effects: clip.effects.map((e) => (e.id === fxId ? { ...e, intensity } : e)) });
+  }
+
+  /** Adiciona um keyframe da propriedade no instante do playhead (valor atual). */
+  function addKeyframe(prop: AnimatableProperty) {
+    const clipTime = Math.min(clip.duration, Math.max(0, playheadMs - clip.startInTimeline));
+    const value = valueAt(clip, prop, clipTime);
+    const kf: Keyframe = { property: prop, timeMs: Math.round(clipTime), value, easing: "easeInOut" };
+    const rest = clip.keyframes.filter((k) => !(k.property === prop && Math.abs(k.timeMs - kf.timeMs) < 40));
+    updateClip(clip.id, { keyframes: [...rest, kf].sort((a, b) => a.timeMs - b.timeMs) });
+  }
+
+  function removeKeyframe(kf: Keyframe) {
+    updateClip(clip.id, { keyframes: clip.keyframes.filter((k) => !(k.property === kf.property && k.timeMs === kf.timeMs)) });
   }
 
   return (
@@ -113,11 +147,100 @@ export function ClipInspector() {
         </Section>
       )}
 
-      {/* velocidade + volume */}
+      {/* velocidade + volume + fades */}
       {isMedia && (
         <Section title="Velocidade e som">
           <Slider label="Velocidade" value={clip.speed} min={0.25} max={4} step={0.05} onChange={(v) => setClipSpeed(clip.id, v)} format={(v) => `${v.toFixed(2)}x`} />
           <Slider label="Volume" value={clip.volume} min={0} max={1} step={0.01} onChange={(v) => updateClip(clip.id, { volume: v })} format={(v) => `${Math.round(v * 100)}%`} />
+          <Slider
+            label="Fade de entrada"
+            value={clip.fadeInMs ?? 0}
+            min={0}
+            max={3000}
+            step={100}
+            onChange={(v) => updateClip(clip.id, { fadeInMs: v > 0 ? v : undefined })}
+            format={(v) => (v > 0 ? `${(v / 1000).toFixed(1)}s` : "—")}
+          />
+          <Slider
+            label="Fade de saída"
+            value={clip.fadeOutMs ?? 0}
+            min={0}
+            max={3000}
+            step={100}
+            onChange={(v) => updateClip(clip.id, { fadeOutMs: v > 0 ? v : undefined })}
+            format={(v) => (v > 0 ? `${(v / 1000).toFixed(1)}s` : "—")}
+          />
+        </Section>
+      )}
+
+      {/* efeitos de sobreposição */}
+      {isVisual && !clip.text && (
+        <Section title="Efeitos">
+          <div className="space-y-1.5">
+            {OVERLAY_EFFECTS.map((fx) => {
+              const active = clip.effects.find((e) => e.id === fx.id);
+              return (
+                <div key={fx.id} className="flex items-center gap-2">
+                  <button
+                    onClick={() => toggleEffect(fx.id)}
+                    aria-pressed={!!active}
+                    className={cn(
+                      "min-w-[96px] rounded-lg border px-2 py-1.5 text-left text-[11px] font-medium transition-colors",
+                      active ? "border-violet-400 bg-violet-500/20 text-white" : "border-line bg-surface-1 text-zinc-400 hover:text-white",
+                    )}
+                  >
+                    {fx.name}
+                  </button>
+                  {active && (
+                    <input
+                      type="range"
+                      min={0.1}
+                      max={1}
+                      step={0.05}
+                      value={active.intensity}
+                      onChange={(e) => setEffectIntensity(fx.id, Number(e.target.value))}
+                      aria-label={`Intensidade de ${fx.name}`}
+                      className="min-w-0 flex-1 accent-violet-500"
+                    />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </Section>
+      )}
+
+      {/* keyframes */}
+      {isVisual && (
+        <Section title="Keyframes (no playhead)">
+          <div className="flex flex-wrap gap-1">
+            {KF_PROPS.map(({ prop, label }) => (
+              <button
+                key={prop}
+                onClick={() => addKeyframe(prop)}
+                title={`Adicionar keyframe de ${label} no playhead`}
+                className="inline-flex items-center gap-1 rounded-lg border border-line bg-surface-1 px-2 py-1 text-[10px] font-medium text-zinc-300 hover:border-violet-500/50 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+              >
+                <Diamond className="h-2.5 w-2.5" aria-hidden />
+                {label}
+              </button>
+            ))}
+          </div>
+          {clip.keyframes.length > 0 && (
+            <ul className="mt-2 max-h-32 space-y-1 overflow-y-auto">
+              {clip.keyframes.map((kf) => (
+                <li key={`${kf.property}-${kf.timeMs}`} className="flex items-center gap-2 rounded-lg bg-surface-1 px-2 py-1 text-[10px] text-zinc-400">
+                  <Diamond className="h-2.5 w-2.5 shrink-0 text-violet-400" aria-hidden />
+                  <span className="min-w-0 flex-1 truncate font-mono">
+                    {kf.property} @ {(kf.timeMs / 1000).toFixed(2)}s = {kf.value.toFixed(2)}
+                  </span>
+                  <button onClick={() => removeKeyframe(kf)} aria-label="Remover keyframe" className="rounded p-0.5 hover:text-rose-400">
+                    <X className="h-3 w-3" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </Section>
       )}
 
