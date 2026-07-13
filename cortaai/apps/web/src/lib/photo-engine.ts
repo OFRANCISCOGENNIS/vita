@@ -1613,3 +1613,64 @@ export function backgroundBlurCanvas(src: HTMLCanvasElement, strength = 60): HTM
   octx.drawImage(sharp, 0, 0);
   return out;
 }
+
+/**
+ * Peso 0..1 de "isto parece pele" a partir de RGB (via YCbCr). Suave nas
+ * bordas da faixa para transição gradual. Puro/testável.
+ */
+export function skinWeight(r: number, g: number, b: number): number {
+  const y = 0.299 * r + 0.587 * g + 0.114 * b;
+  const cb = 128 - 0.168736 * r - 0.331264 * g + 0.5 * b;
+  const cr = 128 + 0.5 * r - 0.418688 * g - 0.081312 * b;
+  if (y < 40 || y > 245) return 0; // sombra dura / estouro
+  // faixas típicas de pele em Cb/Cr, com rampa suave de ±12
+  const inRange = (v: number, lo: number, hi: number): number => {
+    if (v < lo - 12 || v > hi + 12) return 0;
+    if (v >= lo && v <= hi) return 1;
+    return v < lo ? (v - (lo - 12)) / 12 : ((hi + 12) - v) / 12;
+  };
+  const wCb = inRange(cb, 77, 127);
+  const wCr = inRange(cr, 133, 173);
+  return Math.max(0, Math.min(1, wCb * wCr));
+}
+
+/**
+ * Retoque de retrato em 1 clique: suaviza a textura da PELE (seleção por tom)
+ * preservando bordas fortes (olhos, sobrancelhas, contornos) via guia de
+ * diferença. `strength` 0..100. Não usa detecção de rosto — funciona no rosto
+ * e em qualquer área de tom de pele. Devolve um novo canvas.
+ */
+export function portraitRetouch(src: HTMLCanvasElement, strength = 70): HTMLCanvasElement {
+  const w = src.width;
+  const h = src.height;
+  const sctx = src.getContext("2d");
+  if (!sctx) return src;
+  const img = sctx.getImageData(0, 0, w, h);
+  const orig = img.data;
+
+  const blurred = new ImageData(new Uint8ClampedArray(orig), w, h);
+  boxBlurImageData(blurred, Math.max(2, Math.round(Math.min(w, h) / 90)), 2);
+  const bd = blurred.data;
+
+  const s01 = Math.max(0, Math.min(1, strength / 100));
+  for (let i = 0; i < orig.length; i += 4) {
+    const r = orig[i];
+    const g = orig[i + 1];
+    const b = orig[i + 2];
+    const skin = skinWeight(r, g, b);
+    if (skin <= 0) continue;
+    const lo = 0.299 * r + 0.587 * g + 0.114 * b;
+    const lb = 0.299 * bd[i] + 0.587 * bd[i + 1] + 0.114 * bd[i + 2];
+    // bordas fortes (grande diferença) preservam o original; textura fina é suavizada
+    const edgeKeep = Math.max(0, 1 - Math.abs(lo - lb) / 42);
+    const alpha = skin * edgeKeep * s01 * 0.85;
+    if (alpha <= 0) continue;
+    orig[i] = Math.round(r + (bd[i] - r) * alpha);
+    orig[i + 1] = Math.round(g + (bd[i + 1] - g) * alpha);
+    orig[i + 2] = Math.round(b + (bd[i + 2] - b) * alpha);
+  }
+
+  const out = makeCanvas(w, h);
+  out.getContext("2d")!.putImageData(img, 0, 0);
+  return out;
+}

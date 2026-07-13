@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { autoEnhanceAdjustments } from "./photo-engine";
+import { autoEnhanceAdjustments, skinWeight } from "./photo-engine";
 
 /** Cria um "ImageData-like" preenchido com uma cor RGB constante. */
 function solid(r: number, g: number, b: number, w = 16, h = 16) {
@@ -65,6 +65,32 @@ describe("autoEnhanceAdjustments", () => {
     for (const v of Object.values(patch)) {
       expect(v).toBeGreaterThanOrEqual(-100);
       expect(v).toBeLessThanOrEqual(100);
+    }
+  });
+});
+
+describe("skinWeight", () => {
+  it("tom de pele típico tem peso alto", () => {
+    // pele clara/média aproximada
+    expect(skinWeight(230, 180, 150)).toBeGreaterThan(0.5);
+    expect(skinWeight(200, 150, 120)).toBeGreaterThan(0.4);
+  });
+
+  it("azul/verde puros têm peso ~0", () => {
+    expect(skinWeight(0, 0, 255)).toBeLessThan(0.1);
+    expect(skinWeight(0, 255, 0)).toBeLessThan(0.1);
+  });
+
+  it("sombra dura e estouro retornam 0", () => {
+    expect(skinWeight(10, 8, 7)).toBe(0);
+    expect(skinWeight(252, 250, 248)).toBe(0);
+  });
+
+  it("está sempre em 0..1", () => {
+    for (const [r, g, b] of [[230, 180, 150], [0, 0, 255], [128, 100, 90], [255, 0, 0]]) {
+      const v = skinWeight(r, g, b);
+      expect(v).toBeGreaterThanOrEqual(0);
+      expect(v).toBeLessThanOrEqual(1);
     }
   });
 });

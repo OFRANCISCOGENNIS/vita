@@ -4,13 +4,13 @@
 // persisted slice of the photo editor: localStorage "cortaai-photo-presets").
 
 import { useState } from "react";
-import { Aperture, Maximize2, RotateCcw, Save, Sparkles, Trash2, Wand2 } from "lucide-react";
+import { Aperture, Maximize2, RotateCcw, Save, Smile, Sparkles, Trash2, Wand2 } from "lucide-react";
 import { toast } from "@/store/toast";
 import { getBaseCanvas, usePhotoEditorStore, usePhotoPresetsStore } from "@/store/photo-editor";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { autoEnhanceAdjustments, backgroundBlurCanvas, upscaleCanvas, type Adjustments } from "@/lib/photo-engine";
+import { autoEnhanceAdjustments, backgroundBlurCanvas, portraitRetouch, upscaleCanvas, type Adjustments } from "@/lib/photo-engine";
 
 const GROUPS: { title: string; items: { key: keyof Adjustments; label: string; min?: number }[] }[] = [
   {
@@ -98,6 +98,19 @@ export function AjustesPanel() {
     }, 30);
   }
 
+  function retouchPortrait() {
+    if (busy) return;
+    setBusy("Retocando a pele…");
+    setTimeout(() => {
+      try {
+        applyPixelOp((base) => portraitRetouch(base, 70));
+        toast("Retoque de retrato aplicado", { description: "Pele suavizada preservando olhos e contornos. Para mais controle, use Retoque → suavizar pele.", variant: "success" });
+      } finally {
+        setBusy(null);
+      }
+    }, 30);
+  }
+
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
@@ -117,8 +130,11 @@ export function AjustesPanel() {
           <Button size="sm" variant="secondary" disabled={!hasImage || !!busy} onClick={upscale2x}>
             <Maximize2 className="h-3.5 w-3.5" aria-hidden /> Ampliar 2×
           </Button>
-          <Button size="sm" variant="secondary" className="col-span-2" disabled={!hasImage || !!busy} onClick={blurBackground}>
+          <Button size="sm" variant="secondary" disabled={!hasImage || !!busy} onClick={blurBackground}>
             <Aperture className="h-3.5 w-3.5" aria-hidden /> Desfocar fundo
+          </Button>
+          <Button size="sm" variant="secondary" disabled={!hasImage || !!busy} onClick={retouchPortrait}>
+            <Smile className="h-3.5 w-3.5" aria-hidden /> Retoque de retrato
           </Button>
         </div>
         {hasImage && (
