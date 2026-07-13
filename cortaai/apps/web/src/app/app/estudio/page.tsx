@@ -1,28 +1,48 @@
 "use client";
 
 // Estúdio de vídeo multitrilha — layout PRO estilo CapCut/Premiere.
-// Desktop (lg): mídia+música à esquerda, preview no centro, PROPRIEDADES à
-// direita, timeline interativa embaixo. Mobile: preview dominante + barra de
-// ferramentas inferior (Mídia/Música/Texto/Ajustes) com gavetas.
-// Autosave em localStorage; atalhos de teclado profissionais.
+// Desktop (lg): mídia+música+gravação+legendas à esquerda, preview no centro,
+// PROPRIEDADES à direita, timeline interativa embaixo. Mobile: preview
+// dominante + barra de ferramentas inferior com gavetas. Multi-projetos com
+// autosave em localStorage; atalhos de teclado profissionais.
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, ChevronDown, Download, FolderOpen, Music2, Redo2, SlidersHorizontal, Type as TypeIcon, Undo2 } from "lucide-react";
+import {
+  ArrowLeft,
+  Captions,
+  ChevronDown,
+  Circle,
+  Download,
+  FolderKanban,
+  FolderOpen,
+  Music2,
+  Redo2,
+  SlidersHorizontal,
+  Type as TypeIcon,
+  Undo2,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { makeProject, validateProject } from "@/lib/video-editor/model";
-import type { MediaSource } from "@/lib/video-editor/media-registry";
+import {
+  getCurrentProjectId,
+  getProjectEntry,
+  saveProjectEntry,
+  setCurrentProjectId,
+} from "@/lib/video-editor/project-library";
+import { projectDurationMs } from "@/lib/video-editor/timeline-math";
 import { useVideoEditor } from "@/store/video-editor";
 import { TimelineTracks } from "@/components/video-editor/TimelineTracks";
 import { MediaBin } from "@/components/video-editor/MediaBin";
 import { MusicPanel } from "@/components/video-editor/MusicPanel";
+import { CaptionsPanel } from "@/components/video-editor/CaptionsPanel";
+import { RecordPanel } from "@/components/video-editor/RecordPanel";
 import { ClipInspector } from "@/components/video-editor/ClipInspector";
 import { ExportProjectModal } from "@/components/video-editor/ExportProjectModal";
+import { ProjectsModal } from "@/components/video-editor/ProjectsModal";
 import { PreviewStage } from "@/components/video-editor/PreviewStage";
 
-const AUTOSAVE_KEY = "cortaai-studio-autosave";
-
-type Sheet = "bin" | "music" | "inspector" | null;
+type Sheet = "bin" | "music" | "record" | "captions" | "inspector" | null;
 
 export default function EstudioPage() {
   const loadProject = useVideoEditor((s) => s.loadProject);
@@ -35,45 +55,47 @@ export default function EstudioPage() {
   const sourceCount = useVideoEditor((s) => Object.keys(s.sources).length);
   const selectedClipId = useVideoEditor((s) => s.selectedClipId);
   const addTextClip = useVideoEditor((s) => s.addTextClip);
+  const renameProject = useVideoEditor((s) => s.renameProject);
+  const projectName = useVideoEditor((s) => s.project.name);
   const seeded = useRef(false);
   const [sheet, setSheet] = useState<Sheet>(null);
   const [exportOpen, setExportOpen] = useState(false);
+  const [projectsOpen, setProjectsOpen] = useState(false);
 
-  // ------- seed / restauração do autosave -----------------------------------
+  // ------- seed / restauração do projeto atual --------------------------------
   useEffect(() => {
     if (seeded.current) return;
     seeded.current = true;
     try {
-      const raw = localStorage.getItem(AUTOSAVE_KEY);
-      if (raw) {
-        const saved = JSON.parse(raw) as { project?: unknown; sources?: MediaSource[] };
-        const valid = validateProject(saved.project);
+      const currentId = getCurrentProjectId();
+      const entry = currentId ? getProjectEntry(currentId) : null;
+      if (entry) {
+        const valid = validateProject(entry.project);
         if (valid) {
           loadFromJson(valid);
-          (saved.sources ?? []).forEach((src) => {
+          (entry.sources ?? []).forEach((src) => {
             if (src && typeof src.id === "string" && typeof src.mediaId === "string") addSource(src);
           });
           return;
         }
       }
     } catch {
-      /* autosave corrompido → projeto novo */
+      /* biblioteca corrompida → projeto novo */
     }
-    loadProject(makeProject("Meu vídeo", { w: 1080, h: 1920 }, 30));
+    const project = makeProject("Meu vídeo", { w: 1080, h: 1920 }, 30);
+    loadProject(project);
+    setCurrentProjectId(project.id);
   }, [loadProject, loadFromJson, addSource]);
 
-  // ------- autosave (debounce) ------------------------------------------------
+  // ------- autosave na biblioteca de projetos (debounce) -----------------------
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | null = null;
     const unsub = useVideoEditor.subscribe((s, prev) => {
       if (s.project === prev.project && s.sources === prev.sources) return;
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => {
-        try {
-          localStorage.setItem(AUTOSAVE_KEY, JSON.stringify({ project: s.project, sources: Object.values(s.sources) }));
-        } catch {
-          /* quota cheia — ignora silenciosamente */
-        }
+        saveProjectEntry(s.project, Object.values(s.sources), projectDurationMs(s.project.tracks));
+        setCurrentProjectId(s.project.id);
       }, 800);
     });
     return () => {
@@ -82,7 +104,7 @@ export default function EstudioPage() {
     };
   }, []);
 
-  // ------- atalhos de teclado -------------------------------------------------
+  // ------- atalhos de teclado ---------------------------------------------------
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       const t = e.target as HTMLElement | null;
@@ -112,8 +134,6 @@ export default function EstudioPage() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  // ao selecionar um clipe no mobile, abre a gaveta de ajustes? Não — só via botão.
-
   return (
     <div className="flex h-[100dvh] flex-col overflow-hidden bg-surface">
       {/* Topo */}
@@ -126,7 +146,24 @@ export default function EstudioPage() {
           <ArrowLeft className="h-4 w-4" aria-hidden />
           <span className="hidden sm:inline">Sair</span>
         </Link>
-        <p className="min-w-0 flex-1 truncate text-sm font-semibold text-white">Estúdio de vídeo</p>
+        <input
+          key={projectName}
+          defaultValue={projectName}
+          onBlur={(e) => renameProject(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+          }}
+          aria-label="Nome do projeto"
+          className="min-w-0 flex-1 truncate rounded-lg border border-transparent bg-transparent px-2 py-1 text-sm font-semibold text-white hover:border-line focus:border-violet-400 focus:outline-none"
+        />
+        <button
+          onClick={() => setProjectsOpen(true)}
+          aria-label="Projetos"
+          title="Projetos"
+          className="rounded-lg p-2 text-zinc-400 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+        >
+          <FolderKanban className="h-4 w-4" />
+        </button>
         <div className="flex items-center gap-1">
           <button
             onClick={undo}
@@ -156,15 +193,27 @@ export default function EstudioPage() {
         </div>
       </header>
 
-      {/* Área principal: mídia (desktop) + preview + propriedades (desktop) */}
+      {/* Área principal */}
       <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
         <aside className="hidden shrink-0 space-y-5 overflow-y-auto border-r border-line p-3 lg:block lg:w-[280px]">
           <MediaBin />
           <div>
             <p className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+              <Circle className="h-3 w-3 text-rose-400" aria-hidden /> Gravar
+            </p>
+            <RecordPanel />
+          </div>
+          <div>
+            <p className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
               <Music2 className="h-3.5 w-3.5" aria-hidden /> Música
             </p>
             <MusicPanel />
+          </div>
+          <div>
+            <p className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+              <Captions className="h-3.5 w-3.5" aria-hidden /> Legendas
+            </p>
+            <CaptionsPanel />
           </div>
         </aside>
         <div className="min-h-0 flex-1 p-2 sm:p-3">
@@ -195,13 +244,10 @@ export default function EstudioPage() {
       <nav aria-label="Ferramentas" className="flex shrink-0 items-stretch gap-1 overflow-x-auto border-t border-line bg-surface-1/95 px-2 pt-1 pb-[calc(0.35rem+env(safe-area-inset-bottom))] lg:hidden">
         <MobileTool icon={FolderOpen} label={`Mídia${sourceCount > 0 ? ` (${sourceCount})` : ""}`} onClick={() => setSheet("bin")} />
         <MobileTool icon={Music2} label="Música" onClick={() => setSheet("music")} />
+        <MobileTool icon={Circle} label="Gravar" onClick={() => setSheet("record")} />
         <MobileTool icon={TypeIcon} label="Texto" onClick={() => addTextClip("Seu texto")} />
-        <MobileTool
-          icon={SlidersHorizontal}
-          label="Ajustes"
-          onClick={() => setSheet("inspector")}
-          highlight={selectedClipId != null}
-        />
+        <MobileTool icon={Captions} label="Legendas" onClick={() => setSheet("captions")} />
+        <MobileTool icon={SlidersHorizontal} label="Ajustes" onClick={() => setSheet("inspector")} highlight={selectedClipId != null} />
       </nav>
 
       {/* Gavetas (mobile) */}
@@ -211,11 +257,18 @@ export default function EstudioPage() {
       <MobileSheet title="Música" open={sheet === "music"} onClose={() => setSheet(null)}>
         <MusicPanel />
       </MobileSheet>
+      <MobileSheet title="Gravar" open={sheet === "record"} onClose={() => setSheet(null)}>
+        <RecordPanel />
+      </MobileSheet>
+      <MobileSheet title="Legendas" open={sheet === "captions"} onClose={() => setSheet(null)}>
+        <CaptionsPanel />
+      </MobileSheet>
       <MobileSheet title="Ajustes do clipe" open={sheet === "inspector"} onClose={() => setSheet(null)}>
         <ClipInspector />
       </MobileSheet>
 
       <ExportProjectModal open={exportOpen} onClose={() => setExportOpen(false)} />
+      <ProjectsModal open={projectsOpen} onClose={() => setProjectsOpen(false)} />
     </div>
   );
 }
@@ -235,7 +288,7 @@ function MobileTool({
     <button
       onClick={onClick}
       className={cn(
-        "flex min-w-[64px] flex-col items-center justify-center gap-1 rounded-lg px-3 py-1.5 text-[10px] font-medium hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400",
+        "flex min-w-[62px] flex-col items-center justify-center gap-1 rounded-lg px-2.5 py-1.5 text-[10px] font-medium hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400",
         highlight ? "text-violet-300" : "text-zinc-300",
       )}
     >

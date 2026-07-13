@@ -11,7 +11,7 @@ import { Pause, Play } from "lucide-react";
 import { drawComposite, type Drawable } from "@/lib/video-editor/engine";
 import type { Clip } from "@/lib/video-editor/model";
 import { sourceObjectUrl, type MediaSource } from "@/lib/video-editor/media-registry";
-import { clipAtTime, clipEndMs, projectDurationMs, sourceTimeForClip, tracksForRender } from "@/lib/video-editor/timeline-math";
+import { audioGainAt, clipAtTime, clipEndMs, projectDurationMs, sourceTimeForClip, tracksForRender } from "@/lib/video-editor/timeline-math";
 import { useVideoEditor } from "@/store/video-editor";
 
 function fmt(ms: number): string {
@@ -98,19 +98,24 @@ export function PreviewStage() {
   // sincroniza as trilhas de ÁUDIO (música) ao playhead durante a reprodução
   const syncAudio = useCallback(
     (head: number, isPlaying: boolean) => {
-      const activeBySource = new Map<string, { timeSec: number; speed: number }>();
+      const activeBySource = new Map<string, { timeSec: number; speed: number; volume: number }>();
       if (isPlaying) {
         for (const track of project.tracks) {
           if (track.type !== "audio" || track.muted || track.hidden) continue;
           const clip = clipAtTime(track, head);
           if (!clip) continue;
-          activeBySource.set(clip.sourceId, { timeSec: sourceTimeForClip(clip, head) / 1000, speed: clip.speed });
+          activeBySource.set(clip.sourceId, {
+            timeSec: sourceTimeForClip(clip, head) / 1000,
+            speed: clip.speed,
+            volume: Math.min(1, Math.max(0, clip.volume * audioGainAt(clip, head - clip.startInTimeline))),
+          });
         }
       }
       audiosRef.current.forEach((el, sourceId) => {
         const active = activeBySource.get(sourceId);
         if (active) {
           el.playbackRate = Math.min(4, Math.max(0.25, active.speed));
+          el.volume = active.volume;
           if (Math.abs(el.currentTime - active.timeSec) > 0.25) el.currentTime = Math.max(0, active.timeSec);
           if (el.paused) void el.play().catch(() => undefined);
         } else if (!el.paused) {
@@ -254,6 +259,8 @@ export function PreviewStage() {
           // deriva o playhead do tempo real do vídeo
           const newHead = clip.startInTimeline + (el.currentTime * 1000 - clip.trimIn) / clip.speed;
           setPlayhead(newHead >= clipEndMs(clip) ? clipEndMs(clip) : newHead);
+          // fades de áudio do som do próprio vídeo
+          el.volume = Math.min(1, Math.max(0, clip.volume * audioGainAt(clip, newHead - clip.startInTimeline)));
         }
       } else if (audioActive) {
         // sem vídeo sob o playhead, mas há música tocando → relógio de parede

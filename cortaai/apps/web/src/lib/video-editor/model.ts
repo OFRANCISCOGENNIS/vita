@@ -75,6 +75,8 @@ export interface Clip {
   mask?: ClipMask;
   animIn?: ClipAnim; // animação de entrada (fade/zoom/slide/…)
   animOut?: ClipAnim; // animação de saída
+  fadeInMs?: number; // fade de ÁUDIO na entrada
+  fadeOutMs?: number; // fade de ÁUDIO na saída
   // Texto (só para clips em trilha 'text'): conteúdo e estilo básico.
   text?: {
     content: string;
@@ -257,6 +259,8 @@ function sanitizeClip(c: Clip, trackId: string): Clip {
     mask: c.mask,
     animIn: sanitizeAnim(c.animIn),
     animOut: sanitizeAnim(c.animOut),
+    fadeInMs: typeof c.fadeInMs === "number" && c.fadeInMs > 0 ? Math.min(10_000, Math.round(c.fadeInMs)) : undefined,
+    fadeOutMs: typeof c.fadeOutMs === "number" && c.fadeOutMs > 0 ? Math.min(10_000, Math.round(c.fadeOutMs)) : undefined,
     text: c.text,
   };
 }

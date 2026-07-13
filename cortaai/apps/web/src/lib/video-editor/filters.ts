@@ -51,3 +51,12 @@ export function filterById(id: string | undefined): ClipFilter | null {
   if (!id || id === "none") return null;
   return byId.get(id) ?? null;
 }
+
+// ------------------------------------------------- efeitos de sobreposição
+
+/** Efeitos desenhados POR CIMA do clipe (vinheta, grão, VHS) — ids usados em Clip.effects. */
+export const OVERLAY_EFFECTS: { id: string; name: string }[] = [
+  { id: "vignette", name: "Vinheta" },
+  { id: "grain", name: "Grão de filme" },
+  { id: "vhs", name: "VHS" },
+];

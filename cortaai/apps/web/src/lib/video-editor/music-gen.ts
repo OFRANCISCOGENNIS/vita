@@ -170,6 +170,120 @@ export async function generateTrack(presetId: string): Promise<GeneratedTrack | 
   return { blob: encodeWav(rendered), durationMs: Math.round(total * 1000), name: `${preset.name} (gerada)` };
 }
 
+// ------------------------------------------------------------ efeitos sonoros
+
+export interface SfxPreset {
+  id: string;
+  name: string;
+  emoji: string;
+  durationSec: number;
+}
+
+export const SFX_PRESETS: SfxPreset[] = [
+  { id: "whoosh", name: "Whoosh", emoji: "💨", durationSec: 0.7 },
+  { id: "pop", name: "Pop", emoji: "🫧", durationSec: 0.25 },
+  { id: "impact", name: "Impacto", emoji: "💥", durationSec: 0.9 },
+  { id: "riser", name: "Riser", emoji: "📈", durationSec: 1.6 },
+  { id: "ding", name: "Sino", emoji: "🔔", durationSec: 1.2 },
+];
+
+/** Sintetiza um efeito sonoro curto e devolve um WAV pronto. */
+export async function generateSfx(sfxId: string): Promise<GeneratedTrack | null> {
+  const preset = SFX_PRESETS.find((p) => p.id === sfxId);
+  if (!preset || typeof window === "undefined") return null;
+  const OfflineCtor =
+    window.OfflineAudioContext ??
+    (window as unknown as { webkitOfflineAudioContext?: typeof OfflineAudioContext }).webkitOfflineAudioContext;
+  if (!OfflineCtor) return null;
+
+  const sampleRate = 44100;
+  const total = preset.durationSec;
+  const ctx = new OfflineCtor(2, Math.ceil(total * sampleRate), sampleRate);
+  const master = ctx.createGain();
+  master.gain.value = 0.9;
+  master.connect(ctx.destination);
+
+  if (preset.id === "whoosh") {
+    const src = ctx.createBufferSource();
+    src.buffer = noiseBuffer(ctx, total);
+    const bp = ctx.createBiquadFilter();
+    bp.type = "bandpass";
+    bp.Q.value = 1.2;
+    bp.frequency.setValueAtTime(300, 0);
+    bp.frequency.exponentialRampToValueAtTime(3500, total * 0.6);
+    bp.frequency.exponentialRampToValueAtTime(500, total);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, 0);
+    g.gain.linearRampToValueAtTime(0.8, total * 0.4);
+    g.gain.linearRampToValueAtTime(0.0001, total);
+    src.connect(bp).connect(g).connect(master);
+    src.start(0);
+  } else if (preset.id === "pop") {
+    const osc = ctx.createOscillator();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(900, 0);
+    osc.frequency.exponentialRampToValueAtTime(300, 0.12);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.9, 0);
+    g.gain.exponentialRampToValueAtTime(0.001, 0.2);
+    osc.connect(g).connect(master);
+    osc.start(0);
+    osc.stop(total);
+  } else if (preset.id === "impact") {
+    kick(ctx, master, 0);
+    const src = ctx.createBufferSource();
+    src.buffer = noiseBuffer(ctx, 0.5);
+    const lp = ctx.createBiquadFilter();
+    lp.type = "lowpass";
+    lp.frequency.value = 900;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.7, 0);
+    g.gain.exponentialRampToValueAtTime(0.001, 0.8);
+    src.connect(lp).connect(g).connect(master);
+    src.start(0);
+  } else if (preset.id === "riser") {
+    const osc = ctx.createOscillator();
+    osc.type = "sawtooth";
+    osc.frequency.setValueAtTime(80, 0);
+    osc.frequency.exponentialRampToValueAtTime(1200, total);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.05, 0);
+    g.gain.linearRampToValueAtTime(0.6, total * 0.9);
+    g.gain.linearRampToValueAtTime(0.0001, total);
+    const src = ctx.createBufferSource();
+    src.buffer = noiseBuffer(ctx, total);
+    const hp = ctx.createBiquadFilter();
+    hp.type = "highpass";
+    hp.frequency.setValueAtTime(400, 0);
+    hp.frequency.exponentialRampToValueAtTime(6000, total);
+    const gn = ctx.createGain();
+    gn.gain.setValueAtTime(0.02, 0);
+    gn.gain.linearRampToValueAtTime(0.35, total * 0.9);
+    gn.gain.linearRampToValueAtTime(0.0001, total);
+    osc.connect(g).connect(master);
+    src.connect(hp).connect(gn).connect(master);
+    osc.start(0);
+    osc.stop(total);
+    src.start(0);
+  } else {
+    // ding: sino por parciais inharmônicas decaindo
+    [880, 1320, 1760, 2640].forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      osc.type = "sine";
+      osc.frequency.value = freq;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.5 / (i + 1), 0);
+      g.gain.exponentialRampToValueAtTime(0.001, total);
+      osc.connect(g).connect(master);
+      osc.start(0);
+      osc.stop(total);
+    });
+  }
+
+  const rendered = await ctx.startRendering();
+  return { blob: encodeWav(rendered), durationMs: Math.round(total * 1000), name: `${preset.name} (SFX)` };
+}
+
 // ---------------------------------------------------------------- síntese
 
 interface ToneOpts {

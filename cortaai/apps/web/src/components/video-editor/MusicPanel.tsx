@@ -7,7 +7,7 @@
 import { useState } from "react";
 import { Loader2, Music2, Upload } from "lucide-react";
 import { fileKind, registerBlob, registerFile } from "@/lib/video-editor/media-registry";
-import { generateTrack, MUSIC_PRESETS } from "@/lib/video-editor/music-gen";
+import { generateSfx, generateTrack, MUSIC_PRESETS, SFX_PRESETS } from "@/lib/video-editor/music-gen";
 import { useVideoEditor } from "@/store/video-editor";
 import { toast } from "@/store/toast";
 
@@ -34,19 +34,19 @@ export function MusicPanel() {
     }
   }
 
-  async function addGenerated(presetId: string) {
+  async function addGenerated(presetId: string, kind: "music" | "sfx") {
     setBusy(presetId);
     try {
-      const track = await generateTrack(presetId);
+      const track = kind === "music" ? await generateTrack(presetId) : await generateSfx(presetId);
       if (!track) {
-        toast("Não foi possível gerar a trilha neste navegador", { variant: "error" });
+        toast("Não foi possível gerar o áudio neste navegador", { variant: "error" });
         return;
       }
       const source = await registerBlob(track.blob, track.name, "audio", track.durationMs);
       addClipFromSource(source);
-      toast("Trilha gerada e adicionada", { description: track.name });
+      toast(kind === "music" ? "Trilha gerada e adicionada" : "Efeito sonoro adicionado", { description: track.name });
     } catch {
-      toast("Falha ao gerar a trilha", { variant: "error" });
+      toast("Falha ao gerar o áudio", { variant: "error" });
     } finally {
       setBusy(null);
     }
@@ -80,13 +80,30 @@ export function MusicPanel() {
           {MUSIC_PRESETS.map((p) => (
             <button
               key={p.id}
-              onClick={() => addGenerated(p.id)}
+              onClick={() => addGenerated(p.id, "music")}
               disabled={busy !== null}
               className="flex items-center gap-2 rounded-xl border border-line bg-surface-1 px-3 py-2.5 text-left text-sm font-medium text-zinc-200 transition-colors hover:border-violet-500/50 hover:text-white disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
             >
               <span className="text-lg" aria-hidden>
                 {busy === p.id ? <Loader2 className="h-4 w-4 animate-spin" /> : p.emoji}
               </span>
+              {p.name}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-zinc-500">Efeitos sonoros</p>
+        <div className="flex flex-wrap gap-1.5">
+          {SFX_PRESETS.map((p) => (
+            <button
+              key={p.id}
+              onClick={() => addGenerated(p.id, "sfx")}
+              disabled={busy !== null}
+              className="inline-flex items-center gap-1 rounded-lg border border-line bg-surface-1 px-2 py-1.5 text-[11px] font-medium text-zinc-300 transition-colors hover:border-violet-500/50 hover:text-white disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+            >
+              <span aria-hidden>{busy === p.id ? <Loader2 className="h-3 w-3 animate-spin" /> : p.emoji}</span>
               {p.name}
             </button>
           ))}
