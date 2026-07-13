@@ -1566,3 +1566,50 @@ export function upscaleCanvas(src: HTMLCanvasElement, factor: number, maxOutPixe
   ctx.drawImage(cur, 0, 0, targetW, targetH);
   return out;
 }
+
+/**
+ * Desfoca o FUNDO mantendo o assunto (assumido no centro) nítido, com borda
+ * suave (feather). Não é segmentação por IA — é um desfoque radial: cobre bem
+ * retratos com o rosto/corpo centralizado. `strength` 0..100 controla o raio.
+ */
+export function backgroundBlurCanvas(src: HTMLCanvasElement, strength = 60): HTMLCanvasElement {
+  const w = src.width;
+  const h = src.height;
+  const sctx = src.getContext("2d");
+  if (!sctx) return src;
+
+  // 1) versão borrada da imagem inteira
+  const radius = Math.max(4, Math.round((Math.min(w, h) / 22) * (strength / 100 + 0.4)));
+  const img = sctx.getImageData(0, 0, w, h);
+  const blurred = new ImageData(new Uint8ClampedArray(img.data), w, h);
+  boxBlurImageData(blurred, radius, 2);
+
+  const out = makeCanvas(w, h);
+  const octx = out.getContext("2d")!;
+  octx.putImageData(blurred, 0, 0);
+
+  // 2) recorte nítido do assunto (elipse central com feather) por cima
+  const sharp = makeCanvas(w, h);
+  const spx = sharp.getContext("2d")!;
+  spx.putImageData(img, 0, 0);
+  const cx = w / 2;
+  const cy = h * 0.46; // assunto tende a ficar um pouco acima do centro
+  const rx = w * 0.42;
+  const ry = h * 0.52;
+  spx.globalCompositeOperation = "destination-in";
+  spx.save();
+  spx.translate(cx, cy);
+  spx.scale(rx, ry);
+  const grad = spx.createRadialGradient(0, 0, 0.55, 0, 0, 1);
+  grad.addColorStop(0, "rgba(0,0,0,1)");
+  grad.addColorStop(0.7, "rgba(0,0,0,1)");
+  grad.addColorStop(1, "rgba(0,0,0,0)");
+  spx.fillStyle = grad;
+  spx.beginPath();
+  spx.arc(0, 0, 1, 0, Math.PI * 2);
+  spx.fill();
+  spx.restore();
+
+  octx.drawImage(sharp, 0, 0);
+  return out;
+}

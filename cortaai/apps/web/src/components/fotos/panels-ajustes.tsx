@@ -4,13 +4,13 @@
 // persisted slice of the photo editor: localStorage "cortaai-photo-presets").
 
 import { useState } from "react";
-import { Maximize2, RotateCcw, Save, Sparkles, Trash2, Wand2 } from "lucide-react";
+import { Aperture, Maximize2, RotateCcw, Save, Sparkles, Trash2, Wand2 } from "lucide-react";
 import { toast } from "@/store/toast";
 import { getBaseCanvas, usePhotoEditorStore, usePhotoPresetsStore } from "@/store/photo-editor";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { autoEnhanceAdjustments, upscaleCanvas, type Adjustments } from "@/lib/photo-engine";
+import { autoEnhanceAdjustments, backgroundBlurCanvas, upscaleCanvas, type Adjustments } from "@/lib/photo-engine";
 
 const GROUPS: { title: string; items: { key: keyof Adjustments; label: string; min?: number }[] }[] = [
   {
@@ -85,6 +85,19 @@ export function AjustesPanel() {
     }, 30);
   }
 
+  function blurBackground() {
+    if (busy) return;
+    setBusy("Desfocando o fundo…");
+    setTimeout(() => {
+      try {
+        applyPixelOp((base) => backgroundBlurCanvas(base, 60));
+        toast("Fundo desfocado", { description: "Assume o assunto no centro. Para precisão, use o pincel de desfoque em Pincéis.", variant: "success" });
+      } finally {
+        setBusy(null);
+      }
+    }, 30);
+  }
+
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
@@ -103,6 +116,9 @@ export function AjustesPanel() {
           </Button>
           <Button size="sm" variant="secondary" disabled={!hasImage || !!busy} onClick={upscale2x}>
             <Maximize2 className="h-3.5 w-3.5" aria-hidden /> Ampliar 2×
+          </Button>
+          <Button size="sm" variant="secondary" className="col-span-2" disabled={!hasImage || !!busy} onClick={blurBackground}>
+            <Aperture className="h-3.5 w-3.5" aria-hidden /> Desfocar fundo
           </Button>
         </div>
         {hasImage && (
