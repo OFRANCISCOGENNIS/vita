@@ -4,13 +4,14 @@
 // persisted slice of the photo editor: localStorage "cortaai-photo-presets").
 
 import { useState } from "react";
-import { Aperture, Maximize2, RotateCcw, Save, Smile, Sparkles, Trash2, Wand2 } from "lucide-react";
+import { Aperture, Maximize2, RotateCcw, Save, Scissors, Smile, Sparkles, Trash2, Wand2 } from "lucide-react";
 import { toast } from "@/store/toast";
 import { getBaseCanvas, usePhotoEditorStore, usePhotoPresetsStore } from "@/store/photo-editor";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { autoEnhanceAdjustments, backgroundBlurCanvas, portraitRetouch, upscaleCanvas, type Adjustments } from "@/lib/photo-engine";
+import { removeBackground } from "@/lib/ai/background-removal";
 
 const GROUPS: { title: string; items: { key: keyof Adjustments; label: string; min?: number }[] }[] = [
   {
@@ -111,6 +112,25 @@ export function AjustesPanel() {
     }, 30);
   }
 
+  async function removeBg() {
+    if (busy) return;
+    const base = getBaseCanvas();
+    if (!base) return;
+    setBusy("Preparando a IA…");
+    try {
+      const result = await removeBackground(base, (p) => setBusy(p.message));
+      applyPixelOp(() => result);
+      toast("Fundo removido pela IA", { description: "O fundo virou transparente. Exporte em PNG para manter a transparência.", variant: "success" });
+    } catch {
+      toast("Não foi possível remover o fundo", {
+        description: "O modelo de IA precisa baixar (~44 MB) na 1ª vez e de conexão. Tente de novo com internet estável.",
+        variant: "error",
+      });
+    } finally {
+      setBusy(null);
+    }
+  }
+
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
@@ -136,7 +156,14 @@ export function AjustesPanel() {
           <Button size="sm" variant="secondary" disabled={!hasImage || !!busy} onClick={retouchPortrait}>
             <Smile className="h-3.5 w-3.5" aria-hidden /> Retoque de retrato
           </Button>
+          <Button size="sm" variant="secondary" className="col-span-2" disabled={!hasImage || !!busy} onClick={removeBg}>
+            <Scissors className="h-3.5 w-3.5" aria-hidden /> Remover fundo (IA)
+          </Button>
         </div>
+        <p className="text-[10px] leading-relaxed text-zinc-500">
+          A remoção de fundo usa IA que roda no seu aparelho — na 1ª vez baixa ~44 MB e fica em cache. Depois é rápido.
+          Exporte em PNG para manter a transparência.
+        </p>
         {hasImage && (
           <p className="text-[10px] text-zinc-500">
             Tamanho atual: {imgW}×{imgH}px. Ampliar dobra a resolução com reamostragem de alta qualidade (não é super-resolução por IA).
