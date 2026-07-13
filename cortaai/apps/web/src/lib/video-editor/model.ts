@@ -1,0 +1,272 @@
+// MODELO DE DADOS do editor de vídeo multitrilha (fonte da verdade).
+//
+// Tudo aqui é 100% serializável (JSON) para permitir salvar/carregar projeto,
+// undo/redo e sync futuro. Tempos em MILISSEGUNDOS (inteiros seguros). A UI
+// nunca muta estes objetos diretamente — despacha ações no store, que produz
+// um novo estado imutável.
+
+export type TrackType = "video" | "audio" | "text" | "sticker" | "effect";
+
+export type BlendMode =
+  | "normal"
+  | "multiply"
+  | "screen"
+  | "overlay"
+  | "lighten"
+  | "darken"
+  | "difference";
+
+export type Easing = "linear" | "easeIn" | "easeOut" | "easeInOut";
+
+/** Propriedades animáveis por keyframe. */
+export type AnimatableProperty = "x" | "y" | "scale" | "rotation" | "opacity" | "volume";
+
+export interface Keyframe {
+  property: AnimatableProperty;
+  timeMs: number; // relativo ao início do clipe na timeline
+  value: number;
+  easing: Easing;
+}
+
+export interface ClipTransform {
+  x: number; // deslocamento em fração da largura do palco (-1..1), 0 = centro
+  y: number; // deslocamento em fração da altura do palco (-1..1)
+  scale: number; // 1 = tamanho natural (cover)
+  rotation: number; // graus
+  opacity: number; // 0..1
+}
+
+export interface EffectRef {
+  id: string; // id do efeito (catálogo em edit-visuals)
+  intensity: number; // 0..1
+}
+
+export interface ClipMask {
+  kind: "rect" | "ellipse";
+  x: number; // 0..1 (centro)
+  y: number; // 0..1
+  w: number; // 0..1
+  h: number; // 0..1
+  feather: number; // 0..1
+  inverted: boolean;
+}
+
+export interface Clip {
+  id: string;
+  trackId: string;
+  sourceId: string; // referência a uma MediaSource no media-registry
+  startInTimeline: number; // ms — onde o clipe começa na timeline
+  duration: number; // ms — duração NA TIMELINE (já considerando a velocidade)
+  trimIn: number; // ms — ponto inicial dentro da mídia-fonte
+  trimOut: number; // ms — ponto final dentro da mídia-fonte (trimOut-trimIn = duration*speed)
+  transform: ClipTransform;
+  volume: number; // 0..1 (linear)
+  speed: number; // 1 = normal; >1 acelera. Curvas vêm por keyframes 'speed' (futuro).
+  keyframes: Keyframe[];
+  effects: EffectRef[];
+  filterId?: string; // filtro estilizado (fade/retrô/…)
+  blendMode: BlendMode;
+  mask?: ClipMask;
+  // Texto (só para clips em trilha 'text'): conteúdo e estilo básico.
+  text?: {
+    content: string;
+    fontFamily: string;
+    color: string;
+    fontWeight: number;
+    background: string | null;
+  };
+}
+
+export interface Track {
+  id: string;
+  type: TrackType;
+  name: string;
+  clips: Clip[];
+  muted: boolean;
+  locked: boolean;
+  hidden: boolean;
+}
+
+export interface Project {
+  id: string;
+  name: string;
+  resolution: { w: number; h: number };
+  fps: number;
+  tracks: Track[];
+  version: 1;
+}
+
+// ------------------------------------------------------------------ defaults
+
+export const DEFAULT_TRANSFORM: ClipTransform = {
+  x: 0,
+  y: 0,
+  scale: 1,
+  rotation: 0,
+  opacity: 1,
+};
+
+let counter = 0;
+/** Id estável e serializável (não usa Date.now/Math.random no caminho puro). */
+export function newId(prefix: string, seed?: number): string {
+  counter += 1;
+  const base = seed != null ? seed : counter;
+  return `${prefix}_${base.toString(36)}${counter.toString(36)}`;
+}
+
+export function makeTrack(type: TrackType, name?: string, id?: string): Track {
+  return {
+    id: id ?? newId("trk"),
+    type,
+    name: name ?? defaultTrackName(type),
+    clips: [],
+    muted: false,
+    locked: false,
+    hidden: false,
+  };
+}
+
+function defaultTrackName(type: TrackType): string {
+  switch (type) {
+    case "video":
+      return "Vídeo";
+    case "audio":
+      return "Áudio";
+    case "text":
+      return "Texto";
+    case "sticker":
+      return "Elementos";
+    case "effect":
+      return "Efeitos";
+  }
+}
+
+export interface MakeClipInput {
+  trackId: string;
+  sourceId: string;
+  startInTimeline: number;
+  duration: number;
+  trimIn?: number;
+  trimOut?: number;
+  speed?: number;
+  id?: string;
+}
+
+export function makeClip(input: MakeClipInput): Clip {
+  const speed = input.speed ?? 1;
+  const trimIn = input.trimIn ?? 0;
+  const trimOut = input.trimOut ?? trimIn + input.duration * speed;
+  return {
+    id: input.id ?? newId("clip"),
+    trackId: input.trackId,
+    sourceId: input.sourceId,
+    startInTimeline: Math.max(0, Math.round(input.startInTimeline)),
+    duration: Math.max(1, Math.round(input.duration)),
+    trimIn: Math.max(0, Math.round(trimIn)),
+    trimOut: Math.max(1, Math.round(trimOut)),
+    transform: { ...DEFAULT_TRANSFORM },
+    volume: 1,
+    speed,
+    keyframes: [],
+    effects: [],
+    blendMode: "normal",
+  };
+}
+
+export function makeProject(name = "Novo projeto", resolution = { w: 1080, h: 1920 }, fps = 30): Project {
+  return {
+    id: newId("proj"),
+    name,
+    resolution,
+    fps,
+    tracks: [makeTrack("video"), makeTrack("audio")],
+    version: 1,
+  };
+}
+
+// ---------------------------------------------------------------- validation
+
+/**
+ * Valida/normaliza um projeto carregado de JSON (defensivo contra dados
+ * corrompidos). Retorna o projeto saneado ou null quando irrecuperável.
+ */
+export function validateProject(input: unknown): Project | null {
+  if (!input || typeof input !== "object") return null;
+  const p = input as Partial<Project>;
+  if (!Array.isArray(p.tracks) || !p.resolution || typeof p.fps !== "number") return null;
+  const resolution = {
+    w: clampInt(p.resolution.w, 16, 7680, 1080),
+    h: clampInt(p.resolution.h, 16, 7680, 1920),
+  };
+  const tracks: Track[] = p.tracks
+    .filter((t): t is Track => !!t && typeof t === "object" && Array.isArray((t as Track).clips))
+    .map((t) => ({
+      id: String(t.id ?? newId("trk")),
+      type: (["video", "audio", "text", "sticker", "effect"] as TrackType[]).includes(t.type) ? t.type : "video",
+      name: String(t.name ?? "Trilha"),
+      muted: !!t.muted,
+      locked: !!t.locked,
+      hidden: !!t.hidden,
+      clips: t.clips
+        .filter((c): c is Clip => !!c && typeof c === "object")
+        .map((c) => sanitizeClip(c, t.id)),
+    }));
+  return {
+    id: String(p.id ?? newId("proj")),
+    name: String(p.name ?? "Projeto"),
+    resolution,
+    fps: clampInt(p.fps, 1, 120, 30),
+    tracks: tracks.length ? tracks : [makeTrack("video"), makeTrack("audio")],
+    version: 1,
+  };
+}
+
+function sanitizeClip(c: Clip, trackId: string): Clip {
+  const speed = Number.isFinite(c.speed) && c.speed > 0 ? c.speed : 1;
+  const duration = clampInt(c.duration, 1, Number.MAX_SAFE_INTEGER, 1000);
+  const trimIn = clampInt(c.trimIn, 0, Number.MAX_SAFE_INTEGER, 0);
+  return {
+    id: String(c.id ?? newId("clip")),
+    trackId: String(c.trackId ?? trackId),
+    sourceId: String(c.sourceId ?? ""),
+    startInTimeline: clampInt(c.startInTimeline, 0, Number.MAX_SAFE_INTEGER, 0),
+    duration,
+    trimIn,
+    trimOut: clampInt(c.trimOut, trimIn + 1, Number.MAX_SAFE_INTEGER, trimIn + duration * speed),
+    transform: {
+      x: numOr(c.transform?.x, 0),
+      y: numOr(c.transform?.y, 0),
+      scale: numOr(c.transform?.scale, 1),
+      rotation: numOr(c.transform?.rotation, 0),
+      opacity: clamp01(numOr(c.transform?.opacity, 1)),
+    },
+    volume: clamp01(numOr(c.volume, 1)),
+    speed,
+    keyframes: Array.isArray(c.keyframes) ? c.keyframes.filter(isKeyframe) : [],
+    effects: Array.isArray(c.effects) ? c.effects.filter((e) => !!e && typeof e.id === "string") : [],
+    filterId: typeof c.filterId === "string" ? c.filterId : undefined,
+    blendMode: c.blendMode ?? "normal",
+    mask: c.mask,
+    text: c.text,
+  };
+}
+
+function isKeyframe(k: unknown): k is Keyframe {
+  return (
+    !!k &&
+    typeof k === "object" &&
+    typeof (k as Keyframe).timeMs === "number" &&
+    typeof (k as Keyframe).value === "number"
+  );
+}
+
+function clampInt(v: unknown, lo: number, hi: number, fallback: number): number {
+  const n = typeof v === "number" && Number.isFinite(v) ? Math.round(v) : fallback;
+  return Math.min(hi, Math.max(lo, n));
+}
+function numOr(v: unknown, fallback: number): number {
+  return typeof v === "number" && Number.isFinite(v) ? v : fallback;
+}
+function clamp01(v: number): number {
+  return Math.min(1, Math.max(0, v));
+}
