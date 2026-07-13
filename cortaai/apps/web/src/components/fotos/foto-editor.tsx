@@ -34,15 +34,17 @@ import { FiltrosPanel } from "./panels-filtros";
 import { TextoPanel, CamadasPanel } from "./panels-elementos";
 import { LuzPanel } from "./panels-luz";
 
+// Ordem mobile-first: Luz e Retoque logo no início (a fileira rola de lado no
+// celular e o que fica depois da dobra é difícil de descobrir).
 const TABS: { id: FotosTab; label: string; icon: typeof Brush }[] = [
   { id: "ajustes", label: "Ajustes", icon: SlidersHorizontal },
+  { id: "luz", label: "Luz", icon: Sun },
+  { id: "retoque", label: "Retoque", icon: Smile },
+  { id: "filtros", label: "Filtros", icon: Sparkles },
+  { id: "recortar", label: "Recortar", icon: Crop },
   { id: "curvas", label: "Curvas", icon: Activity },
   { id: "cor", label: "Cor (HSL)", icon: Palette },
-  { id: "recortar", label: "Recortar", icon: Crop },
-  { id: "retoque", label: "Retoque", icon: Smile },
   { id: "pinceis", label: "Pincéis", icon: Brush },
-  { id: "filtros", label: "Filtros", icon: Sparkles },
-  { id: "luz", label: "Luz", icon: Sun },
   { id: "texto", label: "Texto & Elementos", icon: Type },
   { id: "camadas", label: "Camadas", icon: Layers },
 ];
