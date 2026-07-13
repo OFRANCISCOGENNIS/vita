@@ -65,6 +65,12 @@ interface VideoEditorState {
   updateClip: (clipId: string, patch: Partial<Clip>) => void;
   /** Muda a velocidade recalculando a duração na timeline (trim preservado). */
   setClipSpeed: (clipId: string, speed: number) => void;
+  /** Extrai/desvincula o áudio de um clipe de vídeo para a trilha de áudio. */
+  detachAudio: (clipId: string) => void;
+  /** Congela o frame no playhead: insere um segmento parado de `holdMs`. */
+  freezeAtPlayhead: (holdMs?: number) => void;
+  /** Troca a mídia-fonte de um clipe (mantém posição/duração na timeline). */
+  replaceClipSource: (clipId: string, source: MediaSource) => void;
   /** Adiciona um clipe de texto no playhead (cria a trilha de texto se preciso). */
   addTextClip: (content: string) => string;
   /** Importa cues de legenda como clipes de texto numa trilha "Legendas" (1 ação no histórico). */
@@ -281,6 +287,94 @@ export const useVideoEditor = create<VideoEditorState>()((set, get) => ({
       withHistory(s, mapTrack(s.project, found.track.id, (t) => ({
         ...t,
         clips: t.clips.map((c) => (c.id === clipId ? { ...c, speed: sp, duration } : c)),
+      }))),
+    );
+  },
+
+  detachAudio: (clipId) => {
+    const found = findClip(get().project, clipId);
+    if (!found) return;
+    const src = get().sources[found.clip.sourceId];
+    if (!src || src.kind !== "video") return;
+    // trilha de áudio alvo (cria se preciso)
+    let audioTrackId = get().project.tracks.find((t) => t.type === "audio" && !t.locked)?.id;
+    if (!audioTrackId) audioTrackId = get().addTrack("audio");
+    // clipe de áudio na MESMA posição/janela, apontando para a mesma mídia
+    const c = found.clip;
+    const audioClip = makeClip({
+      trackId: audioTrackId,
+      sourceId: c.sourceId,
+      startInTimeline: c.startInTimeline,
+      duration: c.duration,
+      trimIn: c.trimIn,
+      trimOut: c.trimOut,
+      speed: c.speed,
+    });
+    audioClip.volume = c.volume;
+    // muta o áudio do vídeo original e adiciona o clipe de áudio (1 ação)
+    set((s) => {
+      const withMuted = mapTrack(s.project, found.track.id, (t) => ({
+        ...t,
+        clips: t.clips.map((cc) => (cc.id === clipId ? { ...cc, volume: 0 } : cc)),
+      }));
+      const withAudio = mapTrack(withMuted, audioTrackId!, (t) => ({
+        ...t,
+        clips: placeClip([...t.clips, audioClip], audioClip.id, audioClip.startInTimeline),
+      }));
+      return withHistory(s, withAudio);
+    });
+  },
+
+  freezeAtPlayhead: (holdMs = 2000) => {
+    const { project, playheadMs, selectedClipId } = get();
+    const target =
+      (selectedClipId && findClip(project, selectedClipId)) ||
+      project.tracks
+        .flatMap((t) => t.clips.map((c) => ({ track: t, clip: c })))
+        .find(({ track, clip }) => track.type === "video" && playheadMs > clip.startInTimeline && playheadMs < clip.startInTimeline + clip.duration);
+    if (!target || target.track.locked) return;
+    const src = get().sources[target.clip.sourceId];
+    if (!src || src.kind !== "video") return;
+    const parts = splitClipAt(target.clip, playheadMs);
+    if (!parts) return;
+    const [left, right] = parts;
+    // clipe congelado que segura o frame do ponto de corte
+    const frozen = makeClip({
+      trackId: target.track.id,
+      sourceId: target.clip.sourceId,
+      startInTimeline: playheadMs,
+      duration: holdMs,
+      trimIn: left.trimOut, // frame exatamente no corte
+      trimOut: left.trimOut + 1,
+      speed: 1,
+    });
+    frozen.freeze = true;
+    frozen.transform = { ...target.clip.transform };
+    // empurra o lado direito para depois do segmento congelado
+    const shiftedRight = { ...right, startInTimeline: right.startInTimeline + holdMs };
+    set((s) =>
+      withHistory(
+        s,
+        mapTrack(s.project, target.track.id, (t) => ({
+          ...t,
+          clips: t.clips.flatMap((c) => (c.id === target.clip.id ? [left, frozen, shiftedRight] : [c])),
+        })),
+      ),
+    );
+    set({ selectedClipId: frozen.id });
+  },
+
+  replaceClipSource: (clipId, source) => {
+    const found = findClip(get().project, clipId);
+    if (!found) return;
+    get().addSource(source);
+    const newDur = source.durationMs > 0 ? source.durationMs : found.clip.duration;
+    set((s) =>
+      withHistory(s, mapTrack(s.project, found.track.id, (t) => ({
+        ...t,
+        clips: t.clips.map((c) =>
+          c.id === clipId ? { ...c, sourceId: source.id, trimIn: 0, trimOut: Math.max(1, Math.min(newDur, c.duration * c.speed)) } : c,
+        ),
       }))),
     );
   },

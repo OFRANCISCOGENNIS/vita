@@ -202,6 +202,7 @@ export function clipAtTime(track: Track, ms: number): Clip | null {
 
 /** Instante (ms) na mídia-fonte para um clipe em um tempo de timeline. */
 export function sourceTimeForClip(clip: Clip, timelineMs: number): number {
+  if (clip.freeze) return clip.trimIn; // congelado: segura sempre o mesmo frame
   const rel = timelineMs - clip.startInTimeline;
   return clip.trimIn + rel * clip.speed;
 }

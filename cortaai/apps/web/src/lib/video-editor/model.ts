@@ -79,6 +79,7 @@ export interface Clip {
   fadeOutMs?: number; // fade de ÁUDIO na saída
   transitionIn?: ClipAnim; // transição COM O CLIPE ANTERIOR adjacente (catálogo em transitions.ts)
   eq?: { low: number; mid: number; high: number }; // equalizador em dB (-12..+12)
+  freeze?: boolean; // congela o frame em `trimIn` por toda a duração do clipe
   // Texto (só para clips em trilha 'text'): conteúdo e estilo básico.
   text?: {
     content: string;
@@ -258,7 +259,8 @@ function sanitizeClip(c: Clip, trackId: string): Clip {
     effects: Array.isArray(c.effects) ? c.effects.filter((e) => !!e && typeof e.id === "string") : [],
     filterId: typeof c.filterId === "string" ? c.filterId : undefined,
     blendMode: c.blendMode ?? "normal",
-    mask: c.mask,
+    mask: sanitizeMask(c.mask),
+    freeze: c.freeze === true ? true : undefined,
     animIn: sanitizeAnim(c.animIn),
     animOut: sanitizeAnim(c.animOut),
     fadeInMs: typeof c.fadeInMs === "number" && c.fadeInMs > 0 ? Math.min(10_000, Math.round(c.fadeInMs)) : undefined,
@@ -266,6 +268,22 @@ function sanitizeClip(c: Clip, trackId: string): Clip {
     transitionIn: sanitizeAnim(c.transitionIn),
     eq: sanitizeEq(c.eq),
     text: c.text,
+  };
+}
+
+function sanitizeMask(m: unknown): ClipMask | undefined {
+  if (!m || typeof m !== "object") return undefined;
+  const mask = m as Partial<ClipMask>;
+  if (mask.kind !== "rect" && mask.kind !== "ellipse") return undefined;
+  const f01 = (v: unknown, d: number) => clamp01(numOr(v, d));
+  return {
+    kind: mask.kind,
+    x: f01(mask.x, 0.5),
+    y: f01(mask.y, 0.5),
+    w: f01(mask.w, 0.6),
+    h: f01(mask.h, 0.6),
+    feather: f01(mask.feather, 0.1),
+    inverted: mask.inverted === true,
   };
 }
 

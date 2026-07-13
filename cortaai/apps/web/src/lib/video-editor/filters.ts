@@ -42,6 +42,15 @@ export const CLIP_FILTERS: ClipFilter[] = [
   },
   { id: "soft", name: "Suave", css: "brightness(1.06) saturate(0.92) contrast(0.94)" },
   { id: "dramatic", name: "Dramático", css: "contrast(1.3) brightness(0.92) saturate(1.05)" },
+  { id: "bw1", name: "P&B 1", css: "grayscale(1) contrast(1.25) brightness(1.05)" },
+  { id: "bw-elegante", name: "P&B elegante", css: "grayscale(1) contrast(0.92) brightness(1.08) sepia(0.05)" },
+  {
+    id: "escuro",
+    name: "Escuro",
+    css: "brightness(0.82) contrast(1.2) saturate(0.95)",
+    overlay: { color: "#0a0a14", opacity: 0.18, blend: "overlay" },
+  },
+  { id: "nitido", name: "Nítido", css: "contrast(1.15) saturate(1.1) brightness(1.02)" },
 ];
 
 const byId = new Map<string, ClipFilter>();

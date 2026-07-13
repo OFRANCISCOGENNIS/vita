@@ -138,18 +138,48 @@ function drawVisualClip(
     .filter(Boolean)
     .join(" ");
 
-  ctx.save();
-  ctx.globalAlpha = opacity;
-  ctx.globalCompositeOperation = BLEND_MAP[clip.blendMode] ?? "source-over";
-  if (filterCss) ctx.filter = filterCss;
-  ctx.translate(canvasW / 2 + tx, canvasH / 2 + ty);
-  if (rotation) ctx.rotate((rotation * Math.PI) / 180);
-  try {
-    ctx.drawImage(d.el, -drawW / 2, -drawH / 2, drawW, drawH);
-  } catch {
-    /* frame não pronto */
+  const blendOp = BLEND_MAP[clip.blendMode] ?? "source-over";
+  if (clip.mask) {
+    // desenha num buffer, recorta pela máscara (com feather) e compõe no palco
+    const buf = getMaskBuffer(canvasW, canvasH);
+    if (buf) {
+      const bctx = buf.ctx;
+      bctx.setTransform(1, 0, 0, 1, 0, 0);
+      bctx.globalAlpha = 1;
+      bctx.globalCompositeOperation = "source-over";
+      bctx.filter = filterCss || "none";
+      bctx.clearRect(0, 0, canvasW, canvasH);
+      bctx.save();
+      bctx.translate(canvasW / 2 + tx, canvasH / 2 + ty);
+      if (rotation) bctx.rotate((rotation * Math.PI) / 180);
+      try {
+        bctx.drawImage(d.el, -drawW / 2, -drawH / 2, drawW, drawH);
+      } catch {
+        /* frame não pronto */
+      }
+      bctx.restore();
+      bctx.filter = "none";
+      paintMask(bctx, clip.mask, canvasW, canvasH);
+      ctx.save();
+      ctx.globalAlpha = opacity;
+      ctx.globalCompositeOperation = blendOp;
+      ctx.drawImage(buf.canvas, 0, 0);
+      ctx.restore();
+    }
+  } else {
+    ctx.save();
+    ctx.globalAlpha = opacity;
+    ctx.globalCompositeOperation = blendOp;
+    if (filterCss) ctx.filter = filterCss;
+    ctx.translate(canvasW / 2 + tx, canvasH / 2 + ty);
+    if (rotation) ctx.rotate((rotation * Math.PI) / 180);
+    try {
+      ctx.drawImage(d.el, -drawW / 2, -drawH / 2, drawW, drawH);
+    } catch {
+      /* frame não pronto */
+    }
+    ctx.restore();
   }
-  ctx.restore();
 
   // tint do filtro (por cima da área do clipe — aproximação: palco inteiro)
   if (filter?.overlay && opacity > 0) {
@@ -430,4 +460,54 @@ function applyOverlayEffects(
 function hash01(n: number): number {
   const s = Math.sin(n * 12.9898) * 43758.5453;
   return s - Math.floor(s);
+}
+
+// -------------------------------------------------------------------- máscara
+
+let _maskBuf: { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D } | null = null;
+function getMaskBuffer(w: number, h: number): { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D } | null {
+  if (typeof document === "undefined") return null;
+  if (!_maskBuf || _maskBuf.canvas.width !== w || _maskBuf.canvas.height !== h) {
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    _maskBuf = { canvas, ctx };
+  }
+  return _maskBuf;
+}
+
+/** Recorta o conteúdo do buffer pela forma da máscara (feather via blur). */
+function paintMask(bctx: CanvasRenderingContext2D, mask: NonNullable<Clip["mask"]>, w: number, h: number): void {
+  const cx = mask.x * w;
+  const cy = mask.y * h;
+  const mw = mask.w * w;
+  const mh = mask.h * h;
+  const blur = mask.feather * Math.min(w, h) * 0.2;
+  bctx.save();
+  if (blur > 0) bctx.filter = `blur(${blur.toFixed(1)}px)`;
+  if (mask.inverted) {
+    // mantém o de FORA da forma: apaga a região da forma
+    bctx.globalCompositeOperation = "destination-out";
+    bctx.fillStyle = "#fff";
+    tracePath(bctx, mask.kind, cx, cy, mw, mh);
+    bctx.fill();
+  } else {
+    // mantém só o de DENTRO da forma
+    bctx.globalCompositeOperation = "destination-in";
+    bctx.fillStyle = "#fff";
+    tracePath(bctx, mask.kind, cx, cy, mw, mh);
+    bctx.fill();
+  }
+  bctx.restore();
+}
+
+function tracePath(ctx: CanvasRenderingContext2D, kind: "rect" | "ellipse", cx: number, cy: number, w: number, h: number): void {
+  ctx.beginPath();
+  if (kind === "ellipse") {
+    ctx.ellipse(cx, cy, Math.max(1, w / 2), Math.max(1, h / 2), 0, 0, Math.PI * 2);
+  } else {
+    ctx.rect(cx - w / 2, cy - h / 2, Math.max(1, w), Math.max(1, h));
+  }
 }

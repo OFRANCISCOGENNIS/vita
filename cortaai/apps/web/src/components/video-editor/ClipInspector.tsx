@@ -5,14 +5,19 @@
 // modo de mesclagem, filtros/looks, animações de entrada/saída e texto.
 // Cada mudança vira uma ação no store (histórico undo/redo).
 
-import { Copy, Diamond, Trash2, X } from "lucide-react";
+import { useRef } from "react";
+import { Copy, Diamond, Music, Repeat, Snowflake, Trash2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ANIM_PRESETS } from "@/lib/video-editor/animations";
 import { valueAt } from "@/lib/video-editor/engine";
 import { CLIP_FILTERS, OVERLAY_EFFECTS } from "@/lib/video-editor/filters";
 import { TRANSITIONS } from "@/lib/video-editor/transitions";
-import type { AnimatableProperty, BlendMode, Clip, Keyframe } from "@/lib/video-editor/model";
+import { registerFile } from "@/lib/video-editor/media-registry";
+import type { AnimatableProperty, BlendMode, Clip, ClipMask, Keyframe } from "@/lib/video-editor/model";
 import { useVideoEditor } from "@/store/video-editor";
+import { toast } from "@/store/toast";
+
+const DEFAULT_MASK: ClipMask = { kind: "rect", x: 0.5, y: 0.5, w: 0.6, h: 0.6, feather: 0.1, inverted: false };
 
 const KF_PROPS: { prop: AnimatableProperty; label: string }[] = [
   { prop: "scale", label: "Escala" },
@@ -32,7 +37,11 @@ export function ClipInspector() {
   const setClipSpeed = useVideoEditor((s) => s.setClipSpeed);
   const deleteClip = useVideoEditor((s) => s.deleteClip);
   const duplicateClip = useVideoEditor((s) => s.duplicateClip);
+  const detachAudio = useVideoEditor((s) => s.detachAudio);
+  const freezeAtPlayhead = useVideoEditor((s) => s.freezeAtPlayhead);
+  const replaceClipSource = useVideoEditor((s) => s.replaceClipSource);
   const sources = useVideoEditor((s) => s.sources);
+  const replaceRef = useRef<HTMLInputElement>(null);
 
   const found = selectedClipId
     ? project.tracks.flatMap((t) => t.clips.map((c) => ({ track: t, clip: c }))).find(({ clip }) => clip.id === selectedClipId)
@@ -49,7 +58,24 @@ export function ClipInspector() {
   const { track, clip } = found;
   const isMedia = track.type === "video" || track.type === "audio";
   const isVisual = track.type !== "audio";
+  const isVideoClip = track.type === "video" && sources[clip.sourceId]?.kind === "video";
   const name = clip.text?.content ?? sources[clip.sourceId]?.name ?? "Clipe";
+
+  function patchMask(patch: Partial<ClipMask>) {
+    updateClip(clip.id, { mask: { ...(clip.mask ?? DEFAULT_MASK), ...patch } });
+  }
+
+  async function replaceSource(files: FileList | null) {
+    const file = files?.[0];
+    if (!file) return;
+    const src = await registerFile(file);
+    if (src) {
+      replaceClipSource(clip.id, src);
+      toast("Mídia substituída", { description: src.name });
+    } else {
+      toast("Formato não suportado", { variant: "error" });
+    }
+  }
 
   function patchTransform(patch: Partial<Clip["transform"]>) {
     updateClip(clip.id, { transform: { ...clip.transform, ...patch } });
@@ -109,6 +135,26 @@ export function ClipInspector() {
           <Trash2 className="h-4 w-4" />
         </button>
       </div>
+
+      {/* ações rápidas (vídeo) */}
+      {isVideoClip && (
+        <div className="grid grid-cols-3 gap-1.5">
+          <ActionButton icon={Snowflake} label="Congelar" onClick={() => freezeAtPlayhead()} />
+          <ActionButton icon={Music} label="Extrair áudio" onClick={() => detachAudio(clip.id)} />
+          <ActionButton icon={Repeat} label="Substituir" onClick={() => replaceRef.current?.click()} />
+          <input
+            ref={replaceRef}
+            type="file"
+            accept="video/*,image/*"
+            className="sr-only"
+            aria-label="Substituir mídia do clipe"
+            onChange={(e) => {
+              void replaceSource(e.target.files);
+              e.target.value = "";
+            }}
+          />
+        </div>
+      )}
 
       {/* texto */}
       {clip.text && (
@@ -335,6 +381,43 @@ export function ClipInspector() {
         </Section>
       )}
 
+      {/* máscara */}
+      {isVisual && !clip.text && (
+        <Section title="Máscara">
+          <div className="grid grid-cols-3 gap-1.5">
+            {(["none", "rect", "ellipse"] as const).map((k) => {
+              const active = (clip.mask?.kind ?? "none") === k || (k === "none" && !clip.mask);
+              return (
+                <button
+                  key={k}
+                  onClick={() => (k === "none" ? updateClip(clip.id, { mask: undefined }) : patchMask({ kind: k }))}
+                  aria-pressed={active}
+                  className={cn(
+                    "rounded-lg border px-1.5 py-1.5 text-[10px] font-medium transition-colors",
+                    active ? "border-violet-400 bg-violet-500/20 text-white" : "border-line bg-surface-1 text-zinc-400 hover:text-white",
+                  )}
+                >
+                  {k === "none" ? "Nenhuma" : k === "rect" ? "Retângulo" : "Elipse"}
+                </button>
+              );
+            })}
+          </div>
+          {clip.mask && (
+            <div className="mt-2 space-y-1">
+              <Slider label="Posição X" value={clip.mask.x} min={0} max={1} step={0.01} onChange={(v) => patchMask({ x: v })} format={(v) => `${Math.round(v * 100)}%`} />
+              <Slider label="Posição Y" value={clip.mask.y} min={0} max={1} step={0.01} onChange={(v) => patchMask({ y: v })} format={(v) => `${Math.round(v * 100)}%`} />
+              <Slider label="Largura" value={clip.mask.w} min={0.05} max={1} step={0.01} onChange={(v) => patchMask({ w: v })} format={(v) => `${Math.round(v * 100)}%`} />
+              <Slider label="Altura" value={clip.mask.h} min={0.05} max={1} step={0.01} onChange={(v) => patchMask({ h: v })} format={(v) => `${Math.round(v * 100)}%`} />
+              <Slider label="Suavizar borda" value={clip.mask.feather} min={0} max={1} step={0.01} onChange={(v) => patchMask({ feather: v })} format={(v) => `${Math.round(v * 100)}%`} />
+              <label className="flex items-center gap-1.5 pt-1 text-[11px] text-zinc-400">
+                <input type="checkbox" checked={clip.mask.inverted} onChange={(e) => patchMask({ inverted: e.target.checked })} className="accent-violet-500" />
+                Inverter (mostra o de fora)
+              </label>
+            </div>
+          )}
+        </Section>
+      )}
+
       {/* mesclagem */}
       {isVisual && !clip.text && (
         <Section title="Mesclagem">
@@ -353,6 +436,18 @@ export function ClipInspector() {
         </Section>
       )}
     </div>
+  );
+}
+
+function ActionButton({ icon: Icon, label, onClick }: { icon: typeof Music; label: string; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="flex flex-col items-center gap-1 rounded-lg border border-line bg-surface-1 px-1 py-2 text-[10px] font-medium text-zinc-300 transition-all hover:border-violet-500/50 hover:text-white active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+    >
+      <Icon className="h-4 w-4" aria-hidden />
+      {label}
+    </button>
   );
 }
 

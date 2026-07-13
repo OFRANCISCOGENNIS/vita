@@ -192,3 +192,19 @@ describe("audioGainAt", () => {
     expect(audioGainAt(clip, 500)).toBeCloseTo(0.5, 5);
   });
 });
+
+describe("sourceTimeForClip com freeze", () => {
+  it("clipe normal mapeia linearmente com a velocidade", () => {
+    const clip = makeClip({ trackId: "t", sourceId: "s", startInTimeline: 1000, duration: 2000 });
+    expect(sourceTimeForClip(clip, 1000)).toBe(0);
+    expect(sourceTimeForClip(clip, 2000)).toBe(1000);
+  });
+
+  it("clipe congelado segura sempre trimIn", () => {
+    const clip = makeClip({ trackId: "t", sourceId: "s", startInTimeline: 1000, duration: 2000, trimIn: 500 });
+    clip.freeze = true;
+    expect(sourceTimeForClip(clip, 1000)).toBe(500);
+    expect(sourceTimeForClip(clip, 2500)).toBe(500);
+    expect(sourceTimeForClip(clip, 2999)).toBe(500);
+  });
+});
