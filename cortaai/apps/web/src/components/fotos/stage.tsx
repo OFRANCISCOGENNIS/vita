@@ -21,6 +21,7 @@ import {
   eraseColorStamp,
   inverseGeometryPoint,
   liquifyStamp,
+  restoreStamp,
   onWatermarkReady,
   paintMaskStamp,
   redEyeStamp,
@@ -275,7 +276,15 @@ export function FotoStage() {
         break;
       }
       case "liquify":
-        liquifyStamp(ctx, full.x, full.y, r * 1.4, full.x - prevPt.x, full.y - prevPt.y, st.liquifyMode, st.brushStrength);
+        if (st.liquifyMode === "restaurar") {
+          // pincel de restauração: volta aos pixels ORIGINAIS (exige mesmas dimensões)
+          const orig = getOriginalCanvas();
+          if (orig && orig.width === ctx.canvas.width && orig.height === ctx.canvas.height) {
+            restoreStamp(ctx, orig, full.x, full.y, r * 1.4, st.brushStrength);
+          }
+        } else {
+          liquifyStamp(ctx, full.x, full.y, r * 1.4, full.x - prevPt.x, full.y - prevPt.y, st.liquifyMode, st.brushStrength);
+        }
         break;
       default:
         break;

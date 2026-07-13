@@ -54,7 +54,7 @@ export const HANDOFF_TO_CAPA = "cortaai-capa-handoff";
 
 export type FotosTab =
   | "ajustes" | "curvas" | "cor" | "recortar" | "retoque"
-  | "pinceis" | "filtros" | "texto" | "camadas";
+  | "pinceis" | "filtros" | "luz" | "texto" | "camadas";
 
 export type ToolId =
   | "mover"

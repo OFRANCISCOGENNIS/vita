@@ -1219,7 +1219,7 @@ export function spotHealStamp(ctx: CanvasRenderingContext2D, cx: number, cy: num
   mixPatch(ctx, p, healed, cx, cy, r * 1.15, 1);
 }
 
-export type LiquifyMode = "empurrar" | "expandir" | "encolher";
+export type LiquifyMode = "empurrar" | "expandir" | "encolher" | "restaurar";
 
 /**
  * Basic liquify: backward-mapped radial warp. "empurrar" drags pixels along
@@ -1672,5 +1672,131 @@ export function portraitRetouch(src: HTMLCanvasElement, strength = 70): HTMLCanv
 
   const out = makeCanvas(w, h);
   out.getContext("2d")!.putImageData(img, 0, 0);
+  return out;
+}
+
+/**
+ * Pincel RESTAURAR: pinta de volta os pixels do ORIGINAL (com borda suave).
+ * Exige que o original tenha as mesmas dimensões da base atual (sem crop/resize
+ * no meio) — o chamador valida.
+ */
+export function restoreStamp(
+  ctx: CanvasRenderingContext2D,
+  original: HTMLCanvasElement,
+  cx: number,
+  cy: number,
+  r: number,
+  strength: number,
+): void {
+  const size = Math.ceil(r * 2);
+  const tmp = makeCanvas(size, size);
+  const tctx = tmp.getContext("2d")!;
+  tctx.drawImage(original, cx - r, cy - r, size, size, 0, 0, size, size);
+  // máscara radial suave com alpha proporcional à força
+  tctx.globalCompositeOperation = "destination-in";
+  const grad = tctx.createRadialGradient(r, r, 0, r, r, r);
+  const a = Math.max(0.05, Math.min(1, strength / 100));
+  grad.addColorStop(0, `rgba(0,0,0,${a})`);
+  grad.addColorStop(0.7, `rgba(0,0,0,${(a * 0.7).toFixed(3)})`);
+  grad.addColorStop(1, "rgba(0,0,0,0)");
+  tctx.fillStyle = grad;
+  tctx.fillRect(0, 0, size, size);
+  ctx.drawImage(tmp, cx - r, cy - r);
+}
+
+// --------------------------------------------------------------------------
+// ILUMINAÇÃO (Luz) — presets de relighting SIMULADO por gradientes + filtro de
+// cor (não é relighting por IA; honesto e 100% no navegador).
+// --------------------------------------------------------------------------
+
+export interface LightingPreset {
+  id: string;
+  name: string;
+  css: string; // ctx.filter
+  /** brilhos radiais (screen): posição 0..1, cor "r,g,b", alpha, raio (fração do maior lado). */
+  spots: { x: number; y: number; color: string; alpha: number; r: number }[];
+  vignette: number; // 0..1
+}
+
+export const LIGHTING_PRESETS: LightingPreset[] = [
+  {
+    id: "hora-dourada",
+    name: "Hora Dourada",
+    css: "sepia(0.22) saturate(1.25) brightness(1.06) contrast(1.04)",
+    spots: [{ x: 0.15, y: 0.08, color: "255,170,60", alpha: 0.35, r: 0.95 }],
+    vignette: 0.25,
+  },
+  {
+    id: "manha",
+    name: "Manhã",
+    css: "brightness(1.1) saturate(1.06) contrast(0.98)",
+    spots: [{ x: 0.5, y: 0, color: "255,240,220", alpha: 0.28, r: 0.9 }],
+    vignette: 0.08,
+  },
+  {
+    id: "drama",
+    name: "Drama",
+    css: "contrast(1.28) brightness(0.9) saturate(0.92)",
+    spots: [{ x: 0.78, y: 0.18, color: "255,200,140", alpha: 0.24, r: 0.7 }],
+    vignette: 0.5,
+  },
+  {
+    id: "meio-dia",
+    name: "Meio-dia Natural",
+    css: "brightness(1.07) contrast(1.08) saturate(1.12)",
+    spots: [{ x: 0.5, y: -0.1, color: "220,235,255", alpha: 0.18, r: 1.0 }],
+    vignette: 0.1,
+  },
+  {
+    id: "entardecer",
+    name: "Entardecer",
+    css: "sepia(0.3) saturate(1.15) brightness(0.98) hue-rotate(-8deg)",
+    spots: [{ x: 0.85, y: 0.85, color: "255,110,80", alpha: 0.3, r: 0.9 }],
+    vignette: 0.35,
+  },
+  {
+    id: "neon-noite",
+    name: "Noite Neon",
+    css: "brightness(0.92) contrast(1.15) saturate(1.3)",
+    spots: [
+      { x: 0.08, y: 0.3, color: "120,80,255", alpha: 0.3, r: 0.8 },
+      { x: 0.92, y: 0.7, color: "255,60,160", alpha: 0.3, r: 0.8 },
+    ],
+    vignette: 0.4,
+  },
+];
+
+/** Aplica um preset de iluminação (destrutivo, com undo) e devolve novo canvas. */
+export function applyLightingCanvas(src: HTMLCanvasElement, presetId: string): HTMLCanvasElement {
+  const preset = LIGHTING_PRESETS.find((p) => p.id === presetId);
+  if (!preset) return src;
+  const w = src.width;
+  const h = src.height;
+  const out = makeCanvas(w, h);
+  const ctx = out.getContext("2d")!;
+  ctx.filter = preset.css;
+  ctx.drawImage(src, 0, 0);
+  ctx.filter = "none";
+
+  // brilhos (screen)
+  ctx.globalCompositeOperation = "screen";
+  for (const spot of preset.spots) {
+    const r = Math.max(w, h) * spot.r;
+    const grad = ctx.createRadialGradient(spot.x * w, spot.y * h, 0, spot.x * w, spot.y * h, r);
+    grad.addColorStop(0, `rgba(${spot.color},${spot.alpha})`);
+    grad.addColorStop(1, `rgba(${spot.color},0)`);
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, w, h);
+  }
+
+  // vinheta
+  if (preset.vignette > 0) {
+    ctx.globalCompositeOperation = "source-over";
+    const grad = ctx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.35, w / 2, h / 2, Math.max(w, h) * 0.75);
+    grad.addColorStop(0, "rgba(0,0,0,0)");
+    grad.addColorStop(1, `rgba(0,0,0,${(0.75 * preset.vignette).toFixed(3)})`);
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, w, h);
+  }
   return out;
 }

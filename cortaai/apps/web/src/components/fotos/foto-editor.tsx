@@ -9,7 +9,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Activity, Brush, Crop, Download, Eye, ImagePlus, ImageUp, Layers, Loader2,
-  Palette, Redo2, Smile, Sparkles, SlidersHorizontal, Type, Undo2, X,
+  Palette, Redo2, Smile, Sparkles, SlidersHorizontal, Sun, Type, Undo2, X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "@/store/toast";
@@ -32,6 +32,7 @@ import { RecortarPanel } from "./panels-geometria";
 import { RetoquePanel, PinceisPanel } from "./panels-retoque";
 import { FiltrosPanel } from "./panels-filtros";
 import { TextoPanel, CamadasPanel } from "./panels-elementos";
+import { LuzPanel } from "./panels-luz";
 
 const TABS: { id: FotosTab; label: string; icon: typeof Brush }[] = [
   { id: "ajustes", label: "Ajustes", icon: SlidersHorizontal },
@@ -41,6 +42,7 @@ const TABS: { id: FotosTab; label: string; icon: typeof Brush }[] = [
   { id: "retoque", label: "Retoque", icon: Smile },
   { id: "pinceis", label: "Pincéis", icon: Brush },
   { id: "filtros", label: "Filtros", icon: Sparkles },
+  { id: "luz", label: "Luz", icon: Sun },
   { id: "texto", label: "Texto & Elementos", icon: Type },
   { id: "camadas", label: "Camadas", icon: Layers },
 ];
@@ -415,6 +417,7 @@ export function FotoEditor() {
           {s.activeTab === "retoque" && <RetoquePanel />}
           {s.activeTab === "pinceis" && <PinceisPanel />}
           {s.activeTab === "filtros" && <FiltrosPanel />}
+          {s.activeTab === "luz" && <LuzPanel />}
           {s.activeTab === "texto" && <TextoPanel />}
           {s.activeTab === "camadas" && <CamadasPanel />}
         </aside>

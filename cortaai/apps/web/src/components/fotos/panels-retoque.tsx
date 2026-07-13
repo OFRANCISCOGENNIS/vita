@@ -10,7 +10,7 @@
 import { Eraser, Eye, Sparkle, Wand2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "@/store/toast";
-import { applySkinSmooth, type LiquifyMode } from "@/lib/photo-engine";
+import { applySkinSmooth, portraitRetouch, type LiquifyMode } from "@/lib/photo-engine";
 import { getMaskCanvas, usePhotoEditorStore, type ToolId } from "@/store/photo-editor";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
@@ -23,7 +23,7 @@ const RETOQUE_TOOLS: ToolDef[] = [
   { id: "dentes", label: "Clarear dentes", hint: "Pincel: clareia e remove o amarelado" },
   { id: "olhos", label: "Clarear olhos", hint: "Pincel: ilumina e realça a íris" },
   { id: "olhos-vermelhos", label: "Olhos vermelhos", hint: "Clique sobre a pupila vermelha" },
-  { id: "liquify", label: "Liquify (moldar)", hint: "Arraste para empurrar; ou expandir/encolher" },
+  { id: "liquify", label: "Remodelar", hint: "Arraste para remodelar; expandir/encolher/restaurar" },
 ];
 
 const PINCEL_TOOLS: ToolDef[] = [
@@ -36,9 +36,10 @@ const PINCEL_TOOLS: ToolDef[] = [
 ];
 
 const LIQUIFY_MODES: { id: LiquifyMode; label: string }[] = [
-  { id: "empurrar", label: "Empurrar" },
+  { id: "empurrar", label: "Remodelar" },
   { id: "expandir", label: "Expandir" },
   { id: "encolher", label: "Encolher / afinar" },
+  { id: "restaurar", label: "Restaurar" },
 ];
 
 function ToolGrid({ tools }: { tools: ToolDef[] }) {
@@ -118,9 +119,24 @@ export function RetoquePanel() {
     }, 30);
   }
 
+  function autoRetouch() {
+    setBusy("Retocando a pele…");
+    setTimeout(() => {
+      try {
+        applyPixelOp((base) => portraitRetouch(base, 70));
+        toast("Retoque automático aplicado", { description: "Pele suavizada preservando olhos e contornos.", variant: "success" });
+      } finally {
+        setBusy(null);
+      }
+    }, 30);
+  }
+
   return (
     <div className="space-y-4">
       <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Retoque (beleza)</h3>
+      <Button size="sm" variant="secondary" className="w-full" onClick={autoRetouch}>
+        <Wand2 className="h-3.5 w-3.5" aria-hidden /> Auto — retocar em 1 clique
+      </Button>
       <ToolGrid tools={RETOQUE_TOOLS} />
       {activeDef && (
         <p className="rounded-lg bg-surface-2/80 px-2.5 py-2 text-[11px] leading-relaxed text-zinc-400">
@@ -150,8 +166,8 @@ export function RetoquePanel() {
 
       {tool === "liquify" && (
         <div className="space-y-2 rounded-xl border border-line bg-surface-2/60 p-3">
-          <p className="text-[11px] font-semibold text-zinc-400">Modo do liquify</p>
-          <div className="flex flex-wrap gap-1.5" role="group" aria-label="Modo do liquify">
+          <p className="text-[11px] font-semibold text-zinc-400">Modo do Remodelar</p>
+          <div className="flex flex-wrap gap-1.5" role="group" aria-label="Modo do Remodelar">
             {LIQUIFY_MODES.map((m) => (
               <button
                 key={m.id}
