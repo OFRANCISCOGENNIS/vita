@@ -202,3 +202,4 @@ Ao trabalhar neste repositório, siga este protocolo para respostas e ações ob
 5. **Diffs mínimos.** Uma edição = uma mudança lógica. Não reformate código não relacionado.
 6. **Sem perguntas desnecessárias.** Se há padrão óbvio, aplique e informe em 1 linha; só pergunte quando a escolha muda o resultado.
 7. **Confirmação enxuta.** Ao concluir: o que mudou, em qual(is) linha(s)/Sub(s) e se foi commitado — em poucas linhas.
+8. **Exportar sempre.** Após qualquer ajuste no `.bas`, sempre entregar o arquivo atualizado ao usuário (enviar o `vba/AnaliseCKCP_OTIMIZADO.bas`), sem precisar pedir.
