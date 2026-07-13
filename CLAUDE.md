@@ -87,6 +87,8 @@ Private nLin As Long              ' qtd de linhas com PEP preenchido
 | `dTipoCls` | CLS2 normalizada | `"COM"` / `"UC"` / `"UAR"` |
 | `dDescSrv` | COD_SERVICO | descrição textual (embutido + `TEXTO BREVE` de `SERVICOS_ATUAIS` em runtime) |
 | `dCfg` | CHAVE | valor (da aba CONFIG) |
+| `dFamEquiv` | CLS2 serviço normalizada | família de material equivalente (+ CONFIG `EQUIV_SRV_MAT`) |
+| `dSrvPuro` | CLS2 serviço normalizada | 1 = serviço sem material esperado (+ CONFIG `SRV_PURO`) |
 | `dClsViagem` | CLASSE_CUSTO | 1 (flag: é classe de viagem) |
 
 ### Compartilhamento entre módulos (fase 1.2)

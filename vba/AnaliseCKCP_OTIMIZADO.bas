@@ -43,6 +43,8 @@ Private dCatCC As Object    ' CLASSE_CUSTO(str) -> "CLS1|CLS2|CLS3|TIPO_APLIC"
 Private dCabo As Object     ' COD_MATERIAL(str) -> fator KG->metros (Double)
 Private dCombo As Object    ' COD_SERVICO(str)  -> fator multiplicador (Double)
 Private dTipoCls As Object  ' CLASSIFICACAO(CLS2 normalizada) -> TIPO (COM/UC/UAR)
+Private dFamEquiv As Object ' CLS2 servico (norm) -> familia material equivalente
+Private dSrvPuro As Object  ' CLS2 servico (norm) -> 1 (servico sem material esperado)
 Private rawHeaders As Variant
 Private rawColCount As Long
 Private gSplashOK As Boolean
@@ -183,6 +185,10 @@ Sub GerarRelatorio()
 
     ' 3f) De-para CLASSIFICACAO (familia/CLS2) -> TIPO (COM/UC/UAR)
     gEtapa = "CarregarTipoClassif": CarregarTipoClassif
+
+    ' 3g) Equivalencias servico->material e familias de servico puro
+    gEtapa = "CarregarEquivSrvMat": CarregarEquivSrvMat
+    gEtapa = "CarregarSrvPuro": CarregarSrvPuro
 
     ' 4) Gera cada aba
     gEtapa = "Gerar_RazaoCJ": Gerar_RazaoCJ
@@ -2439,7 +2445,11 @@ Private Sub CarregarTipoClassif()
         "PAINEL CONTR EXAUSTOR=UAR;TERMINAL BIMETALICO=COM;BOMBA SUBM=UAR;EXAUSTOR=COM;" & _
         "TAMPA DE FERRO=COM;ESPACADOR=COM;RELE=UAR;TERMINAL CABO=COM;CANALETA=COM;CH VAC 1F=UC;" & _
         "POSTE CAPITEL=UC;TORA EUCALIPTO=COM;CAIXA DE PASSAGEM=COM;POSTE LD=UC;CAPACITOR=UC;" & _
-        "CONTROLADOR=UAR;MURO CONC=UC;GRAMPO=COM;DISJ BT=COM;PORTA FUSIVEL=COM"
+        "CONTROLADOR=UAR;MURO CONC=UC;GRAMPO=COM;DISJ BT=COM;PORTA FUSIVEL=COM;" & _
+        "POSTE_TORRE=UC;TORRE MET=UC;TORRE CONC=UC;TRAFO DE FORCA=UC;DISJ SE=UC;" & _
+        "CH SEC TRI=UC;BANCO CAPACITOR=UC;ISOLADOR AT=COM;CONECTOR=COM;" & _
+        "CABO FIB OPT=COM;VIGA CONC=COM;SUPORTE CONC=COM;ANEL CONC=COM;" & _
+        "CANTONEIRA=COM;PAINEL MET=COM;TUBO FOFO=COM"
 
     Dim parts() As String, kv() As String, i As Long, key As String
     parts = Split(s, ";")
@@ -2451,6 +2461,60 @@ Private Sub CarregarTipoClassif()
         End If
     Next i
 End Sub
+
+' De-para CLS2 de SERVICO -> familia de MATERIAL equivalente. Regulariza
+' servicos cuja familia nao existe no catalogo de materiais, ligando-os a
+' familia equivalente para a aderencia MAT vs SRV (via FamiliaAlias).
+' Extensivel sem codigo pela chave EQUIV_SRV_MAT da aba CONFIG ("SRV=MAT;...").
+Private Sub CarregarEquivSrvMat()
+    Set dFamEquiv = CreateObject("Scripting.Dictionary")
+    Dim s As String
+    s = "CH FUSIVEL=CH FUS;" & _
+        "CONEXAO=CONECTOR;" & _
+        "TENSIONAR=COND PROT;" & _
+        "ESTRUTURA=CRUZETA;" & _
+        "ESTRUT MT RSB=CRUZETA;" & _
+        "ESTRUT RDC=ESPACADOR LOSAG"
+    Dim extra As String: extra = CfgTxt("EQUIV_SRV_MAT", "")
+    If extra <> "" Then s = s & ";" & extra
+
+    Dim parts() As String, kv() As String, i As Long, key As String
+    parts = Split(s, ";")
+    For i = 0 To UBound(parts)
+        kv = Split(parts(i), "=")
+        If UBound(kv) >= 1 Then
+            key = NormClassif(kv(0))
+            If key <> "" Then dFamEquiv(key) = Trim$(kv(1))
+        End If
+    Next i
+End Sub
+
+' Familias de servico que legitimamente NAO tem material correspondente
+' (servico puro): nao devem gerar alerta em SERVICO SEM MATERIAL.
+' Extensivel pela chave SRV_PURO da aba CONFIG (familias separadas por ;).
+Private Sub CarregarSrvPuro()
+    Set dSrvPuro = CreateObject("Scripting.Dictionary")
+    Dim s As String
+    s = "PODA;ESCAVACAO;CIVIL;BASE CONC;FUNDACAO;DEMOLIR;MEIO AMBIENTE;" & _
+        "ESTUDO AMBIENTAL;PROJETO;FRETE/TRANSP;TRANSPORTE;DESLOCAMENTO;" & _
+        "MOBILIZAR;DESMOBILIZAR;ATV DRT;DISPONIBILIDADE;DISPON_STC;" & _
+        "ATEND EMERGENCIA;ABRIR ACESSO/FAIXA_SERV;PUBLICIDADE;TURMA LV"
+    Dim extra As String: extra = CfgTxt("SRV_PURO", "")
+    If extra <> "" Then s = s & ";" & extra
+
+    Dim parts() As String, i As Long, key As String
+    parts = Split(s, ";")
+    For i = 0 To UBound(parts)
+        key = NormClassif(parts(i))
+        If key <> "" Then dSrvPuro(key) = 1
+    Next i
+End Sub
+
+' Servico puro = familia sem material esperado (nao gera falso alerta)
+Private Function EhServicoPuro(ByVal cls2 As String) As Boolean
+    If dSrvPuro Is Nothing Then Exit Function
+    EhServicoPuro = dSrvPuro.Exists(NormClassif(cls2))
+End Function
 
 ' Normaliza familia/classificacao p/ casar: maiusc, sem acento, espacos colapsados
 Private Function NormClassif(ByVal s As String) As String
@@ -2486,9 +2550,15 @@ End Function
 ' COND NU -> COND PROT: servico de cabo protegido cobre o material cabo nu
 ' e vice-versa (ambos sao condutores de linha, o servico paga os dois).
 Private Function FamiliaAlias(ByVal cls2 As String) As String
-    Select Case NormClassif(cls2)
+    Dim k As String: k = NormClassif(cls2)
+    Select Case k
         Case "COND ISOLADO/PROT", "COND ISOLADO": FamiliaAlias = "COND PROT"
-        Case Else: FamiliaAlias = cls2
+        Case Else
+            FamiliaAlias = cls2
+            ' De-para servico -> material equivalente (CarregarEquivSrvMat)
+            If Not dFamEquiv Is Nothing Then
+                If dFamEquiv.Exists(k) Then FamiliaAlias = dFamEquiv(k)
+            End If
     End Select
 End Function
 
@@ -3337,7 +3407,11 @@ Private Function MapCategoriaCA(ByVal valor As String) As String
     s = UCase$(SemAcento(Trim$(valor)))
     s = Replace(s, "/", "_")
     s = Replace(s, "-", "_")
-    s = Replace(s, "  ", " ")
+    s = Replace(s, ".", " ")     ' "MAT. UC"/"MAT.COM" (catalogos ATUAIS) -> "MAT UC"/"MAT COM"
+    Do While InStr(s, "  ") > 0
+        s = Replace(s, "  ", " ")
+    Loop
+    s = Trim$(s)
 
     If s = "" Then Exit Function
     If InStr(s, "CLASSIFICAR") > 0 Then MapCategoriaCA = "CLASSIFICAR": Exit Function
@@ -4564,7 +4638,9 @@ P2:
             Dim tipoSM As String: tipoSM = TipoDaClassif(famX)
             If tipoSM = "" Then tipoSM = "SERV"
             Dim riscoSM As String
-            If tipoSM = "UC" Then
+            If EhServicoPuro(famX) Then
+                riscoSM = "N/A (SERVICO PURO)"   ' familia sem material esperado
+            ElseIf tipoSM = "UC" Then
                 riscoSM = "ALTO"
             ElseIf tipoSM = "COM" Then
                 riscoSM = "MEDIO"
@@ -5228,9 +5304,9 @@ Private Sub GarantirConfig()
     ' chaves padrao (chave, valor, descricao)
     Dim def As Variant
     def = Array( _
-        Array("CAT_MATERIAIS", "%USERPROFILE%\Downloads\MATERIAS_ATUAIS (2).xlsx;%USERPROFILE%\Downloads\MATERIAS_ATUAIS.xlsx", "Caminhos do catalogo de materiais (separar alternativas por ;)"), _
-        Array("CAT_SERVICOS", "%USERPROFILE%\Downloads\SERVICOS_ATUAIS.xlsx", "Caminho do catalogo de servicos"), _
-        Array("CAT_CLASSE", "%USERPROFILE%\Downloads\CLASSE_CUSTO_ATUAIS.xlsx;%USERPROFILE%\Downloads\CLASSE_CUSTO_ATUAIS (1).xlsx", "Caminhos do catalogo de classe de custo"), _
+        Array("CAT_MATERIAIS", "%USERPROFILE%\Downloads\MATERIAS_ATUAIS_4.xlsx;%USERPROFILE%\Downloads\MATERIAS_ATUAIS (2).xlsx;%USERPROFILE%\Downloads\MATERIAS_ATUAIS.xlsx", "Caminhos do catalogo de materiais (separar alternativas por ;)"), _
+        Array("CAT_SERVICOS", "%USERPROFILE%\Downloads\SERVICOS_ATUAIS_2.xlsx;%USERPROFILE%\Downloads\SERVICOS_ATUAIS.xlsx", "Caminho do catalogo de servicos"), _
+        Array("CAT_CLASSE", "%USERPROFILE%\Downloads\CLASSE_CUSTO_ATUAIS_2.xlsx;%USERPROFILE%\Downloads\CLASSE_CUSTO_ATUAIS.xlsx", "Caminhos do catalogo de classe de custo"), _
         Array("CAT_CABO", "%USERPROFILE%\Downloads\CONVERSOES_CABO_ATUAIS.xlsx", "Caminho da conversao de cabo KG->m (opcional)"), _
         Array("CAT_COMBO", "%USERPROFILE%\Downloads\SRV_COMBO_ATUAIS.xlsx", "Caminho do catalogo SRV COMBO"), _
         Array("PERC_ATV_EME", "8", "Percentual ATV PREVISTA para PEP EME/EMM (%)"), _
@@ -5238,7 +5314,9 @@ Private Sub GarantirConfig()
         Array("PERC_MOP", "5.483", "Percentual do CALCULO DO MOP sobre o total sem MOP (%)"), _
         Array("MARGEM_ADERENCIA", "10", "Margem da aderencia MAT vs SRV (%)"), _
         Array("CLASSES_VIAGEM", "8111290000;8210390000;8210550000", "Classes de custo de viagem (Alimentacao;Passagem;Hospedagem)"), _
-        Array("CLASSE_COMBUSTIVEL", "8119980000", "Classe de custo de combustiveis -> categoria OUTROS na ANALISE DE CA"))
+        Array("CLASSE_COMBUSTIVEL", "8119980000", "Classe de custo de combustiveis -> categoria OUTROS na ANALISE DE CA"), _
+        Array("EQUIV_SRV_MAT", "", "De-para extra CLS2 servico=familia material (ex.: JUMPER=ALCA;X=Y)"), _
+        Array("SRV_PURO", "", "Familias extra de servico sem material esperado (separadas por ;)"))
 
     ' indexa chaves ja existentes
     Dim ult As Long: ult = ws.Cells(ws.Rows.Count, 1).End(xlUp).Row
@@ -5361,6 +5439,9 @@ Private Function FormatoColuna(ByVal hh As String) As String
     If InStr(hh, "PERC") > 0 Or InStr(hh, "PORC") > 0 Or InStr(hh, "%") > 0 _
        Or InStr(hh, "MENOR 10") > 0 Then
         FormatoColuna = "0.0"
+    ElseIf InStr(hh, "LANCAMENTO") > 0 Or Left$(hh, 2) = "N " _
+       Or InStr(hh, "QTD FAM") > 0 Then
+        FormatoColuna = "#,##0"                 ' contagens inteiras
     ElseIf hh = "MAT" Or hh = "SRV" _
        Or Left$(hh, 3) = "QTD" Or Left$(hh, 5) = "FAIXA" _
        Or InStr(hh, "VALOR") > 0 Or InStr(hh, "TOTAL") > 0 _
@@ -5415,6 +5496,7 @@ Private Sub FormatarVisualAba(ws As Worksheet, ByVal nome As String, _
         Set corpo = ws.Range(ws.Cells(2, 1), ws.Cells(nR, nC))
         corpo.Font.Name = "Segoe UI"
         corpo.Font.Size = 9
+        corpo.VerticalAlignment = xlCenter
 
         ' Zebra por coluna, pulando colunas de veredito/alerta (as cores
         ' semanticas dessas colunas devem prevalecer sobre a zebra).
@@ -5442,6 +5524,18 @@ Private Sub FormatarVisualAba(ws As Worksheet, ByVal nome As String, _
             ' Formato numerico
             Dim fmt As String: fmt = FormatoColuna(hh)
             If fmt <> "" Then ws.Range(ws.Cells(2, jc), ws.Cells(nR, jc)).NumberFormat = fmt
+
+            ' Data bars sutis em colunas de valor (leitura rapida de magnitude)
+            If fmt = "#,##0.00" And (InStr(hh, "VALOR") > 0 Or InStr(hh, "DIF") > 0 _
+               Or InStr(hh, "TOTAL") > 0) And Not EhColunaVeredito(hh) Then
+                On Error Resume Next
+                With ws.Range(ws.Cells(2, jc), ws.Cells(nR, jc)).FormatConditions.AddDatabar
+                    .BarColor.Color = RGB(99, 190, 123)
+                    .BarFillType = xlDataBarFillGradient
+                    .ShowValue = True
+                End With
+                On Error GoTo 0
+            End If
         Next jc
 
         ' Bordas finas claras (uma operacao no range inteiro)
@@ -5450,6 +5544,12 @@ Private Sub FormatarVisualAba(ws As Worksheet, ByVal nome As String, _
             .Weight = xlHairline
             .Color = corBorda
         End With
+
+        ' Contorno da tabela (fecha o bloco visualmente)
+        On Error Resume Next
+        ws.Range(ws.Cells(1, 1), ws.Cells(nR, nC)).BorderAround _
+            LineStyle:=xlContinuous, Weight:=xlThin, Color:=corHdrLn
+        On Error GoTo 0
     End If
 
     ws.Rows(1).AutoFilter
