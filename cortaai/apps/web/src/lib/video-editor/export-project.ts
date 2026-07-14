@@ -442,7 +442,7 @@ export async function renderProjectToBlob(
     codec: plan.videoCodec,
     width,
     height,
-    bitrate: Math.min(12_000_000, Math.round(width * height * fps * 0.12)),
+    bitrate: Math.min(80_000_000, Math.round(width * height * fps * 0.12)),
     framerate: fps,
   });
 
