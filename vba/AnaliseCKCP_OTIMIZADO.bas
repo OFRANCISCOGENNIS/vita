@@ -43,6 +43,8 @@ Private dCatCC As Object    ' CLASSE_CUSTO(str) -> "CLS1|CLS2|CLS3|TIPO_APLIC"
 Private dCabo As Object     ' COD_MATERIAL(str) -> fator KG->metros (Double)
 Private dCombo As Object    ' COD_SERVICO(str)  -> fator multiplicador (Double)
 Private dTipoCls As Object  ' CLASSIFICACAO(CLS2 normalizada) -> TIPO (COM/UC/UAR)
+Private dFamEquiv As Object ' CLS2 servico (norm) -> familia material equivalente
+Private dSrvPuro As Object  ' CLS2 servico (norm) -> 1 (servico sem material esperado)
 Private rawHeaders As Variant
 Private rawColCount As Long
 Private gSplashOK As Boolean
@@ -166,7 +168,11 @@ Sub GerarRelatorio()
     ' 3b) Carrega o catalogo de MATERIAIS (FAMILIA, CLS1/2/3)
     gEtapa = "CarregarCatalogoMateriais": CarregarCatalogoMateriais
 
-    ' 3c) Carrega o catalogo de SERVICOS (CLS1/2/3, TIPO_APLIC, SEGMENTO)
+    ' 3c) Descricoes embutidas de servico (prioridade) ANTES do catalogo externo,
+    '     que preenche as descricoes faltantes a partir de TEXTO BREVE do arquivo.
+    gEtapa = "CarregarDescServico": CarregarDescServico
+
+    ' 3c') Carrega o catalogo de SERVICOS (CLS1/2/3, TIPO_APLIC, SEGMENTO + descricoes)
     gEtapa = "CarregarCatalogoServicos": CarregarCatalogoServicos
 
     ' 3d) Carrega o catalogo de CLASSE DE CUSTO (CLS1/2/3 + TIPO_APLIC; marca RISCO)
@@ -179,7 +185,10 @@ Sub GerarRelatorio()
 
     ' 3f) De-para CLASSIFICACAO (familia/CLS2) -> TIPO (COM/UC/UAR)
     gEtapa = "CarregarTipoClassif": CarregarTipoClassif
-    gEtapa = "CarregarDescServico": CarregarDescServico
+
+    ' 3g) Equivalencias servico->material e familias de servico puro
+    gEtapa = "CarregarEquivSrvMat": CarregarEquivSrvMat
+    gEtapa = "CarregarSrvPuro": CarregarSrvPuro
 
     ' 4) Gera cada aba
     gEtapa = "Gerar_RazaoCJ": Gerar_RazaoCJ
@@ -284,9 +293,9 @@ Private Sub MostrarTelaFuturista(ByVal nLin As Long, ByVal seg As Double)
         .ParagraphFormat.Alignment = msoAlignCenter
     End With
     ok.TextFrame2.VerticalAnchor = msoAnchorMiddle
-    ok.OnAction = "FecharSplash"
+    ok.OnAction = "FecharSplashCKCP"
 
-    ' O painel permanece na tela; o botao OK (FecharSplash) apaga as formas.
+    ' O painel permanece na tela; o botao OK (FecharSplashCKCP) apaga as formas.
     On Error GoTo 0
 End Sub
 
@@ -330,7 +339,7 @@ Private Sub LimparSplash()
     On Error GoTo 0
 End Sub
 
-Public Sub FecharSplash(Optional ByVal ignorar As Variant)
+Public Sub FecharSplashCKCP(Optional ByVal ignorar As Variant)
     gSplashOK = True
     LimparSplash
 End Sub
@@ -637,6 +646,7 @@ Private Sub CarregarCatalogoMateriais()
     ' 1) Tenta o caminho padro em Downloads
     Dim caminho As String
     caminho = CaminhoCatalogo("CAT_MATERIAIS", _
+        "%USERPROFILE%\Downloads\MATERIAS_ATUAIS_4.xlsx;%USERPROFILE%\Downloads\MATERIAS_ATUAIS (4).xlsx;" & _
         "%USERPROFILE%\Downloads\MATERIAS_ATUAIS (2).xlsx;%USERPROFILE%\Downloads\MATERIAS_ATUAIS.xlsx")
 
     ' 2) Se no achar, pede para o usurio selecionar
@@ -1184,6 +1194,115 @@ Private Sub CarregarDescServico()
     dDescSrv("5054000033") = "EXEC INSTAL ELETR CX CONCENTRACAO DE TP"
     dDescSrv("5054000036") = "FIXACAO E INTERLIGACAO MEDIDOR EM PAINEL"
     dDescSrv("5054100006") = "LANCAMENTO DE CORDAO DE FIBRA OPTICA"
+    ' Base de servicos (planilha base_servi_os.xlsx)
+    dDescSrv("5028000005") = "FABRICACAO E INSTALACAO PLACA DA OBRA"
+    dDescSrv("5040000002") = "SINALIZACAO DE ESTRUTURAS COM PINTURA"
+    dDescSrv("5040000006") = "DISTRIBUICAO DE ESTRUTURA LD LM PDE"
+    dDescSrv("5040000008") = "LOCACAO DE ESTRUTURAS LD LM PDE"
+    dDescSrv("5040100002") = "FUNDACAO TIPO C1"
+    dDescSrv("5040100004") = "FUNDACAO TIPO D2"
+    dDescSrv("5040100005") = "FUNDACAO TIPO D3"
+    dDescSrv("5040100046") = "FUNDACAO TIPO D4"
+    dDescSrv("5040200011") = "IMPL ESTR CONC ACIMA DE 26M LD LM PDE"
+    dDescSrv("5040300014") = "MONT ESTRUT CONC CIR SIMPLES SUSP URB LD"
+    dDescSrv("5040300016") = "MONT ESTRUT CONC CIRC SIMPL ANCOR URB LD"
+    dDescSrv("5042000005") = "LANC/NIV/GRAM CABOS PARA-RAIO LD LM PDE"
+    dDescSrv("5042000020") = "LANC COND CIRC SIMP CAL 927,2 LD LM PDE"
+    dDescSrv("5042100005") = "GRAMP COND CIRC SIMP CAL 927,2 LD LM PDE"
+    dDescSrv("5042300008") = "NIV COND CIRC DUP CAL 927,2 LD LM PDE"
+    dDescSrv("5042400003") = "EXEC DE ATERR RURAL - FASE I LD LM PDE"
+    dDescSrv("5045400001") = "CONSERT DE CALCADA COM CIMENTO LD LM PDE"
+    dDescSrv("5045800006") = "EXECUCAO DOS PROGRAMAS AMBIENTAIS"
+    dDescSrv("5045900007") = "INSTALACAO DE DEFENSA LT"
+    dDescSrv("5050200013") = "PINTURA DE BASE OU POSTE C/ CAL SE PDE"
+    dDescSrv("5054100001") = "INSTALACAO E INTERLIG EQUIP COMUNICACAO"
+    dDescSrv("5054200013") = "EXECUTAR INSTALACAO PAINEL MEDICAO OPER"
+    ' Base de servicos (planilha classificar_servi_os.xlsx)
+    dDescSrv("5025300082") = "EXEC SERVICO INTEGRACAO AUTOMACAO"
+    dDescSrv("5025500008") = "ENCERRAMENTO TECNICO DA OBRA LM"
+    dDescSrv("5041000108") = "INST ISOLAD SUSP SP 69KV LD LV PDE"
+    dDescSrv("5041000109") = "RET ISOLAD SUSP SP 69KV LD LV PDE"
+    dDescSrv("5050300014") = "CONSTRUCAO BASE PARA TRAFO 34,5/13,8 KV"
+    dDescSrv("5050300021") = "CONSTRUCAO BASE PARA DISJUNTOR 15KV"
+    dDescSrv("5050300028") = "CONSTRUCAO BASE PARA DISJUNTOR 72,5KV"
+    dDescSrv("5050300108") = "DEMOLIR BASE PARA DISJ. ATE 34,5KV"
+    dDescSrv("5052000133") = "RET CONEX EM EQUIP 69KV SE LV PDE"
+    dDescSrv("5054000022") = "INSTALAR RELE EM PAINEL NOVO"
+    dDescSrv("5056500013") = "MONTAGEM CAIXA EQUIP. PATIO"
+    dDescSrv("5091100037") = "SERVICOS DE DESENVOLVIMENTO DE SOFTWARE"
+    dDescSrv("5120000002") = "INSTALACAO DE AR CONDICIONADO"
+    dDescSrv("5300900040") = "CONST MURO COM DE BLOCO ESTRUT 14X19X39"
+    dDescSrv("5400099371") = "MONTAGEM DE CRUZETA DUPLA"
+    dDescSrv("5500000003") = "138 KV INST. CADEIA ISOLADORES SUS LDAT"
+    dDescSrv("5500000945") = "BACIA COLETORA"
+    dDescSrv("5500000965") = "BASE DE CONCRETO PARA DISJUNTOR 34,5KV -"
+    dDescSrv("5500100769") = "COMISSIONAMENTO CH. SECC. TRIPOLAR (15"
+    dDescSrv("5500100776") = "COMISSIONAMENTO DISJUNTOR DE 15KV (VACUO"
+    dDescSrv("5500100777") = "COMISSIONAMENTO DISJUNTOR DE 345 69 E"
+    dDescSrv("5500100783") = "COMISSIONAMENTO PR'S 15,34,5,69 E 138KV"
+    dDescSrv("5500100788") = "COMISSIONAMENTO RELIGADORES 15/34,5KV"
+    dDescSrv("5500100790") = "COMISSIONAMENTO TC'S (1534569 E 138 K"
+    dDescSrv("5500100801") = "COMISSIONAMENTO/ATIVACAO DE EQUIPAMENT0"
+    dDescSrv("5500100866") = "DEMOLICAO E RETIRO DE CONCRETO"
+    dDescSrv("5500100914") = "DESMONTAGEM A MAO DE ESTRUTURAS METALICA"
+    dDescSrv("5500100920") = "DESMONTAGEM DE BANCO REGULADOR DE TENSAO"
+    dDescSrv("5500100929") = "DESMONTAGEM DE DISJUNTOR ENTRE 10 E 23 K"
+    dDescSrv("5500100931") = "DESMONTAGEM DE DISJUNTOR ENTRE 345 E 69"
+    dDescSrv("5500100977") = "DMONT. RELE COM MULTIFUNCAO"
+    dDescSrv("5500200814") = "FORNECIMENTOS DE MATERIAIS MENORES ELET"
+    dDescSrv("5500200957") = "INSTALACAO CABO DE FIBRA OPTICA"
+    dDescSrv("5500200969") = "INSTALACAO DE CANTEIRO OBRAS SIMPLES"
+    dDescSrv("5500200970") = "INSTALACAO DE CHAVE CONJUGADA PARA BCO."
+    dDescSrv("5500200971") = "INSTALACAO DE CHAVE FUSIVEL DE 10 A 23KV"
+    dDescSrv("5500200973") = "INSTALACAO DE CHAVE MONOPOLAR  10 A 23KV"
+    dDescSrv("5500200980") = "INSTALACAO DE ELETRODUTOS E CONDUTORES A"
+    dDescSrv("5500300005") = "INSTALACAO DE POSTES PARA SUPORTE DE EQU"
+    dDescSrv("5500300006") = "INSTALACAO DE PROTECAO ANTI-FAUNA"
+    dDescSrv("5500300053") = "INSTALACAO/ DESINSTALACAO DE SE MOVEL AT"
+    dDescSrv("5500300079") = "LANCAMENTO DE CABO ISOLADO ATE 630 MM² D"
+    dDescSrv("5500300081") = "LANCAMENTO DE CABO NU ATE 120 MM*2"
+    dDescSrv("5500300088") = "LANCAMENTO E CONEXAO DE CABOS DE CONTROL"
+    dDescSrv("5500300090") = "LANCAMENTO EM VALA DE CABO ISOLADO ATE 6"
+    dDescSrv("5500300137") = "LOCACAO CAMINHAO MUNCK 20 TON. TARA 10 T"
+    dDescSrv("5500300169") = "MANOBRA EM SE POR MANOBRA"
+    dDescSrv("5500300171") = "MANOBRA EN SE_LV"
+    dDescSrv("5500300358") = "MONTAGEM A MAO DE ESTRUTURAS METALICAS"
+    dDescSrv("5500300365") = "MONTAGEM DE BANCO DE REGULADOR AEREO/SUB"
+    dDescSrv("5500300375") = "MONTAGEM DE DISJUNTOR ENTRE 10 E 23 KV ("
+    dDescSrv("5500300378") = "MONTAGEM DE DISJUNTOR ENTRE 345 E 69 KV"
+    dDescSrv("5500300391") = "MONTAGEM DE PARA-RAIOS ENTRE 10 E 23 KV"
+    dDescSrv("5500300399") = "MONTAGEM DE RELIGADOR ATE 34,5KV"
+    dDescSrv("5500300402") = "MONTAGEM DE TRANSFORMADORES DE MEDIDA EN"
+    dDescSrv("5500300415") = "MONTAGEM/CABEAMENTO DO RELE MULTIFUNCAO"
+    dDescSrv("5500300419") = "MUFLA EM CABO ISOLADO ATE 630 MM² DE SEC"
+    dDescSrv("5500300558") = "RETIRADA DE CADEIA DE SUSPENSAO"
+    dDescSrv("5500300563") = "RETIRADA DE CHAVE MONOPOLAR 10 A 23KV"
+    dDescSrv("5500300567") = "RETIRADA DE DETRITOS"
+    dDescSrv("5500300584") = "RETIRADA MODEM - COMUNIC. TELECONTR."
+    dDescSrv("5500300591") = "REVISAO E/OU SUBSTITUICAO DE CONEXOES DE"
+    dDescSrv("5500300748") = "SERV ADM ENCERRAM ORDENS ODI - MANUT"
+    dDescSrv("5500300801") = "SERV PROJ ELABORACAO PROJ ENGENHARIA"
+    dDescSrv("5500300852") = "SERVICO INSTAL SIST COMUNIC VIA SATELIT"
+    dDescSrv("5500400487") = "TESTES PARA CABOS ISOLADOS"
+    dDescSrv("5500400583") = "TRANSP. DE EQUIPAM. E/OU MATERIAIS - SE"
+    dDescSrv("5500400598") = "TRANSPORTE DE EQUIPAMENTOS MENORES"
+    dDescSrv("5500400601") = "TRANSPORTE DE EQUIPAMENTOS/MATERIAIS COM"
+    dDescSrv("5500500620") = "13KV DMONT. CHAVE SECCIONADORA MONOFASIC"
+    dDescSrv("5500500624") = "13KV DMONT. RELIGADOR TRIPOLAR"
+    dDescSrv("5500500626") = "13KV DMONT. TRANSFORMADOR DE CORRENTE"
+    dDescSrv("5500500631") = "13KV LANC. CABO AL, DE 266,8 A 477MCM"
+    dDescSrv("5500500632") = "13KV LANC. CABO ISOLADO, DE 101 A 300MM"
+    dDescSrv("5500500633") = "13KV MONT. DISJUNTOR TRIPOLAR"
+    dDescSrv("5500500634") = "13KV MONT. SUPORTE METALICO PARA TC"
+    dDescSrv("5500500635") = "13KV MONT. TRANSFORMADOR DE CORRENTE"
+    dDescSrv("5500500666") = "69KV LANC. CABO AL, DE 266,8 A 477MCM"
+    dDescSrv("5500500691") = "DMONT. CABO DE ACO"
+    dDescSrv("5500500918") = "US - INSTALACAO DE CADEIA DE ISOLADORES"
+    dDescSrv("5500500919") = "US - RETIRADA DE CADEIA DE ISOLADORES DE"
+    dDescSrv("5500500921") = "LOCACAO MAT/EQ CACAMBA ESTAC ATE 10M3'"
+    dDescSrv("5500500939") = "69 KV INST. CADEIA ISOLADORES SUS LDAT"
+    dDescSrv("5500500940") = "69 KV INST. CADEIA ISOLADORES ANC LDAT"
+    dDescSrv("5500900688") = "COMISSIONAMENTO/ATIVACAO DE EQUIP -AT"
 End Sub
 
 Private Function DescServico(ByVal cod As String) As String
@@ -1220,7 +1339,9 @@ Private Sub CarregarCatalogoServicos()
     Set dCatSrv = CreateObject("Scripting.Dictionary")
 
     Dim caminho As String
-    caminho = CaminhoCatalogo("CAT_SERVICOS", "%USERPROFILE%\Downloads\SERVICOS_ATUAIS.xlsx")
+    caminho = CaminhoCatalogo("CAT_SERVICOS", _
+        "%USERPROFILE%\Downloads\SERVICOS_ATUAIS_2.xlsx;%USERPROFILE%\Downloads\SERVICOS_ATUAIS (2).xlsx;" & _
+        "%USERPROFILE%\Downloads\SERVICOS_ATUAIS.xlsx")
     If caminho = "" Then
         Dim f As Variant
         f = Application.GetOpenFilename( _
@@ -1235,20 +1356,22 @@ Private Sub CarregarCatalogoServicos()
     Set wb = Workbooks.Open(caminho, ReadOnly:=True, UpdateLinks:=0)
     Set ws = wb.Worksheets(1)
 
-    Dim cCod As Long, c1 As Long, c2 As Long, c3 As Long, cTA As Long, cSeg As Long
+    Dim cCod As Long, c1 As Long, c2 As Long, c3 As Long, cTA As Long, cSeg As Long, cTxt As Long
     cCod = ColLike(ws, Array("COD SERVICO", "COD_SERVICO", "SERVICO"))
     c1 = ColLike(ws, Array("CLS1"))
     c2 = ColLike(ws, Array("CLS2"))
     c3 = ColLike(ws, Array("CLS3"))
     cTA = ColLike(ws, Array("TIPO APLICACAO", "TIPO_APLICACAO", "TIPO APLIC"))
     cSeg = ColLike(ws, Array("SEGMENTO"))
+    cTxt = ColLike(ws, Array("TEXTO BREVE", "TEXTO_BREVE", "DENOMINACAO", "DESCRICAO"))
     If cCod = 0 Then wb.Close SaveChanges:=False: Exit Sub
+    If dDescSrv Is Nothing Then Set dDescSrv = CreateObject("Scripting.Dictionary")
 
     Dim ult As Long
     ult = ws.Cells(ws.Rows.Count, cCod).End(xlUp).Row
     arr = ws.Range(ws.Cells(2, 1), ws.Cells(ult, ws.UsedRange.Columns.Count)).Value
 
-    Dim i As Long, cod As String
+    Dim i As Long, cod As String, desc As String
     For i = 1 To UBound(arr, 1)
         cod = NormCod(arr(i, cCod))
         If cod <> "" And Not dCatSrv.Exists(cod) Then
@@ -1258,6 +1381,11 @@ Private Sub CarregarCatalogoServicos()
                 TextoMatriz(arr, i, c3) & "|" & _
                 TextoMatriz(arr, i, cTA) & "|" & _
                 TextoMatriz(arr, i, cSeg)
+        End If
+        ' Descricao vinda do arquivo (embutido em dDescSrv tem prioridade)
+        If cod <> "" And cTxt > 0 And Not dDescSrv.Exists(cod) Then
+            desc = Trim$(TextoMatriz(arr, i, cTxt))
+            If desc <> "" Then dDescSrv(cod) = desc
         End If
     Next i
     wb.Close SaveChanges:=False
@@ -1289,6 +1417,7 @@ Private Sub CarregarCatalogoClasse()
 
     Dim caminho As String
     caminho = CaminhoCatalogo("CAT_CLASSE", _
+        "%USERPROFILE%\Downloads\CLASSE_CUSTO_ATUAIS_2.xlsx;%USERPROFILE%\Downloads\CLASSE_CUSTO_ATUAIS (2).xlsx;" & _
         "%USERPROFILE%\Downloads\CLASSE_CUSTO_ATUAIS.xlsx;%USERPROFILE%\Downloads\CLASSE_CUSTO_ATUAIS (1).xlsx")
     If caminho = "" Then
         Dim f As Variant
@@ -1339,6 +1468,10 @@ Private Sub CarregarClassificacaoClassesDados()
     ' CLASSE DE CUSTO -> CLS1 | CLS2 | CLS3
     ' Embutida para que ANALISE DE CA classifique MOP, tributos, suporte,
     ' frete, JOA e risco mesmo sem arquivo externo.
+
+    ' Base completa CLASSE_CUSTO_ATUAIS (782 classes); os overrides curados
+    ' abaixo rodam depois e tem prioridade sobre a base.
+    CarregarClassesCustoAuto
 
     ' --- Alimentacao Viagem ----------------------------------------------
     AddClasseCusto "8111290000", "OUTROS", "ALIMENTACAO", "SUPORTE"
@@ -1409,6 +1542,752 @@ Private Sub AddClasseCusto(ByVal cod As String, ByVal cls1 As String, ByVal cls2
     If dCatCC Is Nothing Then Set dCatCC = CreateObject("Scripting.Dictionary")
     dCatCC(NormCod(cod)) = cls1 & "|" & cls2 & "|" & cls3 & "|"
 End Sub
+
+Private Sub CarregarClassesCustoAuto()
+    ' Base oficial CLASSE_CUSTO_ATUAIS (embutida). Chamada ANTES dos overrides
+    ' curados de CarregarClassificacaoClassesDados, que tem prioridade.
+    AddClasseCusto "6105107110", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6105207110", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "610530902", "OUTROS", "ALUGUEL", "RISCO"
+    AddClasseCusto "6105407110", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6105407997", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6105408145", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6110000301", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6110000302", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6110000303", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6110001111", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6110001301", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6110002110", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6110002113", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6110002158", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6110002159", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6110002190", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6110002191", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6110002197", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6110002208", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6110002302", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6110009000", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6110009008", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6110009018", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6110009020", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150000101", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150000112", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150000124", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150000126", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150000127", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150000128", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150000130", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150000140", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150000142", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150000153", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150000192", "OUTROS", "ODC_PESSOAL", "TRIBUTOS"
+    AddClasseCusto "6150001110", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150001111", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150001112", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150001113", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150001114", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150001115", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150001117", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150001118", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150001120", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150001121", "OUTROS", "MAT_VENDAS", "RISCO"
+    AddClasseCusto "6150001122", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150001125", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150001129", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150001130", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150001192", "OUTROS", "ODC_MATERIAL", "TRIBUTOS"
+    AddClasseCusto "6150001195", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150002102", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150002103", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150002104", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150002105", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150002106", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150002107", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150002109", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150002110", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150002112", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150002113", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150002114", "OUTROS", "RISCO", "RISCO"
+    AddClasseCusto "6150002115", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150002116", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150002120", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150002121", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150002123", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150002125", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150002126", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150002130", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150002131", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150002132", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150002133", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150002134", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150002136", "OUTROS", "RISCO", "RISCO"
+    AddClasseCusto "6150002137", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150002138", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150002139", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150002140", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150002142", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150002144", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150002148", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150002149", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150002150", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150002151", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150002152", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150002153", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150002155", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150002156", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150002157", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150002161", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150002162", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150002163", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150002164", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150002166", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150002168", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150002169", "OUTROS", "ODC_MATERIAL", "TRIBUTOS"
+    AddClasseCusto "6150002171", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150002175", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150002176", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150002178", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150002179", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150002180", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150002182", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150002183", "OUTROS", "CC_CUSTEIO", "RISCO"
+    AddClasseCusto "6150002186", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150002192", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150002193", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150002195", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150002207", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150002211", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150002212", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150002214", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150002232", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150002234", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150002238", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150002246", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150002293", "OUTROS", "CC_REC_DESPESAS", "RISCO"
+    AddClasseCusto "6150004425", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150005301", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150009101", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150009102", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150009103", "OUTROS", "RISCO", "RISCO"
+    AddClasseCusto "6150009104", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150009201", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150009301", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150009302", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150009303", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150009401", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150009403", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150009504", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150009804", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150009907", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150009908", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150009915", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150009917", "OUTROS", "CC_CUSTEIO", "RISCO"
+    AddClasseCusto "6150009919", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150009922", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150009932", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150009942", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150009946", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150009988", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150009994", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150260100", "OUTROS", "MOP_CUSTEIO", "RISCO"
+    AddClasseCusto "6150260200", "OUTROS", "MOP_CUSTEIO", "RISCO"
+    AddClasseCusto "6150261100", "OUTROS", "MOP_CUSTEIO", "RISCO"
+    AddClasseCusto "6150269100", "OUTROS", "MOP_CUSTEIO", "RISCO"
+    AddClasseCusto "6150269200", "OUTROS", "MOP_CUSTEIO", "RISCO"
+    AddClasseCusto "6150269300", "OUTROS", "MOP_CUSTEIO", "RISCO"
+    AddClasseCusto "6150269500", "OUTROS", "MOP_CUSTEIO", "RISCO"
+    AddClasseCusto "6150269600", "OUTROS", "MOP_CUSTEIO", "RISCO"
+    AddClasseCusto "6150269800", "OUTROS", "MOP_CUSTEIO", "RISCO"
+    AddClasseCusto "6150269900", "OUTROS", "MOP_CUSTEIO", "RISCO"
+    AddClasseCusto "6150270100", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150270200", "OUTROS", "MOP_CUSTEIO", "RISCO"
+    AddClasseCusto "6150272100", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150279100", "OUTROS", "MOP_CUSTEIO", "RISCO"
+    AddClasseCusto "6150279200", "OUTROS", "MOP_CUSTEIO", "RISCO"
+    AddClasseCusto "6150279300", "OUTROS", "MOP_CUSTEIO", "RISCO"
+    AddClasseCusto "6150279500", "OUTROS", "MOP_CUSTEIO", "RISCO"
+    AddClasseCusto "6150279600", "OUTROS", "MOP_CUSTEIO", "RISCO"
+    AddClasseCusto "6150279800", "OUTROS", "MOP_CUSTEIO", "RISCO"
+    AddClasseCusto "6150279900", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6150280100", "OUTROS", "MOP_CUSTEIO", "RISCO"
+    AddClasseCusto "6150280200", "OUTROS", "MOP_CUSTEIO", "RISCO"
+    AddClasseCusto "6150281100", "OUTROS", "MOP_CUSTEIO", "RISCO"
+    AddClasseCusto "6150289100", "OUTROS", "MOP_CUSTEIO", "RISCO"
+    AddClasseCusto "6150289200", "OUTROS", "MOP_CUSTEIO", "RISCO"
+    AddClasseCusto "6150289300", "OUTROS", "MOP_CUSTEIO", "RISCO"
+    AddClasseCusto "6150289500", "OUTROS", "MOP_CUSTEIO", "RISCO"
+    AddClasseCusto "6150289600", "OUTROS", "MOP_CUSTEIO", "RISCO"
+    AddClasseCusto "6150289800", "OUTROS", "MOP_CUSTEIO", "RISCO"
+    AddClasseCusto "6150289900", "OUTROS", "MOP_CUSTEIO", "RISCO"
+    AddClasseCusto "6150290100", "OUTROS", "MOP_CUSTEIO", "RISCO"
+    AddClasseCusto "6150290200", "OUTROS", "MOP_CUSTEIO", "RISCO"
+    AddClasseCusto "6150291100", "OUTROS", "MOP_CUSTEIO", "RISCO"
+    AddClasseCusto "6150292100", "OUTROS", "MOP_CUSTEIO", "RISCO"
+    AddClasseCusto "6150299100", "OUTROS", "MOP_CUSTEIO", "RISCO"
+    AddClasseCusto "6150299200", "OUTROS", "MOP_CUSTEIO", "RISCO"
+    AddClasseCusto "6150299300", "OUTROS", "MOP_CUSTEIO", "RISCO"
+    AddClasseCusto "6150299500", "OUTROS", "MOP_CUSTEIO", "RISCO"
+    AddClasseCusto "6150299600", "OUTROS", "MOP_CUSTEIO", "RISCO"
+    AddClasseCusto "6150299800", "OUTROS", "MOP_CUSTEIO", "RISCO"
+    AddClasseCusto "6150299900", "OUTROS", "MOP_CUSTEIO", "RISCO"
+    AddClasseCusto "6310003003", "OUTROS", "RISCO", "RISCO"
+    AddClasseCusto "6310009001", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6310009002", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6350001007", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6350001013", "OUTROS", "IOF", "TRIBUTOS"
+    AddClasseCusto "6350003001", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6350003004", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6350003010", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6350009001", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6350009006", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6350009012", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6710003001", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6710009001", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6750001001", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6750002001", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6750009002", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "6999999998", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "8000100000", "OUTROS", "CC_LIQUIDACAO", "RISCO"
+    AddClasseCusto "8000200000", "OUTROS", "CC_LIQUIDACAO", "RISCO"
+    AddClasseCusto "8001100000", "OUTROS", "CC_LIQUIDACAO", "RISCO"
+    AddClasseCusto "8001200000", "OUTROS", "CC_LIQUIDACAO", "RISCO"
+    AddClasseCusto "8002100000", "OUTROS", "CC_LIQUIDACAO", "RISCO"
+    AddClasseCusto "8003600000", "OUTROS", "CC_LIQUIDACAO", "RISCO"
+    AddClasseCusto "8003700000", "OUTROS", "CC_LIQUIDACAO", "RISCO"
+    AddClasseCusto "8003900000", "OUTROS", "CC_LIQUIDACAO", "RISCO"
+    AddClasseCusto "8004000000", "OUTROS", "CC_LIQUIDACAO", "RISCO"
+    AddClasseCusto "8004100000", "OUTROS", "CC_LIQUIDACAO", "RISCO"
+    AddClasseCusto "8004200000", "OUTROS", "CC_LIQUIDACAO", "RISCO"
+    AddClasseCusto "8005300000", "OUTROS", "CC_LIQUIDACAO", "RISCO"
+    AddClasseCusto "8005500000", "OUTROS", "CC_LIQUIDACAO", "RISCO"
+    AddClasseCusto "8005600000", "OUTROS", "CC_LIQUIDACAO", "RISCO"
+    AddClasseCusto "8008100000", "OUTROS", "CC_LIQUIDACAO", "RISCO"
+    AddClasseCusto "8008200000", "OUTROS", "CC_LIQUIDACAO", "RISCO"
+    AddClasseCusto "8008300000", "OUTROS", "CC_LIQUIDACAO", "RISCO"
+    AddClasseCusto "8009100000", "OUTROS", "CC_LIQUIDACAO", "RISCO"
+    AddClasseCusto "8009200000", "OUTROS", "CC_LIQUIDACAO", "RISCO"
+    AddClasseCusto "8009300000", "OUTROS", "CC_LIQUIDACAO", "RISCO"
+    AddClasseCusto "8009400000", "OUTROS", "CC_LIQUIDACAO", "RISCO"
+    AddClasseCusto "8009500000", "OUTROS", "CC_LIQUIDACAO", "RISCO"
+    AddClasseCusto "8009600000", "OUTROS", "CC_LIQUIDACAO", "RISCO"
+    AddClasseCusto "8009700000", "OUTROS", "CC_LIQUIDACAO", "RISCO"
+    AddClasseCusto "8009800000", "OUTROS", "CC_LIQUIDACAO", "RISCO"
+    AddClasseCusto "8009900000", "OUTROS", "CC_LIQUIDACAO", "RISCO"
+    AddClasseCusto "8010000001", "OUTROS", "RISCO", "RISCO"
+    AddClasseCusto "8010000002", "OUTROS", "RISCO", "RISCO"
+    AddClasseCusto "8010000003", "OUTROS", "RISCO", "RISCO"
+    AddClasseCusto "8010000004", "OUTROS", "RISCO", "RISCO"
+    AddClasseCusto "8010000180", "OUTROS", "RISCO", "RISCO"
+    AddClasseCusto "8010000181", "OUTROS", "RISCO", "RISCO"
+    AddClasseCusto "8010000182", "OUTROS", "RISCO", "RISCO"
+    AddClasseCusto "8010000183", "OUTROS", "RISCO", "RISCO"
+    AddClasseCusto "8010000184", "OUTROS", "RISCO", "RISCO"
+    AddClasseCusto "8010240000", "OUTROS", "RISCO", "RISCO"
+    AddClasseCusto "8010290000", "OUTROS", "MOP_MONTAGEM", "MOP"
+    AddClasseCusto "8010420000", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "8010440000", "OUTROS", "RISCO", "RISCO"
+    AddClasseCusto "8010490000", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "8010880000", "OUTROS", "RISCO", "RISCO"
+    AddClasseCusto "8019010000", "OUTROS", "ENCERRAMENTO ODS", "TRIBUTOS"
+    AddClasseCusto "8019040000", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "8019930000", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "8020000280", "OUTROS", "RISCO", "RISCO"
+    AddClasseCusto "8020000281", "OUTROS", "RISCO", "RISCO"
+    AddClasseCusto "8020260000", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "8020270000", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "8020280000", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "8020290000", "OUTROS", "MOP_MONTAGEM", "MOP"
+    AddClasseCusto "8020420000", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "8020880000", "OUTROS", "ODR", "RISCO"
+    AddClasseCusto "8020970000", "OUTROS", "RISCO", "RISCO"
+    AddClasseCusto "8029040000", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "8110000000", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8110001180", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8110001181", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8110010000", "OUTROS", "ENCERRAMENTO ODD", "BAIXA ODD"
+    AddClasseCusto "8110010093", "OUTROS", "ENCERRAMENTO ODD", "BAIXA ODD"
+    AddClasseCusto "8110010094", "OUTROS", "ENCERRAMENTO ODD", "BAIXA ODD"
+    AddClasseCusto "8110010095", "OUTROS", "ENCERRAMENTO ODD", "BAIXA ODD"
+    AddClasseCusto "8110010096", "OUTROS", "ENCERRAMENTO ODD", "BAIXA ODD"
+    AddClasseCusto "8110010097", "OUTROS", "ENCERRAMENTO ODD", "BAIXA ODD"
+    AddClasseCusto "8110010098", "OUTROS", "ENCERRAMENTO ODD", "BAIXA ODD"
+    AddClasseCusto "8110010099", "OUTROS", "ENCERRAMENTO ODD", "BAIXA ODD"
+    AddClasseCusto "8110020000", "OUTROS", "ENCERRAMENTO ODD", "BAIXA ODD"
+    AddClasseCusto "8110020093", "OUTROS", "ENCERRAMENTO ODD", "BAIXA ODD"
+    AddClasseCusto "8110020094", "OUTROS", "ENCERRAMENTO ODD", "BAIXA ODD"
+    AddClasseCusto "8110020095", "OUTROS", "ENCERRAMENTO ODD", "BAIXA ODD"
+    AddClasseCusto "8110020096", "OUTROS", "ENCERRAMENTO ODD", "BAIXA ODD"
+    AddClasseCusto "8110020097", "OUTROS", "ENCERRAMENTO ODD", "BAIXA ODD"
+    AddClasseCusto "8110020098", "OUTROS", "ENCERRAMENTO ODD", "BAIXA ODD"
+    AddClasseCusto "8110020099", "OUTROS", "ENCERRAMENTO ODD", "BAIXA ODD"
+    AddClasseCusto "8110030000", "OUTROS", "ODA_N/A_EM_OBRA", "RISCO"
+    AddClasseCusto "8110040000", "OUTROS", "ODA_N/A_EM_OBRA", "RISCO"
+    AddClasseCusto "8110050000", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "8110060000", "OUTROS", "ODC", "OUTROS"
+    AddClasseCusto "8110070000", "OUTROS", "ODP", "RISCO"
+    AddClasseCusto "8110080000", "OUTROS", "ODR", "RISCO"
+    AddClasseCusto "8110100000", "OUTROS", "ODR", "RISCO"
+    AddClasseCusto "8110110000", "OUTROS", "RISCO", "RISCO"
+    AddClasseCusto "8110120000", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "8110130000", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8110140000", "OUTROS", "BENFEITORIAS", "OUTROS"
+    AddClasseCusto "8110150000", "OUTROS", "TRANSF. FAB. E REP M", "RISCO"
+    AddClasseCusto "8110290000", "OUTROS", "MOP_MONTAGEM", "MOP"
+    AddClasseCusto "8110940000", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "8110950000", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "8110970000", "OUTROS", "OUTROS", "TRIBUTOS"
+    AddClasseCusto "8110999000", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8111010000", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8111060000", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "8111080000", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8111090000", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8111140000", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "8111160000", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8111190000", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "8111200000", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8111210000", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8111220000", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8111230000", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8111250000", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8111260000", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8111270000", "OUTROS", "RISCO", "RISCO"
+    AddClasseCusto "8111320000", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8111330000", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "8111340000", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8111350000", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "8111350001", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8111350002", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8111350003", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8111350004", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8111350005", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8111350006", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8111350007", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8111350008", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8111360000", "OUTROS", "MATERIAL", "RISCO"
+    AddClasseCusto "8111370000", "OUTROS", "RISCO", "RISCO"
+    AddClasseCusto "8111380000", "OUTROS", "RISCO", "RISCO"
+    AddClasseCusto "8111390000", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8111410000", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8111480000", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8111490000", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8111493000", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8111500000", "OUTROS", "RISCO", "RISCO"
+    AddClasseCusto "8111540000", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8111550000", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8111570000", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8111580000", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8111600000", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8111630000", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8111650000", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8111670000", "OUTROS", "RISCO", "RISCO"
+    AddClasseCusto "8111680000", "OUTROS", "RISCO", "RISCO"
+    AddClasseCusto "8111690000", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8111720000", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8111800000", "OUTROS", "RISCO", "RISCO"
+    AddClasseCusto "8111810000", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "8111820000", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8111830000", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8111870000", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8111880000", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8111890000", "OUTROS", "RISCO", "RISCO"
+    AddClasseCusto "8111900000", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8111910000", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8111920000", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8111930000", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8111940000", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8111950000", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8111960000", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8111970000", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8113070000", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8113150000", "OUTROS", "RISCO", "RISCO"
+    AddClasseCusto "8113200000", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8113210000", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "8113220000", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "8113360000", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8113450000", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8113470000", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "8113480000", "MATERIAL", "RISCO", "RISCO"
+    AddClasseCusto "8113490000", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8113550000", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8113560000", "OUTROS", "MATERIAL", "RISCO"
+    AddClasseCusto "8113570000", "OUTROS", "RISCO", "RISCO"
+    AddClasseCusto "8113600000", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8113880000", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "8113900000", "OUTROS", "RISCO", "RISCO"
+    AddClasseCusto "8113910000", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "8113920000", "OUTROS", "RISCO", "RISCO"
+    AddClasseCusto "8113930000", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8114680000", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8114690000", "OUTROS", "SIST COMUNIC LOCAL", "RISCO"
+    AddClasseCusto "8114770000", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8114800000", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8114810000", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8114820000", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8114830000", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8114840000", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8114850000", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8114860000", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8114870000", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8114880000", "OUTROS", "RISCO", "RISCO"
+    AddClasseCusto "8114890000", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8114920000", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8116290000", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8116860000", "MATERIAL", "TERRENO", "MAT. UC"
+    AddClasseCusto "8116960000", "OUTROS", "URBAN_BENFEITORIAS", "MAO DE OBRA CIVIL"
+    AddClasseCusto "8116970000", "OUTROS", "URBAN_BENFEITORIAS", "MAO DE OBRA CIVIL"
+    AddClasseCusto "8116990000", "OUTROS", "URBAN_BENFEITORIAS", "MAO DE OBRA CIVIL"
+    AddClasseCusto "8117250000", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8117260000", "OUTROS", "INDENIZACAO_SERVIDAO", "OUTROS"
+    AddClasseCusto "8117270000", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8117310000", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8117320000", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8117330000", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8118980000", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8118990000", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8119000000", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8119010000", "OUTROS", "ENCERRAMENTO ODS", "TRIBUTOS"
+    AddClasseCusto "8119030000", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8119040000", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "8119050000", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8119060000", "OUTROS", "CC_MATERIAL", "TRIBUTOS"
+    AddClasseCusto "8119870000", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8119880000", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8119900000", "OUTROS", "ODA_N/A_EM_OBRA", "RISCO"
+    AddClasseCusto "8119920000", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "8119930000", "MATERIAL", "SALDO REMANESCENTE", "RISCO"
+    AddClasseCusto "8119940000", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8119960000", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8119970000", "OUTROS", "RISCO", "RISCO"
+    AddClasseCusto "8119990000", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "8210002290", "OUTROS", "CC_SERVICO", "RISCO"
+    AddClasseCusto "8210002291", "OUTROS", "CC_SERVICO", "RISCO"
+    AddClasseCusto "8210002292", "OUTROS", "CC_SERVICO", "RISCO"
+    AddClasseCusto "8210010000", "OUTROS", "RISCO", "RISCO"
+    AddClasseCusto "8210020000", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "8210050000", "OUTROS", "RECUP_EQP RT", "RISCO"
+    AddClasseCusto "8210060000", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "8210070000", "OUTROS", "MANUT_VEICULO", "RISCO"
+    AddClasseCusto "8210080000", "OUTROS", "CC_SERVICO", "RISCO"
+    AddClasseCusto "8210090000", "OUTROS", "EQUIPAMENTOS G", "RISCO"
+    AddClasseCusto "8210100000", "OUTROS", "CC_SERVICO", "RISCO"
+    AddClasseCusto "8210110000", "OUTROS", "CC_SERVICO", "RISCO"
+    AddClasseCusto "8210120000", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "8210130000", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "8210150000", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "8210160000", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "8210190000", "OUTROS", "CC_SERVICO", "RISCO"
+    AddClasseCusto "8210200000", "OUTROS", "CC_SERVICO", "RISCO"
+    AddClasseCusto "8210210000", "OUTROS", "CC_SERVICO", "RISCO"
+    AddClasseCusto "8210230000", "OUTROS", "CONSULTORIA", "SUPORTE"
+    AddClasseCusto "8210240000", "OUTROS", "OUTROS", "OUTROS"
+    AddClasseCusto "8210250000", "OUTROS", "CC_SERVICO", "RISCO"
+    AddClasseCusto "8210290000", "OUTROS", "MOP_MONTAGEM", "MOP"
+    AddClasseCusto "8210300000", "OUTROS", "RISCO", "RISCO"
+    AddClasseCusto "8210310000", "OUTROS", "CC_SERVICO", "RISCO"
+    AddClasseCusto "8210320000", "OUTROS", "SOFTWARE", "OUTROS"
+    AddClasseCusto "8210340000", "SERVICO", "FRETE/TRANSP", "FRETE/TRANSP"
+    AddClasseCusto "8210350000", "OUTROS", "CC_SERVICO", "RISCO"
+    AddClasseCusto "8210360000", "OUTROS", "CC_SERVICO", "RISCO"
+    AddClasseCusto "8210380000", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "8210410000", "OUTROS", "CC_SERVICO", "RISCO"
+    AddClasseCusto "8210420000", "OUTROS", "CC_SERVICO", "RISCO"
+    AddClasseCusto "8210440000", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "8210460000", "OUTROS", "CC_SERVICO", "RISCO"
+    AddClasseCusto "8210480000", "OUTROS", "CC_MATERIAL", "RISCO"
+    AddClasseCusto "8210490000", "OUTROS", "PUBLICIDADE", "PUBLICIDADE"
+    AddClasseCusto "8210500000", "OUTROS", "SERVICOS DE REPROGRAFIA", "RISCO"
+    AddClasseCusto "8210510000", "OUTROS", "AGUA ESGOTO", "RISCO"
+    AddClasseCusto "8210530000", "SERVICO", "RISCO", "RISCO"
+    AddClasseCusto "8210540000", "OUTROS", "CC_SERVICO", "RISCO"
+    AddClasseCusto "8210560000", "OUTROS", "ALIMENTACAO", "SUPORTE"
+    AddClasseCusto "8210570000", "OUTROS", "INDENIZACAO", "SUPORTE"
+    AddClasseCusto "8210580000", "OUTROS", "CC_SERVICO", "RISCO"
+    AddClasseCusto "8210620000", "OUTROS", "SERVICO DE IMPRESSAO", "RISCO"
+    AddClasseCusto "8210660000", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "8210710000", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "8210750000", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "8210760000", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "8210770000", "OUTROS", "CC_SERVICO", "RISCO"
+    AddClasseCusto "8210780000", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "8210790000", "OUTROS", "RESCISAO CONTRATUAL", "RISCO"
+    AddClasseCusto "8210800000", "OUTROS", "OUTROS", "SUPORTE"
+    AddClasseCusto "8210820000", "OUTROS", "LOGISTICA", "SUPORTE"
+    AddClasseCusto "8210840000", "OUTROS", "RISCO", "RISCO"
+    AddClasseCusto "8210880000", "OUTROS", "ODR", "RISCO"
+    AddClasseCusto "8210920000", "OUTROS", "RISCO", "RISCO"
+    AddClasseCusto "8210940000", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "8210950000", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "8210970000", "OUTROS", "OUTROS", "TRIBUTOS"
+    AddClasseCusto "8219000000", "OUTROS", "ENCERRAMENTO ODS", "OUTROS"
+    AddClasseCusto "8219010000", "OUTROS", "ENCERRAMENTO ODS", "TRIBUTOS"
+    AddClasseCusto "8219020000", "OUTROS", "ODC", "MOP"
+    AddClasseCusto "8219030000", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "8219040000", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "8219050000", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "8219060000", "OUTROS", "CC_MATERIAL", "TRIBUTOS"
+    AddClasseCusto "8219070000", "OUTROS", "CC_SERVICO", "RISCO"
+    AddClasseCusto "8219930000", "OUTROS", "SALDO REMANESCENTE", "RISCO"
+    AddClasseCusto "8220070000", "OUTROS", "SOFTWARE", "OUTROS"
+    AddClasseCusto "8220100000", "OUTROS", "CC_SERVICO", "RISCO"
+    AddClasseCusto "8220310000", "OUTROS", "CC_SERVICO", "RISCO"
+    AddClasseCusto "8220350000", "OUTROS", "CC_SERVICO", "RISCO"
+    AddClasseCusto "8220360000", "OUTROS", "CC_SERVICO", "RISCO"
+    AddClasseCusto "8220370000", "OUTROS", "CC_SERVICO", "RISCO"
+    AddClasseCusto "8530010000", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "8530020000", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "8530030000", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "8530940000", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "8530970000", "OUTROS", "OUTROS", "TRIBUTOS"
+    AddClasseCusto "8539000000", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "8539010000", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "8539020000", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "8539030000", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "8539040000", "OUTROS", "DEPRECIACAO", "RISCO"
+    AddClasseCusto "8539050000", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "8539060000", "OUTROS", "CC_MATERIAL", "OUTROS"
+    AddClasseCusto "8539930000", "OUTROS", "RISCO", "RISCO"
+    AddClasseCusto "8550010000", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "8550020000", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "8550030000", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "8559010000", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "8559020000", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "8559030000", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "8559040000", "OUTROS", "AMORTIZACAO", "TRIBUTOS"
+    AddClasseCusto "8559050000", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "8559060000", "OUTROS", "CC_MATERIAL", "OUTROS"
+    AddClasseCusto "8611002101", "OUTROS", "PIS", "TRIBUTOS"
+    AddClasseCusto "8611002102", "OUTROS", "COFINS", "TRIBUTOS"
+    AddClasseCusto "8611002103", "OUTROS", "TRIBUTOS", "TRIBUTOS"
+    AddClasseCusto "8611002301", "OUTROS", "TRIBUTOS", "TRIBUTOS"
+    AddClasseCusto "8611009000", "OUTROS", "ENCERRAMENTO ODS", "TRIBUTOS"
+    AddClasseCusto "8611009007", "OUTROS", "ODA_N/A_EM_OBRA", "RISCO"
+    AddClasseCusto "8611009020", "OUTROS", "ENCERRAMENTO DE ODS", "OUTROS"
+    AddClasseCusto "8611880000", "OUTROS", "ODR", "RISCO"
+    AddClasseCusto "8810010000", "OUTROS", "OUTROS", "TRIBUTOS"
+    AddClasseCusto "8810020000", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "8810030000", "OUTROS", "OUTROS", "TRIBUTOS"
+    AddClasseCusto "8819930000", "OUTROS", "OUTROS", "TRIBUTOS"
+    AddClasseCusto "8820010000", "OUTROS", "OUTROS", "OUTROS"
+    AddClasseCusto "8820020000", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "8826860000", "MATERIAL", "TERRENO", "MAT. UC"
+    AddClasseCusto "8829930000", "OUTROS", "OUTROS", "TRIBUTOS"
+    AddClasseCusto "8830010000", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "8830020000", "OUTROS", "INDENIZACAO", "RISCO"
+    AddClasseCusto "8830030000", "OUTROS", "INDENIZACAO", "RISCO"
+    AddClasseCusto "8839930000", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "8840010000", "OUTROS", "ENCERRAMENTO ODD", "BAIXA ODD"
+    AddClasseCusto "8840020000", "OUTROS", "ODA_N/A_EM_OBRA", "RISCO"
+    AddClasseCusto "8900000000", "OUTROS", "CC_SERVICO/MATERIAL", "RISCO"
+    AddClasseCusto "8910009180", "OUTROS", "RISCO", "RISCO"
+    AddClasseCusto "8910009181", "OUTROS", "RISCO", "RISCO"
+    AddClasseCusto "8910009182", "OUTROS", "RISCO", "RISCO"
+    AddClasseCusto "8910010000", "OUTROS", "SUPORTE ALUGUEL", "RISCO"
+    AddClasseCusto "8910020000", "OUTROS", "RISCO", "RISCO"
+    AddClasseCusto "8910260000", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "8910270000", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "8910280000", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "8910290000", "OUTROS", "MOP_MONTAGEM", "MOP"
+    AddClasseCusto "8910880000", "OUTROS", "ODR", "RISCO"
+    AddClasseCusto "8910950000", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "8910970000", "OUTROS", "OUTROS", "TRIBUTOS"
+    AddClasseCusto "8919000000", "OUTROS", "ENCERRAMENTO ODS", "OUTROS"
+    AddClasseCusto "8919010000", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "8919020000", "OUTROS", "ODC", "MOP"
+    AddClasseCusto "8919030000", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "8919040000", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "8919050000", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "8919080000", "OUTROS", "OUTROS", "JOA"
+    AddClasseCusto "8919930000", "OUTROS", "RISCO", "RISCO"
+    AddClasseCusto "8920009280", "OUTROS", "RISCO", "RISCO"
+    AddClasseCusto "8920009281", "OUTROS", "RISCO", "RISCO"
+    AddClasseCusto "8920010000", "OUTROS", "CC_SEGUROS", "RISCO"
+    AddClasseCusto "8920020000", "OUTROS", "CC_SEGUROS", "RISCO"
+    AddClasseCusto "8920260000", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "8920270000", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "8920280000", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "8920290000", "OUTROS", "MOP_MONTAGEM", "MOP"
+    AddClasseCusto "8920950000", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "8920970000", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "8929000000", "OUTROS", "ENCERRAMENTO ODS", "OUTROS"
+    AddClasseCusto "8929010000", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "8929020000", "OUTROS", "ODC", "MOP"
+    AddClasseCusto "8929030000", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "8929040000", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "8929050000", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "8929930000", "OUTROS", "CC_SEGUROS", "RISCO"
+    AddClasseCusto "8930009380", "OUTROS", "RISCO", "RISCO"
+    AddClasseCusto "8930009381", "OUTROS", "RISCO", "RISCO"
+    AddClasseCusto "8930010000", "OUTROS", "OUTROS", "TRIBUTOS"
+    AddClasseCusto "8930020000", "OUTROS", "OUTROS", "TRIBUTOS"
+    AddClasseCusto "8930260000", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "8930270000", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "8930280000", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "8930290000", "OUTROS", "MOP_MONTAGEM", "MOP"
+    AddClasseCusto "8930950000", "OUTROS", "TRIBUTOS", "TRIBUTOS"
+    AddClasseCusto "8930970000", "OUTROS", "OUTROS", "TRIBUTOS"
+    AddClasseCusto "8939000000", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "8939010000", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "8939020000", "OUTROS", "TRIBUTOS", "TRIBUTOS"
+    AddClasseCusto "8939030000", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "8939040000", "OUTROS", "OUTROS", "TRIBUTOS"
+    AddClasseCusto "8939050000", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "8939930000", "OUTROS", "OUTROS", "TRIBUTOS"
+    AddClasseCusto "8940009480", "OUTROS", "RISCO", "RISCO"
+    AddClasseCusto "8949020000", "OUTROS", "CC_TF_ODC", "TRIBUTOS"
+    AddClasseCusto "8950009580", "OUTROS", "RISCO", "RISCO"
+    AddClasseCusto "8950009581", "OUTROS", "RISCO", "RISCO"
+    AddClasseCusto "8950040000", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "8950260000", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "8950270000", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "8950280000", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "8950290000", "OUTROS", "MOP_MONTAGEM", "MOP"
+    AddClasseCusto "8950950000", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "8960009680", "OUTROS", "RISCO", "RISCO"
+    AddClasseCusto "8960009681", "OUTROS", "RISCO", "RISCO"
+    AddClasseCusto "8960260000", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "8960270000", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "8960280000", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "8960290000", "OUTROS", "MOP_MONTAGEM", "MOP"
+    AddClasseCusto "8960950000", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "8970009780", "OUTROS", "RISCO", "RISCO"
+    AddClasseCusto "8970950000", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "8970970000", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "8980009880", "OUTROS", "RISCO", "RISCO"
+    AddClasseCusto "8980009881", "OUTROS", "RISCO", "RISCO"
+    AddClasseCusto "8980009882", "OUTROS", "RISCO", "RISCO"
+    AddClasseCusto "8980010000", "OUTROS", "CC_REC_DESPESAS", "RISCO"
+    AddClasseCusto "8980260000", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "8980270000", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "8980280000", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "8980290000", "OUTROS", "MOP_MONTAGEM", "MOP"
+    AddClasseCusto "8989000000", "OUTROS", "ENCERRAMENTO ODS", "OUTROS"
+    AddClasseCusto "8989010000", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "8989020000", "OUTROS", "ODC", "MOP"
+    AddClasseCusto "8989040000", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "8989050000", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "8989060000", "OUTROS", "CC_TF_ODC", "OUTROS"
+    AddClasseCusto "8989080000", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "8990009980", "OUTROS", "RISCO", "RISCO"
+    AddClasseCusto "8990009981", "OUTROS", "RISCO", "RISCO"
+    AddClasseCusto "8990010001", "OUTROS", "OUTROS", "TRIBUTOS"
+    AddClasseCusto "8990020000", "OUTROS", "SALDO REMANESCENTE", "RISCO"
+    AddClasseCusto "8990030000", "OUTROS", "RISCO", "RISCO"
+    AddClasseCusto "8990040000", "OUTROS", "INDENIZACAO_SERVIDAO", "OUTROS"
+    AddClasseCusto "8990050000", "OUTROS", "CC_POS_GRADUACAO", "RISCO"
+    AddClasseCusto "8990080000", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "8990190000", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "8990290000", "OUTROS", "MOP_MONTAGEM", "MOP"
+    AddClasseCusto "8990880000", "OUTROS", "ODR", "RISCO"
+    AddClasseCusto "8990950000", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "8990970000", "OUTROS", "OUTROS", "TRIBUTOS"
+    AddClasseCusto "8990990000", "OUTROS", "CC_PERDAS", "RISCO"
+    AddClasseCusto "8997250000", "OUTROS", "DIR_PATENTES", "RISCO"
+    AddClasseCusto "8997270000", "OUTROS", "OUTROS", "OUTROS"
+    AddClasseCusto "8999000000", "OUTROS", "ENCERRAMENTO ODS", "OUTROS"
+    AddClasseCusto "8999010000", "OUTROS", "ENCERRAMENTO ODS", "TRIBUTOS"
+    AddClasseCusto "8999020000", "OUTROS", "ODC", "MOP"
+    AddClasseCusto "8999030000", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "8999040000", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "8999050000", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "8999910000", "OUTROS", "RISCO", "RISCO"
+    AddClasseCusto "8999920000", "OUTROS", "TERRENO", "MAT. UC"
+    AddClasseCusto "8999930000", "OUTROS", "SALDO REMANESCENTE", "RISCO"
+    AddClasseCusto "8999940000", "OUTROS", "RISCO", "RISCO"
+    AddClasseCusto "8999950000", "OUTROS", "RISCO", "RISCO"
+    AddClasseCusto "8999960000", "OUTROS", "RISCO", "RISCO"
+    AddClasseCusto "8999970000", "OUTROS", "RISCO", "RISCO"
+    AddClasseCusto "8999980000", "OUTROS", "RISCO", "RISCO"
+    AddClasseCusto "8999980001", "OUTROS", "CC_LIQUIDACAO", "RISCO"
+    AddClasseCusto "8999980002", "OUTROS", "CC_LIQUIDACAO", "RISCO"
+    AddClasseCusto "8999990000", "OUTROS", "RISCO", "RISCO"
+    AddClasseCusto "8999999997", "OUTROS", "OUTROS", "RISCO"
+    AddClasseCusto "8999999998", "OUTROS", "OUTROS", "OUTROS"
+    AddClasseCusto "8999999999", "OUTROS", "RISCO", "RISCO"
+    AddClasseCusto "ADM01", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "ADM02", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "ADM11", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "ADM21", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "ADM53", "OUTROS", "DEPRECIACAO", "RISCO"
+    AddClasseCusto "ADM55", "OUTROS", "OUTROS", "TRIBUTOS"
+    AddClasseCusto "ADM91", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "ADM92", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "ADM93", "OUTROS", "OUTROS", "TRIBUTOS"
+    AddClasseCusto "ADM98", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "ADM99", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "AHT01", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "AHT02", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "AHT11", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "AHT21", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "AHT53", "OUTROS", "OUTROS", "OUTROS"
+    AddClasseCusto "AHT55", "OUTROS", "OUTROS", "OUTROS"
+    AddClasseCusto "AHT91", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "AHT92", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "AHT93", "OUTROS", "TRIBUTOS", "TRIBUTOS"
+    AddClasseCusto "AHT95", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "AHT96", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "AHT97", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "AHT98", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "AHT99", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "EFT91", "OUTROS", "OUTROS", "JOA"
+    AddClasseCusto "EFT93", "OUTROS", "OUTROS", "TRIBUTOS"
+    AddClasseCusto "EFT99", "OUTROS", "JOA", "JOA"
+    AddClasseCusto "FIS01", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "FIS02", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "FIS11", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "FIS21", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "FIS91", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "FIS92", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "FIS93", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "FIS95", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "FIS96", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "FIS98", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "FIS99", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "GRN01", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "GRN02", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "GRN11", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "GRN21", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "GRN91", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "GRN92", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "GRN93", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "GRN95", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "GRN96", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "GRN98", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "GRN99", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "MON01", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "MON02", "OUTROS", "MOP_MONTAGEM", "MOP"
+    AddClasseCusto "MON11", "OUTROS", "MOP_MONTAGEM", "MOP"
+    AddClasseCusto "MON21", "OUTROS", "MOP_MONTAGEM", "MOP"
+    AddClasseCusto "MON91", "OUTROS", "MOP_MONTAGEM", "MOP"
+    AddClasseCusto "MON92", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "MON93", "OUTROS", "MOP_MONTAGEM", "MOP"
+    AddClasseCusto "MON95", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "MON96", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "MON98", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "MON99", "OUTROS", "MOP_MONTAGEM", "MOP"
+    AddClasseCusto "ODC01", "OUTROS", "ODC", "TRIBUTOS"
+    AddClasseCusto "ODC11", "OUTROS", "ODC", "TRIBUTOS"
+    AddClasseCusto "ODC21", "OUTROS", "ODC", "TRIBUTOS"
+    AddClasseCusto "ODC53", "OUTROS", "ODC", "OUTROS"
+    AddClasseCusto "ODC55", "OUTROS", "ODC", "OUTROS"
+    AddClasseCusto "ODC91", "OUTROS", "ODC", "TRIBUTOS"
+    AddClasseCusto "ODC92", "OUTROS", "ODC", "TRIBUTOS"
+    AddClasseCusto "ODC93", "OUTROS", "ODC", "TRIBUTOS"
+    AddClasseCusto "ODC94", "OUTROS", "ODC", "TRIBUTOS"
+    AddClasseCusto "ODC98", "OUTROS", "ODC", "TRIBUTOS"
+    AddClasseCusto "ODC99", "OUTROS", "ODC", "TRIBUTOS"
+    AddClasseCusto "PRJ01", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "PRJ02", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "PRJ11", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "PRJ21", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "PRJ91", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "PRJ92", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "PRJ93", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "PRJ95", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "PRJ96", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "PRJ98", "OUTROS", "MOP", "MOP"
+    AddClasseCusto "PRJ99", "OUTROS", "MOP", "MOP"
+End Sub
+
 
 ' Devolve parte do catlogo de classe: 0=CLS1,1=CLS2,2=CLS3,3=TIPO_APLIC
 Private Function CCInfo(codCC As Variant, idx As Long) As String
@@ -1566,7 +2445,11 @@ Private Sub CarregarTipoClassif()
         "PAINEL CONTR EXAUSTOR=UAR;TERMINAL BIMETALICO=COM;BOMBA SUBM=UAR;EXAUSTOR=COM;" & _
         "TAMPA DE FERRO=COM;ESPACADOR=COM;RELE=UAR;TERMINAL CABO=COM;CANALETA=COM;CH VAC 1F=UC;" & _
         "POSTE CAPITEL=UC;TORA EUCALIPTO=COM;CAIXA DE PASSAGEM=COM;POSTE LD=UC;CAPACITOR=UC;" & _
-        "CONTROLADOR=UAR;MURO CONC=UC;GRAMPO=COM;DISJ BT=COM;PORTA FUSIVEL=COM"
+        "CONTROLADOR=UAR;MURO CONC=UC;GRAMPO=COM;DISJ BT=COM;PORTA FUSIVEL=COM;" & _
+        "POSTE_TORRE=UC;TORRE MET=UC;TORRE CONC=UC;TRAFO DE FORCA=UC;DISJ SE=UC;" & _
+        "CH SEC TRI=UC;BANCO CAPACITOR=UC;ISOLADOR AT=COM;CONECTOR=COM;" & _
+        "CABO FIB OPT=COM;VIGA CONC=COM;SUPORTE CONC=COM;ANEL CONC=COM;" & _
+        "CANTONEIRA=COM;PAINEL MET=COM;TUBO FOFO=COM"
 
     Dim parts() As String, kv() As String, i As Long, key As String
     parts = Split(s, ";")
@@ -1577,7 +2460,893 @@ Private Sub CarregarTipoClassif()
             If key <> "" And Not dTipoCls.Exists(key) Then dTipoCls(key) = Trim$(kv(1))
         End If
     Next i
+
+    ' Preenche familias fora da tabela curada a partir do CLS3 do catalogo
+    ' (curadas acima tem prioridade; AddTipoCls nao sobrepoe).
+    CarregarTipoClassifAuto
+
+    ' Familias UAR adicionais declaradas na CONFIG (chave FAM_UAR, separadas por ;).
+    ' UAR e equivalente a UC: PEP com essas familias nao gera alerta "SEM UC".
+    Dim famUAR As String: famUAR = CfgTxt("FAM_UAR", "")
+    If famUAR <> "" Then
+        parts = Split(famUAR, ";")
+        For i = 0 To UBound(parts)
+            key = NormClassif(parts(i))
+            If key <> "" Then dTipoCls(key) = "UAR"   ' sobrepoe (declaracao explicita vence)
+        Next i
+    End If
 End Sub
+
+Private Sub CarregarTipoClassifAuto()
+    ' TIPO (UC/COM) por familia derivado do CLS3 dominante do catalogo de
+    ' materiais (MAT. UC/MAT. COM). Preenche familias fora da tabela curada;
+    ' AddTipoCls nao sobrepoe entradas ja definidas (curadas tem prioridade).
+    AddTipoCls "ABRACADEIRA TRIPARTIDA DN700", "UC"
+    AddTipoCls "ABRACADEIRA_PRESSAO", "COM"
+    AddTipoCls "ABRANDADOR", "UC"
+    AddTipoCls "ACESS FLANGE", "COM"
+    AddTipoCls "ACESSORIO PERFILADO", "COM"
+    AddTipoCls "ACESS_SOLAR", "COM"
+    AddTipoCls "ACESS_TERMOC_MUFLA", "COM"
+    AddTipoCls "ACIONADOR CHAV", "UC"
+    AddTipoCls "ACS COMUNIC", "UC"
+    AddTipoCls "ADAPTADOR", "COM"
+    AddTipoCls "ADAPTADOR_TUBULACAO", "COM"
+    AddTipoCls "ADESIVO (ANE)", "COM"
+    AddTipoCls "AGITADOR", "COM"
+    AddTipoCls "ALARME DE COMUNIC", "COM"
+    AddTipoCls "ALICATE", "UC"
+    AddTipoCls "ALINHADOR EIXO", "COM"
+    AddTipoCls "ALINHADOR POLIA", "UC"
+    AddTipoCls "ALINHADOR TUBO", "COM"
+    AddTipoCls "AMORTECEDOR", "COM"
+    AddTipoCls "AMORTECEDOR GRAMPO", "COM"
+    AddTipoCls "AMPERIMETRO", "UC"
+    AddTipoCls "ANALISADOR", "UC"
+    AddTipoCls "ANALISADOR QUAL ENERGIA", "UC"
+    AddTipoCls "ANALISADOR REG", "UC"
+    AddTipoCls "ANEL BORRAC", "COM"
+    AddTipoCls "ANEL PLAST", "COM"
+    AddTipoCls "ANEL VEDACAO", "COM"
+    AddTipoCls "ANEL_CONC", "COM"
+    AddTipoCls "ANTENA", "UC"
+    AddTipoCls "ANTENA SATELITE", "UC"
+    AddTipoCls "ANTENA_CELULAR", "COM"
+    AddTipoCls "ANTENA_RADIO", "UC"
+    AddTipoCls "AP_ANALISADOR", "UC"
+    AddTipoCls "AP_ULTRASOM", "UC"
+    AddTipoCls "AQUECEDOR", "UC"
+    AddTipoCls "AR CONDICIONADO", "UC"
+    AddTipoCls "ARAME", "COM"
+    AddTipoCls "ARAME_LISO", "COM"
+    AddTipoCls "AREIA", "COM"
+    AddTipoCls "ARGAMASSA", "COM"
+    AddTipoCls "ARRUELA", "COM"
+    AddTipoCls "ASFALTO", "COM"
+    AddTipoCls "ASFALTO FRIO", "COM"
+    AddTipoCls "ATERRO", "COM"
+    AddTipoCls "AUTOTRAC", "UC"
+    AddTipoCls "AUTOTRAFO", "UC"
+    AddTipoCls "AUTOTRAFO POT", "UC"
+    AddTipoCls "BACIA_CONTENCAO_QUIMICA", "UC"
+    AddTipoCls "BANCADA HIDROMETRACAO", "COM"
+    AddTipoCls "BANCO BATERIA", "UC"
+    AddTipoCls "BANCO_CAPACTOR", "UC"
+    AddTipoCls "BANDEJA", "COM"
+    AddTipoCls "BANDEJA_OPTIC", "COM"
+    AddTipoCls "BARRA", "COM"
+    AddTipoCls "BARRA ESTRUT", "COM"
+    AddTipoCls "BARRAMENTO", "UC"
+    AddTipoCls "BARRAMENTO_BIFASICO", "UC"
+    AddTipoCls "BARRA_COBRE", "UC"
+    AddTipoCls "BARRA_SUPORTE", "UC"
+    AddTipoCls "BASE", "COM"
+    AddTipoCls "BASE BANC CAPAC", "UC"
+    AddTipoCls "BASE CONC CMB", "UC"
+    AddTipoCls "BASE CONC DISJ", "UC"
+    AddTipoCls "BASE CONC TAMBOR", "COM"
+    AddTipoCls "BASE_ANTENA", "COM"
+    AddTipoCls "BASE_FUS", "COM"
+    AddTipoCls "BASE_PARA", "UC"
+    AddTipoCls "BASTAO(OPEX)", "COM"
+    AddTipoCls "BATERIA", "COM"
+    AddTipoCls "BATERIA ALCALIN (ANE)", "COM"
+    AddTipoCls "BATERIA SOLAR", "COM"
+    AddTipoCls "BATERIAS", "COM"
+    AddTipoCls "BEBEDOURO", "UC"
+    AddTipoCls "BETONEIRA", "UC"
+    AddTipoCls "BGAN KIT LEGACY", "UC"
+    AddTipoCls "BLOCO", "COM"
+    AddTipoCls "BLOCO_TESTE", "COM"
+    AddTipoCls "BLOQUEADOR CILINDRICO", "UC"
+    AddTipoCls "BOBINA", "COM"
+    AddTipoCls "BOBINA ELETRICA", "COM"
+    AddTipoCls "BOBINA TF", "COM"
+    AddTipoCls "BOMBA", "COM"
+    AddTipoCls "BOMBA CENTRIF", "UC"
+    AddTipoCls "BOMBA D'AGUA", "COM"
+    AddTipoCls "BOMBA DAGUA", "COM"
+    AddTipoCls "BOMBA DE ENCHER PNEU", "COM"
+    AddTipoCls "BOMBA DE FLUIDOS", "UC"
+    AddTipoCls "BOMBA DOSADORA", "UC"
+    AddTipoCls "BOMBA FLUTUANTE", "UC"
+    AddTipoCls "BOMBA PERISTALICA", "UC"
+    AddTipoCls "BOMBA SUBMERSA", "UC"
+    AddTipoCls "BOMBA SUCCAO", "UC"
+    AddTipoCls "BOMBA VAC", "COM"
+    AddTipoCls "BORNE", "COM"
+    AddTipoCls "BRACO", "COM"
+    AddTipoCls "BRITA", "COM"
+    AddTipoCls "BRUCHA TF FORCA", "UC"
+    AddTipoCls "BUCHA", "COM"
+    AddTipoCls "BUCHA CAP", "UC"
+    AddTipoCls "BUCHA TF", "UC"
+    AddTipoCls "BUCHA TF 138KV", "UC"
+    AddTipoCls "CABINE BCAP", "COM"
+    AddTipoCls "CABO", "COM"
+    AddTipoCls "CABO ACO", "COM"
+    AddTipoCls "CABO COAXIAL", "COM"
+    AddTipoCls "CABO CU", "UC"
+    AddTipoCls "CABO FIBRA", "COM"
+    AddTipoCls "CABO FLEX", "COM"
+    AddTipoCls "CABO LAN UTP", "COM"
+    AddTipoCls "CABO PATCH", "COM"
+    AddTipoCls "CABO SOLAR", "COM"
+    AddTipoCls "CABOS_PARA_RAIOS", "COM"
+    AddTipoCls "CABO_ACO_COBREADO", "UC"
+    AddTipoCls "CABO_CU", "COM"
+    AddTipoCls "CABO_ELET", "COM"
+    AddTipoCls "CABO_FLEXIVEL", "COM"
+    AddTipoCls "CABO_RELE", "COM"
+    AddTipoCls "CADEIA_ISOLADORES", "UC"
+    AddTipoCls "CAIXA", "COM"
+    AddTipoCls "CAIXA 2MED", "COM"
+    AddTipoCls "CAIXA 3MED", "COM"
+    AddTipoCls "CAIXA 4MED", "COM"
+    AddTipoCls "CAIXA 6MED", "COM"
+    AddTipoCls "CAIXA 8MED", "COM"
+    AddTipoCls "CAIXA BLIND PDR", "COM"
+    AddTipoCls "CAIXA CONTROL TF", "UC"
+    AddTipoCls "CAIXA D'AGUA", "COM"
+    AddTipoCls "CAIXA DE PROT SM", "COM"
+    AddTipoCls "CAIXA FIBRA OPT", "COM"
+    AddTipoCls "CAIXA LIG", "COM"
+    AddTipoCls "CAIXA LIG BCAP", "COM"
+    AddTipoCls "CAIXA LINK", "COM"
+    AddTipoCls "CAIXA MED", "COM"
+    AddTipoCls "CAIXA MEDIDOR", "COM"
+    AddTipoCls "CAIXA PAINEL ELET", "COM"
+    AddTipoCls "CAIXA PASSAGEM", "COM"
+    AddTipoCls "CAIXA PROTETOR", "COM"
+    AddTipoCls "CAIXA SIGFI", "COM"
+    AddTipoCls "CAIXA TERM", "UC"
+    AddTipoCls "CAIXA_PASSAGEM", "COM"
+    AddTipoCls "CAMARA EXTINC", "UC"
+    AddTipoCls "CAMARA UV", "COM"
+    AddTipoCls "CAMERA_FILM", "UC"
+    AddTipoCls "CAMERA_FILM (ANE)", "UC"
+    AddTipoCls "CAMINHAO", "UC"
+    AddTipoCls "CANALETA CONC", "UC"
+    AddTipoCls "CANALETA_PERFURADA", "COM"
+    AddTipoCls "CANETA", "COM"
+    AddTipoCls "CANIVETE", "COM"
+    AddTipoCls "CANTONEIRA SIGFI", "COM"
+    AddTipoCls "CAP PVC", "COM"
+    AddTipoCls "CAPITEL CONC", "UC"
+    AddTipoCls "CARGA INDEVIDA X", "UC"
+    AddTipoCls "CARREGADOR_FLU", "UC"
+    AddTipoCls "CARRETEL DE ACO", "UC"
+    AddTipoCls "CATRACA (ANE)", "UC"
+    AddTipoCls "CCM", "UC"
+    AddTipoCls "CC_MATERIAL", "UC"
+    AddTipoCls "CENTELHADOR", "COM"
+    AddTipoCls "CH ATERR", "UC"
+    AddTipoCls "CH SACA FU", "UC"
+    AddTipoCls "CH SEC 138KV", "UC"
+    AddTipoCls "CH SEC 145KV", "UC"
+    AddTipoCls "CH SEC 69KV", "UC"
+    AddTipoCls "CH SEC 69KV_SUPORTE", "UC"
+    AddTipoCls "CH SEC OLEO", "UC"
+    AddTipoCls "CH SEC TANDEM", "UC"
+    AddTipoCls "CH SEC_SUPORTE", "UC"
+    AddTipoCls "CH TF", "UC"
+    AddTipoCls "CH VAC 3F", "UC"
+    AddTipoCls "CHAPA", "COM"
+    AddTipoCls "CHAPA MET", "COM"
+    AddTipoCls "CHAVE", "COM"
+    AddTipoCls "CHAVE ATS", "COM"
+    AddTipoCls "CHAVE TE (FERRAMENTA)", "COM"
+    AddTipoCls "CHAVE_VACUO", "UC"
+    AddTipoCls "CHUMBADOR", "COM"
+    AddTipoCls "CHUMBADOR_CB", "COM"
+    AddTipoCls "CILINDRO GAS", "COM"
+    AddTipoCls "CIMENTO", "COM"
+    AddTipoCls "CJ BOMBA", "UC"
+    AddTipoCls "CJ MOTOBOMBA", "COM"
+    AddTipoCls "CJ REAGENT", "COM"
+    AddTipoCls "CJ_RADIADOR TF", "UC"
+    AddTipoCls "COLARINHO PEAD DN200", "UC"
+    AddTipoCls "COLETOR REG", "UC"
+    AddTipoCls "COLUN MET", "UC"
+    AddTipoCls "COLUNA BARRA", "COM"
+    AddTipoCls "COLUNA CONC", "UC"
+    AddTipoCls "COMPORTA", "UC"
+    AddTipoCls "COMPORTA 400MM", "UC"
+    AddTipoCls "COMPORTA DN1000", "COM"
+    AddTipoCls "COMPORTA DN500", "COM"
+    AddTipoCls "COMPORTA DUPLA", "UC"
+    AddTipoCls "COMPORTA VERT", "UC"
+    AddTipoCls "COMPRESSOR AR", "UC"
+    AddTipoCls "COMUTADOR", "UC"
+    AddTipoCls "COMUTADOR TF", "UC"
+    AddTipoCls "CONCENTRADOR_DIGITAL", "UC"
+    AddTipoCls "CONCHA OLHAL", "COM"
+    AddTipoCls "COND ACO", "COM"
+    AddTipoCls "COND FIBRA", "UC"
+    AddTipoCls "COND FIBRA OPT", "UC"
+    AddTipoCls "COND SUBAQUAT", "UC"
+    AddTipoCls "CONDENSADOR", "UC"
+    AddTipoCls "CONDULET", "COM"
+    AddTipoCls "CONDULETE", "COM"
+    AddTipoCls "CONE ANTIPOUSO", "COM"
+    AddTipoCls "CONEC EMEND", "UC"
+    AddTipoCls "CONECTOR DB9", "COM"
+    AddTipoCls "CONECTOR_MACHO", "COM"
+    AddTipoCls "CONEXAO FOFO", "UC"
+    AddTipoCls "CONEX_CRUZETA", "COM"
+    AddTipoCls "CONJ CUBICULO", "UC"
+    AddTipoCls "CONJ CX CPU", "COM"
+    AddTipoCls "CONJ MED", "UC"
+    AddTipoCls "CONJ PLACA", "UC"
+    AddTipoCls "CONJ SIGFI", "UC"
+    AddTipoCls "CONJ_CAD_ISOL", "UC"
+    AddTipoCls "CONJ_POSTE ARMADO", "UC"
+    AddTipoCls "CONTAINER", "COM"
+    AddTipoCls "CONTATO", "UC"
+    AddTipoCls "CONTATO AUX", "COM"
+    AddTipoCls "CONTATOR", "COM"
+    AddTipoCls "CONTR ELETN", "UC"
+    AddTipoCls "CONTRA VIGA", "COM"
+    AddTipoCls "CONTRAVENTO LD", "COM"
+    AddTipoCls "CONTROL VAZ FLUTUADOR", "UC"
+    AddTipoCls "CONTROL. NV DE AGUA", "COM"
+    AddTipoCls "CONTROLADOR_SOLAR", "UC"
+    AddTipoCls "CONTROLE B_CAP", "COM"
+    AddTipoCls "CONTROLE RELIG", "UC"
+    AddTipoCls "CONVERSOR", "UC"
+    AddTipoCls "CORDAO FIBRA", "COM"
+    AddTipoCls "CORREIA", "COM"
+    AddTipoCls "CORRENTE VALETADEIRA", "UC"
+    AddTipoCls "CPU DA CP", "COM"
+    AddTipoCls "CPU DA CS", "UC"
+    AddTipoCls "CROMATOGRAFO", "UC"
+    AddTipoCls "CRONOMETRO", "COM"
+    AddTipoCls "CUBICULO", "UC"
+    AddTipoCls "CURVA", "COM"
+    AddTipoCls "CURVA 45° DN800", "UC"
+    AddTipoCls "CURVA 45º DN600", "UC"
+    AddTipoCls "CURVA 90º DN1000", "UC"
+    AddTipoCls "CURVA 90º DN150", "COM"
+    AddTipoCls "CURVA 90º DN200", "COM"
+    AddTipoCls "CURVA 90º DN300", "COM"
+    AddTipoCls "CURVA 90º DN400", "COM"
+    AddTipoCls "CURVA 90º DN600", "UC"
+    AddTipoCls "CURVA 90º DN8000", "UC"
+    AddTipoCls "CURVA 90º DN900", "UC"
+    AddTipoCls "CURVA_STAND", "COM"
+    AddTipoCls "CX BLIND", "COM"
+    AddTipoCls "CX BLIND CMB", "COM"
+    AddTipoCls "CX PAPELAO", "COM"
+    AddTipoCls "CX PASS CONC_ARMADO", "COM"
+    AddTipoCls "CX PDR HIDROM", "COM"
+    AddTipoCls "CX PORTA DISJ", "COM"
+    AddTipoCls "DATALOGGER", "COM"
+    AddTipoCls "DEFENSA", "UC"
+    AddTipoCls "DEFENSA MET", "UC"
+    AddTipoCls "DESKTOP", "COM"
+    AddTipoCls "DETECTOR_FALTA", "UC"
+    AddTipoCls "DISJ", "COM"
+    AddTipoCls "DISJ CUBICULO", "UC"
+    AddTipoCls "DISJ MOTOR", "COM"
+    AddTipoCls "DISJUNTOR", "UC"
+    AddTipoCls "DISJUNTOR_AT", "UC"
+    AddTipoCls "DISJUNTOR_BIP", "COM"
+    AddTipoCls "DISJ_TERMOMAG", "COM"
+    AddTipoCls "DISPLAY_LCD", "COM"
+    AddTipoCls "DISPOSITIVO_OB", "UC"
+    AddTipoCls "DISTRIBUIDOR DIO", "UC"
+    AddTipoCls "DISTRIBUIDOR OPTICO", "UC"
+    AddTipoCls "DOSADOR CLORADOR", "UC"
+    AddTipoCls "DOSADORA HIDROG", "UC"
+    AddTipoCls "DRIVER", "UC"
+    AddTipoCls "DUTO PEAD - RAMAL", "UC"
+    AddTipoCls "DUTO RETRATIL", "UC"
+    AddTipoCls "ECAPORADOR", "UC"
+    AddTipoCls "EIXO ACIONAMENTO", "UC"
+    AddTipoCls "EIXO BOMBA", "UC"
+    AddTipoCls "EIXO BOMBAMERSA", "COM"
+    AddTipoCls "EIXO INTERMED", "UC"
+    AddTipoCls "EIXO REGULAG", "UC"
+    AddTipoCls "EIXO TRANSM", "UC"
+    AddTipoCls "ELETROCALHA", "COM"
+    AddTipoCls "ELETROCENTRO", "UC"
+    AddTipoCls "ELO", "COM"
+    AddTipoCls "ELO FUS", "COM"
+    AddTipoCls "EMPILHADEIRA", "UC"
+    AddTipoCls "ENCOD ABSOLUTO", "UC"
+    AddTipoCls "ENGRAXADEIRA", "UC"
+    AddTipoCls "ENVELOPE MEDIDOR", "COM"
+    AddTipoCls "ENVELOPE PLAST", "COM"
+    AddTipoCls "EQP_LABORATORIO", "COM"
+    AddTipoCls "ESCADA", "UC"
+    AddTipoCls "ESCADA PEDAROLA", "COM"
+    AddTipoCls "ESCORA ARM", "UC"
+    AddTipoCls "ESFERA SINALIZ", "UC"
+    AddTipoCls "ESMETILHADEIRA", "UC"
+    AddTipoCls "ESPUMA POLIURET", "COM"
+    AddTipoCls "ESTABILIZADOR COLUNAMERSA", "COM"
+    AddTipoCls "ESTRU MET", "UC"
+    AddTipoCls "ESTRUT ANC", "COM"
+    AddTipoCls "ESTRUT SIGFI", "UC"
+    AddTipoCls "ESTRUT SUSP", "COM"
+    AddTipoCls "ESTRUTURA SUPORTE", "COM"
+    AddTipoCls "ESTRUT_BCAP", "COM"
+    AddTipoCls "ESTRUT_LD", "UC"
+    AddTipoCls "ESTUFA", "UC"
+    AddTipoCls "EST_GATEWAY", "UC"
+    AddTipoCls "ETIQUETA MED", "COM"
+    AddTipoCls "EXPAN ENTRAD", "UC"
+    AddTipoCls "EXTENSAO OTICA", "COM"
+    AddTipoCls "EXTENSAO_MONOFIBRA", "COM"
+    AddTipoCls "EXTENSAO_TORRE", "COM"
+    AddTipoCls "EXTIN INC", "UC"
+    AddTipoCls "EXTRATOR", "UC"
+    AddTipoCls "FERRO SOLDA (ANE)", "COM"
+    AddTipoCls "FERROMAGNETICO", "UC"
+    AddTipoCls "FILTRO DE AR", "COM"
+    AddTipoCls "FIO COBRE", "COM"
+    AddTipoCls "FIREWALL", "UC"
+    AddTipoCls "FITA_IS", "COM"
+    AddTipoCls "FIXACAO", "COM"
+    AddTipoCls "FLANGE", "UC"
+    AddTipoCls "FONTE ALIM", "COM"
+    AddTipoCls "FONTE NOTEBOOK", "UC"
+    AddTipoCls "FORMULARIO", "COM"
+    AddTipoCls "FORTISWITCH", "COM"
+    AddTipoCls "FRIGOBAR", "UC"
+    AddTipoCls "FURADEIRA", "UC"
+    AddTipoCls "FUSIVEL", "COM"
+    AddTipoCls "FUSIVEL CRT", "COM"
+    AddTipoCls "GABARITO_TORRE", "COM"
+    AddTipoCls "GARRAFA_RELI", "UC"
+    AddTipoCls "GAS_INCOLOR", "COM"
+    AddTipoCls "GATEWAY", "UC"
+    AddTipoCls "GAXETA", "COM"
+    AddTipoCls "GERAD PORTAT", "UC"
+    AddTipoCls "GERADOR", "UC"
+    AddTipoCls "GERADOR (FERRAMENTAL)", "UC"
+    AddTipoCls "GERADOR DE CLORO", "UC"
+    AddTipoCls "GPS", "UC"
+    AddTipoCls "GRELHA", "COM"
+    AddTipoCls "GRELHA_TORRE", "COM"
+    AddTipoCls "GRUPO", "UC"
+    AddTipoCls "GRUPO GERADOR SIGFI", "UC"
+    AddTipoCls "GUARDA CORPO", "COM"
+    AddTipoCls "GUARNICAO_BUCHA", "COM"
+    AddTipoCls "HASTE", "COM"
+    AddTipoCls "HIDROEJETOR", "UC"
+    AddTipoCls "HIDROGEROX", "UC"
+    AddTipoCls "HIDROMETRO", "UC"
+    AddTipoCls "IED", "UC"
+    AddTipoCls "IMPERMEABILIZANTE", "COM"
+    AddTipoCls "IMPRESSORA ETIQUETA", "UC"
+    AddTipoCls "IMPRESSORA_PLOTTER", "UC"
+    AddTipoCls "IMPRESSORA_TERMIC", "COM"
+    AddTipoCls "INDIC MICRO", "UC"
+    AddTipoCls "INDICADOR OLEO", "UC"
+    AddTipoCls "INDICADOR TF", "UC"
+    AddTipoCls "INTERRUPTOR ODS", "COM"
+    AddTipoCls "INTERRUPTOR TOM", "COM"
+    AddTipoCls "INVERSOR", "UC"
+    AddTipoCls "INVERSOR SIGFI", "UC"
+    AddTipoCls "ISOL PEDESTAL", "UC"
+    AddTipoCls "ISOL PEDESTAL_SUPORTE", "UC"
+    AddTipoCls "ISOLADOR", "COM"
+    AddTipoCls "ISOLADOR (SUCATA)", "COM"
+    AddTipoCls "ISOLADOR CAST", "COM"
+    AddTipoCls "ISOLADOR MT", "COM"
+    AddTipoCls "ISOLADOR PEDESTAL", "COM"
+    AddTipoCls "ISOLADOR_AT", "UC"
+    AddTipoCls "ISOLADOR_EPOXI", "COM"
+    AddTipoCls "JAR TEST", "UC"
+    AddTipoCls "JG RETENTOR", "UC"
+    AddTipoCls "JOELHO", "COM"
+    AddTipoCls "JUNCAO", "COM"
+    AddTipoCls "JUNTA", "COM"
+    AddTipoCls "JUNTA DESMONT. DN1000", "UC"
+    AddTipoCls "JUNTA DESMONT. DN400", "UC"
+    AddTipoCls "JUNTA DESMONT. DN500", "UC"
+    AddTipoCls "JUNTA DESMONT. DN700", "UC"
+    AddTipoCls "JUNTA DESMONT. DN800", "UC"
+    AddTipoCls "JUNTA GIBAULT", "COM"
+    AddTipoCls "JUNTA GIBAULT DN600", "COM"
+    AddTipoCls "KIT ATER", "COM"
+    AddTipoCls "KIT BUSHLINK", "COM"
+    AddTipoCls "KIT CALCO", "UC"
+    AddTipoCls "KIT CAVALETE", "COM"
+    AddTipoCls "KIT DISP_MED", "COM"
+    AddTipoCls "KIT ELETR SIGFI", "COM"
+    AddTipoCls "KIT HIDRANTE", "UC"
+    AddTipoCls "KIT PLPT", "COM"
+    AddTipoCls "KIT T TABLET", "UC"
+    AddTipoCls "KIT_CONTROLE", "UC"
+    AddTipoCls "KIT_PLACAS", "COM"
+    AddTipoCls "LACRE", "COM"
+    AddTipoCls "LAJE_PREFABRICADA", "UC"
+    AddTipoCls "LAMPADA", "COM"
+    AddTipoCls "LAMPADA_SINALIZ", "COM"
+    AddTipoCls "LAVADORA", "UC"
+    AddTipoCls "LIC S SOFTW", "UC"
+    AddTipoCls "LIMITADOR_CORRENTE", "COM"
+    AddTipoCls "LNB AUTO", "UC"
+    AddTipoCls "LOTE TERRENO", "UC"
+    AddTipoCls "LUMINARIA", "UC"
+    AddTipoCls "LUVA", "COM"
+    AddTipoCls "LUVA ELETROD", "COM"
+    AddTipoCls "LUVA FERRO DN150", "COM"
+    AddTipoCls "LUVA FERRO DN800", "UC"
+    AddTipoCls "LUVA PVC", "COM"
+    AddTipoCls "LUVA ULTRALINK", "UC"
+    AddTipoCls "LUVA_ALUMINIO", "COM"
+    AddTipoCls "MADEIRA", "COM"
+    AddTipoCls "MALHA ATERRAMENTO", "UC"
+    AddTipoCls "MALHA_DIFUS", "COM"
+    AddTipoCls "MANGEUIRA", "COM"
+    AddTipoCls "MANGUEIRA", "COM"
+    AddTipoCls "MANGUEIRA (ANE)", "COM"
+    AddTipoCls "MANGUEIRA INDUSTRIAL", "COM"
+    AddTipoCls "MANILHA", "COM"
+    AddTipoCls "MANOMETRO", "COM"
+    AddTipoCls "MANOMETRO_BAR", "UC"
+    AddTipoCls "MAQUINA", "UC"
+    AddTipoCls "MAQUINA ELETROFUSAO", "UC"
+    AddTipoCls "MAQ_SOLDA", "UC"
+    AddTipoCls "MARRETA", "UC"
+    AddTipoCls "MASSA ISOLANTE", "COM"
+    AddTipoCls "MASTRO ANTENA", "COM"
+    AddTipoCls "MAT.COM", "COM"
+    AddTipoCls "MATRIZ_DIODO", "COM"
+    AddTipoCls "MEDIDOR DE VAZAO", "UC"
+    AddTipoCls "MEDIDOR ULTRASONICO", "UC"
+    AddTipoCls "MEDIDOR VAZAO", "UC"
+    AddTipoCls "MEDIDOR_FRONTEIRA", "UC"
+    AddTipoCls "MED_VAZAO", "UC"
+    AddTipoCls "MESA SE", "UC"
+    AddTipoCls "MICROCOMPUTADOR", "UC"
+    AddTipoCls "MICROHMIMETRO", "UC"
+    AddTipoCls "MICROSWITCH INVERS", "UC"
+    AddTipoCls "MINI TECLADO", "COM"
+    AddTipoCls "MINI_DISJ", "COM"
+    AddTipoCls "MISTURADOR RAP", "UC"
+    AddTipoCls "MOD CONCENT", "UC"
+    AddTipoCls "MODEM", "UC"
+    AddTipoCls "MODULO", "COM"
+    AddTipoCls "MODULO CONTROLE", "UC"
+    AddTipoCls "MODULO DIODO", "COM"
+    AddTipoCls "MODULO REMOT", "UC"
+    AddTipoCls "MODULO REMOTO", "UC"
+    AddTipoCls "MODULO SOLAR", "UC"
+    AddTipoCls "MODULO TRANSCEPTOR", "UC"
+    AddTipoCls "MODULO_TROC", "UC"
+    AddTipoCls "MOD_RETIFICADOR", "UC"
+    AddTipoCls "MOD_VENTILADOR", "UC"
+    AddTipoCls "MONITOR", "UC"
+    AddTipoCls "MONITOR GAS", "COM"
+    AddTipoCls "MONITOR PC", "COM"
+    AddTipoCls "MONITOR TEMP OLEO", "UC"
+    AddTipoCls "MONITOR TEMP. TF", "UC"
+    AddTipoCls "MONITOR_AUTOM", "UC"
+    AddTipoCls "MOTO VENTILADOR", "UC"
+    AddTipoCls "MOTOBOMBA", "COM"
+    AddTipoCls "MOTOBOMBA CENTMERSA", "UC"
+    AddTipoCls "MOTOBOMBA SUBMMERSA", "UC"
+    AddTipoCls "MOTOPODA", "UC"
+    AddTipoCls "MOTOR CC", "COM"
+    AddTipoCls "MOTOSSERRA", "UC"
+    AddTipoCls "MOTOVENTILADOR", "COM"
+    AddTipoCls "MOTOVENTILADOR TF", "COM"
+    AddTipoCls "MOUSE", "COM"
+    AddTipoCls "NIPLE", "COM"
+    AddTipoCls "NO-BREAK", "UC"
+    AddTipoCls "NOBREAK", "COM"
+    AddTipoCls "NOTEBOOK", "UC"
+    AddTipoCls "OLEO ISOL", "COM"
+    AddTipoCls "OLEO LUB", "COM"
+    AddTipoCls "OLEO MINERAL", "COM"
+    AddTipoCls "PAINEL", "UC"
+    AddTipoCls "PAINEL CC", "UC"
+    AddTipoCls "PAINEL COMANDO", "COM"
+    AddTipoCls "PAINEL CSA", "UC"
+    AddTipoCls "PAINEL ELET", "UC"
+    AddTipoCls "PAINEL EXCLUSIVO", "UC"
+    AddTipoCls "PAINEL FOTO BP", "COM"
+    AddTipoCls "PAINEL FRONTAL", "COM"
+    AddTipoCls "PAINEL MEDICAO", "UC"
+    AddTipoCls "PAINEL PROT", "UC"
+    AddTipoCls "PAINEL SERV AUX", "UC"
+    AddTipoCls "PAINEL TELECOM", "UC"
+    AddTipoCls "PAINEL_AUTO", "UC"
+    AddTipoCls "PAINEL_AUTOMACAO", "UC"
+    AddTipoCls "PAINEL_ELET", "UC"
+    AddTipoCls "PAINEL_MED", "UC"
+    AddTipoCls "PAINEL_PART", "UC"
+    AddTipoCls "PAINEL_QGBT", "UC"
+    AddTipoCls "PAINEL_SERVIDOR", "UC"
+    AddTipoCls "PAINEL_TELEM", "UC"
+    AddTipoCls "PAPEL QUIMICO", "COM"
+    AddTipoCls "PAPEL TOALHA", "COM"
+    AddTipoCls "PARA RAIO", "UC"
+    AddTipoCls "PARA RAIO AT", "UC"
+    AddTipoCls "PARA RAIO_SUPORTE", "UC"
+    AddTipoCls "PARAF", "COM"
+    AddTipoCls "PARAFUSO_SEXT", "COM"
+    AddTipoCls "PARALELISMO SINCRONO TF", "UC"
+    AddTipoCls "PARECE CORTA FOGO", "UC"
+    AddTipoCls "PATCH PANEL", "COM"
+    AddTipoCls "PATCH UTP", "COM"
+    AddTipoCls "PDA_RELE", "UC"
+    AddTipoCls "PE DE TORRE", "COM"
+    AddTipoCls "PEDRA_BRITADA", "COM"
+    AddTipoCls "PEDREGULHO/SEIXO", "COM"
+    AddTipoCls "PERFIL", "COM"
+    AddTipoCls "PERFIL_ESTRUT", "COM"
+    AddTipoCls "PILAR_ESTACA", "UC"
+    AddTipoCls "PILHA", "COM"
+    AddTipoCls "PLACA", "COM"
+    AddTipoCls "PLACA DE REDE", "UC"
+    AddTipoCls "PLACA DE REDUCAO", "UC"
+    AddTipoCls "PLACA ELETRONICA", "COM"
+    AddTipoCls "PLACA MONTG SIGFI", "COM"
+    AddTipoCls "PLACA SINALIZACAO", "COM"
+    AddTipoCls "PLACA TERMOPLASTICA", "UC"
+    AddTipoCls "POLO DISJ", "UC"
+    AddTipoCls "POLYWALL", "UC"
+    AddTipoCls "PONTALETE", "COM"
+    AddTipoCls "PORCA", "COM"
+    AddTipoCls "PORCA_SEXTAVADA", "COM"
+    AddTipoCls "POSTE", "UC"
+    AddTipoCls "POSTE MET", "UC"
+    AddTipoCls "POSTE RD (SUCATA)", "UC"
+    AddTipoCls "POSTE TELEFONICO", "UC"
+    AddTipoCls "POSTE TELESCOPICO", "UC"
+    AddTipoCls "POSTE/BARRA_SUPORTE", "UC"
+    AddTipoCls "POSTE_MET_LUM", "UC"
+    AddTipoCls "PREGO", "COM"
+    AddTipoCls "PRENSA-FIO", "COM"
+    AddTipoCls "PREPARADOR POLIMERO", "UC"
+    AddTipoCls "PROCESSADOR", "UC"
+    AddTipoCls "PROD_QUIMICO", "COM"
+    AddTipoCls "PROLONGADOR", "COM"
+    AddTipoCls "PROT", "COM"
+    AddTipoCls "PROTETOR", "UC"
+    AddTipoCls "PROTETOR DPS", "UC"
+    AddTipoCls "PROTETOR ILUM", "UC"
+    AddTipoCls "QGBT", "UC"
+    AddTipoCls "QGS", "UC"
+    AddTipoCls "QUADRO DE COMANDO", "UC"
+    AddTipoCls "QUADRO DT", "UC"
+    AddTipoCls "QUADRO ELET", "COM"
+    AddTipoCls "QUADRO_COMANDO", "COM"
+    AddTipoCls "QUADRO_DISJ", "COM"
+    AddTipoCls "QUADRO_ELETR", "UC"
+    AddTipoCls "QUADRO_MED_BLIND", "COM"
+    AddTipoCls "QUADRO_MET", "COM"
+    AddTipoCls "QUADRO_METALICO", "UC"
+    AddTipoCls "RACK", "COM"
+    AddTipoCls "RACK_CABO", "COM"
+    AddTipoCls "RACK_SERVIDOR", "UC"
+    AddTipoCls "RADIO", "COM"
+    AddTipoCls "REATOR", "UC"
+    AddTipoCls "REATOR LAMP", "COM"
+    AddTipoCls "REATOR POT", "UC"
+    AddTipoCls "REBITE", "COM"
+    AddTipoCls "RECEPTOR", "UC"
+    AddTipoCls "REDUCAO", "COM"
+    AddTipoCls "REDUCAO CONCENTRICA", "UC"
+    AddTipoCls "REFIGERADO", "UC"
+    AddTipoCls "REFLETOR", "UC"
+    AddTipoCls "REGISTRO", "COM"
+    AddTipoCls "REGISTRO DN500", "UC"
+    AddTipoCls "REGISTRO GAVETA", "COM"
+    AddTipoCls "REGUA BORNE", "COM"
+    AddTipoCls "REGUA TOMADA", "COM"
+    AddTipoCls "REGUA_TOMADA", "COM"
+    AddTipoCls "REGULADOR SUCATA", "UC"
+    AddTipoCls "REGULADOR_TENSAO", "UC"
+    AddTipoCls "RELE AUX", "COM"
+    AddTipoCls "RELE BCO CAP", "UC"
+    AddTipoCls "RELE CONTATO", "COM"
+    AddTipoCls "RELE DIGITAL", "UC"
+    AddTipoCls "RELE PROT", "UC"
+    AddTipoCls "RELE REG", "UC"
+    AddTipoCls "RELE REGULADOR", "UC"
+    AddTipoCls "RELE SUPERV_TENSAO", "COM"
+    AddTipoCls "RELE TF", "UC"
+    AddTipoCls "RELE_RAPIDO", "COM"
+    AddTipoCls "REPETIDORA", "UC"
+    AddTipoCls "REPETIDORA RADIO", "UC"
+    AddTipoCls "RESERVATORIO", "UC"
+    AddTipoCls "RESERVATORIO 500L", "COM"
+    AddTipoCls "RESERVATORIO TF", "COM"
+    AddTipoCls "RESI ELETR", "UC"
+    AddTipoCls "RESISTOR", "COM"
+    AddTipoCls "RETIFICADOR", "UC"
+    AddTipoCls "RETIFICADOR + BC_BATERIA", "UC"
+    AddTipoCls "RETROESCAVADEIRA", "UC"
+    AddTipoCls "RISCO", "UC"
+    AddTipoCls "ROLAMENTO", "UC"
+    AddTipoCls "ROTAMETRO", "UC"
+    AddTipoCls "ROTEADOR", "UC"
+    AddTipoCls "ROTOR DE SUCCAO", "UC"
+    AddTipoCls "ROTOR P/ BOMBAS", "UC"
+    AddTipoCls "RTAC", "UC"
+    AddTipoCls "SATURADOR", "UC"
+    AddTipoCls "SE MOVEL", "UC"
+    AddTipoCls "SECCIONADOR", "UC"
+    AddTipoCls "SENSO OPT", "UC"
+    AddTipoCls "SENSO TEMP", "UC"
+    AddTipoCls "SENSOR", "UC"
+    AddTipoCls "SENSOR ARCO ELETRICO", "UC"
+    AddTipoCls "SENSOR PT100", "COM"
+    AddTipoCls "SENSOR RESISTVO", "UC"
+    AddTipoCls "SEPARADOR DE HIDROGENIO", "UC"
+    AddTipoCls "SERVIDOR", "UC"
+    AddTipoCls "SIGFI_PAINEL SOLAR", "UC"
+    AddTipoCls "SILICAGEL", "COM"
+    AddTipoCls "SINALIZADOR SOLAR", "COM"
+    AddTipoCls "SINALIZ_AVIFAUNA", "COM"
+    AddTipoCls "SINCRONIZADOR", "UC"
+    AddTipoCls "SIS. DE VIGILANCIA", "UC"
+    AddTipoCls "SIS. FOTOV BOMBEA_AGUA", "UC"
+    AddTipoCls "SIST FILTR", "UC"
+    AddTipoCls "SIST FLUT", "UC"
+    AddTipoCls "SIST ILUM BASE RELE", "COM"
+    AddTipoCls "SIST ILUM REFLETOR", "COM"
+    AddTipoCls "SIST ILUM RELE", "COM"
+    AddTipoCls "SIST ILUM SUPORTE", "COM"
+    AddTipoCls "SIST ILUMINACAO", "UC"
+    AddTipoCls "SIST MED", "UC"
+    AddTipoCls "SIST RETIFICACAO", "UC"
+    AddTipoCls "SIST TIA", "UC"
+    AddTipoCls "SISTEMA DE ALIMENTACAO", "UC"
+    AddTipoCls "SIST_MED_TOT", "UC"
+    AddTipoCls "SIST_RETIFICADOR", "UC"
+    AddTipoCls "SOFTWARE", "UC"
+    AddTipoCls "SOLDA", "UC"
+    AddTipoCls "SONDA", "COM"
+    AddTipoCls "SOPRADOR", "UC"
+    AddTipoCls "SSD", "UC"
+    AddTipoCls "STAND COMERCIAL", "UC"
+    AddTipoCls "STUB MET", "UC"
+    AddTipoCls "SUCATA MET", "COM"
+    AddTipoCls "SUPORTE ATENA", "COM"
+    AddTipoCls "SUPORTE CH SEC", "COM"
+    AddTipoCls "SUPORTE GACHO", "COM"
+    AddTipoCls "SUPORTE HIDROMETRO", "COM"
+    AddTipoCls "SUPORTE ISOL PED", "UC"
+    AddTipoCls "SUPORTE POSTE", "COM"
+    AddTipoCls "SUPORTE TC", "COM"
+    AddTipoCls "SUPORTE_ISOLADOR", "COM"
+    AddTipoCls "SUPORTE_TC", "UC"
+    AddTipoCls "SUSPENSAO_TORRE", "COM"
+    AddTipoCls "SWITCH", "UC"
+    AddTipoCls "TAMPA ESGOTO", "COM"
+    AddTipoCls "TAMPAO", "COM"
+    AddTipoCls "TAMPA_CANALETA", "COM"
+    AddTipoCls "TANQUE", "COM"
+    AddTipoCls "TANQUE AGITADOR", "COM"
+    AddTipoCls "TAPETE (ANE)", "COM"
+    AddTipoCls "TAPETE ISOLANTE", "COM"
+    AddTipoCls "TC", "UC"
+    AddTipoCls "TC_CX CONCENT", "COM"
+    AddTipoCls "TC_MF", "UC"
+    AddTipoCls "TE 90° DN450", "UC"
+    AddTipoCls "TE 90° DN500", "UC"
+    AddTipoCls "TE 90° DN800", "UC"
+    AddTipoCls "TE DN150", "COM"
+    AddTipoCls "TE FLANGE DN700", "UC"
+    AddTipoCls "TE FLANGE DN800", "UC"
+    AddTipoCls "TE REUCAO DN1000", "UC"
+    AddTipoCls "TE REUCAO DN150/75", "COM"
+    AddTipoCls "TE REUCAO DN250/100", "COM"
+    AddTipoCls "TE REUCAO DN500", "UC"
+    AddTipoCls "TE REUCAO DN600", "UC"
+    AddTipoCls "TE REUCAO DN700", "UC"
+    AddTipoCls "TE REUCAO DN800", "UC"
+    AddTipoCls "TECLADO", "COM"
+    AddTipoCls "TEE", "COM"
+    AddTipoCls "TEE REDUCAO", "COM"
+    AddTipoCls "TELA", "COM"
+    AddTipoCls "TELA_MALHA", "COM"
+    AddTipoCls "TELEFONE", "UC"
+    AddTipoCls "TELEFONE MOV/CEL", "COM"
+    AddTipoCls "TELEFONE VOIP", "COM"
+    AddTipoCls "TERMINAL", "UC"
+    AddTipoCls "TERMINAL COBRE", "COM"
+    AddTipoCls "TERMINAL MUFLA", "COM"
+    AddTipoCls "TERMINAL PINO", "COM"
+    AddTipoCls "TERMINAL SERVER", "UC"
+    AddTipoCls "TERMINAL_COMPR", "COM"
+    AddTipoCls "TERMINAL_ILH", "COM"
+    AddTipoCls "TERMINAL_OLHAL", "COM"
+    AddTipoCls "TERMINAL_PRE", "COM"
+    AddTipoCls "TERMINAL_PRESSAO", "COM"
+    AddTipoCls "TERMINAL_TUBULAR", "COM"
+    AddTipoCls "TERMO COMUM", "COM"
+    AddTipoCls "TERMO NOTIFI", "COM"
+    AddTipoCls "TERMO OCORR", "COM"
+    AddTipoCls "TERMO REGULAR", "COM"
+    AddTipoCls "TERMO VISTORIA", "COM"
+    AddTipoCls "TERMOCAPTADOR", "COM"
+    AddTipoCls "TERMORESISTENCIA", "COM"
+    AddTipoCls "TERMOSTATO", "COM"
+    AddTipoCls "TERMOVISOR", "UC"
+    AddTipoCls "TERRENO", "UC"
+    AddTipoCls "TERROMETRO DIG", "UC"
+    AddTipoCls "TIJOLO", "COM"
+    AddTipoCls "TINTA", "COM"
+    AddTipoCls "TINTA (ANE)", "COM"
+    AddTipoCls "TINTA SPRAY", "COM"
+    AddTipoCls "TOMADA ODS", "COM"
+    AddTipoCls "TOMADAS_DE", "COM"
+    AddTipoCls "TOMADA_DUPLA", "COM"
+    AddTipoCls "TORA", "COM"
+    AddTipoCls "TORRE", "UC"
+    AddTipoCls "TP", "UC"
+    AddTipoCls "TP_CX CONCENT", "COM"
+    AddTipoCls "TP_TC_SUPORT ACO", "UC"
+    AddTipoCls "TP_TC_SUPORT CONC", "UC"
+    AddTipoCls "TR", "UC"
+    AddTipoCls "TRAFO COMANDO", "COM"
+    AddTipoCls "TRAFO CONV/RETIF", "COM"
+    AddTipoCls "TRAFO SE", "UC"
+    AddTipoCls "TRAFO_MOVEL", "UC"
+    AddTipoCls "TRANS BALANC", "UC"
+    AddTipoCls "TRANSCEIVER", "COM"
+    AddTipoCls "TRANSCEPTOR", "UC"
+    AddTipoCls "TRANSDUTOR", "UC"
+    AddTipoCls "TRANSMISSOR", "UC"
+    AddTipoCls "TRILHO MET", "COM"
+    AddTipoCls "TRILHOS", "COM"
+    AddTipoCls "TROCADOR DE CALOR", "COM"
+    AddTipoCls "TSA", "UC"
+    AddTipoCls "TSA_SUPORTE", "UC"
+    AddTipoCls "TUBO", "COM"
+    AddTipoCls "TUBO 25X6MM", "COM"
+    AddTipoCls "TUBO ACO", "COM"
+    AddTipoCls "TUBO COLETOR", "COM"
+    AddTipoCls "TUBO DEFOFO", "COM"
+    AddTipoCls "TUBO DEFOFO DN150", "COM"
+    AddTipoCls "TUBO DEFOFO DN200", "COM"
+    AddTipoCls "TUBO DEFOFO DN250", "COM"
+    AddTipoCls "TUBO DN100", "UC"
+    AddTipoCls "TUBO DN200", "UC"
+    AddTipoCls "TUBO DN400", "UC"
+    AddTipoCls "TUBO DN600", "UC"
+    AddTipoCls "TUBO DN700", "UC"
+    AddTipoCls "TUBO DN800", "UC"
+    AddTipoCls "TUBO ELEVACAO", "COM"
+    AddTipoCls "TUBO PBA", "COM"
+    AddTipoCls "TUBO PEAD", "COM"
+    AddTipoCls "TUBO PVC", "COM"
+    AddTipoCls "TUBO PVC DN50/60", "COM"
+    AddTipoCls "TUBO PVC DN75/85", "COM"
+    AddTipoCls "TUBO RIGIDO", "COM"
+    AddTipoCls "TURBIDIMETRO", "UC"
+    AddTipoCls "TV", "UC"
+    AddTipoCls "TV LED", "UC"
+    AddTipoCls "UCC", "UC"
+    AddTipoCls "UNID CONDENSADORA", "UC"
+    AddTipoCls "UNID EVAPORADORA", "UC"
+    AddTipoCls "UNIDA TEST", "UC"
+    AddTipoCls "UNIDADE CONTROLE", "UC"
+    AddTipoCls "UNID_CONC_COMUM", "UC"
+    AddTipoCls "UNID_DE_CONTROLE", "UC"
+    AddTipoCls "UPDG", "UC"
+    AddTipoCls "UPS", "UC"
+    AddTipoCls "URTT", "UC"
+    AddTipoCls "UTR", "UC"
+    AddTipoCls "VALETADEIRA", "UC"
+    AddTipoCls "VALVULA", "COM"
+    AddTipoCls "VALVULA BORBOLETA", "UC"
+    AddTipoCls "VALVULA DN1", "COM"
+    AddTipoCls "VALVULA DN2", "COM"
+    AddTipoCls "VALVULA DN200", "COM"
+    AddTipoCls "VALVULA DN3/4", "COM"
+    AddTipoCls "VALVULA DN300", "UC"
+    AddTipoCls "VALVULA DN32", "COM"
+    AddTipoCls "VALVULA DN350", "UC"
+    AddTipoCls "VALVULA DN400", "UC"
+    AddTipoCls "VALVULA ESFERA", "COM"
+    AddTipoCls "VALVULA GAVETA", "UC"
+    AddTipoCls "VALVULA PRESSAO", "COM"
+    AddTipoCls "VALVULA RETENTORA", "UC"
+    AddTipoCls "VARA MANOBRA", "COM"
+    AddTipoCls "VASSOURA", "COM"
+    AddTipoCls "VEDACAO", "COM"
+    AddTipoCls "VEDANTE", "COM"
+    AddTipoCls "VEIC FROT", "UC"
+    AddTipoCls "VEIC_FROT", "UC"
+    AddTipoCls "VENTILADOR", "UC"
+    AddTipoCls "VENTOSA", "COM"
+    AddTipoCls "VERGALHAO", "COM"
+    AddTipoCls "VERIFICAR", "UC"
+    AddTipoCls "VIGA", "UC"
+    AddTipoCls "VIGA_CONC", "UC"
+    AddTipoCls "VOLTIMETRO", "UC"
+    AddTipoCls "ZZ CA CADASTRO", "UC"
+End Sub
+
+Private Sub AddTipoCls(ByVal fam As String, ByVal tipo As String)
+    If dTipoCls Is Nothing Then Set dTipoCls = CreateObject("Scripting.Dictionary")
+    Dim k As String: k = NormClassif(fam)
+    If k <> "" And Not dTipoCls.Exists(k) Then dTipoCls(k) = tipo
+End Sub
+
+
+' De-para CLS2 de SERVICO -> familia de MATERIAL equivalente. Regulariza
+' servicos cuja familia nao existe no catalogo de materiais, ligando-os a
+' familia equivalente para a aderencia MAT vs SRV (via FamiliaAlias).
+' Extensivel sem codigo pela chave EQUIV_SRV_MAT da aba CONFIG ("SRV=MAT;...").
+Private Sub CarregarEquivSrvMat()
+    Set dFamEquiv = CreateObject("Scripting.Dictionary")
+    Dim s As String
+    s = "CH FUSIVEL=CH FUS;" & _
+        "CONEXAO=CONECTOR;" & _
+        "TENSIONAR=COND PROT;" & _
+        "ESTRUTURA=CRUZETA;" & _
+        "ESTRUT MT RSB=CRUZETA;" & _
+        "ESTRUT RDC=ESPACADOR LOSAG"
+    Dim extra As String: extra = CfgTxt("EQUIV_SRV_MAT", "")
+    If extra <> "" Then s = s & ";" & extra
+
+    Dim parts() As String, kv() As String, i As Long, key As String
+    parts = Split(s, ";")
+    For i = 0 To UBound(parts)
+        kv = Split(parts(i), "=")
+        If UBound(kv) >= 1 Then
+            key = NormClassif(kv(0))
+            If key <> "" Then dFamEquiv(key) = Trim$(kv(1))
+        End If
+    Next i
+End Sub
+
+' Familias de servico que legitimamente NAO tem material correspondente
+' (servico puro): nao devem gerar alerta em SERVICO SEM MATERIAL.
+' Extensivel pela chave SRV_PURO da aba CONFIG (familias separadas por ;).
+Private Sub CarregarSrvPuro()
+    Set dSrvPuro = CreateObject("Scripting.Dictionary")
+    Dim s As String
+    s = "PODA;ESCAVACAO;CIVIL;BASE CONC;FUNDACAO;DEMOLIR;MEIO AMBIENTE;" & _
+        "ESTUDO AMBIENTAL;PROJETO;FRETE/TRANSP;TRANSPORTE;DESLOCAMENTO;" & _
+        "MOBILIZAR;DESMOBILIZAR;ATV DRT;DISPONIBILIDADE;DISPON_STC;" & _
+        "ATEND EMERGENCIA;ABRIR ACESSO/FAIXA_SERV;PUBLICIDADE;TURMA LV"
+    Dim extra As String: extra = CfgTxt("SRV_PURO", "")
+    If extra <> "" Then s = s & ";" & extra
+
+    Dim parts() As String, i As Long, key As String
+    parts = Split(s, ";")
+    For i = 0 To UBound(parts)
+        key = NormClassif(parts(i))
+        If key <> "" Then dSrvPuro(key) = 1
+    Next i
+End Sub
+
+' Servico puro = familia sem material esperado (nao gera falso alerta)
+Private Function EhServicoPuro(ByVal cls2 As String) As Boolean
+    If dSrvPuro Is Nothing Then Exit Function
+    EhServicoPuro = dSrvPuro.Exists(NormClassif(cls2))
+End Function
 
 ' Normaliza familia/classificacao p/ casar: maiusc, sem acento, espacos colapsados
 Private Function NormClassif(ByVal s As String) As String
@@ -1613,9 +3382,15 @@ End Function
 ' COND NU -> COND PROT: servico de cabo protegido cobre o material cabo nu
 ' e vice-versa (ambos sao condutores de linha, o servico paga os dois).
 Private Function FamiliaAlias(ByVal cls2 As String) As String
-    Select Case NormClassif(cls2)
+    Dim k As String: k = NormClassif(cls2)
+    Select Case k
         Case "COND ISOLADO/PROT", "COND ISOLADO": FamiliaAlias = "COND PROT"
-        Case Else: FamiliaAlias = cls2
+        Case Else
+            FamiliaAlias = cls2
+            ' De-para servico -> material equivalente (CarregarEquivSrvMat)
+            If Not dFamEquiv Is Nothing Then
+                If dFamEquiv.Exists(k) Then FamiliaAlias = dFamEquiv(k)
+            End If
     End Select
 End Function
 
@@ -1767,6 +3542,11 @@ Private Sub Gerar_MaterialVsServico()
     ' dPep4TemSrv: marca PEP4NIVEL que possuem pelo menos 1 lancamento de servico.
     ' Usado para bloquear regras de cobertura quando o PEP nao tem nenhum servico.
     Dim dPep4TemSrv As Object: Set dPep4TemSrv = CreateObject("Scripting.Dictionary")
+    ' dFamTipo: TIPO (UC/COM) inferido do CLS3 real do catalogo de materiais
+    ' (MAT. UC / MAT. COM), por familia. Usado como fallback quando a familia
+    ' nao esta na tabela fixa dTipoCls -> evita falso "SEM UC".
+    Dim dFamTipo As Object: Set dFamTipo = CreateObject("Scripting.Dictionary")
+    Dim cls3m As String, famN As String
     For i = 1 To UBound(dados, 1)
         pep = Trim$(CStr(dados(i, cPEP))): If pep = "" Then GoTo Prox
         q = ToNum(dados(i, cQtd))
@@ -1774,6 +3554,14 @@ Private Sub Gerar_MaterialVsServico()
             cls2 = MatInfoLinha(i, 2)                  ' CLS2 do catalogo/base enriquecida
             If cls2 = "" Then cls2 = "(SEM CLS2)"
             cls2 = FamiliaAlias(cls2)                  ' unifica familias equivalentes
+            ' TIPO por CLS3 do item (MAT. UC / MAT. COM); UC prevalece
+            cls3m = UCase$(MatInfoLinha(i, 3))
+            famN = NormClassif(cls2)
+            If InStr(cls3m, "UC") > 0 Then
+                dFamTipo(famN) = "UC"
+            ElseIf InStr(cls3m, "COM") > 0 And dFamTipo(famN) <> "UC" Then
+                dFamTipo(famN) = "COM"
+            End If
             ' Ajuste fino: cabos em KG -> metros (metros = kg * fator)
             fat = CaboFator(dados(i, cMaterial))
             If fat > 0 Then q = q * fat
@@ -1966,6 +3754,11 @@ ProxEQ:
         clsv = CStr(pv(1))
         pep4v = CStr(pv(0))                     ' PEP completo (nivel 4)
         tcv = UCase$(TipoDaClassif(clsv))
+        ' Fallback: familia sem TIPO na tabela fixa -> usa CLS3 do catalogo
+        ' (MAT. UC / MAT. COM). Corrige falso "SEM UC" em familias nao mapeadas.
+        If tcv = "" Then
+            If dFamTipo.Exists(NormClassif(clsv)) Then tcv = dFamTipo(NormClassif(clsv))
+        End If
         If tcv = "UAR" Then dUAR(pep4v) = 1     ' PEP4 possui familia UAR
         If tcv = "UC" Then
             mv = 0: If dMat.Exists(ks(r)) Then mv = dMat(ks(r))
@@ -2464,7 +4257,11 @@ Private Function MapCategoriaCA(ByVal valor As String) As String
     s = UCase$(SemAcento(Trim$(valor)))
     s = Replace(s, "/", "_")
     s = Replace(s, "-", "_")
-    s = Replace(s, "  ", " ")
+    s = Replace(s, ".", " ")     ' "MAT. UC"/"MAT.COM" (catalogos ATUAIS) -> "MAT UC"/"MAT COM"
+    Do While InStr(s, "  ") > 0
+        s = Replace(s, "  ", " ")
+    Loop
+    s = Trim$(s)
 
     If s = "" Then Exit Function
     If InStr(s, "CLASSIFICAR") > 0 Then MapCategoriaCA = "CLASSIFICAR": Exit Function
@@ -2609,10 +4406,20 @@ PulaConta:
         outp(rr, 11) = MatInfoLinha(fi, 2)   ' CLS2
         ' PRECO_UNITARIO = VALOR_MOEDA / QTD_ENTRADA (somas brutas, 4 casas)
         If q <> 0 Then outp(rr, 12) = Round(dV(k) / dQ(k), 4)
-        ' ADERENCIA por tipo de PEP ANEEL (ODD/ODI/ODM/ODS):
-        '   ODD (.D): QTD_ENTRADA ou VALOR_MOEDA positivo   -> NAO ADERENTE
-        '   ODI/ODM/ODS: QTD_ENTRADA ou VALOR_MOEDA negativo -> NAO ADERENTE
-        If TipoPEPCodigo(pep) = "D" Then
+        ' ADERENCIA:
+        '   1) QTD=0 e VALOR<>0                        -> NAO ADERENTE
+        '   2) sinais opostos (QTD e VALOR)             -> NAO ADERENTE
+        '   3) VALOR=0 e QTD<>0                         -> NAO ADERENTE
+        '   4) por tipo de PEP ANEEL (ODD/ODI/ODM/ODS):
+        '      ODD (.D): QTD_ENTRADA ou VALOR_MOEDA positivo   -> NAO ADERENTE
+        '      ODI/ODM/ODS: QTD_ENTRADA ou VALOR_MOEDA negativo -> NAO ADERENTE
+        If q = 0 And val <> 0 Then
+            outp(rr, 13) = "NAO ADERENTE"
+        ElseIf (q > 0 And val < 0) Or (q < 0 And val > 0) Then
+            outp(rr, 13) = "NAO ADERENTE"
+        ElseIf val = 0 And q <> 0 Then
+            outp(rr, 13) = "NAO ADERENTE"
+        ElseIf TipoPEPCodigo(pep) = "D" Then
             outp(rr, 13) = IIf(q > 0 Or val > 0, "NAO ADERENTE", "ADERENTE")
         Else
             outp(rr, 13) = IIf(q < 0 Or val < 0, "NAO ADERENTE", "ADERENTE")
@@ -2734,9 +4541,10 @@ ProxUAR:
         If Not dPepTodos.Exists(pep) Then dPepTodos(pep) = 1
         If EhMaterial(CStr(dados(i, cClassif))) Then
             cls2 = FamiliaAlias(MatInfoLinha(i, 2))
-            If UCase$(TipoDaClassif(cls2, TextoCampo(i, cTexto))) = "UC" Then
-                dPepTemUC(pep) = 1
-            End If
+            Dim tUC As String: tUC = UCase$(TipoDaClassif(cls2, TextoCampo(i, cTexto)))
+            ' Fallback: familia sem TIPO -> usa CLS3 do catalogo (MAT. UC)
+            If tUC = "" And InStr(UCase$(MatInfoLinha(i, 3)), "UC") > 0 Then tUC = "UC"
+            If tUC = "UC" Then dPepTemUC(pep) = 1
         End If
 PreCalc:
     Next i
@@ -3681,7 +5489,9 @@ P2:
             Dim tipoSM As String: tipoSM = TipoDaClassif(famX)
             If tipoSM = "" Then tipoSM = "SERV"
             Dim riscoSM As String
-            If tipoSM = "UC" Then
+            If EhServicoPuro(famX) Then
+                riscoSM = "N/A (SERVICO PURO)"   ' familia sem material esperado
+            ElseIf tipoSM = "UC" Then
                 riscoSM = "ALTO"
             ElseIf tipoSM = "COM" Then
                 riscoSM = "MEDIO"
@@ -4345,9 +6155,9 @@ Private Sub GarantirConfig()
     ' chaves padrao (chave, valor, descricao)
     Dim def As Variant
     def = Array( _
-        Array("CAT_MATERIAIS", "%USERPROFILE%\Downloads\MATERIAS_ATUAIS (2).xlsx;%USERPROFILE%\Downloads\MATERIAS_ATUAIS.xlsx", "Caminhos do catalogo de materiais (separar alternativas por ;)"), _
-        Array("CAT_SERVICOS", "%USERPROFILE%\Downloads\SERVICOS_ATUAIS.xlsx", "Caminho do catalogo de servicos"), _
-        Array("CAT_CLASSE", "%USERPROFILE%\Downloads\CLASSE_CUSTO_ATUAIS.xlsx;%USERPROFILE%\Downloads\CLASSE_CUSTO_ATUAIS (1).xlsx", "Caminhos do catalogo de classe de custo"), _
+        Array("CAT_MATERIAIS", "%USERPROFILE%\Downloads\MATERIAS_ATUAIS_4.xlsx;%USERPROFILE%\Downloads\MATERIAS_ATUAIS (2).xlsx;%USERPROFILE%\Downloads\MATERIAS_ATUAIS.xlsx", "Caminhos do catalogo de materiais (separar alternativas por ;)"), _
+        Array("CAT_SERVICOS", "%USERPROFILE%\Downloads\SERVICOS_ATUAIS_2.xlsx;%USERPROFILE%\Downloads\SERVICOS_ATUAIS.xlsx", "Caminho do catalogo de servicos"), _
+        Array("CAT_CLASSE", "%USERPROFILE%\Downloads\CLASSE_CUSTO_ATUAIS_2.xlsx;%USERPROFILE%\Downloads\CLASSE_CUSTO_ATUAIS.xlsx", "Caminhos do catalogo de classe de custo"), _
         Array("CAT_CABO", "%USERPROFILE%\Downloads\CONVERSOES_CABO_ATUAIS.xlsx", "Caminho da conversao de cabo KG->m (opcional)"), _
         Array("CAT_COMBO", "%USERPROFILE%\Downloads\SRV_COMBO_ATUAIS.xlsx", "Caminho do catalogo SRV COMBO"), _
         Array("PERC_ATV_EME", "8", "Percentual ATV PREVISTA para PEP EME/EMM (%)"), _
@@ -4355,7 +6165,10 @@ Private Sub GarantirConfig()
         Array("PERC_MOP", "5.483", "Percentual do CALCULO DO MOP sobre o total sem MOP (%)"), _
         Array("MARGEM_ADERENCIA", "10", "Margem da aderencia MAT vs SRV (%)"), _
         Array("CLASSES_VIAGEM", "8111290000;8210390000;8210550000", "Classes de custo de viagem (Alimentacao;Passagem;Hospedagem)"), _
-        Array("CLASSE_COMBUSTIVEL", "8119980000", "Classe de custo de combustiveis -> categoria OUTROS na ANALISE DE CA"))
+        Array("CLASSE_COMBUSTIVEL", "8119980000", "Classe de custo de combustiveis -> categoria OUTROS na ANALISE DE CA"), _
+        Array("EQUIV_SRV_MAT", "", "De-para extra CLS2 servico=familia material (ex.: JUMPER=ALCA;X=Y)"), _
+        Array("SRV_PURO", "", "Familias extra de servico sem material esperado (separadas por ;)"), _
+        Array("FAM_UAR", "", "Familias UAR extra (equivalentes a UC; nao geram alerta SEM UC). Separadas por ;"))
 
     ' indexa chaves ja existentes
     Dim ult As Long: ult = ws.Cells(ws.Rows.Count, 1).End(xlUp).Row
@@ -4478,6 +6291,9 @@ Private Function FormatoColuna(ByVal hh As String) As String
     If InStr(hh, "PERC") > 0 Or InStr(hh, "PORC") > 0 Or InStr(hh, "%") > 0 _
        Or InStr(hh, "MENOR 10") > 0 Then
         FormatoColuna = "0.0"
+    ElseIf InStr(hh, "LANCAMENTO") > 0 Or Left$(hh, 2) = "N " _
+       Or InStr(hh, "QTD FAM") > 0 Then
+        FormatoColuna = "#,##0"                 ' contagens inteiras
     ElseIf hh = "MAT" Or hh = "SRV" _
        Or Left$(hh, 3) = "QTD" Or Left$(hh, 5) = "FAIXA" _
        Or InStr(hh, "VALOR") > 0 Or InStr(hh, "TOTAL") > 0 _
@@ -4532,6 +6348,7 @@ Private Sub FormatarVisualAba(ws As Worksheet, ByVal nome As String, _
         Set corpo = ws.Range(ws.Cells(2, 1), ws.Cells(nR, nC))
         corpo.Font.Name = "Segoe UI"
         corpo.Font.Size = 9
+        corpo.VerticalAlignment = xlCenter
 
         ' Zebra por coluna, pulando colunas de veredito/alerta (as cores
         ' semanticas dessas colunas devem prevalecer sobre a zebra).
@@ -4559,6 +6376,18 @@ Private Sub FormatarVisualAba(ws As Worksheet, ByVal nome As String, _
             ' Formato numerico
             Dim fmt As String: fmt = FormatoColuna(hh)
             If fmt <> "" Then ws.Range(ws.Cells(2, jc), ws.Cells(nR, jc)).NumberFormat = fmt
+
+            ' Data bars sutis em colunas de valor (leitura rapida de magnitude)
+            If fmt = "#,##0.00" And (InStr(hh, "VALOR") > 0 Or InStr(hh, "DIF") > 0 _
+               Or InStr(hh, "TOTAL") > 0) And Not EhColunaVeredito(hh) Then
+                On Error Resume Next
+                With ws.Range(ws.Cells(2, jc), ws.Cells(nR, jc)).FormatConditions.AddDatabar
+                    .BarColor.Color = RGB(99, 190, 123)
+                    .BarFillType = xlDataBarFillGradient
+                    .ShowValue = True
+                End With
+                On Error GoTo 0
+            End If
         Next jc
 
         ' Bordas finas claras (uma operacao no range inteiro)
@@ -4567,6 +6396,12 @@ Private Sub FormatarVisualAba(ws As Worksheet, ByVal nome As String, _
             .Weight = xlHairline
             .Color = corBorda
         End With
+
+        ' Contorno da tabela (fecha o bloco visualmente)
+        On Error Resume Next
+        ws.Range(ws.Cells(1, 1), ws.Cells(nR, nC)).BorderAround _
+            LineStyle:=xlContinuous, Weight:=xlThin, Color:=corHdrLn
+        On Error GoTo 0
     End If
 
     ws.Rows(1).AutoFilter

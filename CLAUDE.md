@@ -81,12 +81,14 @@ Private nLin As Long              ' qtd de linhas com PEP preenchido
 |------------|-------|-------|
 | `dCatMat` | COD_MATERIAL | `"FAMILIA\|CLS1\|CLS2\|CLS3"` |
 | `dCatSrv` | COD_SERVICO | `"CLS1\|CLS2\|CLS3\|TIPO_APLIC\|SEGMENTO"` |
-| `dCatCC` | CLASSE_CUSTO | `"CLS1\|CLS2\|CLS3\|TIPO_APLIC"` |
+| `dCatCC` | CLASSE_CUSTO | `"CLS1\|CLS2\|CLS3\|TIPO_APLIC"` (782 classes embutidas via `CarregarClassesCustoAuto` + 42 overrides curados) |
 | `dCabo` | COD_MATERIAL | fator KG→metros (Double) |
 | `dCombo` | COD_SERVICO | fator multiplicador (Double) |
 | `dTipoCls` | CLS2 normalizada | `"COM"` / `"UC"` / `"UAR"` |
-| `dDescSrv` | COD_SERVICO | descrição textual (catálogo embutido) |
+| `dDescSrv` | COD_SERVICO | descrição textual (embutido + `TEXTO BREVE` de `SERVICOS_ATUAIS` em runtime) |
 | `dCfg` | CHAVE | valor (da aba CONFIG) |
+| `dFamEquiv` | CLS2 serviço normalizada | família de material equivalente (+ CONFIG `EQUIV_SRV_MAT`) |
+| `dSrvPuro` | CLS2 serviço normalizada | 1 = serviço sem material esperado (+ CONFIG `SRV_PURO`) |
 | `dClsViagem` | CLASSE_CUSTO | 1 (flag: é classe de viagem) |
 
 ### Compartilhamento entre módulos (fase 1.2)
@@ -189,4 +191,17 @@ Dois códigos de serviço recebem `CLS2 = "COND PROT"` forçado para casar com m
 
 ## Índice rápido de Subs/Functions
 
-Ver `vba/AnaliseCKCP_OTIMIZADO.bas` ou o arquivo de documentação completo `AnaliseCKCP_OTIMIZADO_DOC.md` para o índice com números de linha.
+Ver `vba/AnaliseCKCP_OTIMIZADO.bas` ou o arquivo de documentação completo `vba/AnaliseCKCP_OTIMIZADO_DOC.md` para o índice com números de linha (linha exata de cada Sub/Function).
+
+## Modo Objetivo — protocolo de trabalho (economia de tokens)
+
+Ao trabalhar neste repositório, siga este protocolo para respostas e ações objetivas:
+
+1. **Responda direto.** Sem preâmbulo, sem repetir o pedido, sem resumo redundante. Entregue o resultado e pare.
+2. **Ação > explicação.** Faça a alteração no `.bas` e mostre só o essencial (linha alterada + motivo em 1 frase). Não cole blocos grandes de código já existente.
+3. **Localize por índice.** Use `vba/AnaliseCKCP_OTIMIZADO_DOC.md` para achar a linha da Sub/Function antes de abrir o arquivo. Leia só o trecho necessário (`offset`/`limit`), nunca as 6k+ linhas inteiras.
+4. **Busca cirúrgica.** Prefira `Grep` por nome de procedimento/dicionário a varreduras amplas.
+5. **Diffs mínimos.** Uma edição = uma mudança lógica. Não reformate código não relacionado.
+6. **Sem perguntas desnecessárias.** Se há padrão óbvio, aplique e informe em 1 linha; só pergunte quando a escolha muda o resultado.
+7. **Confirmação enxuta.** Ao concluir: o que mudou, em qual(is) linha(s)/Sub(s) e se foi commitado — em poucas linhas.
+8. **Exportar sempre.** Após qualquer ajuste no `.bas`, sempre entregar o arquivo atualizado ao usuário (enviar o `vba/AnaliseCKCP_OTIMIZADO.bas`), sem precisar pedir.
