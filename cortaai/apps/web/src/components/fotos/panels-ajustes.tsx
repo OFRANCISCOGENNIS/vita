@@ -10,7 +10,7 @@ import { getBaseCanvas, usePhotoEditorStore, usePhotoPresetsStore } from "@/stor
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { autoEnhanceAdjustments, backgroundBlurCanvas, portraitRetouch, upscaleCanvas, type Adjustments } from "@/lib/photo-engine";
+import { autoEnhanceAdjustments, backgroundBlurCanvas, denoisePhotoCanvas, portraitRetouch, upscaleCanvas, type Adjustments } from "@/lib/photo-engine";
 import { removeBackground } from "@/lib/ai/background-removal";
 
 const GROUPS: { title: string; items: { key: keyof Adjustments; label: string; min?: number }[] }[] = [
@@ -112,6 +112,19 @@ export function AjustesPanel() {
     }, 30);
   }
 
+  function denoise() {
+    if (busy) return;
+    setBusy("Reduzindo o ruído…");
+    setTimeout(() => {
+      try {
+        applyPixelOp((base) => denoisePhotoCanvas(base, 60));
+        toast("Ruído reduzido", { description: "Textura fina suavizada preservando as bordas.", variant: "success" });
+      } finally {
+        setBusy(null);
+      }
+    }, 30);
+  }
+
   async function removeBg() {
     if (busy) return;
     const base = getBaseCanvas();
@@ -156,7 +169,10 @@ export function AjustesPanel() {
           <Button size="sm" variant="secondary" disabled={!hasImage || !!busy} onClick={retouchPortrait}>
             <Smile className="h-3.5 w-3.5" aria-hidden /> Retoque de retrato
           </Button>
-          <Button size="sm" variant="secondary" className="col-span-2" disabled={!hasImage || !!busy} onClick={removeBg}>
+          <Button size="sm" variant="secondary" disabled={!hasImage || !!busy} onClick={denoise}>
+            <Sparkles className="h-3.5 w-3.5" aria-hidden /> Reduzir ruído
+          </Button>
+          <Button size="sm" variant="secondary" disabled={!hasImage || !!busy} onClick={removeBg}>
             <Scissors className="h-3.5 w-3.5" aria-hidden /> Remover fundo (IA)
           </Button>
         </div>

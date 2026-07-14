@@ -134,7 +134,11 @@ function drawVisualClip(
 
   const filter = filterById(clip.filterId);
   const blurPx = env.blurPx > 0 ? (env.blurPx / 100) * canvasH * 0.06 : 0;
-  const filterCss = [filter?.css !== "none" ? filter?.css : "", blurPx > 0 ? `blur(${blurPx.toFixed(1)}px)` : ""]
+  const ca = clip.colorAdjust;
+  const gradeCss = ca
+    ? `brightness(${(1 + ca.brightness / 100).toFixed(3)}) contrast(${(1 + ca.contrast / 100).toFixed(3)}) saturate(${Math.max(0, 1 + ca.saturation / 100).toFixed(3)})${ca.hue ? ` hue-rotate(${Math.round(ca.hue)}deg)` : ""}`
+    : "";
+  const filterCss = [filter?.css !== "none" ? filter?.css : "", gradeCss, blurPx > 0 ? `blur(${blurPx.toFixed(1)}px)` : ""]
     .filter(Boolean)
     .join(" ");
 
