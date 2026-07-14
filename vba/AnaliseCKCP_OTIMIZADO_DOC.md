@@ -1,7 +1,7 @@
 # AnaliseCKCP_OTIMIZADO — Documentação completa
 
 Documentação de referência do módulo VBA `vba/AnaliseCKCP_OTIMIZADO.bas`.
-Versão atual: **7.135 linhas · 63 Subs · 72 Functions** (módulo `AnaliseCKCP`).
+Versão atual: **7.154 linhas · 63 Subs · 72 Functions** (módulo `AnaliseCKCP`).
 
 > Para visão geral de arquitetura, fluxo e regras de negócio, ver `CLAUDE.md` e `ARCHITECTURE.md`.
 > Este arquivo é o **índice detalhado por linha** de todos os procedimentos.
@@ -201,3 +201,9 @@ Versão atual: **7.135 linhas · 63 Subs · 72 Functions** (módulo `AnaliseCKCP
 - **Serviço puro**: `dSrvPuro` (`CarregarSrvPuro`) marca famílias sem material esperado (PODA, CIVIL, FUNDACAO, FRETE/TRANSP, PROJETO, MOBILIZAR…) — na aba SERVICO SEM MATERIAL o RISCO vira `N/A (SERVICO PURO)` em vez de falso alerta. Extensível pela chave `SRV_PURO`.
 - **+16 famílias com TIPO** no `dTipoCls` por analogia (TORRE MET/CONC, POSTE_TORRE, TRAFO DE FORCA, DISJ SE, CH SEC TRI, BANCO CAPACITOR = UC; ISOLADOR AT, CONECTOR, CABO FIB OPT, VIGA/SUPORTE/ANEL CONC, CANTONEIRA, PAINEL MET, TUBO FOFO = COM).
 - **Design**: data bars verdes em colunas VALOR/DIF/TOTAL, contorno da tabela, corpo centrado verticalmente, formato inteiro para contagens (`QTD_LANCAMENTOS`, `N *`), CONFIG com caminhos dos catálogos novos e as 2 chaves novas.
+
+### Fix falso "SEM UC"
+
+- **Sintoma**: PEP com material UC recebia veredito/alerta `SEM UC`.
+- **Causa**: a detecção de família UC dependia só de `TipoDaClassif(CLS2)` (tabela fixa `dTipoCls`), e ~1.162 famílias de material dos catálogos ATUAIS não estão nessa tabela → não contavam como UC.
+- **Fix**: quando a família não tem TIPO na tabela, usa o CLS3 real do item (`MAT. UC`/`MAT. COM`) como fallback. Corrigido nos dois pontos de detecção: `Gerar_MaterialVsServico` (novo `dFamTipo` por família, a partir do CLS3) e `Gerar_AlertasCriticos` (seção A "PEPs sem UC", fallback inline por linha).

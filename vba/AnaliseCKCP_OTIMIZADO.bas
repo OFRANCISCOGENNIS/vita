@@ -2710,6 +2710,11 @@ Private Sub Gerar_MaterialVsServico()
     ' dPep4TemSrv: marca PEP4NIVEL que possuem pelo menos 1 lancamento de servico.
     ' Usado para bloquear regras de cobertura quando o PEP nao tem nenhum servico.
     Dim dPep4TemSrv As Object: Set dPep4TemSrv = CreateObject("Scripting.Dictionary")
+    ' dFamTipo: TIPO (UC/COM) inferido do CLS3 real do catalogo de materiais
+    ' (MAT. UC / MAT. COM), por familia. Usado como fallback quando a familia
+    ' nao esta na tabela fixa dTipoCls -> evita falso "SEM UC".
+    Dim dFamTipo As Object: Set dFamTipo = CreateObject("Scripting.Dictionary")
+    Dim cls3m As String, famN As String
     For i = 1 To UBound(dados, 1)
         pep = Trim$(CStr(dados(i, cPEP))): If pep = "" Then GoTo Prox
         q = ToNum(dados(i, cQtd))
@@ -2717,6 +2722,14 @@ Private Sub Gerar_MaterialVsServico()
             cls2 = MatInfoLinha(i, 2)                  ' CLS2 do catalogo/base enriquecida
             If cls2 = "" Then cls2 = "(SEM CLS2)"
             cls2 = FamiliaAlias(cls2)                  ' unifica familias equivalentes
+            ' TIPO por CLS3 do item (MAT. UC / MAT. COM); UC prevalece
+            cls3m = UCase$(MatInfoLinha(i, 3))
+            famN = NormClassif(cls2)
+            If InStr(cls3m, "UC") > 0 Then
+                dFamTipo(famN) = "UC"
+            ElseIf InStr(cls3m, "COM") > 0 And dFamTipo(famN) <> "UC" Then
+                dFamTipo(famN) = "COM"
+            End If
             ' Ajuste fino: cabos em KG -> metros (metros = kg * fator)
             fat = CaboFator(dados(i, cMaterial))
             If fat > 0 Then q = q * fat
@@ -2909,6 +2922,11 @@ ProxEQ:
         clsv = CStr(pv(1))
         pep4v = CStr(pv(0))                     ' PEP completo (nivel 4)
         tcv = UCase$(TipoDaClassif(clsv))
+        ' Fallback: familia sem TIPO na tabela fixa -> usa CLS3 do catalogo
+        ' (MAT. UC / MAT. COM). Corrige falso "SEM UC" em familias nao mapeadas.
+        If tcv = "" Then
+            If dFamTipo.Exists(NormClassif(clsv)) Then tcv = dFamTipo(NormClassif(clsv))
+        End If
         If tcv = "UAR" Then dUAR(pep4v) = 1     ' PEP4 possui familia UAR
         If tcv = "UC" Then
             mv = 0: If dMat.Exists(ks(r)) Then mv = dMat(ks(r))
@@ -3691,9 +3709,10 @@ ProxUAR:
         If Not dPepTodos.Exists(pep) Then dPepTodos(pep) = 1
         If EhMaterial(CStr(dados(i, cClassif))) Then
             cls2 = FamiliaAlias(MatInfoLinha(i, 2))
-            If UCase$(TipoDaClassif(cls2, TextoCampo(i, cTexto))) = "UC" Then
-                dPepTemUC(pep) = 1
-            End If
+            Dim tUC As String: tUC = UCase$(TipoDaClassif(cls2, TextoCampo(i, cTexto)))
+            ' Fallback: familia sem TIPO -> usa CLS3 do catalogo (MAT. UC)
+            If tUC = "" And InStr(UCase$(MatInfoLinha(i, 3)), "UC") > 0 Then tUC = "UC"
+            If tUC = "UC" Then dPepTemUC(pep) = 1
         End If
 PreCalc:
     Next i
