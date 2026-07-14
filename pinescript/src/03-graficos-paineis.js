@@ -1068,6 +1068,8 @@ function atualizarDecisao() {
 
     // Funil de qualidade: mostra quais dos 6 elos de assertividade estão fechados
     try { renderFunilQualidade(riscoNoticia); } catch (e) { }
+    // Ferramentas Pro (VP/níveis/book) acompanham os recálculos
+    try { if (typeof proAtualizar === 'function') proAtualizar(); } catch (e) { }
 
     // Contexto histórico: o score atual costuma acertar quanto? (assertividade medida)
     const scoreAtivo = Math.max(long, short);

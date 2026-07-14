@@ -502,6 +502,49 @@ check('piloto: pendente não entra no saldo (3 resolvidas, 1 aberta)', piloto.op
 check('piloto: stake % usa saldo atual (10% de 1080 = 108)', Math.abs(piloto.stakePct - 108) < 0.01, 's=' + piloto.stakePct);
 check('piloto: zerar reseta o saldo ao inicial', Math.abs(piloto.saldoZerado - 1000) < 0.01 && piloto.opsZerado === 0);
 
+// FERRAMENTAS PRO (estilo Profit): funções puras + integração
+const pro = await p.evaluate(() => {
+  // Volume Profile: 3 velas com preço típico no mesmo bucket → POC ali
+  const velas = [
+    { high: 10.2, low: 9.8, close: 10.0, volume: 100 },
+    { high: 10.3, low: 9.9, close: 10.1, volume: 300 },
+    { high: 12.0, low: 11.6, close: 11.8, volume: 50 },
+    { high: 8.4, low: 8.0, close: 8.2, volume: 60 }
+  ];
+  const vp = volumeProfile(velas, 8);
+  const precoPoc = vp.lo + (vp.poc + 0.5) * vp.passo;
+  // Fibonacci: perna de alta (fundo antes do topo) → 50% = (hi+lo)/2
+  const sobe = [];
+  for (let i = 0; i < 30; i++) sobe.push({ high: 100 + i, low: 99 + i, close: 100 + i });
+  const fib = fibNiveis(sobe);
+  const meio = fib.niveis.find(n => n.k === 0.5).preco;
+  // Imbalance: só compra = +1; equilibrado = 0
+  const imbC = bookImbalance([[1, 10]], []);
+  const imbE = bookImbalance([[1, 5]], [[2, 5]]);
+  // Níveis no gráfico: toggle liga (cria price lines) e desliga (remove)
+  if (!dados || dados.length < 210) { dados = gerarDadosSim(300, 2); recomputarIndicadores(); }
+  alternarNiveis(true); const nLinhas = linhasNiveis.length;
+  alternarNiveis(false); const zerou = linhasNiveis.length === 0;
+  // Painel VP renderiza com dados carregados
+  renderVolumeProfile();
+  const vpLinhas = document.querySelectorAll('#vpBody .vp-row').length;
+  const temPoc = !!document.querySelector('#vpBody .vp-poc');
+  return { precoPoc, alta: fib.alta, meio, imbC, imbE, nLinhas, zerou, vpLinhas, temPoc };
+});
+check('volumeProfile: POC no bucket de maior volume (~10.1)', pro.precoPoc > 9.5 && pro.precoPoc < 10.7, 'poc=' + pro.precoPoc);
+check('fibNiveis: perna de alta e 50% no meio da perna', pro.alta && Math.abs(pro.meio - (sobreMeio => sobreMeio)((129 + 99) / 2)) < 0.75, 'meio=' + pro.meio);
+check('bookImbalance: só compra=+1 · equilibrado=0', pro.imbC === 1 && pro.imbE === 0);
+check('níveis no gráfico: liga cria linhas (fib+S/R), desliga remove', pro.nLinhas >= 7 && pro.zerou, 'linhas=' + pro.nLinhas);
+check('Volume Profile renderiza 24 faixas com POC marcado', pro.vpLinhas === 24 && pro.temPoc, 'linhas=' + pro.vpLinhas);
+// Book: mensagem clara quando o par não é Binance ao ligar
+const bookMsgTxt = await p.evaluate(() => {
+  document.getElementById('bookAtivo').checked = true; ligarBook();
+  const t = document.getElementById('bookDom').textContent;
+  document.getElementById('bookAtivo').checked = false; pararBook();
+  return t;
+});
+check('book avisa quando o par não é Binance (fonte sim)', /Binance/.test(bookMsgTxt), bookMsgTxt.slice(0, 60));
+
 // 8) PWA manifest
 check('PWA manifest presente', await p.$eval('link[rel=manifest]', e => e.href.startsWith('data:application/manifest')));
 

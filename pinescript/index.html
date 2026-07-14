@@ -380,6 +380,23 @@
                     <p class="group-note">Registra sozinho as entradas que passam no gatilho como operações simuladas e acompanha saldo/WR/drawdown. Payout usa o campo <strong>Payout (%)</strong>. Não executa nada na corretora — a operação real, se quiser, é manual.</p>
                 </div>
 
+                <!-- FERRAMENTAS PRO (estilo Profit): Volume Profile + Níveis no gráfico -->
+                <div class="chart-container" id="proPanel">
+                    <h2>📊 Volume Profile & Níveis <span id="proMeta" class="tv-sync-tag"></span></h2>
+                    <label class="reg-filtro"><input type="checkbox" id="niveisAtivo"> <span>📐 Desenhar níveis no gráfico — <strong>Fibonacci automático</strong> (última perna) + <strong>S/R</strong> mais próximos</span></label>
+                    <div id="vpBody" class="vp-body"></div>
+                </div>
+
+                <!-- Book de Ofertas (DOM) + Times & Trades — fluxo real Binance -->
+                <div class="chart-container" id="bookPanel">
+                    <h2>📖 Book de Ofertas & Times/Trades <span id="bookMetaTag" class="tv-sync-tag">○</span></h2>
+                    <label class="reg-filtro"><input type="checkbox" id="bookAtivo"> <span>Ligar fluxo ao vivo (pares <strong>Binance</strong>) — profundidade + fita de negócios</span></label>
+                    <div class="book-grid">
+                        <div id="bookDom"></div>
+                        <div id="bookFita"></div>
+                    </div>
+                </div>
+
                 <div class="chart-container" id="estudoPanel" style="display:none;">
                     <h2>📚 Estudos de Mercado <span id="estudoMeta" class="tv-sync-tag"></span></h2>
                     <div id="estudoRegime" class="decision-chips"></div>
@@ -596,6 +613,7 @@
                             <li>O <strong>Registro</strong> marca ✓/✗ automaticamente após a expiração e compara o acerto real com o previsto.</li>
                             <li>O backtest roda num <strong>Web Worker</strong> (segundo plano), então a tela não trava durante a otimização.</li>
                             <li><strong>🕵️ Agentes de Estudo</strong> (opcional): com o estudo contínuo ativado, 4 agentes trabalham sozinhos — 🧪 reotimiza as moedas em rodízio, 🔭 aplica os parâmetros certos quando o regime vira, ⚖️ audita a calibração e 🧠 mede os fatores. O painel mostra o que cada um encontrou.</li>
+                            <li><strong>📊 Ferramentas Pro</strong> (estilo Profit): <strong>Volume Profile</strong> com POC/área de valor, <strong>níveis no gráfico</strong> (Fibonacci automático + S/R) e <strong>Book de Ofertas + Times &amp; Trades</strong> ao vivo (profundidade e fita reais da Binance, com pressão compra×venda e agressões grandes em destaque).</li>
                             <li><strong>🎮 Piloto Automático</strong> (paper trading): opera sozinho numa <strong>conta DEMO simulada</strong> sobre dados reais — registra as entradas que passam no gatilho (nível A / funil ≥5) como operações com stake e acompanha saldo, win rate e drawdown. <strong>Não toca em corretora</strong> (a Binomo bloqueia iframe e proíbe bots); a operação real, se você quiser, é manual.</li>
                         </ul>
                     </section>
@@ -642,6 +660,7 @@
     <script src="src/07-backtest.js"></script>
     <script src="src/08-agentes.js"></script>
     <script src="src/09-piloto.js"></script>
+    <script src="src/10-profit.js"></script>
     <!-- APP:END -->
 </body>
 </html>
