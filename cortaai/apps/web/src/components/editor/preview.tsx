@@ -209,7 +209,7 @@ export function EditorPreview() {
 
   // Responsive frame: largest size that fits the measured stage (small margin),
   // preserving the aspect. Falls back to the legacy 420px before first measure.
-  const STAGE_MARGIN = 12;
+  const STAGE_MARGIN = 6;
   const availW = Math.max(0, (stageSize?.w ?? 0) - STAGE_MARGIN * 2);
   const availH = Math.max(0, (stageSize?.h ?? 0) - STAGE_MARGIN * 2);
   const fitH = Math.floor(Math.min(availH, availW / aspect.ratio));

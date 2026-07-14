@@ -11,11 +11,12 @@ import { useEditorStore } from "@/store/editor";
 import { Slider } from "@/components/ui/slider";
 import { groupSentences } from "./sentences";
 
-// Altura desktop das trilhas (px) — usada só na matemática do waveform SVG.
-// O tamanho visual dos rows vem das classes h-9 lg:h-11 (36px mobile / 44px
-// desktop) para a timeline roubar menos altura do vídeo no celular.
-const TRACK_H = 44;
-const TRACK_CLS = "h-9 lg:h-11";
+// Altura das trilhas (px) — usada só na matemática do waveform SVG (o SVG
+// escala com preserveAspectRatio="none", então basta manter a proporção). O
+// tamanho visual dos rows vem das classes h-8 lg:h-9 (32px mobile / 36px
+// desktop), compactas estilo CapCut para o vídeo ocupar o máximo de altura.
+const TRACK_H = 36;
+const TRACK_CLS = "h-8 lg:h-9";
 
 export function EditorTimeline() {
   const {
@@ -64,7 +65,7 @@ export function EditorTimeline() {
   return (
     <div className="shrink-0 border-t border-line bg-surface-1/80">
       {/* Transport controls — desktop; no mobile a linha de transporte fica acima da timeline */}
-      <div className="hidden items-center gap-2 px-4 py-1.5 lg:flex">
+      <div className="hidden items-center gap-2 px-4 py-1 lg:flex">
         <button
           onClick={() => seek(0)}
           aria-label="Voltar ao início"
@@ -109,7 +110,7 @@ export function EditorTimeline() {
       <div className="flex">
         {/* Track labels (desktop) */}
         <div className="hidden w-24 shrink-0 border-r border-line text-[10px] font-medium uppercase tracking-wide text-zinc-500 lg:block">
-          <div className="flex h-6 items-center px-3" aria-hidden />
+          <div className="flex h-5 items-center px-3" aria-hidden />
           <div className={cn("flex items-center gap-1.5 px-3", TRACK_CLS)}>
             <Film className="h-3 w-3" aria-hidden /> Vídeo
           </div>
@@ -125,7 +126,7 @@ export function EditorTimeline() {
         </div>
 
         {/* Scrollable timeline */}
-        <div ref={scrollRef} className="editor-scroll min-w-0 flex-1 overflow-x-auto pb-1 lg:pb-2">
+        <div ref={scrollRef} className="editor-scroll min-w-0 flex-1 overflow-x-auto pb-0.5 lg:pb-1">
           <div
             className="relative cursor-crosshair"
             style={{ width }}
@@ -142,7 +143,7 @@ export function EditorTimeline() {
             }}
           >
             {/* Ruler */}
-            <div className="relative h-6 border-b border-line">
+            <div className="relative h-5 border-b border-line">
               {ticks.map((t) => (
                 <span
                   key={t}
@@ -160,7 +161,7 @@ export function EditorTimeline() {
               <div className="absolute inset-1 overflow-hidden rounded-lg bg-gradient-to-r from-violet-800/60 to-fuchsia-800/40 ring-1 ring-inset ring-white/10">
                 <div className="flex h-full items-center gap-1 px-2" aria-hidden>
                   {Array.from({ length: Math.max(3, Math.floor(width / 64)) }).map((_, i) => (
-                    <span key={i} className="h-6 w-12 shrink-0 rounded-sm bg-black/30" />
+                    <span key={i} className="h-4 w-10 shrink-0 rounded-sm bg-black/30" />
                   ))}
                 </div>
               </div>
