@@ -1,7 +1,7 @@
 # AnaliseCKCP_OTIMIZADO — Documentação completa
 
 Documentação de referência do módulo VBA `vba/AnaliseCKCP_OTIMIZADO.bas`.
-Versão atual: **7.166 linhas · 63 Subs · 72 Functions** (módulo `AnaliseCKCP`).
+Versão atual: **7.987 linhas · 65 Subs · 72 Functions** (módulo `AnaliseCKCP`).
 
 > Para visão geral de arquitetura, fluxo e regras de negócio, ver `CLAUDE.md` e `ARCHITECTURE.md`.
 > Este arquivo é o **índice detalhado por linha** de todos os procedimentos.
@@ -29,7 +29,7 @@ Versão atual: **7.166 linhas · 63 Subs · 72 Functions** (módulo `AnaliseCKCP
 | 442 | `Function PontuarBase(ws) As Long` | Pontua abas candidatas à base. |
 | 452 | `Function ColLike(ws, frags) As Long` | Busca coluna por fragmento. |
 | 476 | `Function SemAcento(s) As String` | Normaliza acentuação. |
-| 5181 | `Function ColExata(ws, frags) As Long` | Busca coluna por match exato. |
+| 6032 | `Function ColExata(ws, frags) As Long` | Busca coluna por match exato. |
 
 ## 3. Carga de dados em memória
 
@@ -63,9 +63,11 @@ Versão atual: **7.166 linhas · 63 Subs · 72 Functions** (módulo `AnaliseCKCP
 | 2344 | `Function CaboFator(codMat)` | Fator de cabo. |
 | 2358 | `Sub CarregarComboServico()` | `dCombo` |
 | 2409 | `Function ComboFator(codSrv)` | Fator combo. |
-| 2431 | `Sub CarregarTipoClassif()` | `dTipoCls` (COM/UC/UAR) |
-| 2469 | `Sub CarregarEquivSrvMat()` | `dFamEquiv` (CLS2 serviço → família material; + CONFIG `EQUIV_SRV_MAT`) |
-| 2495 | `Sub CarregarSrvPuro()` | `dSrvPuro` (famílias sem material esperado; + CONFIG `SRV_PURO`) |
+| 2431 | `Sub CarregarTipoClassif()` | `dTipoCls` (COM/UC/UAR) — curadas + `CarregarTipoClassifAuto` + CONFIG `FAM_UAR` |
+| 2480 | `Sub CarregarTipoClassifAuto()` | 804 famílias UC/COM do CLS3 do catálogo (não sobrepõe curadas) |
+| 3290 | `Sub AddTipoCls(fam, tipo)` | Insere família em `dTipoCls` se ainda não existir |
+| 3301 | `Sub CarregarEquivSrvMat()` | `dFamEquiv` (CLS2 serviço → família material; + CONFIG `EQUIV_SRV_MAT`) |
+| 3327 | `Sub CarregarSrvPuro()` | `dSrvPuro` (famílias sem material esperado; + CONFIG `SRV_PURO`) |
 
 ## 5. Helpers de classificação e cálculo
 
@@ -76,106 +78,106 @@ Versão atual: **7.166 linhas · 63 Subs · 72 Functions** (módulo `AnaliseCKCP
 | 623 | `Function TipoPEPANEEL(pep)` |
 | 631 | `Function ClassificacaoPendente(cls1,cls2,cls3)` |
 | 1315 | `Function NormCod(v)` |
-| 2520 | `Function NormClassif(s)` |
-| 2535 | `Function TipoDaClassif(classif, ...)` |
-| 2552 | `Function FamiliaAlias(cls2)` — unifica COND* e aplica `dFamEquiv` |
-| 2514 | `Function EhServicoPuro(cls2)` |
-| 2566 | `Function EhCabo(cls2)` |
-| 2573 | `Function CobertoReligador(cls2)` |
-| 2579 | `Function DentroMargem(a, b)` |
-| 2594 | `Function PEP3(pep)` — PEP 3º nível |
-| 2603 | `Function SegmentoPI(pep)` |
-| 2612 | `Function GrupoPerc(pep)` |
-| 2621 | `Function EhMaterial(classif)` |
-| 2626 | `Function ToNum(v)` |
+| 3352 | `Function NormClassif(s)` |
+| 3367 | `Function TipoDaClassif(classif, ...)` |
+| 3384 | `Function FamiliaAlias(cls2)` — unifica COND* e aplica `dFamEquiv` |
+| 3346 | `Function EhServicoPuro(cls2)` |
+| 3398 | `Function EhCabo(cls2)` |
+| 3405 | `Function CobertoReligador(cls2)` |
+| 3411 | `Function DentroMargem(a, b)` |
+| 3426 | `Function PEP3(pep)` — PEP 3º nível |
+| 3435 | `Function SegmentoPI(pep)` |
+| 3444 | `Function GrupoPerc(pep)` |
+| 3453 | `Function EhMaterial(classif)` |
+| 3458 | `Function ToNum(v)` |
 
 ## 6. Geradores de abas
 
 | Linha | Procedimento | Aba |
 |------:|--------------|-----|
-| 2634 | `Sub Gerar_RazaoCJ()` | `RAZAO CJ` |
-| 2694 | `Sub Gerar_MaterialVsServico()` | `MATERIAL vs SERVICO` (+ popula `dMvSVerd/dMvSFamNC/dMvSDif`) |
-| 3227 | `Sub Gerar_AnaliseCA()` | `ANALISE DE CA` |
-| 3448 | `Sub Gerar_ClasseDeCusto()` | `CLASSE DE CUSTO` |
-| 3497 | `Sub Gerar_Material()` | `MATERIAL` |
-| 3593 | `Sub Gerar_Servico()` | `SERVICO` |
-| 3661 | `Sub Gerar_AlertasCriticos()` | `ALERTAS CRITICOS` |
-| 4074 | `Sub Gerar_Regras()` | `REGRAS` |
-| 4311 | `Sub Gerar_PainelExecutivo()` | `PAINEL EXECUTIVO` |
-| 4572 | `Sub Gerar_ServicoSemMaterial()` | `SERVICO SEM MATERIAL` |
-| 4671 | `Sub Gerar_PortfolioObra()` | `PORTFOLIO OBRA` |
-| 4807 | `Sub Gerar_NaoClassificados()` | `NAO CLASSIFICADOS` |
-| 4890 | `Sub Gerar_RacionalizacaoCOM()` | `RACIONALIZACAO COM` |
-| 5593 | `Sub Gerar_MatVsServAT()` | `MAT vs SERV AT` (módulo AT) |
-| 6842 | `Sub CriarPremissas()` | `PREMISSAS` |
+| 3466 | `Sub Gerar_RazaoCJ()` | `RAZAO CJ` |
+| 3526 | `Sub Gerar_MaterialVsServico()` | `MATERIAL vs SERVICO` (+ popula `dMvSVerd/dMvSFamNC/dMvSDif`) |
+| 4077 | `Sub Gerar_AnaliseCA()` | `ANALISE DE CA` |
+| 4298 | `Sub Gerar_ClasseDeCusto()` | `CLASSE DE CUSTO` |
+| 4347 | `Sub Gerar_Material()` | `MATERIAL` |
+| 4443 | `Sub Gerar_Servico()` | `SERVICO` |
+| 4511 | `Sub Gerar_AlertasCriticos()` | `ALERTAS CRITICOS` |
+| 4925 | `Sub Gerar_Regras()` | `REGRAS` |
+| 5162 | `Sub Gerar_PainelExecutivo()` | `PAINEL EXECUTIVO` |
+| 5423 | `Sub Gerar_ServicoSemMaterial()` | `SERVICO SEM MATERIAL` |
+| 5522 | `Sub Gerar_PortfolioObra()` | `PORTFOLIO OBRA` |
+| 5658 | `Sub Gerar_NaoClassificados()` | `NAO CLASSIFICADOS` |
+| 5741 | `Sub Gerar_RacionalizacaoCOM()` | `RACIONALIZACAO COM` |
+| 6445 | `Sub Gerar_MatVsServAT()` | `MAT vs SERV AT` (módulo AT) |
+| 7694 | `Sub CriarPremissas()` | `PREMISSAS` |
 
 ### Helpers de ANALISE DE CA
-3331 `ValorCat` · 3336 `CategoriaAnaliseCA` · 3384 `CategoriaPorClasseCusto` · 3399 `ClasseCustoDadosOutros` · 3405 `MapCategoriaCA`
+4181 `ValorCat` · 4186 `CategoriaAnaliseCA` · 4234 `CategoriaPorClasseCusto` · 4249 `ClasseCustoDadosOutros` · 4255 `MapCategoriaCA`
 
 ### Helpers de ALERTAS
-4012 `EscreverCardAlerta` · 4034 `EscreverCabecalhoAlerta`
+4863 `EscreverCardAlerta` · 4885 `EscreverCabecalhoAlerta`
 
 ### Helpers de RACIONALIZACAO COM
-5052 `CriarMapaNT006_RC` · 5144 `AddMatRC` · 5166 `EhPepEmergencia` · 5171 `AtvPrevista`
+5903 `CriarMapaNT006_RC` · 5995 `AddMatRC` · 6017 `EhPepEmergencia` · 6022 `AtvPrevista`
 
 ### Classes de viagem
-4545 `EhClasseViagem` · 4556 `DescClasseViagem`
+5396 `EhClasseViagem` · 5407 `DescClasseViagem`
 
 ## 7. Escrita, ordenação e formatação de abas
 
 | Linha | Procedimento |
 |------:|--------------|
-| 4149 | `Sub EscreverAba(nome, outp())` |
-| 4187 | `Sub OrdenarAba(ws, nome, ...)` |
-| 5194 | `Sub AplicarFreeze(ws, celula, ...)` |
-| 5211 | `Function CategoriaVeredito(v)` |
-| 5227 | `Sub ColorirColunaVeredito(ws, jc, nR)` |
-| 5249 | `Sub PintarRunVeredito(ws, jc, ...)` |
-| 5269 | `Sub PintarStatusRC(ws, linIni, ...)` |
-| 5412 | `Function EhColunaVeredito(hh)` |
-| 5419 | `Function CorAba(nome)` |
-| 5437 | `Function FormatoColuna(hh)` |
-| 5462 | `Sub FormatarVisualAba(ws, nome, ...)` |
-| 5569 | `Sub OrganizarAbas()` |
+| 5000 | `Sub EscreverAba(nome, outp())` |
+| 5038 | `Sub OrdenarAba(ws, nome, ...)` |
+| 6045 | `Sub AplicarFreeze(ws, celula, ...)` |
+| 6062 | `Function CategoriaVeredito(v)` |
+| 6078 | `Sub ColorirColunaVeredito(ws, jc, nR)` |
+| 6100 | `Sub PintarRunVeredito(ws, jc, ...)` |
+| 6120 | `Sub PintarStatusRC(ws, linIni, ...)` |
+| 6264 | `Function EhColunaVeredito(hh)` |
+| 6271 | `Function CorAba(nome)` |
+| 6289 | `Function FormatoColuna(hh)` |
+| 6314 | `Sub FormatarVisualAba(ws, nome, ...)` |
+| 6421 | `Sub OrganizarAbas()` |
 
 ## 8. Configuração (aba CONFIG)
 
 | Linha | Procedimento |
 |------:|--------------|
-| 5289 | `Sub GarantirConfig()` |
-| 5345 | `Sub CarregarConfig()` |
-| 5372 | `Function CfgTxt(chave, padrao)` |
-| 5383 | `Function CfgNum(chave, padrao)` |
-| 5393 | `Function CaminhoCatalogo(chave, padrao)` |
+| 6140 | `Sub GarantirConfig()` |
+| 6197 | `Sub CarregarConfig()` |
+| 6224 | `Function CfgTxt(chave, padrao)` |
+| 6235 | `Function CfgNum(chave, padrao)` |
+| 6245 | `Function CaminhoCatalogo(chave, padrao)` |
 
 ## 9. Módulo AT (`MAT vs SERV AT`)
 
 | Linha | Procedimento |
 |------:|--------------|
-| 5613 | `Sub CarregarDados_AT()` |
-| 5671 | `Sub CarregarCorresp()` |
-| 5737 | `Function AcharAbaCorresp()` |
-| 5749 | `Function AchaCorrespNoWb(wb)` |
-| 5767 | `Function NomeNorm(s)` |
-| 5781 | `Sub AplicarRegrasPreAgrupamento()` |
-| 5828 | `Sub AgruparItens()` |
-| 5899 | `Sub AplicarRegrasPosAgrupamento()` |
-| 6034 | `Sub PadronizarCls2()` |
-| 6080 | `Sub CalcularMatSrv()` |
-| 6191 | `Sub CalcularAderencia()` |
-| 6399 | `Sub CalcularTipoCusto()` |
-| 6415 | `Sub CalcularPctMop()` |
-| 6454 | `Sub OrdenarPorGrupo()` |
-| 6495 | `Sub QuickSortIdx(keys, idx, lo, hi)` |
-| 6516 | `Function DeveOrdenar(a, b)` |
-| 6537 | `Function TipoOrdem(a)` |
-| 6547 | `Sub EscreverAbaAT()` |
+| 6465 | `Sub CarregarDados_AT()` |
+| 6523 | `Sub CarregarCorresp()` |
+| 6589 | `Function AcharAbaCorresp()` |
+| 6601 | `Function AchaCorrespNoWb(wb)` |
+| 6619 | `Function NomeNorm(s)` |
+| 6633 | `Sub AplicarRegrasPreAgrupamento()` |
+| 6680 | `Sub AgruparItens()` |
+| 6751 | `Sub AplicarRegrasPosAgrupamento()` |
+| 6886 | `Sub PadronizarCls2()` |
+| 6932 | `Sub CalcularMatSrv()` |
+| 7043 | `Sub CalcularAderencia()` |
+| 7251 | `Sub CalcularTipoCusto()` |
+| 7267 | `Sub CalcularPctMop()` |
+| 7306 | `Sub OrdenarPorGrupo()` |
+| 7347 | `Sub QuickSortIdx(keys, idx, lo, hi)` |
+| 7368 | `Function DeveOrdenar(a, b)` |
+| 7389 | `Function TipoOrdem(a)` |
+| 7399 | `Sub EscreverAbaAT()` |
 
 ### Helpers AT (códigos/serviços)
-6723 `CleanCod` · 6731 `TemSaldo` · 6735 `ContemPalavra` · 6739 `EhAutoCorrespondente` · 6749 `EhNaCorresp` · 6759 `GetTipoServico` · 6774 `GetGrupoKey` · 6810 `PepExisteComSufixo` · 6820 `PepTemMob`
+7575 `CleanCod` · 7583 `TemSaldo` · 7587 `ContemPalavra` · 7591 `EhAutoCorrespondente` · 7601 `EhNaCorresp` · 7611 `GetTipoServico` · 7626 `GetGrupoKey` · 7662 `PepExisteComSufixo` · 7672 `PepTemMob`
 
 ## 10. Helpers de PREMISSAS
-7073 `SecaoTitulo` · 7085 `TabelaCabecalho` · 7100 `LinhaDados` · 7129 `AplicarBordas`
+7925 `SecaoTitulo` · 7937 `TabelaCabecalho` · 7952 `LinhaDados` · 7981 `AplicarBordas`
 
 ---
 
@@ -213,3 +215,9 @@ Versão atual: **7.166 linhas · 63 Subs · 72 Functions** (módulo `AnaliseCKCP
 - Regra: PEP que só tem família **UAR** (sem UC) não deve gerar alerta "SEM UC" — UAR é equivalente a UC. Já era aplicado às 6 famílias UAR fixas (`CP_CS_MD`, `TER_LEITURA`, `RELE`, `BOMBA SUBM`, `PAINEL CONTR EXAUSTOR`, `CONTROLADOR`), que são excluídas de todas as seções de ALERTAS CRÍTICOS e ficam `APROVADO` em MATERIAL vs SERVICO.
 - **Limitação**: os catálogos ATUAIS não trazem "UAR" em nenhuma coluna estruturada (CLS1/2/3, TIPO_APLICACAO) — só em texto livre. Logo, famílias UAR fora das 6 fixas não são reconhecidas automaticamente.
 - **Solução**: nova chave CONFIG `FAM_UAR` (`CarregarTipoClassif`) — lista de famílias (CLS2) a tratar como UAR, separadas por `;`. Declaração explícita **sobrepõe** a tabela fixa. Ex.: `FAM_UAR = SISTEMA CFTV;CERCA ELETRICA`.
+
+### Cobertura de classificação de famílias (804 famílias)
+
+- **Antes**: só ~90 famílias tinham TIPO (UC/COM/UAR) na tabela curada `dTipoCls`; ~1.162 famílias dos catálogos ATUAIS ficavam sem TIPO (resolvidas só pelo fallback de CLS3 em runtime, restrito ao MATERIAL vs SERVICO e ALERTAS).
+- **Agora**: `CarregarTipoClassifAuto` embute **804 famílias** com TIPO (UC/COM) derivado do **CLS3 dominante** do catálogo de materiais (maioria `MAT. UC` → UC, `MAT. COM` → COM). Classificação consistente em toda a cadeia (portfólio, serviço sem material, etc.), não só nos dois pontos com fallback.
+- **Prioridade preservada**: ordem de carga = curadas (`CarregarTipoClassif`) → auto (preenche lacunas, `AddTipoCls` não sobrepõe) → `FAM_UAR` (override explícito). Famílias só-`RISCO`/`OUTROS` (sem UC/COM) e ruído (`(ANE)`, `SUCATA`, `LICENCA`) ficam de fora.
