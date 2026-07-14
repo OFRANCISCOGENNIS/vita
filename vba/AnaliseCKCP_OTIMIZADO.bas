@@ -2460,6 +2460,17 @@ Private Sub CarregarTipoClassif()
             If key <> "" And Not dTipoCls.Exists(key) Then dTipoCls(key) = Trim$(kv(1))
         End If
     Next i
+
+    ' Familias UAR adicionais declaradas na CONFIG (chave FAM_UAR, separadas por ;).
+    ' UAR e equivalente a UC: PEP com essas familias nao gera alerta "SEM UC".
+    Dim famUAR As String: famUAR = CfgTxt("FAM_UAR", "")
+    If famUAR <> "" Then
+        parts = Split(famUAR, ";")
+        For i = 0 To UBound(parts)
+            key = NormClassif(parts(i))
+            If key <> "" Then dTipoCls(key) = "UAR"   ' sobrepoe (declaracao explicita vence)
+        Next i
+    End If
 End Sub
 
 ' De-para CLS2 de SERVICO -> familia de MATERIAL equivalente. Regulariza
@@ -5335,7 +5346,8 @@ Private Sub GarantirConfig()
         Array("CLASSES_VIAGEM", "8111290000;8210390000;8210550000", "Classes de custo de viagem (Alimentacao;Passagem;Hospedagem)"), _
         Array("CLASSE_COMBUSTIVEL", "8119980000", "Classe de custo de combustiveis -> categoria OUTROS na ANALISE DE CA"), _
         Array("EQUIV_SRV_MAT", "", "De-para extra CLS2 servico=familia material (ex.: JUMPER=ALCA;X=Y)"), _
-        Array("SRV_PURO", "", "Familias extra de servico sem material esperado (separadas por ;)"))
+        Array("SRV_PURO", "", "Familias extra de servico sem material esperado (separadas por ;)"), _
+        Array("FAM_UAR", "", "Familias UAR extra (equivalentes a UC; nao geram alerta SEM UC). Separadas por ;"))
 
     ' indexa chaves ja existentes
     Dim ult As Long: ult = ws.Cells(ws.Rows.Count, 1).End(xlUp).Row

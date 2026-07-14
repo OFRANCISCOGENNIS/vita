@@ -1,7 +1,7 @@
 # AnaliseCKCP_OTIMIZADO — Documentação completa
 
 Documentação de referência do módulo VBA `vba/AnaliseCKCP_OTIMIZADO.bas`.
-Versão atual: **7.154 linhas · 63 Subs · 72 Functions** (módulo `AnaliseCKCP`).
+Versão atual: **7.166 linhas · 63 Subs · 72 Functions** (módulo `AnaliseCKCP`).
 
 > Para visão geral de arquitetura, fluxo e regras de negócio, ver `CLAUDE.md` e `ARCHITECTURE.md`.
 > Este arquivo é o **índice detalhado por linha** de todos os procedimentos.
@@ -207,3 +207,9 @@ Versão atual: **7.154 linhas · 63 Subs · 72 Functions** (módulo `AnaliseCKCP
 - **Sintoma**: PEP com material UC recebia veredito/alerta `SEM UC`.
 - **Causa**: a detecção de família UC dependia só de `TipoDaClassif(CLS2)` (tabela fixa `dTipoCls`), e ~1.162 famílias de material dos catálogos ATUAIS não estão nessa tabela → não contavam como UC.
 - **Fix**: quando a família não tem TIPO na tabela, usa o CLS3 real do item (`MAT. UC`/`MAT. COM`) como fallback. Corrigido nos dois pontos de detecção: `Gerar_MaterialVsServico` (novo `dFamTipo` por família, a partir do CLS3) e `Gerar_AlertasCriticos` (seção A "PEPs sem UC", fallback inline por linha).
+
+### UAR equivalente a UC (não alertar "SEM UC")
+
+- Regra: PEP que só tem família **UAR** (sem UC) não deve gerar alerta "SEM UC" — UAR é equivalente a UC. Já era aplicado às 6 famílias UAR fixas (`CP_CS_MD`, `TER_LEITURA`, `RELE`, `BOMBA SUBM`, `PAINEL CONTR EXAUSTOR`, `CONTROLADOR`), que são excluídas de todas as seções de ALERTAS CRÍTICOS e ficam `APROVADO` em MATERIAL vs SERVICO.
+- **Limitação**: os catálogos ATUAIS não trazem "UAR" em nenhuma coluna estruturada (CLS1/2/3, TIPO_APLICACAO) — só em texto livre. Logo, famílias UAR fora das 6 fixas não são reconhecidas automaticamente.
+- **Solução**: nova chave CONFIG `FAM_UAR` (`CarregarTipoClassif`) — lista de famílias (CLS2) a tratar como UAR, separadas por `;`. Declaração explícita **sobrepõe** a tabela fixa. Ex.: `FAM_UAR = SISTEMA CFTV;CERCA ELETRICA`.
