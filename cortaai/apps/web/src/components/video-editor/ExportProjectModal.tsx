@@ -16,8 +16,11 @@ import { Modal } from "@/components/ui/modal";
 import { Progress } from "@/components/ui/progress";
 
 const RESOLUTIONS = [
-  { id: "1080p", label: "Full HD", shortSide: 1080, hint: "recomendado" },
   { id: "720p", label: "HD", shortSide: 720, hint: "mais rápido" },
+  { id: "1080p", label: "Full HD", shortSide: 1080, hint: "recomendado" },
+  { id: "1440p", label: "2K", shortSide: 1440, hint: "nítido" },
+  { id: "2160p", label: "4K", shortSide: 2160, hint: "pesado" },
+  { id: "4320p", label: "8K", shortSide: 4320, hint: "experimental" },
 ] as const;
 
 const FPS_OPTIONS = [24, 30, 60] as const;
@@ -41,6 +44,7 @@ export function ExportProjectModal({ open, onClose }: { open: boolean; onClose: 
 
   const supported = isExportSupported();
   const durationMs = projectDurationMs(project.tracks);
+  const heavyRes = resolution === "1440p" || resolution === "2160p" || resolution === "4320p";
 
   async function startExport() {
     setExporting(true);
@@ -114,7 +118,7 @@ export function ExportProjectModal({ open, onClose }: { open: boolean; onClose: 
 
         <div>
           <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-zinc-500">Resolução</p>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-3 gap-2">
             {RESOLUTIONS.map((r) => (
               <button
                 key={r.id}
@@ -131,6 +135,14 @@ export function ExportProjectModal({ open, onClose }: { open: boolean; onClose: 
               </button>
             ))}
           </div>
+          {heavyRes && (
+            <p className="mt-2 flex items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-200">
+              <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+              {resolution === "4320p"
+                ? "8K é experimental: exige um computador forte e bastante memória — pode demorar muito ou falhar em celulares. Se falhar, use 4K."
+                : "Resolução alta deixa a exportação mais lenta e o arquivo maior. Acima de 1080p pode sair em WebM (VP9) quando o navegador não codifica H.264 nesse tamanho."}
+            </p>
+          )}
         </div>
 
         <div>

@@ -106,11 +106,20 @@ export async function pickCodecs(width: number, height: number, wantAudio: boole
     }
   };
 
-  // MP4 (H.264 + AAC) — o mais compatível para redes sociais.
-  if (await tryVideo("avc1.42001f")) {
-    const aacOk = !wantAudio || (await tryAudio("mp4a.40.2", 48000));
-    if (aacOk) {
-      return { container: "mp4", videoCodec: "avc1.42001f", audioCodec: wantAudio ? "mp4a.40.2" : null, mimeType: "video/mp4", ext: "mp4" };
+  // MP4 (H.264 + AAC) — o mais compatível para redes sociais. Acima de 1080p
+  // tenta perfis High com nível maior (1440p/4K/8K); mantém Baseline 3.1 como
+  // padrão para ≤1080p (comportamento validado). Se nenhum H.264 servir na
+  // resolução pedida, cai para VP9/WebM (que suporta 4K/8K).
+  const px = width * height;
+  const h264Candidates: string[] = [];
+  if (px > 2_100_000) h264Candidates.push("avc1.640033", "avc1.64002a"); // High L5.1 / L4.2
+  h264Candidates.push("avc1.42001f"); // Baseline L3.1
+  for (const codec of h264Candidates) {
+    if (await tryVideo(codec)) {
+      const aacOk = !wantAudio || (await tryAudio("mp4a.40.2", 48000));
+      if (aacOk) {
+        return { container: "mp4", videoCodec: codec, audioCodec: wantAudio ? "mp4a.40.2" : null, mimeType: "video/mp4", ext: "mp4" };
+      }
     }
   }
   // WebM (VP9/VP8 + Opus) — sempre presente no Chromium.
