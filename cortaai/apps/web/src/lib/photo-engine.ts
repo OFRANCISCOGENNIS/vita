@@ -1812,3 +1812,39 @@ export function applyLightingCanvas(src: HTMLCanvasElement, presetId: string, in
   }
   return out;
 }
+
+/**
+ * REDUZIR RUÍDO (1 clique): suaviza a textura fina da imagem inteira
+ * preservando bordas — mistura com a versão borrada apenas onde a diferença
+ * de luma é pequena (ruído/grão), mantendo contornos nítidos. Estilo Topaz
+ * Denoise, honesto (sem IA). `strength` 0..100.
+ */
+export function denoisePhotoCanvas(src: HTMLCanvasElement, strength = 60): HTMLCanvasElement {
+  const w = src.width;
+  const h = src.height;
+  const sctx = src.getContext("2d");
+  if (!sctx) return src;
+  const img = sctx.getImageData(0, 0, w, h);
+  const orig = img.data;
+
+  const blurred = new ImageData(new Uint8ClampedArray(orig), w, h);
+  boxBlurImageData(blurred, Math.max(1, Math.round(Math.min(w, h) / 400) + 1), 2);
+  const bd = blurred.data;
+
+  const s01 = Math.max(0, Math.min(1, strength / 100));
+  for (let i = 0; i < orig.length; i += 4) {
+    const lo = 0.299 * orig[i] + 0.587 * orig[i + 1] + 0.114 * orig[i + 2];
+    const lb = 0.299 * bd[i] + 0.587 * bd[i + 1] + 0.114 * bd[i + 2];
+    // diferença grande = borda real → preserva; pequena = ruído → suaviza
+    const edgeKeep = Math.max(0, 1 - Math.abs(lo - lb) / 28);
+    const alpha = edgeKeep * s01 * 0.9;
+    if (alpha <= 0) continue;
+    orig[i] = Math.round(orig[i] + (bd[i] - orig[i]) * alpha);
+    orig[i + 1] = Math.round(orig[i + 1] + (bd[i + 1] - orig[i + 1]) * alpha);
+    orig[i + 2] = Math.round(orig[i + 2] + (bd[i + 2] - orig[i + 2]) * alpha);
+  }
+
+  const out = makeCanvas(w, h);
+  out.getContext("2d")!.putImageData(img, 0, 0);
+  return out;
+}

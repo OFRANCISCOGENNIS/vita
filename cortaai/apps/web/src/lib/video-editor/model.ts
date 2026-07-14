@@ -84,6 +84,8 @@ export interface Clip {
   audioFx?: { denoise?: boolean; voice?: boolean };
   /** Chroma key: remove a cor (fundo verde/azul) do clipe de vídeo. */
   chroma?: { color: string; tolerance: number; softness: number };
+  /** Color grading por clipe (estilo Lumetri): valores -100..100 / hue -180..180. */
+  colorAdjust?: { brightness: number; contrast: number; saturation: number; hue: number };
   // Texto (só para clips em trilha 'text'): conteúdo e estilo básico.
   text?: {
     content: string;
@@ -270,6 +272,7 @@ function sanitizeClip(c: Clip, trackId: string): Clip {
         ? { denoise: c.audioFx.denoise === true || undefined, voice: c.audioFx.voice === true || undefined }
         : undefined,
     chroma: sanitizeChroma(c.chroma),
+    colorAdjust: sanitizeColorAdjust(c.colorAdjust),
     animIn: sanitizeAnim(c.animIn),
     animOut: sanitizeAnim(c.animOut),
     fadeInMs: typeof c.fadeInMs === "number" && c.fadeInMs > 0 ? Math.min(10_000, Math.round(c.fadeInMs)) : undefined,
@@ -278,6 +281,22 @@ function sanitizeClip(c: Clip, trackId: string): Clip {
     eq: sanitizeEq(c.eq),
     text: c.text,
   };
+}
+
+function sanitizeColorAdjust(
+  ca: unknown,
+): { brightness: number; contrast: number; saturation: number; hue: number } | undefined {
+  if (!ca || typeof ca !== "object") return undefined;
+  const c = ca as { brightness?: unknown; contrast?: unknown; saturation?: unknown; hue?: unknown };
+  const band = (v: unknown, lim: number) => Math.min(lim, Math.max(-lim, typeof v === "number" && Number.isFinite(v) ? v : 0));
+  const out = {
+    brightness: band(c.brightness, 100),
+    contrast: band(c.contrast, 100),
+    saturation: band(c.saturation, 100),
+    hue: band(c.hue, 180),
+  };
+  if (out.brightness === 0 && out.contrast === 0 && out.saturation === 0 && out.hue === 0) return undefined;
+  return out;
 }
 
 function sanitizeChroma(ch: unknown): { color: string; tolerance: number; softness: number } | undefined {

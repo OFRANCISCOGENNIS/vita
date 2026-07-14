@@ -81,6 +81,13 @@ export function ClipInspector() {
     updateClip(clip.id, { transform: { ...clip.transform, ...patch } });
   }
 
+  function patchColorAdjust(patch: Partial<{ brightness: number; contrast: number; saturation: number; hue: number }>) {
+    const base = clip.colorAdjust ?? { brightness: 0, contrast: 0, saturation: 0, hue: 0 };
+    const next = { ...base, ...patch };
+    const flat = next.brightness === 0 && next.contrast === 0 && next.saturation === 0 && next.hue === 0;
+    updateClip(clip.id, { colorAdjust: flat ? undefined : next });
+  }
+
   function patchAudioFx(patch: Partial<{ denoise?: boolean; voice?: boolean }>) {
     const next = { ...(clip.audioFx ?? {}), ...patch };
     const empty = !next.denoise && !next.voice;
@@ -284,6 +291,16 @@ export function ClipInspector() {
               <Slider label="Suavizar borda" value={clip.chroma.softness} min={0} max={0.5} step={0.01} onChange={(v) => updateClip(clip.id, { chroma: { ...clip.chroma!, softness: v } })} format={(v) => `${Math.round(v * 100)}%`} />
             </div>
           )}
+        </Section>
+      )}
+
+      {/* color grading por clipe (estilo Lumetri) */}
+      {isVisual && !clip.text && (
+        <Section title="Cor (grading)">
+          <Slider label="Brilho" value={clip.colorAdjust?.brightness ?? 0} min={-100} max={100} step={1} onChange={(v) => patchColorAdjust({ brightness: v })} format={(v) => `${v > 0 ? "+" : ""}${Math.round(v)}`} />
+          <Slider label="Contraste" value={clip.colorAdjust?.contrast ?? 0} min={-100} max={100} step={1} onChange={(v) => patchColorAdjust({ contrast: v })} format={(v) => `${v > 0 ? "+" : ""}${Math.round(v)}`} />
+          <Slider label="Saturação" value={clip.colorAdjust?.saturation ?? 0} min={-100} max={100} step={1} onChange={(v) => patchColorAdjust({ saturation: v })} format={(v) => `${v > 0 ? "+" : ""}${Math.round(v)}`} />
+          <Slider label="Matiz" value={clip.colorAdjust?.hue ?? 0} min={-180} max={180} step={1} onChange={(v) => patchColorAdjust({ hue: v })} format={(v) => `${Math.round(v)}°`} />
         </Section>
       )}
 

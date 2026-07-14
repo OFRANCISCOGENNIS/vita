@@ -5,15 +5,40 @@
 // Spotify — faixas protegidas não podem ir num vídeo exportado.
 
 import { useState } from "react";
-import { Loader2, Music2, Upload } from "lucide-react";
+import { Loader2, Mic2, Music2, Upload } from "lucide-react";
 import { fileKind, registerBlob, registerFile } from "@/lib/video-editor/media-registry";
 import { generateSfx, generateTrack, MUSIC_PRESETS, SFX_PRESETS } from "@/lib/video-editor/music-gen";
+import { generateSpeech, TTS_VOICES } from "@/lib/ai/tts";
 import { useVideoEditor } from "@/store/video-editor";
 import { toast } from "@/store/toast";
 
 export function MusicPanel() {
   const addClipFromSource = useVideoEditor((s) => s.addClipFromSource);
   const [busy, setBusy] = useState<string | null>(null);
+  const [ttsText, setTtsText] = useState("");
+  const [ttsVoice, setTtsVoice] = useState(TTS_VOICES[0].id);
+
+  async function addNarration() {
+    if (!ttsText.trim()) {
+      toast("Digite o texto da narração", { variant: "error" });
+      return;
+    }
+    setBusy("tts");
+    try {
+      const result = await generateSpeech(ttsText, ttsVoice, (p) => setBusy(p.message));
+      const source = await registerBlob(result.blob, "Narração (IA)", "audio", result.durationMs);
+      addClipFromSource(source);
+      toast("Narração adicionada à timeline", { description: `${(result.durationMs / 1000).toFixed(1)}s de fala gerada no aparelho.` });
+      setTtsText("");
+    } catch {
+      toast("Falha ao gerar a narração", {
+        description: "A voz de IA (~80 MB) baixa na 1ª vez e precisa de internet estável. Tente de novo.",
+        variant: "error",
+      });
+    } finally {
+      setBusy(null);
+    }
+  }
 
   async function importOwn(files: FileList | null) {
     if (!files) return;
@@ -110,6 +135,45 @@ export function MusicPanel() {
             </button>
           ))}
         </div>
+      </div>
+
+      <div>
+        <p className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+          <Mic2 className="h-3.5 w-3.5" aria-hidden /> Narração (IA)
+        </p>
+        <textarea
+          rows={2}
+          value={ttsText}
+          onChange={(e) => setTtsText(e.target.value)}
+          placeholder="Digite o texto que a voz vai falar…"
+          aria-label="Texto da narração"
+          className="w-full rounded-xl border border-line bg-surface-1 px-2.5 py-2 text-xs text-white placeholder:text-zinc-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+        />
+        <div className="mt-1.5 flex items-center gap-2">
+          <select
+            value={ttsVoice}
+            onChange={(e) => setTtsVoice(e.target.value)}
+            aria-label="Voz da narração"
+            className="min-w-0 flex-1 rounded-lg border border-line bg-surface-1 px-2 py-1.5 text-xs text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+          >
+            {TTS_VOICES.map((v) => (
+              <option key={v.id} value={v.id}>
+                {v.name}
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={() => void addNarration()}
+            disabled={busy !== null}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-600 px-3 py-1.5 text-xs font-semibold text-white transition-all hover:from-violet-500 hover:to-fuchsia-500 active:scale-95 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+          >
+            {busy && busy !== "import" ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : <Mic2 className="h-3.5 w-3.5" aria-hidden />}
+            Gerar
+          </button>
+        </div>
+        <p className="mt-1 text-[10px] leading-relaxed text-zinc-600">
+          Voz de IA gerada no seu aparelho (baixa ~80 MB na 1ª vez). Vozes em português incluídas.
+        </p>
       </div>
 
       <p className="text-[11px] leading-relaxed text-zinc-600">
