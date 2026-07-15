@@ -362,14 +362,14 @@ export function PreviewStage() {
     <div className="flex h-full min-h-0 flex-col gap-2">
       <div
         ref={stageRef}
-        className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-2xl border border-white/[0.06] bg-[#050508] bg-[radial-gradient(ellipse_50%_50%_at_50%_45%,rgba(139,92,246,0.07),transparent)]"
+        className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-2xl bg-[#050508]"
       >
         <canvas
           ref={canvasRef}
           width={pw}
           height={ph}
           style={{ width: fit.w, height: fit.h }}
-          className="anim-rise rounded-lg bg-black shadow-[0_0_0_1px_rgba(255,255,255,0.06),0_24px_80px_-24px_rgba(0,0,0,0.9),0_0_64px_-16px_rgba(139,92,246,0.25)]"
+          className="anim-rise rounded-lg bg-black shadow-[0_0_0_1px_rgba(255,255,255,0.05),0_16px_48px_-16px_rgba(0,0,0,0.8)]"
         />
         <span className="pointer-events-none absolute left-3 top-2.5 hidden items-center gap-1.5 lg:flex">
           <span className="text-[10px] font-medium text-zinc-500">Pré-visualização</span>
@@ -385,7 +385,7 @@ export function PreviewStage() {
       </div>
 
       {/* transporte: tempo à esquerda, frame-a-frame + play central, proporção/tela cheia à direita */}
-      <div className="relative flex shrink-0 items-center rounded-2xl border border-white/[0.08] bg-surface-1/60 px-3 py-2 backdrop-blur-xl">
+      <div className="relative flex shrink-0 items-center rounded-2xl bg-surface-1/50 px-3 py-1.5 backdrop-blur-xl">
         <span className="font-mono text-xs tabular-nums text-zinc-300">
           {fmt(playheadMs)} <span className="text-zinc-600">/ {fmt(durationMs)}</span>
         </span>

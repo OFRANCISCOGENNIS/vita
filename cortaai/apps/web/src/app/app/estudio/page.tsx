@@ -14,6 +14,7 @@ import {
   AudioLines,
   Captions,
   ChevronDown,
+  ChevronsLeft,
   Circle,
   Clapperboard,
   Download,
@@ -116,6 +117,7 @@ export default function EstudioPage() {
   const [sheet, setSheet] = useState<Sheet>(null);
   const [rail, setRail] = useState<RailPanel>("ferramentas");
   const [toolsOpen, setToolsOpen] = useState(true);
+  const [railOpen, setRailOpen] = useState(true);
   const [exportOpen, setExportOpen] = useState(false);
   const [projectsOpen, setProjectsOpen] = useState(false);
   const [saveState, setSaveState] = useState<"salvo" | "salvando">("salvo");
@@ -359,22 +361,31 @@ export default function EstudioPage() {
 
       {/* Área principal */}
       <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
-        {/* rail esquerdo com labels (desktop) */}
-        <nav aria-label="Seções do editor" className="hidden shrink-0 flex-col border-r border-white/[0.06] bg-surface-1/40 lg:flex lg:w-[164px]">
-          <div className="editor-scroll min-h-0 flex-1 overflow-y-auto p-2">
+        {/* rail esquerdo — recolhível para só-ícones (estilo CapCut desktop) */}
+        <nav
+          aria-label="Seções do editor"
+          className={cn(
+            "hidden shrink-0 flex-col border-r border-white/[0.05] bg-surface-1/30 transition-[width] duration-300 ease-out lg:flex",
+            railOpen ? "lg:w-[164px]" : "lg:w-[58px]",
+          )}
+        >
+          <div className="editor-scroll min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-2">
             <Link
               href="/app"
-              className="flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-xs font-medium text-zinc-400 transition-colors hover:bg-white/5 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+              title="Início"
+              className="flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-xs font-medium text-zinc-400 transition-all hover:bg-white/5 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
             >
-              <Home className="h-4 w-4" aria-hidden /> Início
+              <Home className="h-4 w-4 shrink-0" aria-hidden /> {railOpen && "Início"}
             </Link>
             <button
               onClick={() => setProjectsOpen(true)}
-              className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-xs font-medium text-zinc-400 transition-colors hover:bg-white/5 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+              title="Projetos"
+              aria-label="Projetos"
+              className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-xs font-medium text-zinc-400 transition-all hover:bg-white/5 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
             >
-              <FolderKanban className="h-4 w-4" aria-hidden /> Projetos
+              <FolderKanban className="h-4 w-4 shrink-0" aria-hidden /> {railOpen && "Projetos"}
             </button>
-            <div className="my-1.5 border-t border-white/[0.06]" />
+            <div className="my-1.5 border-t border-white/[0.05]" />
             {RAIL_ITEMS.map((item) => (
               <button
                 key={item.id}
@@ -383,21 +394,39 @@ export default function EstudioPage() {
                   setToolsOpen(true);
                 }}
                 aria-pressed={rail === item.id}
+                aria-label={item.label}
+                title={item.label}
                 className={cn(
-                  "flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400",
-                  rail === item.id ? "bg-violet-500/15 text-violet-200 ring-1 ring-inset ring-violet-400/30" : "text-zinc-400 hover:bg-white/5 hover:text-white",
+                  "relative flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-xs font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400",
+                  rail === item.id ? "bg-violet-500/15 text-violet-200" : "text-zinc-400 hover:bg-white/5 hover:text-white",
                 )}
               >
-                <item.icon className={cn("h-4 w-4", item.id === "gravar" && "text-rose-400")} aria-hidden />
-                {item.label}
+                <item.icon className={cn("h-4 w-4 shrink-0", item.id === "gravar" && "text-rose-400")} aria-hidden />
+                {railOpen && item.label}
                 {item.id === "midia" && sourceCount > 0 && (
-                  <span className="ml-auto rounded-full bg-violet-500/20 px-1.5 text-[9px] font-bold text-violet-300">{sourceCount}</span>
+                  <span
+                    className={cn(
+                      "rounded-full bg-violet-500/20 px-1.5 text-[9px] font-bold text-violet-300",
+                      railOpen ? "ml-auto" : "absolute -right-0.5 -top-0.5",
+                    )}
+                  >
+                    {sourceCount}
+                  </span>
                 )}
               </button>
             ))}
           </div>
           <div className="shrink-0 p-2">
-            <StorageCard onManage={() => setProjectsOpen(true)} />
+            {railOpen && <StorageCard onManage={() => setProjectsOpen(true)} />}
+            <button
+              onClick={() => setRailOpen((v) => !v)}
+              aria-expanded={railOpen}
+              aria-label={railOpen ? "Recolher menu" : "Expandir menu"}
+              title={railOpen ? "Recolher menu" : "Expandir menu"}
+              className="mt-1.5 flex w-full items-center justify-center rounded-xl py-1.5 text-zinc-500 transition-all hover:bg-white/5 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+            >
+              <ChevronsLeft className={cn("h-4 w-4 transition-transform duration-300", !railOpen && "rotate-180")} />
+            </button>
           </div>
         </nav>
 
@@ -413,7 +442,7 @@ export default function EstudioPage() {
           {/* faixa inferior larga: encolhe (com scroll próprio) para nunca engolir o vídeo */}
           <div
             className={cn(
-              "hidden min-h-0 flex-col border-t border-white/[0.06] bg-surface-1/25 lg:flex",
+              "hidden min-h-0 flex-col border-t border-white/[0.05] bg-surface-1/20 lg:flex",
               toolsOpen ? "shrink" : "shrink-0",
             )}
             style={toolsOpen ? { maxHeight: "32dvh", minHeight: 92 } : undefined}
@@ -424,21 +453,26 @@ export default function EstudioPage() {
               className="flex shrink-0 items-center justify-between px-3 pb-1 pt-2 text-left text-[11px] font-semibold uppercase tracking-wide text-zinc-500 transition-colors hover:text-zinc-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
             >
               {rail === "ferramentas" ? "Ferramentas de edição" : PANEL_TITLES[rail]}
-              <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", !toolsOpen && "rotate-180")} aria-hidden />
+              <ChevronDown className={cn("h-3.5 w-3.5 transition-transform duration-300", !toolsOpen && "rotate-180")} aria-hidden />
             </button>
-            {toolsOpen && (
-              <div key={rail} className="panel-fade editor-scroll min-h-0 flex-1 overflow-y-auto px-3 pb-3">
-                {rail === "ferramentas" && <ToolsPanel onNavigate={setRail} />}
-                {rail === "midia" && <MediaBin />}
-                {rail === "audio" && <MusicPanel />}
-                {rail === "texto" && <TextPanel />}
-                {rail === "legendas" && <CaptionsPanel />}
-                {rail === "transicoes" && <TransitionsPanel />}
-                {rail === "filtros" && <FiltersPanel />}
-                {rail === "efeitos" && <EffectsPanel />}
-                {rail === "gravar" && <RecordPanel />}
+            <div
+              className="grid min-h-0 flex-1 transition-[grid-template-rows] duration-300 ease-out motion-reduce:transition-none"
+              style={{ gridTemplateRows: toolsOpen ? "1fr" : "0fr" }}
+            >
+              <div className="min-h-0 overflow-hidden">
+                <div key={rail} className="panel-fade editor-scroll h-full overflow-y-auto px-3 pb-3">
+                  {rail === "ferramentas" && <ToolsPanel onNavigate={setRail} />}
+                  {rail === "midia" && <MediaBin />}
+                  {rail === "audio" && <MusicPanel />}
+                  {rail === "texto" && <TextPanel />}
+                  {rail === "legendas" && <CaptionsPanel />}
+                  {rail === "transicoes" && <TransitionsPanel />}
+                  {rail === "filtros" && <FiltersPanel />}
+                  {rail === "efeitos" && <EffectsPanel />}
+                  {rail === "gravar" && <RecordPanel />}
+                </div>
               </div>
-            )}
+            </div>
           </div>
         </div>
 
@@ -448,24 +482,16 @@ export default function EstudioPage() {
             <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
               <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden /> Propriedades
             </p>
-            <div className="flex items-center gap-1">
+            {selectedClipId && (
               <button
-                onClick={() => addTextClip("Seu texto")}
-                className="inline-flex items-center gap-1 rounded-lg border border-line px-2 py-1 text-[10px] font-medium text-zinc-300 hover:border-violet-500/50 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+                onClick={() => select(null)}
+                aria-label="Fechar propriedades (desmarcar clipe)"
+                title="Desmarcar clipe"
+                className="rounded-lg p-1 text-zinc-500 transition-colors hover:bg-white/5 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
               >
-                <TypeIcon className="h-3 w-3" aria-hidden /> Texto
+                <ChevronDown className="h-3.5 w-3.5 rotate-[-90deg]" />
               </button>
-              {selectedClipId && (
-                <button
-                  onClick={() => select(null)}
-                  aria-label="Fechar propriedades (desmarcar clipe)"
-                  title="Desmarcar clipe"
-                  className="rounded-lg p-1 text-zinc-500 transition-colors hover:bg-white/5 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
-                >
-                  <ChevronDown className="h-3.5 w-3.5 rotate-[-90deg]" />
-                </button>
-              )}
-            </div>
+            )}
           </div>
           <ClipInspector />
         </aside>

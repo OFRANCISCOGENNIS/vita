@@ -7,12 +7,13 @@
 // vira uma ação no store (histórico undo/redo).
 
 import { useEffect, useRef, useState } from "react";
-import { Copy, Diamond, Music, Repeat, RotateCcw, Snowflake, Trash2, X } from "lucide-react";
+import { Copy, Diamond, Film, Music, Repeat, RotateCcw, Snowflake, Trash2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ANIM_PRESETS } from "@/lib/video-editor/animations";
 import { valueAt } from "@/lib/video-editor/engine";
 import { CLIP_FILTERS, OVERLAY_EFFECTS } from "@/lib/video-editor/filters";
 import { TRANSITIONS } from "@/lib/video-editor/transitions";
+import { projectDurationMs } from "@/lib/video-editor/timeline-math";
 import { registerFile } from "@/lib/video-editor/media-registry";
 import type { AnimatableProperty, BlendMode, Clip, ClipMask, Keyframe } from "@/lib/video-editor/model";
 import { useVideoEditor } from "@/store/video-editor";
@@ -62,10 +63,38 @@ export function ClipInspector() {
     : null;
 
   if (!found) {
+    // estado vazio útil (estilo pro): resumo REAL do projeto atual
+    const dur = projectDurationMs(project.tracks);
+    const clipCount = project.tracks.reduce((n, t) => n + t.clips.length, 0);
     return (
-      <p className="rounded-xl border border-dashed border-line px-3 py-6 text-center text-xs text-zinc-500">
-        Selecione um clipe na timeline para editar as propriedades.
-      </p>
+      <div className="anim-rise space-y-3">
+        <div className="rounded-2xl bg-white/[0.03] p-3">
+          <p className="mb-2 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
+            <Film className="h-3 w-3" aria-hidden /> Projeto
+          </p>
+          <dl className="space-y-1 text-[11px]">
+            <div className="flex justify-between">
+              <dt className="text-zinc-500">Resolução</dt>
+              <dd className="font-mono text-zinc-300">{project.resolution.w}×{project.resolution.h}</dd>
+            </div>
+            <div className="flex justify-between">
+              <dt className="text-zinc-500">Quadros/s</dt>
+              <dd className="font-mono text-zinc-300">{project.fps} fps</dd>
+            </div>
+            <div className="flex justify-between">
+              <dt className="text-zinc-500">Duração</dt>
+              <dd className="font-mono text-zinc-300">{(dur / 1000).toFixed(1)}s</dd>
+            </div>
+            <div className="flex justify-between">
+              <dt className="text-zinc-500">Clipes</dt>
+              <dd className="font-mono text-zinc-300">{clipCount}</dd>
+            </div>
+          </dl>
+        </div>
+        <p className="px-1 text-center text-[11px] leading-relaxed text-zinc-600">
+          Selecione um clipe na timeline para editar as propriedades dele aqui.
+        </p>
+      </div>
     );
   }
 

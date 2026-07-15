@@ -182,7 +182,7 @@ export function TimelineTracks() {
   const hasSelection = selectedClipId != null;
 
   return (
-    <div className="flex flex-col overflow-hidden rounded-2xl border border-white/[0.08] bg-surface-1/60 shadow-[0_-8px_40px_-16px_rgba(0,0,0,0.6)] backdrop-blur-xl">
+    <div className="flex flex-col overflow-hidden rounded-2xl bg-surface-1/50 backdrop-blur-xl">
       {/* barra de ferramentas + zoom */}
       <div className="flex items-center gap-1 border-b border-white/[0.06] px-2 py-1">
         <span className="mr-1 hidden font-mono text-xs text-zinc-400 sm:inline">
