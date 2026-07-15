@@ -10,6 +10,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@breezystack/lamejs": "^1.2.7",
     "lucide-react": "0.454.0",
     "mp4-muxer": "5.2.2",
     "next": "14.2.32",

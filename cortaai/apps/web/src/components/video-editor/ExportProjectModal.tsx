@@ -38,26 +38,33 @@ function readDefaultRes(): (typeof RESOLUTIONS)[number]["id"] {
 
 const FPS_OPTIONS = [24, 30, 60] as const;
 
-const FORMATS: { id: ExportFormat; label: string; hint: string }[] = [
-  { id: "video", label: "Vídeo", hint: "MP4/WebM com áudio" },
-  { id: "gif", label: "GIF", hint: "animado, sem som" },
-  { id: "png-seq", label: "PNG (.zip)", hint: "sequência de quadros" },
+/** Opções de extensão — cada uma mapeia para um formato/contêiner REAL. */
+const FORMATS: { id: string; label: string; hint: string; format: ExportFormat; container?: "mp4" | "webm" }[] = [
+  { id: "mp4", label: "MP4", hint: "vídeo H.264 + AAC", format: "video", container: "mp4" },
+  { id: "webm", label: "WebM", hint: "vídeo VP9, sempre disponível", format: "video", container: "webm" },
+  { id: "gif", label: "GIF", hint: "animado, sem som", format: "gif" },
+  { id: "mp3", label: "MP3", hint: "só o áudio · 192 kbps", format: "mp3" },
+  { id: "wav", label: "WAV", hint: "áudio sem compressão", format: "wav" },
+  { id: "png-seq", label: "PNG (.zip)", hint: "sequência de quadros", format: "png-seq" },
 ];
 
 export function ExportProjectModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const project = useVideoEditor((s) => s.project);
   const sources = useVideoEditor((s) => s.sources);
 
-  const [format, setFormat] = useState<ExportFormat>("video");
+  const [formatId, setFormatId] = useState<string>("mp4");
   const [resolution, setResolution] = useState<(typeof RESOLUTIONS)[number]["id"]>("1080p");
   const [fps, setFps] = useState<(typeof FPS_OPTIONS)[number]>(30);
   const [exporting, setExporting] = useState(false);
   const [progress, setProgress] = useState<{ pct: number; message: string } | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
+  const chosen = FORMATS.find((f) => f.id === formatId) ?? FORMATS[0];
+  const format: ExportFormat = chosen.format;
+  const isAudioOnly = format === "mp3" || format === "wav";
   const supported = isExportSupported();
   const durationMs = projectDurationMs(project.tracks);
-  const heavyRes = resolution === "1440p" || resolution === "2160p" || resolution === "4320p";
+  const heavyRes = !isAudioOnly && (resolution === "1440p" || resolution === "2160p" || resolution === "4320p");
 
   // sincroniza com a resolução padrão escolhida no topo do Estúdio
   useEffect(() => {
@@ -75,6 +82,7 @@ export function ExportProjectModal({ open, onClose }: { open: boolean; onClose: 
         shortSide,
         fps,
         format,
+        container: chosen.container,
         signal: controller.signal,
         onProgress: (p) => setProgress(p),
       });
@@ -86,9 +94,16 @@ export function ExportProjectModal({ open, onClose }: { open: boolean; onClose: 
       a.click();
       a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 30_000);
-      toast(format === "video" ? "Vídeo exportado" : format === "gif" ? "GIF exportado" : "Sequência PNG exportada", {
-        description: format === "video" ? `${result.fileName} — com áudio mixado` : result.fileName,
-      });
+      toast(
+        format === "video"
+          ? "Vídeo exportado"
+          : format === "gif"
+            ? "GIF exportado"
+            : format === "mp3" || format === "wav"
+              ? "Áudio exportado"
+              : "Sequência PNG exportada",
+        { description: format === "video" ? `${result.fileName} — com áudio mixado` : result.fileName },
+      );
       onClose();
     } catch (err) {
       if ((err as DOMException)?.name === "AbortError") {
@@ -119,12 +134,12 @@ export function ExportProjectModal({ open, onClose }: { open: boolean; onClose: 
             {FORMATS.map((f) => (
               <button
                 key={f.id}
-                onClick={() => setFormat(f.id)}
+                onClick={() => setFormatId(f.id)}
                 disabled={exporting}
-                aria-pressed={format === f.id}
+                aria-pressed={formatId === f.id}
                 className={cn(
                   "rounded-xl border px-2 py-2 text-left text-xs transition-colors",
-                  format === f.id ? "border-violet-400 bg-violet-500/20 text-white" : "border-line bg-surface-1 text-zinc-400 hover:text-white",
+                  formatId === f.id ? "border-violet-400 bg-violet-500/20 text-white" : "border-line bg-surface-1 text-zinc-400 hover:text-white",
                 )}
               >
                 <span className="block font-semibold">{f.label}</span>
@@ -134,7 +149,7 @@ export function ExportProjectModal({ open, onClose }: { open: boolean; onClose: 
           </div>
         </div>
 
-        <div>
+        <div className={cn(isAudioOnly && "hidden")}>
           <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-zinc-500">Resolução</p>
           <div className="grid grid-cols-3 gap-2">
             {RESOLUTIONS.map((r) => (
@@ -163,7 +178,7 @@ export function ExportProjectModal({ open, onClose }: { open: boolean; onClose: 
           )}
         </div>
 
-        <div>
+        <div className={cn(isAudioOnly && "hidden")}>
           <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-zinc-500">Quadros por segundo</p>
           <div className="grid grid-cols-3 gap-2">
             {FPS_OPTIONS.map((f) => (
@@ -185,11 +200,17 @@ export function ExportProjectModal({ open, onClose }: { open: boolean; onClose: 
 
         <p className="text-[11px] text-zinc-500">
           Duração do projeto: {(durationMs / 1000).toFixed(1)}s ·{" "}
-          {format === "video"
-            ? "MP4 (H.264) quando o navegador suportar, senão WebM. Áudio dos vídeos e músicas mixados no arquivo."
-            : format === "gif"
-              ? "GIF animado (sem som), reduzido para ~480px e ~15 fps para o arquivo não ficar gigante."
-              : "Um .zip com um PNG por quadro (sem som) — ideal para reeditar em outro programa."}
+          {formatId === "mp4"
+            ? "MP4 (H.264 + AAC) — o mais compatível com redes sociais. Se o navegador não codificar H.264, avisamos e o WebM resolve."
+            : formatId === "webm"
+              ? "WebM (VP9 + Opus) — sempre disponível e toca em qualquer player moderno."
+              : format === "gif"
+                ? "GIF animado (sem som), reduzido para ~480px e ~15 fps para o arquivo não ficar gigante."
+                : format === "mp3"
+                  ? "Só o áudio do projeto (vozes + músicas mixadas) em MP3 192 kbps — codificado no seu aparelho."
+                  : format === "wav"
+                    ? "Só o áudio do projeto em WAV 16-bit sem compressão (arquivo maior, qualidade máxima)."
+                    : "Um .zip com um PNG por quadro (sem som) — ideal para reeditar em outro programa."}
         </p>
 
         {progress && (

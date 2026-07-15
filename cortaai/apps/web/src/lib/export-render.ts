@@ -87,7 +87,12 @@ export interface CodecPlan {
   ext: string;
 }
 
-export async function pickCodecs(width: number, height: number, wantAudio: boolean): Promise<CodecPlan> {
+export async function pickCodecs(
+  width: number,
+  height: number,
+  wantAudio: boolean,
+  prefer?: "auto" | "mp4" | "webm",
+): Promise<CodecPlan> {
   const tryVideo = async (codec: string) => {
     try {
       const res = await VideoEncoder.isConfigSupported({ codec, width, height, bitrate: 6_000_000 });
@@ -111,15 +116,20 @@ export async function pickCodecs(width: number, height: number, wantAudio: boole
   // padrão para ≤1080p (comportamento validado). Se nenhum H.264 servir na
   // resolução pedida, cai para VP9/WebM (que suporta 4K/8K).
   const px = width * height;
-  const h264Candidates: string[] = [];
-  if (px > 2_100_000) h264Candidates.push("avc1.640033", "avc1.64002a"); // High L5.1 / L4.2
-  h264Candidates.push("avc1.42001f"); // Baseline L3.1
-  for (const codec of h264Candidates) {
-    if (await tryVideo(codec)) {
-      const aacOk = !wantAudio || (await tryAudio("mp4a.40.2", 48000));
-      if (aacOk) {
-        return { container: "mp4", videoCodec: codec, audioCodec: wantAudio ? "mp4a.40.2" : null, mimeType: "video/mp4", ext: "mp4" };
+  if (prefer !== "webm") {
+    const h264Candidates: string[] = [];
+    if (px > 2_100_000) h264Candidates.push("avc1.640033", "avc1.64002a"); // High L5.1 / L4.2
+    h264Candidates.push("avc1.42001f"); // Baseline L3.1
+    for (const codec of h264Candidates) {
+      if (await tryVideo(codec)) {
+        const aacOk = !wantAudio || (await tryAudio("mp4a.40.2", 48000));
+        if (aacOk) {
+          return { container: "mp4", videoCodec: codec, audioCodec: wantAudio ? "mp4a.40.2" : null, mimeType: "video/mp4", ext: "mp4" };
+        }
       }
+    }
+    if (prefer === "mp4") {
+      throw new Error("Este navegador não codifica MP4 (H.264) nessa resolução — exporte em WebM, que toca em qualquer player");
     }
   }
   // WebM (VP9/VP8 + Opus) — sempre presente no Chromium.

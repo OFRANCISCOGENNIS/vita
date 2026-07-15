@@ -16,12 +16,14 @@ import type { MediaSource } from "./media-registry";
 export type { ExportProgress, ExportResult };
 export { isExportSupported };
 
-export type ExportFormat = "video" | "gif" | "png-seq";
+export type ExportFormat = "video" | "gif" | "png-seq" | "mp3" | "wav";
 
 export interface ProjectExportOptions {
-  shortSide: number; // 720 | 1080
+  shortSide: number; // 720 | 1080 | 1440 | 2160 | 4320
   fps: number; // 24 | 30 | 60
   format?: ExportFormat; // padrão: video
+  /** Contêiner do vídeo: "auto" escolhe o melhor; "mp4"/"webm" forçam a extensão. */
+  container?: "auto" | "mp4" | "webm";
   onProgress?: (p: ExportProgress) => void;
   signal?: AbortSignal;
 }
@@ -279,6 +281,24 @@ export async function renderProjectToBlob(
 
   const durationMs = Math.min(MAX_EXPORT_MS, projectDurationMs(project.tracks));
   if (durationMs < 200) throw new Error("O projeto está vazio — adicione clipes à timeline");
+
+  // --- exportação SÓ DE ÁUDIO (MP3/WAV) — sem pipeline de vídeo -----------------
+  if (opts.format === "mp3" || opts.format === "wav") {
+    report(5, "Mixando o áudio do projeto…");
+    const audio = await mixProjectAudio(project, sources, durationMs, opts.signal);
+    if (!audio) throw new Error("O projeto não tem áudio para exportar — adicione um clipe com som");
+    throwIfAborted(opts.signal);
+    if (opts.format === "wav") {
+      report(70, "Gerando WAV…");
+      const blob = audioBufferToWav(audio);
+      report(100, "Concluído.");
+      return { blob, mimeType: "audio/wav", fileName: `${slugFile(project.name)}.wav` };
+    }
+    const blob = await audioBufferToMp3(audio, opts.signal, (p) => report(30 + p * 0.68, "Codificando MP3…"));
+    report(100, "Concluído.");
+    return { blob, mimeType: "audio/mpeg", fileName: `${slugFile(project.name)}.mp3` };
+  }
+
   const { width, height } = evenDims(project, opts.shortSide);
   const fps = opts.fps;
   const totalFrames = Math.max(1, Math.ceil((durationMs / 1000) * fps));
@@ -393,7 +413,7 @@ export async function renderProjectToBlob(
   throwIfAborted(opts.signal);
 
   report(6, "Escolhendo o codec…");
-  const plan = await pickCodecs(width, height, audioBuffer != null);
+  const plan = await pickCodecs(width, height, audioBuffer != null, opts.container);
 
   // --- muxer + encoders ---------------------------------------------------------
   let finalizeAndGetBuffer: () => ArrayBuffer;
@@ -587,4 +607,83 @@ async function exportFramesOnly(format: "gif" | "png-seq", c: FramesOnlyCtx): Pr
   const blob = makeZip(files);
   void ctx;
   return { blob, mimeType: "application/zip", fileName: `${base}_png.zip` };
+}
+
+// ---------------------------------------------------------- áudio: WAV e MP3
+
+/** Codifica um AudioBuffer em WAV PCM 16-bit (estéreo intercalado). */
+function audioBufferToWav(buffer: AudioBuffer): Blob {
+  const channels = Math.min(2, buffer.numberOfChannels);
+  const frames = buffer.length;
+  const sampleRate = buffer.sampleRate;
+  const dataLen = frames * channels * 2;
+  const buf = new ArrayBuffer(44 + dataLen);
+  const view = new DataView(buf);
+  const writeStr = (off: number, s: string) => {
+    for (let i = 0; i < s.length; i++) view.setUint8(off + i, s.charCodeAt(i));
+  };
+  writeStr(0, "RIFF");
+  view.setUint32(4, 36 + dataLen, true);
+  writeStr(8, "WAVE");
+  writeStr(12, "fmt ");
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, channels, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * channels * 2, true);
+  view.setUint16(32, channels * 2, true);
+  view.setUint16(34, 16, true);
+  writeStr(36, "data");
+  view.setUint32(40, dataLen, true);
+  const ch0 = buffer.getChannelData(0);
+  const ch1 = channels > 1 ? buffer.getChannelData(1) : ch0;
+  let off = 44;
+  for (let i = 0; i < frames; i++) {
+    const l = Math.max(-1, Math.min(1, ch0[i]));
+    const r = Math.max(-1, Math.min(1, ch1[i]));
+    view.setInt16(off, l < 0 ? l * 0x8000 : l * 0x7fff, true);
+    view.setInt16(off + 2, r < 0 ? r * 0x8000 : r * 0x7fff, true);
+    off += 4;
+  }
+  return new Blob([view], { type: "audio/wav" });
+}
+
+/** Codifica um AudioBuffer em MP3 192 kbps (lamejs, 100% no navegador). */
+async function audioBufferToMp3(
+  buffer: AudioBuffer,
+  signal?: AbortSignal,
+  onPct?: (pct01to100: number) => void,
+): Promise<Blob> {
+  const lame = await import("@breezystack/lamejs");
+  const sampleRate = buffer.sampleRate;
+  const frames = buffer.length;
+  const ch0 = buffer.getChannelData(0);
+  const ch1 = buffer.numberOfChannels > 1 ? buffer.getChannelData(1) : ch0;
+
+  // Float32 → Int16 (o encoder trabalha em PCM 16-bit)
+  const left = new Int16Array(frames);
+  const right = new Int16Array(frames);
+  for (let i = 0; i < frames; i++) {
+    const l = Math.max(-1, Math.min(1, ch0[i]));
+    const r = Math.max(-1, Math.min(1, ch1[i]));
+    left[i] = l < 0 ? l * 0x8000 : l * 0x7fff;
+    right[i] = r < 0 ? r * 0x8000 : r * 0x7fff;
+  }
+
+  const encoder = new lame.Mp3Encoder(2, sampleRate, 192);
+  const CHUNK = 1152; // tamanho de frame do MP3
+  const parts: Uint8Array[] = [];
+  for (let i = 0; i < frames; i += CHUNK) {
+    throwIfAborted(signal);
+    const out = encoder.encodeBuffer(left.subarray(i, i + CHUNK), right.subarray(i, i + CHUNK));
+    if (out.length > 0) parts.push(new Uint8Array(out));
+    if (i % (CHUNK * 200) === 0) {
+      onPct?.(Math.round((i / frames) * 100));
+      // deixa a UI respirar em projetos longos
+      await new Promise((r) => setTimeout(r, 0));
+    }
+  }
+  const tail = encoder.flush();
+  if (tail.length > 0) parts.push(new Uint8Array(tail));
+  return new Blob(parts as BlobPart[], { type: "audio/mpeg" });
 }
