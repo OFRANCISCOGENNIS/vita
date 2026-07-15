@@ -4,9 +4,13 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Clock, Image as ImageIcon, Pencil, Share2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Clapperboard, Clock, Image as ImageIcon, Loader2, Pencil, Share2 } from "lucide-react";
 import type { Cut } from "@/lib/types";
+import * as api from "@/lib/api";
+import { openInStudio } from "@/lib/open-in-studio";
 import { formatDuration } from "@/lib/utils";
+import { toast } from "@/store/toast";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { ShareModal } from "./share-modal";
@@ -19,7 +23,32 @@ const statusLabels: Record<Cut["status"], { label: string; variant: "default" | 
 };
 
 export function CutCard({ cut }: { cut: Cut }) {
+  const router = useRouter();
   const [shareOpen, setShareOpen] = useState(false);
+  const [studioBusy, setStudioBusy] = useState(false);
+
+  async function toStudio() {
+    if (studioBusy) return;
+    setStudioBusy(true);
+    try {
+      const project = await api.getProject(cut.projectId).catch(() => null);
+      const result = await openInStudio({
+        mediaId: project?.mediaId,
+        mediaUrl: project?.mediaUrl,
+        name: cut.title,
+        startSec: cut.startSeconds,
+        endSec: cut.endSeconds,
+      });
+      if (result.ok) {
+        toast("Clipe aberto no Estúdio", { description: "Só o trecho do clipe entrou na timeline — edite à vontade." });
+        router.push("/app/estudio");
+      } else {
+        toast("Não deu para abrir no Estúdio", { description: result.reason, variant: "error" });
+      }
+    } finally {
+      setStudioBusy(false);
+    }
+  }
 
   const snippet = cut.transcript
     .slice(0, 16)
@@ -60,6 +89,15 @@ export function CutCard({ cut }: { cut: Cut }) {
         >
           <Pencil className="h-3.5 w-3.5" aria-hidden /> Abrir no editor
         </Link>
+        <button
+          onClick={() => void toStudio()}
+          aria-label="Abrir no Estúdio PRO"
+          title="Abrir no Estúdio PRO (multitrilha)"
+          disabled={studioBusy}
+          className="inline-flex h-8 w-8 items-center justify-center rounded-xl text-zinc-300 transition-colors hover:bg-white/5 hover:text-white disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+        >
+          {studioBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : <Clapperboard className="h-3.5 w-3.5" aria-hidden />}
+        </button>
         <Link
           href={`/app/capa/editor?cut=${cut.id}`}
           aria-label="Criar capa deste clipe"

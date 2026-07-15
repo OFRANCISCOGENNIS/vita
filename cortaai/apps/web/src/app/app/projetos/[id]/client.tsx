@@ -5,9 +5,10 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
-import { ArrowLeft, CheckCircle2, Circle, Loader2, Pencil, Plus } from "lucide-react";
+import { useParams, useRouter } from "next/navigation";
+import { ArrowLeft, CheckCircle2, Circle, Clapperboard, Loader2, Pencil, Plus } from "lucide-react";
 import * as api from "@/lib/api";
+import { openInStudio } from "@/lib/open-in-studio";
 import type { Cut, Project } from "@/lib/types";
 import { cn, formatDuration } from "@/lib/utils";
 import { toast } from "@/store/toast";
@@ -68,9 +69,27 @@ export default function ProjectDetailPage({ id: propId }: { id?: string } = {}) 
   const params = useParams<{ id: string }>();
   const id = propId ?? params?.id ?? "";
 
+  const router = useRouter();
   const [project, setProject] = useState<Project | null>(null);
   const [cuts, setCuts] = useState<Cut[] | null>(null);
   const [error, setError] = useState(false);
+  const [studioBusy, setStudioBusy] = useState(false);
+
+  async function toStudio() {
+    if (!project || studioBusy) return;
+    setStudioBusy(true);
+    try {
+      const result = await openInStudio({ mediaId: project.mediaId, mediaUrl: project.mediaUrl, name: project.title });
+      if (result.ok) {
+        toast("Vídeo aberto no Estúdio", { description: "O vídeo inteiro entrou na timeline — edite à vontade." });
+        router.push("/app/estudio");
+      } else {
+        toast("Não deu para abrir no Estúdio", { description: result.reason, variant: "error" });
+      }
+    } finally {
+      setStudioBusy(false);
+    }
+  }
 
   function load() {
     setError(false);
@@ -146,12 +165,20 @@ export default function ProjectDetailPage({ id: propId }: { id?: string } = {}) 
             </div>
             {project.status === "ready" && (
               <div className="flex flex-wrap items-center gap-2">
+                <button
+                  onClick={() => void toStudio()}
+                  disabled={studioBusy}
+                  className="inline-flex h-10 items-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 px-4 text-sm font-semibold text-white shadow-glow transition-all hover:from-violet-500 hover:to-fuchsia-500 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+                >
+                  {studioBusy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Clapperboard className="h-4 w-4" aria-hidden />}
+                  Abrir no Estúdio
+                </button>
                 {defaultCut && (
                   <Link
                     href={`/app/editor?cut=${defaultCut.id}`}
-                    className="inline-flex h-10 items-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 px-4 text-sm font-semibold text-white shadow-glow transition-all hover:from-violet-500 hover:to-fuchsia-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+                    className="inline-flex h-10 items-center gap-2 rounded-xl border border-line bg-surface-1 px-4 text-sm font-semibold text-zinc-200 transition-colors hover:border-violet-500/50 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
                   >
-                    <Pencil className="h-4 w-4" aria-hidden /> Abrir no editor
+                    <Pencil className="h-4 w-4" aria-hidden /> Editor de cortes
                   </Link>
                 )}
                 <Button variant="secondary" onClick={newClip} disabled={cuts === null}>

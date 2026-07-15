@@ -51,6 +51,18 @@ export async function registerFile(file: File): Promise<MediaSource | null> {
   }
 }
 
+/**
+ * Cria um MediaSource a partir de um blob JÁ SALVO no IndexedDB (ex.: vídeo de
+ * um projeto/corte do app) — sem duplicar o arquivo. Null se o blob não existe.
+ */
+export async function sourceFromExistingMedia(mediaId: string, name: string, kind: SourceKind): Promise<MediaSource | null> {
+  const url = await getMediaObjectUrl(mediaId);
+  if (!url) return null;
+  if (kind === "video") return probeVideo(name, mediaId, url);
+  if (kind === "image") return probeImage(name, mediaId, url);
+  return probeAudio(name, mediaId, url);
+}
+
 function probeVideo(name: string, mediaId: string, url: string): Promise<MediaSource> {
   return new Promise((resolve) => {
     const base: MediaSource = { id: newId("src"), kind: "video", name, mediaId, durationMs: 0, width: 0, height: 0, posterDataUrl: null };
