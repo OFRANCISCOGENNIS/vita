@@ -103,6 +103,7 @@ export function ToolsPanel({ onNavigate }: { onNavigate: (panel: RailPanel) => v
     updateClip(found.clip.id, { transform: { ...found.clip.transform, scale: s } });
     toast("Estabilização leve aplicada (por recorte)", {
       description: "Reduz o tremor cortando as bordas. Tremor forte só um app de desktop resolve — no navegador não dá para rastrear o movimento.",
+      important: true,
     });
   }
 
