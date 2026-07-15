@@ -564,10 +564,36 @@ const rail = await p.evaluate(() => {
   document.querySelector('.rail-btn[data-p="painelFluxo"]').click();   // fecha de volta
   return { botoes, fluxoOculto, decisaoVisivel, precoVisivel, abriu, salvo, iconeAtivo, scanRevelado };
 });
-check('rail tem 16 painéis + botão "todos"', rail.botoes === 17, 'botoes=' + rail.botoes);
+check('rail tem 17 painéis + botão "todos"', rail.botoes === 18, 'botoes=' + rail.botoes);
 check('minimalista: secundários ocultos, decisão+gráfico visíveis', rail.fluxoOculto && rail.decisaoVisivel && rail.precoVisivel, JSON.stringify(rail));
 check('clique no ícone abre o painel, persiste e marca o ícone', rail.abriu && rail.salvo && rail.iconeAtivo);
 check('railMostrar revela painel auto-aberto (scanner)', rail.scanRevelado);
+
+// PRICE ACTION — estudo de entradas: LTA/LTB, zonas de confluência, painel
+const paT = await p.evaluate(() => {
+  // LTA: fundos ascendentes colineares → linha com 3 toques e inclinação > 0
+  const lta = calcularLT([{ i: 0, price: 100 }, { i: 10, price: 102 }, { i: 20, price: 104 }], 30, 'LTA', 0.35, 1);
+  // LTB: topos descendentes; e direção errada (subindo) não vira LTB
+  const ltb = calcularLT([{ i: 0, price: 110 }, { i: 10, price: 108 }, { i: 20, price: 106 }], 30, 'LTB', 0.35, 1);
+  const ltbErrada = calcularLT([{ i: 0, price: 100 }, { i: 10, price: 105 }], 30, 'LTB', 0.35, 1);
+  // Zonas: 100 e 100.2 se agrupam (tol 0.5); 105 fica só
+  const zonas = zonasConfluencia([{ preco: 100, rotulo: 'S' }, { preco: 100.2, rotulo: 'fib 61.8' }, { preco: 105, rotulo: 'R' }], 0.5);
+  // Painel: renderiza com dados simulados
+  if (!dados || dados.length < 210) { dados = gerarDadosSim(300, 2); recomputarIndicadores(); }
+  renderPriceAction();
+  const linhas = document.querySelectorAll('#paBody .kv').length;
+  const leitura = document.getElementById('paLeitura').textContent;
+  // LTA/LTB no gráfico acompanham o toggle 📐
+  alternarNiveis(true); const comLT = !!(serieLTA || serieLTB);
+  alternarNiveis(false); const semLT = !serieLTA && !serieLTB;
+  return { ltaOk: !!lta && lta.slope > 0 && lta.toques >= 3, ltbOk: !!ltb && ltb.slope < 0, ltbErrada: ltbErrada === null,
+           zonaN: zonas[0].n, zonaItens: zonas[0].itens.join('+'), linhas, temLeitura: leitura.length > 20, comLT, semLT };
+});
+check('calcularLT: LTA com 3 toques e inclinação positiva', paT.ltaOk, JSON.stringify(paT));
+check('calcularLT: LTB descendente ok · direção errada rejeitada', paT.ltbOk && paT.ltbErrada);
+check('zonasConfluencia agrupa níveis próximos (S+fib)', paT.zonaN === 2 && /S\+fib/.test(paT.zonaItens), paT.zonaItens);
+check('painel Price Action renderiza 7 linhas + leitura da entrada', paT.linhas === 7 && paT.temLeitura, 'linhas=' + paT.linhas);
+check('LTA/LTB traçadas no gráfico seguem o toggle 📐', paT.comLT && paT.semLT);
 
 // 8) PWA manifest
 check('PWA manifest presente', await p.$eval('link[rel=manifest]', e => e.href.startsWith('data:application/manifest')));

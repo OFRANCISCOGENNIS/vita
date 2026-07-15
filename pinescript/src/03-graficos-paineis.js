@@ -1071,6 +1071,7 @@ function atualizarDecisao() {
     try { renderFunilQualidade(riscoNoticia); } catch (e) { }
     // Ferramentas Pro (VP/níveis/book) acompanham os recálculos
     try { if (typeof proAtualizar === 'function') proAtualizar(); } catch (e) { }
+    try { if (typeof renderPriceAction === 'function') renderPriceAction(); } catch (e) { }
 
     // Contexto histórico: o score atual costuma acertar quanto? (assertividade medida)
     const scoreAtivo = Math.max(long, short);

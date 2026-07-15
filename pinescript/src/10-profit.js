@@ -60,6 +60,7 @@ let linhasNiveis = [];
 function alternarNiveis(on) {
     linhasNiveis.forEach(l => { try { serieVelas.removePriceLine(l); } catch (e) { } });
     linhasNiveis = [];
+    if (typeof tracarLTs === 'function') { try { tracarLTs(on); } catch (e) { } }   // LTA/LTB acompanham o toggle
     if (!on || !serieVelas || !dados || dados.length < 20) return;
     const add = (price, color, style, title) => {
         try { linhasNiveis.push(serieVelas.createPriceLine({ price, color, lineWidth: 1, lineStyle: style, axisLabelVisible: false, title })); } catch (e) { }

@@ -400,6 +400,14 @@
                     </div>
                 </div>
 
+                <!-- PRICE ACTION: estudo de entradas (S/R + fib + LTA/LTB + micro×macro) -->
+                <div class="chart-container" id="painelPA">
+                    <h2>🧭 Price Action — Entradas <span id="paMeta" class="tv-sync-tag"></span></h2>
+                    <div id="paBody" class="qo-kv"></div>
+                    <div id="paLeitura" class="decision-context"></div>
+                    <p class="group-note">Estudo descritivo: zona de confluência (S/R + fib + LT) + alinhamento micro×macro + vela de confirmação. Ligue 📐 em "Volume Profile &amp; Níveis" p/ traçar LTA/LTB e fibs no gráfico.</p>
+                </div>
+
                 <div class="chart-container" id="estudoPanel" style="display:none;">
                     <h2>📚 Estudos de Mercado <span id="estudoMeta" class="tv-sync-tag"></span></h2>
                     <div id="estudoRegime" class="decision-chips"></div>
@@ -616,6 +624,7 @@
                             <li>O <strong>Registro</strong> marca ✓/✗ automaticamente após a expiração e compara o acerto real com o previsto.</li>
                             <li>O backtest roda num <strong>Web Worker</strong> (segundo plano), então a tela não trava durante a otimização.</li>
                             <li><strong>🕵️ Agentes de Estudo</strong> (opcional): com o estudo contínuo ativado, 4 agentes trabalham sozinhos — 🧪 reotimiza as moedas em rodízio, 🔭 aplica os parâmetros certos quando o regime vira, ⚖️ audita a calibração e 🧠 mede os fatores. O painel mostra o que cada um encontrou.</li>
+                            <li><strong>🧭 Price Action — Entradas</strong>: LTA/LTB (2+ pivôs na direção; 3+ toques validam a linha), zonas de confluência (S/R + fib + LT a ≤0.5 ATR entre si), alinhamento micro (estrutura HH/HL × LH/LL do TF) × macro (TF maior/EMA200) e vela de confirmação. Leitura descritiva: a entrada de qualidade nasce no TESTE de uma zona — nunca "no meio do nada".</li>
                             <li><strong>📊 Ferramentas Pro</strong> (estilo Profit): <strong>Volume Profile</strong> com POC/área de valor, <strong>níveis no gráfico</strong> (Fibonacci automático + S/R) e <strong>Book de Ofertas + Times &amp; Trades</strong> ao vivo (profundidade e fita reais da Binance, com pressão compra×venda e agressões grandes em destaque).</li>
                             <li><strong>🎮 Piloto Automático</strong> (paper trading): opera sozinho numa <strong>conta DEMO simulada</strong> sobre dados reais — registra as entradas que passam no gatilho (nível A / funil ≥5) como operações com stake e acompanha saldo, win rate e drawdown. <strong>Não toca em corretora</strong> (a Binomo bloqueia iframe e proíbe bots); a operação real, se você quiser, é manual.</li>
                         </ul>
@@ -665,6 +674,7 @@
     <script src="src/09-piloto.js"></script>
     <script src="src/10-profit.js"></script>
     <script src="src/11-minimal.js"></script>
+    <script src="src/12-priceaction.js"></script>
     <!-- APP:END -->
 </body>
 </html>

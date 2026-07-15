@@ -17,6 +17,7 @@ const PAINEIS_MENU = [
     { id: 'pilotoPanel', ico: '🎮', rot: 'Piloto Automático (conta demo)' },
     { id: 'proPanel', ico: '📶', rot: 'Volume Profile & Níveis (fib/S-R)' },
     { id: 'bookPanel', ico: '📖', rot: 'Book de Ofertas & Times/Trades' },
+    { id: 'painelPA', ico: '🧭', rot: 'Price Action — estudo de entradas (S/R · fib · LTA/LTB · micro×macro)' },
     { id: 'painelEntradas', ico: '🔔', rot: 'Avisos de Entrada (tabela)' },
     { id: 'painelMetricas', ico: '📐', rot: 'Métricas de Análise (backtest)' },
     { id: 'estudoPanel', ico: '📚', rot: 'Estudos de Mercado' },
