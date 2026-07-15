@@ -183,24 +183,24 @@ export function ToolsPanel({ onNavigate }: { onNavigate: (panel: RailPanel) => v
   ];
 
   return (
-    <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 xl:grid-cols-8">
+    <div className="grid grid-cols-4 gap-1.5 lg:grid-cols-8">
       {TOOLS.map((t, i) => (
         <button
           key={t.title}
           onClick={t.onClick}
           style={{ animationDelay: `${i * 25}ms` }}
-          className="anim-rise hover-lift flex flex-col items-center gap-1.5 rounded-2xl border border-line bg-surface-1/80 px-2 py-3 text-center transition-colors hover:border-violet-500/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+          className="anim-rise hover-lift flex flex-col items-center gap-1 rounded-xl border border-line bg-surface-1/80 px-1.5 py-2 text-center transition-colors hover:border-violet-500/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
         >
           <span
             className={cn(
-              "flex h-9 w-9 items-center justify-center rounded-xl border border-violet-400/30 bg-violet-500/10 text-violet-300",
+              "flex h-8 w-8 items-center justify-center rounded-lg border border-violet-400/30 bg-violet-500/10 text-violet-300",
               t.accent,
             )}
           >
-            <t.icon className="h-5 w-5" aria-hidden />
+            <t.icon className="h-4 w-4" aria-hidden />
           </span>
-          <span className="text-[11px] font-semibold leading-tight text-zinc-100">{t.title}</span>
-          <span className="text-[9.5px] leading-tight text-zinc-500">{t.sub}</span>
+          <span className="text-[10.5px] font-semibold leading-tight text-zinc-100">{t.title}</span>
+          <span className="text-[9px] leading-tight text-zinc-500">{t.sub}</span>
         </button>
       ))}
     </div>

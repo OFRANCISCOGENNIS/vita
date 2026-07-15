@@ -115,6 +115,7 @@ export default function EstudioPage() {
   const seeded = useRef(false);
   const [sheet, setSheet] = useState<Sheet>(null);
   const [rail, setRail] = useState<RailPanel>("ferramentas");
+  const [toolsOpen, setToolsOpen] = useState(true);
   const [exportOpen, setExportOpen] = useState(false);
   const [projectsOpen, setProjectsOpen] = useState(false);
   const [saveState, setSaveState] = useState<"salvo" | "salvando">("salvo");
@@ -210,7 +211,10 @@ export default function EstudioPage() {
       // no desktop, o mesmo evento troca o painel do rail
       const map: Record<string, RailPanel | undefined> = { bin: "midia", music: "audio", captions: "legendas", record: "gravar" };
       const panel = map[detail];
-      if (panel) setRail(panel);
+      if (panel) {
+        setRail(panel);
+        setToolsOpen(true);
+      }
     }
     window.addEventListener("studio-open-sheet", onOpenSheet);
     return () => window.removeEventListener("studio-open-sheet", onOpenSheet);
@@ -374,7 +378,10 @@ export default function EstudioPage() {
             {RAIL_ITEMS.map((item) => (
               <button
                 key={item.id}
-                onClick={() => setRail(item.id)}
+                onClick={() => {
+                  setRail(item.id);
+                  setToolsOpen(true);
+                }}
                 aria-pressed={rail === item.id}
                 className={cn(
                   "flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400",
@@ -396,28 +403,42 @@ export default function EstudioPage() {
 
         {/* centro: preview + timeline + faixa de ferramentas (desktop) */}
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-          <div className="min-h-0 flex-1 p-2 sm:p-3">
+          {/* o VÍDEO tem prioridade: altura mínima garantida mesmo em telas baixas */}
+          <div className="min-h-[240px] flex-1 p-2 sm:p-3">
             <PreviewStage />
           </div>
           <div className="shrink-0 px-2 pb-1 sm:px-3">
             <TimelineTracks />
           </div>
-          {/* faixa inferior larga: ferramentas de edição / painel do rail (desktop) */}
-          <div className="hidden shrink-0 border-t border-white/[0.06] bg-surface-1/25 lg:block">
-            <p className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+          {/* faixa inferior larga: encolhe (com scroll próprio) para nunca engolir o vídeo */}
+          <div
+            className={cn(
+              "hidden min-h-0 flex-col border-t border-white/[0.06] bg-surface-1/25 lg:flex",
+              toolsOpen ? "shrink" : "shrink-0",
+            )}
+            style={toolsOpen ? { maxHeight: "32dvh", minHeight: 92 } : undefined}
+          >
+            <button
+              onClick={() => setToolsOpen((v) => !v)}
+              aria-expanded={toolsOpen}
+              className="flex shrink-0 items-center justify-between px-3 pb-1 pt-2 text-left text-[11px] font-semibold uppercase tracking-wide text-zinc-500 transition-colors hover:text-zinc-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+            >
               {rail === "ferramentas" ? "Ferramentas de edição" : PANEL_TITLES[rail]}
-            </p>
-            <div key={rail} className="panel-fade editor-scroll max-h-[42dvh] overflow-y-auto px-3 pb-3">
-              {rail === "ferramentas" && <ToolsPanel onNavigate={setRail} />}
-              {rail === "midia" && <MediaBin />}
-              {rail === "audio" && <MusicPanel />}
-              {rail === "texto" && <TextPanel />}
-              {rail === "legendas" && <CaptionsPanel />}
-              {rail === "transicoes" && <TransitionsPanel />}
-              {rail === "filtros" && <FiltersPanel />}
-              {rail === "efeitos" && <EffectsPanel />}
-              {rail === "gravar" && <RecordPanel />}
-            </div>
+              <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", !toolsOpen && "rotate-180")} aria-hidden />
+            </button>
+            {toolsOpen && (
+              <div key={rail} className="panel-fade editor-scroll min-h-0 flex-1 overflow-y-auto px-3 pb-3">
+                {rail === "ferramentas" && <ToolsPanel onNavigate={setRail} />}
+                {rail === "midia" && <MediaBin />}
+                {rail === "audio" && <MusicPanel />}
+                {rail === "texto" && <TextPanel />}
+                {rail === "legendas" && <CaptionsPanel />}
+                {rail === "transicoes" && <TransitionsPanel />}
+                {rail === "filtros" && <FiltersPanel />}
+                {rail === "efeitos" && <EffectsPanel />}
+                {rail === "gravar" && <RecordPanel />}
+              </div>
+            )}
           </div>
         </div>
 
