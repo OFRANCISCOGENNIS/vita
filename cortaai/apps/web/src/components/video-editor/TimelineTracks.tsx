@@ -29,7 +29,7 @@ import type { Clip, Track, TrackType } from "@/lib/video-editor/model";
 import { boundaryCandidates, clipEndMs, projectDurationMs, snapTime, timeToPx } from "@/lib/video-editor/timeline-math";
 import { useVideoEditor } from "@/store/video-editor";
 
-const TRACK_H = 52;
+const TRACK_H = 34;
 const LABEL_W = 112;
 const SNAP_PX = 8;
 
@@ -184,7 +184,7 @@ export function TimelineTracks() {
   return (
     <div className="flex flex-col overflow-hidden rounded-2xl border border-white/[0.08] bg-surface-1/60 shadow-[0_-8px_40px_-16px_rgba(0,0,0,0.6)] backdrop-blur-xl">
       {/* barra de ferramentas + zoom */}
-      <div className="flex items-center gap-1 border-b border-white/[0.06] px-2 py-1.5">
+      <div className="flex items-center gap-1 border-b border-white/[0.06] px-2 py-1">
         <span className="mr-1 hidden font-mono text-xs text-zinc-400 sm:inline">
           {fmt(playheadMs)} <span className="text-zinc-600">/ {fmt(projectDurationMs(project.tracks))}</span>
         </span>
@@ -322,7 +322,7 @@ export function TimelineTracks() {
                       }}
                       aria-label="Adicionar mídia"
                       title="Adicionar mídia"
-                      className="absolute top-1/2 z-10 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg bg-white text-black shadow-lg transition-transform active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+                      className="absolute top-1/2 z-10 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-lg bg-white text-black shadow-lg transition-transform active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
                       style={{ left: timeToPx(track.clips.reduce((m, c) => Math.max(m, clipEndMs(c)), 0), pxPerSecond) + 8 }}
                     >
                       <Plus className="h-4 w-4" />

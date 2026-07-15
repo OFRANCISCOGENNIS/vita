@@ -403,8 +403,8 @@ export default function EstudioPage() {
 
         {/* centro: preview + timeline + faixa de ferramentas (desktop) */}
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-          {/* o VÍDEO tem prioridade: altura mínima garantida mesmo em telas baixas */}
-          <div className="min-h-[240px] flex-1 p-2 sm:p-3">
+          {/* o VÍDEO tem prioridade: altura mínima garantida (cresce com a tela) */}
+          <div className="min-h-[max(240px,46dvh)] flex-1 p-2 sm:p-3">
             <PreviewStage />
           </div>
           <div className="shrink-0 px-2 pb-1 sm:px-3">
