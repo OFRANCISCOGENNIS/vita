@@ -235,6 +235,51 @@ check('filtro salvo persiste e entra no seletor', filtros.salvou && filtros.noSe
 check('aplicar restaura fatores, portões e tolerâncias', filtros.restaurou);
 check('excluir remove do storage e do seletor', filtros.excluiu);
 
+// 4.9) Perfil de Abertura: perfil máximo, persistência de controles e aquecimento da IA
+const boot = await p.evaluate(() => {
+  // fotografa o estado p/ devolver no fim (o suite depende dos toggles atuais)
+  const fot = {}; BOOT_IDS.forEach(id => { const el = document.getElementById(id); if (el) fot[id] = el.type === 'checkbox' ? el.checked : el.value; });
+  // 1) perfil máxima qualidade
+  aplicarPerfilMaximo();
+  const gates = ['useHtf', 'useSessao', 'useSR', 'usePA', 'useNewsFilter', 'usePesoIA', 'useGrade', 'useMacd', 'usePadrao']
+    .every(id => document.getElementById(id).checked);
+  const min4 = document.getElementById('minScore').value === '4';
+  const bollOff = !document.getElementById('useBollinger').checked;
+  // 2) persistência: salva, bagunça, restaura
+  document.getElementById('useMacd').checked = true;
+  document.getElementById('paAtr').value = '1.5';
+  salvarEstadoControles();
+  document.getElementById('useMacd').checked = false;
+  document.getElementById('paAtr').value = '0.2';
+  const restaurou = restaurarEstadoControles()
+    && document.getElementById('useMacd').checked
+    && document.getElementById('paAtr').value === '1.5';
+  // devolve o estado original e persiste (p/ não vazar pros próximos testes)
+  Object.keys(fot).forEach(id => { const el = document.getElementById(id); if (el.type === 'checkbox') el.checked = fot[id]; else el.value = fot[id]; });
+  salvarEstadoControles(); recalcularSinaisApenas();
+  return { gates, min4, bollOff, restaurou, automacao: !!navigator.webdriver };
+});
+check('perfil máximo liga fatores + todos os portões', boot.gates && boot.bollOff);
+check('perfil máximo exige 4 fatores (balanceado)', boot.min4);
+check('controles persistem (salvar → restaurar)', boot.restaurou);
+check('automação detectada: automatismos de boot pulados nos testes', boot.automacao);
+const aqueceu = await p.evaluate(async () => {
+  // par sem cache → aquece; com cache → não repete
+  const sym = symbolAtual();
+  const bakCache = iaCache[sym]; delete iaCache[sym];
+  Object.keys(iaCache).filter(k => k.startsWith(sym + '|')).forEach(k => delete iaCache[k]);
+  _bootIAJaRodou = false;
+  const rodou = await aquecerIAsePreciso();          // sim: treina o par atual
+  const temCache = !!iaCache[sym] || Object.keys(iaCache).some(k => k.startsWith(sym + '|'));
+  _bootIAJaRodou = false;
+  const repetiu = await aquecerIAsePreciso();        // agora há cache → false
+  if (bakCache) iaCache[sym] = bakCache;
+  return { rodou, temCache, repetiu };
+});
+check('IA aquece sozinha quando o par não tem parâmetros', aqueceu.rodou && aqueceu.temCache, JSON.stringify(aqueceu));
+check('com cache existente a IA não re-treina no boot', aqueceu.repetiu === false);
+check('auto-reotimização vem ligada de fábrica', await p.evaluate(() => document.getElementById('autoReopt').checked));
+
 // 4.5) Métricas de assertividade: Wilson LB penaliza amostra pequena; expectativa
 const stat = await p.evaluate(() => ({
   lbPequena: wilsonLB(5, 6), lbGrande: wilsonLB(55, 80),

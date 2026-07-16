@@ -398,7 +398,8 @@ function iniciar() {
     aplicarControles(ctrlPref == null ? window.innerWidth > 900 : ctrlPref !== '0');
     aplicarTema(localStorage.getItem('tema') === 'light' ? 'light' : 'dark');
     atualizarAvisoOTC();
-    document.getElementById('autoReopt').checked = localStorage.getItem('autoReopt') === '1';
+    // padrão LIGADO: a IA se mantém afinada sozinha (reotimiza a cada 60 min)
+    document.getElementById('autoReopt').checked = localStorage.getItem('autoReopt') !== '0';
     document.getElementById('regSoA').checked = localStorage.getItem('regSoA') !== '0';   // padrão: só nível A
     document.getElementById('modoSniper').checked = localStorage.getItem('modoSniper') === '1';
     configurarCardsRecolhiveis();
