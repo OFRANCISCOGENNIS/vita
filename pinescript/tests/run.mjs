@@ -600,6 +600,25 @@ const amp = await p.evaluate(async () => {
 check('modo compacto = 500px', amp.normal >= 480 && amp.normal <= 520, 'h=' + amp.normal);
 check('⛶ amplia p/ 1200px (padrão) e vira "Reduzir"', amp.grande === 1200 && /Reduzir/.test(amp.rotulo), 'h=' + amp.grande);
 check('segundo clique volta ao padrão e persiste', amp.voltou === amp.normal && amp.persistiu);
+// Fluidez: pivôs memoizados na mesma vela · animações pausam com a aba oculta
+const fluido = await p.evaluate(() => {
+  const a = acharPivotsSR(), b = acharPivotsSR();
+  const memo = a === b;                                    // mesma referência = cache
+  dados.push({ ...dados[dados.length - 1], time: dados[dados.length - 1].time + 300 });
+  recomputarIndicadores();
+  const c = acharPivotsSR();
+  const invalida = c !== a;                                // vela nova = recalcula
+  dados.pop(); recomputarIndicadores(); acharPivotsSR();
+  Object.defineProperty(document, 'hidden', { value: true, configurable: true });
+  document.dispatchEvent(new Event('visibilitychange'));
+  const pausou = document.body.classList.contains('anim-pausa');
+  Object.defineProperty(document, 'hidden', { value: false, configurable: true });
+  document.dispatchEvent(new Event('visibilitychange'));
+  const voltouAnim = !document.body.classList.contains('anim-pausa');
+  return { memo, invalida, pausou, voltouAnim };
+});
+check('pivôs S/R memoizados (mesma vela = mesmo objeto)', fluido.memo && fluido.invalida);
+check('aba oculta pausa animações · voltar retoma', fluido.pausou && fluido.voltouAnim);
 
 // 4.10) Padrões de preço (Fase 2): doji, harami, CHoCH, topo/fundo duplo, triângulo
 const pads = await p.evaluate(() => {

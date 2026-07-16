@@ -2036,3 +2036,42 @@ body::before {
 /* ---- Grupo de ações da topbar: 🎓 Análise + Controles + tema + ajuda quebram JUNTOS ---- */
 .qo-acoes { display: flex; gap: 8px; margin-left: auto; align-items: center; }
 .qo-acoes .qo-toggle { margin-left: 0; }
+
+/* ============================================================================
+   CAMADA FLUIDEZ — mesmas animações, custo de GPU/CPU muito menor
+   ============================================================================ */
+/* Aurora: sem filter:blur (o blur de 30px numa camada gigante repintava a tela
+   toda a cada frame). Os gradientes já são suaves; só transform = composited. */
+body::before { filter: none; opacity: 0.85; will-change: transform; animation-duration: 90s; }
+
+/* Logo: pulso só de transform (animar drop-shadow força repaint contínuo) */
+@keyframes qoLogoPulseLeve { 50% { transform: scale(1.07); } }
+.qo-logo { animation: qoLogoPulseLeve 3.2s ease-in-out infinite; }
+
+/* Linha de energia e marca: mais lentas = menos frames repintados */
+.qo-topbar::after { animation-duration: 14s; }
+.qo-brand strong { animation-duration: 14s; }
+
+/* Painel de decisão: o pulso de box-shadow repintava o painel inteiro a cada
+   frame. Agora o brilho vive num ::after fixo e só a OPACIDADE anima (GPU). */
+.decision-panel { position: relative; }
+.decision-panel:has(.verdict-call), .decision-panel:has(.verdict-put) { animation: none !important; }
+.decision-panel::after {
+    content: ''; position: absolute; inset: -1px; border-radius: inherit;
+    pointer-events: none; opacity: 0;
+}
+@keyframes qoGlowOp { 0%, 100% { opacity: 0.35; } 50% { opacity: 1; } }
+.decision-panel:has(.verdict-call)::after {
+    box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.45), 0 14px 54px rgba(34, 197, 94, 0.30);
+    animation: qoGlowOp 2.2s ease-in-out infinite;
+}
+.decision-panel:has(.verdict-put)::after {
+    box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.45), 0 14px 54px rgba(239, 68, 68, 0.30);
+    animation: qoGlowOp 2.2s ease-in-out infinite;
+}
+
+/* Aba oculta: TODA animação pausa (JS alterna a classe em visibilitychange) */
+body.anim-pausa *, body.anim-pausa::before, body.anim-pausa::after,
+body.anim-pausa *::before, body.anim-pausa *::after {
+    animation-play-state: paused !important;
+}

@@ -37,7 +37,15 @@ function calcularZonasSR() {
 }
 
 // ---- Overlay: faixas sombreadas sobre o gráfico ----
+// FLUIDEZ: pan/zoom dispara dezenas de eventos por segundo — coalesce em rAF
+// (1 reposicionamento por frame, no máximo).
+let _zonasRaf = false;
 function reposicionarZonas() {
+    if (_zonasRaf) return;
+    _zonasRaf = true;
+    requestAnimationFrame(() => { _zonasRaf = false; _reposicionarZonasAgora(); });
+}
+function _reposicionarZonasAgora() {
     const ov = document.getElementById('zonasOverlay');
     if (!ov || !dados || dados.length < 30 || !serieVelas || !computed || !computed.atrValues) return;
     const z = calcularZonasSR();
@@ -67,7 +75,7 @@ function desenharZonasSR(on) {
         chartPreco.timeScale().subscribeVisibleLogicalRangeChange(() => { if (zonasSRAtivas) reposicionarZonas(); });
         window.addEventListener('resize', () => { if (zonasSRAtivas) reposicionarZonas(); });
     }
-    reposicionarZonas();
+    _reposicionarZonasAgora();   // ligar/desligar reflete na hora (sem esperar frame)
     try { atualizarMarcadores(); } catch (e) { }   // acrescenta HH/HL/LH/LL nos pivôs
 }
 

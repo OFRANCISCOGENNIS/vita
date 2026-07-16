@@ -145,3 +145,9 @@ window.addEventListener('unhandledrejection', (e) => {
     QLOG.erro('promessa rejeitada:', (e.reason && (e.reason.message || e.reason)) || e.reason);
 });
 
+
+// ---- FLUIDEZ: com a aba oculta, TODA animação CSS pausa (economiza CPU/GPU;
+// os dados continuam atualizando — só o desenho decorativo dorme) ----
+document.addEventListener('visibilitychange', function () {
+    document.body.classList.toggle('anim-pausa', document.hidden);
+});

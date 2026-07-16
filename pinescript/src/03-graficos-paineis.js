@@ -126,17 +126,20 @@ function redesenharTudo(ajustarZoom) {
 // cada um desperdiça CPU e trava a UI. Agrupamos por FRAME (requestAnimationFrame)
 // e recomputamos no máximo 1×/frame. O fechamento de vela nunca é perdido: o
 // flag "fechou" é acumulado (OR) até o flush.
-let _tickPend = false, _tickFechou = false;
+let _tickPend = false, _tickFechou = false, _tickUltimoT = 0, _paineisPesadosT = 0;
 function agendarTick(fechou) {
     _tickFechou = _tickFechou || fechou;
     if (_tickPend) return;
     _tickPend = true;
-    requestAnimationFrame(() => {
-        _tickPend = false;
+    // FLUIDEZ: tick intra-vela coalescido a ≤4/s (recomputar indicadores a cada
+    // frame engasgava a tela); fechamento de vela continua imediato.
+    const espera = _tickFechou ? 0 : Math.max(0, 250 - (Date.now() - _tickUltimoT));
+    setTimeout(() => requestAnimationFrame(() => {
+        _tickPend = false; _tickUltimoT = Date.now();
         const f = _tickFechou; _tickFechou = false;
         // Guarda: um erro no tick não pode derrubar o gráfico ao vivo.
         try { atualizarUltimoCandle(f); } catch (e) { QLOG.erro('tick:', e); }
-    });
+    }), espera);
 }
 
 function atualizarUltimoCandle(fechou) {
@@ -1127,9 +1130,15 @@ function atualizarDecisao() {
 
     // Funil de qualidade: mostra quais dos 6 elos de assertividade estão fechados
     try { renderFunilQualidade(riscoNoticia); } catch (e) { }
-    // Ferramentas Pro (VP/níveis/book) acompanham os recálculos
-    try { if (typeof proAtualizar === 'function') proAtualizar(); } catch (e) { }
-    try { if (typeof renderPriceAction === 'function') renderPriceAction(); } catch (e) { }
+    // Ferramentas Pro (VP/níveis/book) e Price Action acompanham os recálculos.
+    // FLUIDEZ: são painéis informativos pesados (pivôs+LTs+volume profile) —
+    // no máximo 1 render a cada 600ms; recálculos em rajada não os re-renderizam.
+    const _agoraPaineis = Date.now();
+    if (_agoraPaineis - _paineisPesadosT >= 600) {
+        _paineisPesadosT = _agoraPaineis;
+        try { if (typeof proAtualizar === 'function') proAtualizar(); } catch (e) { }
+        try { if (typeof renderPriceAction === 'function') renderPriceAction(); } catch (e) { }
+    }
 
     // Contexto histórico: o score atual costuma acertar quanto? (assertividade medida)
     const scoreAtivo = Math.max(long, short);

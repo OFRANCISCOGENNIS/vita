@@ -151,9 +151,15 @@ function sessaoDe(t) {
 function sessaoForte(t) { return sessaoDe(t) !== 'Ásia'; }
 
 // ---- Suporte/Resistência: pivôs (topos/fundos locais) da janela SR_W ----
+// FLUIDEZ: memoizado por (nº de barras + tempo da última vela) — vários painéis
+// pedem os pivôs na mesma atualização; a vela em formação não muda pivôs
+// confirmados, então o cache vale até nascer vela nova ou recarregar dados.
 const SR_W = 5;
+let _pivKey = '', _pivMemo = null;
 function acharPivotsSR() {
     const { highs, lows } = computed;
+    const chave = highs.length + '|' + (dados.length ? dados[dados.length - 1].time : 0);
+    if (_pivMemo && chave === _pivKey) return _pivMemo;
     const res = [], sup = [];
     for (let j = SR_W; j < highs.length - SR_W; j++) {
         let ph = true, pl = true;
@@ -164,7 +170,8 @@ function acharPivotsSR() {
         if (ph) res.push({ i: j, price: highs[j] });
         if (pl) sup.push({ i: j, price: lows[j] });
     }
-    return { res, sup };
+    _pivKey = chave; _pivMemo = { res, sup };
+    return _pivMemo;
 }
 // Veta long colado numa resistência acima / short colado num suporte abaixo.
 // Só usa pivôs já confirmados (i + SR_W <= barra) — sem olhar o futuro.
