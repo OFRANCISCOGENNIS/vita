@@ -294,7 +294,7 @@ body {
     position: relative;
 }
 
-.tv-chart-main { height: var(--chart-h, 500px); }
+.tv-chart-main { height: var(--chart-h, 1200px); }
 .tv-chart-sub { height: 190px; }
 
 .chart-legend {

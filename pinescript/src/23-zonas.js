@@ -241,16 +241,16 @@ document.addEventListener('DOMContentLoaded', function () {
     if (b) b.addEventListener('click', abrirAnaliseMestre);
     const bT = document.getElementById('btnAnaliseTop');   // atalho na barra superior
     if (bT) bT.addEventListener('click', abrirAnaliseMestre);
-    // ⛶ Ampliar: alterna a altura do gráfico principal (500px ↔ 72% da janela)
+    // ⛶: alterna a altura do gráfico principal (padrão 1200px ↔ compacto 500px)
     const bM = document.getElementById('btnChartMax');
     if (bM) {
         const pintarM = () => {
-            const on = localStorage.getItem('chartAlto') === '1';
-            bM.classList.toggle('is-active', on);
-            bM.textContent = on ? '⛶ Reduzir' : '⛶ Ampliar';
+            const grande = localStorage.getItem('chartAlto') !== '0';
+            bM.classList.toggle('is-active', grande);
+            bM.textContent = grande ? '⛶ Reduzir' : '⛶ Ampliar';
         };
         bM.addEventListener('click', () => {
-            localStorage.setItem('chartAlto', localStorage.getItem('chartAlto') === '1' ? '0' : '1');
+            localStorage.setItem('chartAlto', localStorage.getItem('chartAlto') === '0' ? '1' : '0');
             pintarM();
             window.dispatchEvent(new Event('resize'));           // reaplica altura/largura
             if (zonasSRAtivas) requestAnimationFrame(reposicionarZonas);

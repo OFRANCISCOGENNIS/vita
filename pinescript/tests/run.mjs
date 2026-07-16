@@ -597,8 +597,8 @@ const amp = await p.evaluate(async () => {
   const voltou = alt();
   return { normal, grande, voltou, rotulo, persistiu: localStorage.getItem('chartAlto') === '0' };
 });
-check('gráfico padrão maior (500px)', amp.normal >= 480 && amp.normal <= 520, 'h=' + amp.normal);
-check('⛶ amplia p/ 1000px e vira "Reduzir"', amp.grande === 1000 && /Reduzir/.test(amp.rotulo), 'h=' + amp.grande);
+check('modo compacto = 500px', amp.normal >= 480 && amp.normal <= 520, 'h=' + amp.normal);
+check('⛶ amplia p/ 1200px (padrão) e vira "Reduzir"', amp.grande === 1200 && /Reduzir/.test(amp.rotulo), 'h=' + amp.grande);
 check('segundo clique volta ao padrão e persiste', amp.voltou === amp.normal && amp.persistiu);
 
 // 4.10) Padrões de preço (Fase 2): doji, harami, CHoCH, topo/fundo duplo, triângulo
