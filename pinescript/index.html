@@ -147,6 +147,8 @@
                         <span>Volatilidade % (só no modo Simulado)</span>
                     </label>
                     <button id="btnGerar" class="btn-primary">⚡ Recarregar / Gerar</button>
+                    <span id="histInfo" class="group-note"></span>
+                    <button id="btnHistLimpar" class="btn-ghost" type="button" style="margin-top:4px;">🗑 Limpar histórico local de velas</button>
                 </section>
 
                 <!-- Tendência -->
@@ -591,10 +593,12 @@
             <!-- COLUNA DIREITA: Registro de entradas (tabela lateral) -->
             <aside class="registro-col chart-container" id="registroPanel" style="display:none;">
                 <h2>🗓️ Registro de entradas <span id="registroMeta" class="tv-sync-tag"></span>
-                    <button id="btnLimparReg" class="btn-ghost" style="float:right;">Limpar</button></h2>
+                    <button id="btnLimparReg" class="btn-ghost" style="float:right;">Limpar</button>
+                    <button id="btnRelatorio" class="btn-ghost" style="float:right;margin-right:6px;" title="Baixar relatório de performance dos últimos 7 dias (HTML)">📄 Relatório</button></h2>
                 <label class="reg-filtro"><input type="checkbox" id="regSoA" checked> <span>Só entradas nível <strong>A</strong> e <strong class="grau-b">B</strong></span></label>
                 <div id="regArrows" class="reg-arrows"></div>
                 <div id="iaCalib" class="ia-calib" style="display:none;"></div>
+                <div id="calibExtra" class="ia-calib" style="display:none;"></div>
                 <div id="registroBody" class="reg-list"></div>
             </aside>
         </main>
@@ -643,6 +647,10 @@
                             <li><strong>🧭 Price Action — Entradas</strong>: LTA/LTB (2+ pivôs na direção; 3+ toques validam a linha), zonas de confluência (S/R + fib + LT a ≤0.5 ATR entre si), alinhamento micro (estrutura HH/HL × LH/LL do TF) × macro (TF maior/EMA200) e vela de confirmação. Leitura descritiva: a entrada de qualidade nasce no TESTE de uma zona — nunca "no meio do nada".</li>
                             <li><strong>📐 Filtro Price Action</strong> (portão, nos controles): com ele ligado, o veredito CALL só vale com o preço a ≤ X ATR de um suporte ou da LTA; PUT só perto de resistência ou da LTB. Longe da zona vira <em>AGUARDAR 📐</em> — sem som, notificação ou registro. O chip <em>PA zona</em> mostra o lado da zona mais próxima.</li>
                             <li><strong>🕯 Padrões de preço</strong> (painel 🧭 e retrato da entrada): doji (indecisão), harami (alta/baixa), CHoCH (quebra de caráter da estrutura), topo/fundo duplo (±0.5 ATR) e triângulo/canal (sobre as LTs). Leitura descritiva — NÃO entram na pontuação: padrão sem contexto é ruído; confirme com a zona e o alinhamento micro×macro.</li>
+                            <li><strong>📚 Histórico acumulado</strong>: cada carga real de velas fica guardada no navegador (IndexedDB). Dia após dia a base local cresce e a <strong>IA treina com meses de dados</strong>, não só a janela da API. A linha na seção Dados mostra o acumulado do par/TF.</li>
+                            <li><strong>📏 Calibração real</strong> (no Registro): curva <em>previsto × realizado</em> por faixa de probabilidade (quando o app diz 60%, acerta 60%?) e <strong>acerto REAL por fator</strong> — com 10+ amostras, o resultado do Registro passa a modular a pontuação dinâmica (±25%). O backtest propõe, o real confirma.</li>
+                            <li><strong>📄 Relatório</strong> (botão no Registro): baixa um HTML com o placar do período (acerto, LB de Wilson, break-even, expectativa), quebras por selo/funil/par, curva de calibração e a config vigente — o espelho honesto da semana.</li>
+                            <li><strong>📲 PWA offline</strong>: hospedado (https), o app registra um Service Worker — instala no celular e abre sem internet (dados ao vivo exigem rede, claro).</li>
                             <li><strong>✨ Perfil de Abertura</strong>: na primeira vez o app já abre no <em>Perfil Máxima Qualidade</em> (8 fatores + todos os portões + tolerâncias balanceadas) e afina os fatores pro regime real assim que os dados chegam. Depois disso, TODOS os controles são salvos sozinhos — o app reabre exatamente como você deixou. Se o par aberto não tem parâmetros de IA, ela aquece em segundo plano (1×) e a reotimização automática (a cada 60 min) vem ligada de fábrica.</li>
                             <li><strong>📊 Ferramentas Pro</strong> (estilo Profit): <strong>Volume Profile</strong> com POC/área de valor, <strong>níveis no gráfico</strong> (Fibonacci automático + S/R) e <strong>Book de Ofertas + Times &amp; Trades</strong> ao vivo (profundidade e fita reais da Binance, com pressão compra×venda e agressões grandes em destaque).</li>
                             <li><strong>🎮 Piloto Automático</strong> (paper trading): opera sozinho numa <strong>conta DEMO simulada</strong> sobre dados reais — registra as entradas que passam no gatilho (nível A / funil ≥5) como operações com stake e acompanha saldo, win rate e drawdown. <strong>Não toca em corretora</strong> (a Binomo bloqueia iframe e proíbe bots); a operação real, se você quiser, é manual.</li>
@@ -721,6 +729,9 @@
     <script src="src/14-filtros.js"></script>
     <script src="src/15-boot.js"></script>
     <script src="src/16-padroes.js"></script>
+    <script src="src/17-historico.js"></script>
+    <script src="src/18-calibracao.js"></script>
+    <script src="src/19-relatorio.js"></script>
     <!-- APP:END -->
 </body>
 </html>

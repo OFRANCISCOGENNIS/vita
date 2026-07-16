@@ -108,6 +108,11 @@ async function aquecerIAsePreciso() {
 // Os scripts ficam no fim do <body>: os controles já existem aqui, e o
 // DOMContentLoaded (que chama iniciar/carregar) só dispara depois.
 const _bootAutomacao = !!navigator.webdriver;
+// PWA offline: registra o Service Worker (só em http/https — file:// não suporta;
+// o arquivo único aberto do disco já é offline por natureza)
+if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+    try { navigator.serviceWorker.register('sw.js').catch(() => { }); } catch (e) { }
+}
 const _bootRestaurou = restaurarEstadoControles();
 const _bootPrimeiraVez = !_bootRestaurou;
 if (_bootPrimeiraVez && !_bootAutomacao) aplicarPerfilMaximo();

@@ -117,6 +117,8 @@ async function verificarEntradasPendentes() {
 function atualizarCalibracaoIA() {
     const cal = document.getElementById('iaCalib');
     if (!cal) return;
+    // curva previsto×realizado + acerto real por fator (bloco 23) acompanham o placar
+    try { if (typeof renderCalibracaoAvancada === 'function') renderCalibracaoAvancada(); } catch (e) { }
     const cc = iaCache[symbolAtual() + '|' + regimeUltimo()] || iaCache[symbolAtual()];
     const res = registro.filter(r => r.resultado === 'WIN' || r.resultado === 'LOSS');
     if (res.length < 3) { cal.style.display = 'none'; return; }
@@ -256,6 +258,8 @@ async function _iaOtimizarSimbolo(symbol, isSim, dSimBase, beWR, EXP_OPCOES, el)
         if (!isSim) {
             try { dTf = await carregarHistoricoTF(symbol, tf, IA_VELAS); } catch (e) { continue; }
             if (!dTf || dTf.length < 210) continue;
+            // Histórico acumulado (IndexedDB): treina com MESES de velas, não só a janela da API
+            try { if (typeof historicoParaIA === 'function') dTf = await historicoParaIA(symbol, tf, dTf); } catch (e) { }
         }
         dados = dTf; el('timeframe').value = tf;
         // Regime do ativo (medido no primeiro TF carregado) — indexa o iaCache por regime

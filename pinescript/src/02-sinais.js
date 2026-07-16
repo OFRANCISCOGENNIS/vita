@@ -299,9 +299,11 @@ function recomputarSinais() {
         const longScore = fatL.filter(f => f.on && f.ok).length;
         const shortScore = fatS.filter(f => f.on && f.ok).length;
         // Pontuação dinâmica: peso do fator = (acerto histórico IA) × (peso do
-        // regime de mercado da vela) — aprendizado contínuo + contexto.
+        // regime de mercado da vela) × (acerto REAL do fator no Registro, bloco
+        // 23 — o backtest propõe, o resultado real confirma ou demite).
         const wReg = regimes ? PESOS_REGIME[regimes[i]] : null;
-        const pesoTotal = f => pesoDe(pesos, f.k) * (wReg ? wReg[f.k] : 1);
+        const pReal = usePeso && typeof pesosReaisMapa === 'function' ? pesosReaisMapa() : null;
+        const pesoTotal = f => pesoDe(pesos, f.k) * (wReg ? wReg[f.k] : 1) * (pReal ? pesoRealFator(pReal, f.k) : 1);
         const longW = fatL.reduce((s, f) => s + (f.on && f.ok ? pesoTotal(f) : 0), 0);
         const shortW = fatS.reduce((s, f) => s + (f.on && f.ok ? pesoTotal(f) : 0), 0);
 

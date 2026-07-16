@@ -1972,3 +1972,10 @@ body::before {
     .btn-primary::after { display: none; }
     .rail-btn:hover, .qo-stat:hover, .chart-container:hover, .btn-primary:hover, .btn-mini:hover, .btn-preset:hover { transform: none; }
 }
+
+/* ---- Calibração avançada (curva + fatores) e histórico ---- */
+.calib-tit { font-size: 12px; font-weight: 700; color: var(--ink); margin: 10px 0 4px; }
+.calib-fatores { display: flex; flex-wrap: wrap; gap: 6px; }
+#calibExtra .kv { display: flex; justify-content: space-between; gap: 10px; padding: 3px 0; font-size: 12px; border-bottom: 1px dashed var(--hairline); }
+#calibExtra .kv b { color: var(--ink); }
+#calibExtra .kv-good b { color: var(--call); } #calibExtra .kv-bad b { color: var(--put); } #calibExtra .kv-warn b { color: var(--warning); }

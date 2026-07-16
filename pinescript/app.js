@@ -612,9 +612,11 @@ function recomputarSinais() {
         const longScore = fatL.filter(f => f.on && f.ok).length;
         const shortScore = fatS.filter(f => f.on && f.ok).length;
         // Pontuação dinâmica: peso do fator = (acerto histórico IA) × (peso do
-        // regime de mercado da vela) — aprendizado contínuo + contexto.
+        // regime de mercado da vela) × (acerto REAL do fator no Registro, bloco
+        // 23 — o backtest propõe, o resultado real confirma ou demite).
         const wReg = regimes ? PESOS_REGIME[regimes[i]] : null;
-        const pesoTotal = f => pesoDe(pesos, f.k) * (wReg ? wReg[f.k] : 1);
+        const pReal = usePeso && typeof pesosReaisMapa === 'function' ? pesosReaisMapa() : null;
+        const pesoTotal = f => pesoDe(pesos, f.k) * (wReg ? wReg[f.k] : 1) * (pReal ? pesoRealFator(pReal, f.k) : 1);
         const longW = fatL.reduce((s, f) => s + (f.on && f.ok ? pesoTotal(f) : 0), 0);
         const shortW = fatS.reduce((s, f) => s + (f.on && f.ok ? pesoTotal(f) : 0), 0);
 
@@ -2844,6 +2846,8 @@ async function verificarEntradasPendentes() {
 function atualizarCalibracaoIA() {
     const cal = document.getElementById('iaCalib');
     if (!cal) return;
+    // curva previsto×realizado + acerto real por fator (bloco 23) acompanham o placar
+    try { if (typeof renderCalibracaoAvancada === 'function') renderCalibracaoAvancada(); } catch (e) { }
     const cc = iaCache[symbolAtual() + '|' + regimeUltimo()] || iaCache[symbolAtual()];
     const res = registro.filter(r => r.resultado === 'WIN' || r.resultado === 'LOSS');
     if (res.length < 3) { cal.style.display = 'none'; return; }
@@ -2983,6 +2987,8 @@ async function _iaOtimizarSimbolo(symbol, isSim, dSimBase, beWR, EXP_OPCOES, el)
         if (!isSim) {
             try { dTf = await carregarHistoricoTF(symbol, tf, IA_VELAS); } catch (e) { continue; }
             if (!dTf || dTf.length < 210) continue;
+            // Histórico acumulado (IndexedDB): treina com MESES de velas, não só a janela da API
+            try { if (typeof historicoParaIA === 'function') dTf = await historicoParaIA(symbol, tf, dTf); } catch (e) { }
         }
         dados = dTf; el('timeframe').value = tf;
         // Regime do ativo (medido no primeiro TF carregado) — indexa o iaCache por regime
@@ -5250,6 +5256,11 @@ async function aquecerIAsePreciso() {
 // Os scripts ficam no fim do <body>: os controles já existem aqui, e o
 // DOMContentLoaded (que chama iniciar/carregar) só dispara depois.
 const _bootAutomacao = !!navigator.webdriver;
+// PWA offline: registra o Service Worker (só em http/https — file:// não suporta;
+// o arquivo único aberto do disco já é offline por natureza)
+if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+    try { navigator.serviceWorker.register('sw.js').catch(() => { }); } catch (e) { }
+}
 const _bootRestaurou = restaurarEstadoControles();
 const _bootPrimeiraVez = !_bootRestaurou;
 if (_bootPrimeiraVez && !_bootAutomacao) aplicarPerfilMaximo();
@@ -5365,3 +5376,339 @@ function padroesAtuais() {
     if (tc) out.push({ nome: tc.tipo, dir: tc.dir, dica: 'formação de linhas de tendência — espere o rompimento/teste' });
     return out;
 }
+// ============================================================================
+// BLOCO 22 — HISTÓRICO ACUMULADO (IndexedDB): amostra grande = IA confiável
+// ============================================================================
+// Cada carga real de velas fica guardada no navegador (IndexedDB 'quantops').
+// Dia após dia o histórico local cresce — e a IA passa a treinar com MESES de
+// dados em vez da janela de ~500 velas da API. Simulado nunca é gravado.
+
+let _hdb = null;
+function hdb() {
+    return new Promise((res, rej) => {
+        if (_hdb) return res(_hdb);
+        const rq = indexedDB.open('quantops', 1);
+        rq.onupgradeneeded = () => {
+            const d = rq.result;
+            if (!d.objectStoreNames.contains('velas'))
+                d.createObjectStore('velas', { keyPath: ['sym', 'tf', 'time'] });
+        };
+        rq.onsuccess = () => { _hdb = rq.result; res(_hdb); };
+        rq.onerror = () => rej(rq.error);
+    });
+}
+
+const HIST_MAX_POR_PAR = 60000;   // ~200 dias de M5 por par/timeframe
+
+async function historicoGravar(sym, tf, velas) {
+    if (!sym || !velas || !velas.length) return false;
+    try {
+        const d = await hdb();
+        const tx = d.transaction('velas', 'readwrite');
+        const st = tx.objectStore('velas');
+        velas.forEach(v => {
+            if (v && v.time) st.put({ sym, tf, time: v.time, open: v.open, high: v.high, low: v.low, close: v.close, volume: v.volume || 0 });
+        });
+        return await new Promise(r => { tx.oncomplete = () => r(true); tx.onerror = () => r(false); tx.onabort = () => r(false); });
+    } catch (e) { return false; }
+}
+
+function _histRange(sym, tf) { return IDBKeyRange.bound([sym, tf, 0], [sym, tf, Infinity]); }
+
+async function historicoCarregar(sym, tf, max) {
+    try {
+        const d = await hdb();
+        const st = d.transaction('velas', 'readonly').objectStore('velas');
+        const tudo = await new Promise((r, j) => { const q = st.getAll(_histRange(sym, tf)); q.onsuccess = () => r(q.result || []); q.onerror = () => j(q.error); });
+        tudo.sort((a, b) => a.time - b.time);
+        return max && tudo.length > max ? tudo.slice(-max) : tudo;
+    } catch (e) { return []; }
+}
+
+async function historicoInfo(sym, tf) {
+    try {
+        const d = await hdb();
+        const st = d.transaction('velas', 'readonly').objectStore('velas');
+        const n = await new Promise((r, j) => { const q = st.count(_histRange(sym, tf)); q.onsuccess = () => r(q.result); q.onerror = () => j(q.error); });
+        if (!n) return { n: 0, desde: null };
+        const first = await new Promise((r, j) => { const q = st.openCursor(_histRange(sym, tf)); q.onsuccess = () => r(q.result ? q.result.value.time : null); q.onerror = () => j(q.error); });
+        return { n, desde: first };
+    } catch (e) { return { n: 0, desde: null }; }
+}
+
+async function historicoLimpar() {
+    try {
+        const d = await hdb();
+        const tx = d.transaction('velas', 'readwrite');
+        tx.objectStore('velas').clear();
+        return await new Promise(r => { tx.oncomplete = () => r(true); tx.onerror = () => r(false); });
+    } catch (e) { return false; }
+}
+
+// Poda o excedente antigo de um par/TF (mantém as HIST_MAX_POR_PAR mais novas)
+async function _histPodar(sym, tf) {
+    try {
+        const info = await historicoInfo(sym, tf);
+        if (info.n <= HIST_MAX_POR_PAR + 5000) return;
+        let sobra = info.n - HIST_MAX_POR_PAR;
+        const d = await hdb();
+        const tx = d.transaction('velas', 'readwrite');
+        const cur = tx.objectStore('velas').openCursor(_histRange(sym, tf));
+        cur.onsuccess = () => {
+            const c = cur.result;
+            if (c && sobra-- > 0) { c.delete(); c.continue(); }
+        };
+    } catch (e) { }
+}
+
+// ---- Merge para a IA: histórico local (antigo) + janela fresca da API ----
+// Também grava a janela fresca — cada rodada da IA engorda o histórico.
+async function historicoParaIA(sym, tf, frescas, cap) {
+    if (!frescas || !frescas.length) return frescas;
+    await historicoGravar(sym, tf, frescas);
+    _histPodar(sym, tf);
+    const antigas = await historicoCarregar(sym, tf, cap || 3000);
+    const corte = frescas[0].time;
+    const merged = antigas.filter(v => v.time < corte)
+        .map(v => ({ time: v.time, open: v.open, high: v.high, low: v.low, close: v.close, volume: v.volume }))
+        .concat(frescas);
+    const capN = cap || 3000;
+    return merged.length > capN ? merged.slice(-capN) : merged;
+}
+
+// ---- Auto-acumulação: a cada 45s grava as velas do par aberto (fonte real e
+// conexão saudável — o fallback simulado nunca contamina o histórico) ----
+async function _histAutoSalvar() {
+    try {
+        if (fonte() === 'sim' || !dados || dados.length < 30) return;
+        const dot = document.getElementById('connDot');
+        if (!dot || dot.className.indexOf('conn-on') < 0) return;   // só com dado vivo confirmado
+        await historicoGravar(symbolAtual(), tfMinutes(), dados);
+        _histPodar(symbolAtual(), tfMinutes());
+        renderHistInfo();
+    } catch (e) { }
+}
+setInterval(_histAutoSalvar, 45000);
+
+// ---- Linha informativa na seção DADOS ----
+async function renderHistInfo() {
+    const el = document.getElementById('histInfo');
+    if (!el) return;
+    try {
+        const info = await historicoInfo(symbolAtual(), tfMinutes());
+        el.textContent = info.n
+            ? `📚 Histórico local: ${info.n.toLocaleString('pt-BR')} velas deste par/TF (desde ${new Date(info.desde * 1000).toLocaleDateString('pt-BR')}) — a IA treina com tudo.`
+            : '📚 Histórico local vazio — vai acumulando sozinho a cada sessão com dados reais.';
+    } catch (e) { }
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    renderHistInfo();
+    const b = document.getElementById('btnHistLimpar');
+    if (b) b.addEventListener('click', async () => {
+        await historicoLimpar();
+        renderHistInfo();
+        showToast('🗑 Histórico local de velas apagado', 'ok');
+    });
+});
+// ============================================================================
+// BLOCO 23 — CALIBRAÇÃO REAL: curva previsto×realizado + pesos pelos resultados
+// ============================================================================
+// O Registro (WIN/LOSS verificado) é o dado mais valioso do app: é o resultado
+// REAL, não o backtest. Este bloco fecha o ciclo de evidência:
+//   1. Curva de calibração — quando o app previu 60%, acertou 60%?
+//   2. Pesos reais por fator — o acerto REAL de cada fator (quando alinhado à
+//      entrada) modula a pontuação dinâmica: o backtest propõe, o real confirma.
+
+const MAPA_FATOR_LETRA = {
+    'Tendência': 'T', 'EMA 200': 'Ma', 'RSI': 'Mo', 'ATR': 'V', 'Estrutura': 'E',
+    'Fluxo': 'F', 'Correlação': 'C', 'Padrão': 'P', 'MACD': 'X', 'Bollinger': 'B'
+};
+
+// ---- Curva de calibração (função pura): baldes de probabilidade prevista ----
+function curvaCalibracao(regs) {
+    const faixas = [[0, 50], [50, 55], [55, 60], [60, 65], [65, 101]];
+    const rows = faixas.map(([a, b]) => ({ faixa: (b > 100 ? a + '%+' : a + '–' + b + '%'), a, b, n: 0, w: 0, prevSoma: 0 }));
+    (regs || []).forEach(r => {
+        if (!r.resultado || !r.det || r.det.pEst == null) return;
+        const p = r.det.pEst * 100;
+        const row = rows.find(x => p >= x.a && p < x.b);
+        if (!row) return;
+        row.n++; row.prevSoma += r.det.pEst;
+        if (r.resultado === 'WIN') row.w++;
+    });
+    return rows.filter(r => r.n > 0).map(r => ({ faixa: r.faixa, n: r.n, prev: r.prevSoma / r.n, real: r.w / r.n }));
+}
+
+// ---- Pesos reais por fator (função pura) ----
+// Para cada entrada verificada, cada fator ALINHADO à direção da entrada
+// (dir = dir da entrada, ou ✓ não-direcional) recebe o desfecho dela.
+function pesosReaisCalc(regs) {
+    const o = {};
+    (regs || []).forEach(r => {
+        if (!r.resultado || !r.det || !r.det.fatores) return;
+        r.det.fatores.forEach(f => {
+            const k = MAPA_FATOR_LETRA[f.nome];
+            if (!k) return;
+            if (!(f.dir === 2 || f.dir === r.dir)) return;
+            o[k] = o[k] || { n: 0, w: 0 };
+            o[k].n++;
+            if (r.resultado === 'WIN') o[k].w++;
+        });
+    });
+    Object.keys(o).forEach(k => o[k].wr = o[k].w / o[k].n);
+    return o;
+}
+
+// Multiplicador do fator na pontuação dinâmica: neutro (1.0) até 10 amostras;
+// depois, acerto real 60% → ×1.10 · 40% → ×0.90 (limitado a ±25%).
+function pesoRealFator(mapa, k) {
+    const o = mapa && mapa[k];
+    if (!o || o.n < 10) return 1;
+    return Math.max(0.75, Math.min(1.25, 1 + (o.wr - 0.5)));
+}
+
+// Memo de 5s: calcularSinais roda o tempo todo; o registro muda devagar
+let _pReaisMemo = null, _pReaisT = 0;
+function pesosReaisMapa() {
+    if (!_pReaisMemo || Date.now() - _pReaisT > 5000) {
+        _pReaisMemo = pesosReaisCalc(typeof registro !== 'undefined' ? registro : []);
+        _pReaisT = Date.now();
+    }
+    return _pReaisMemo;
+}
+
+// ---- Render: curva + fatores no painel de calibração da IA ----
+function renderCalibracaoAvancada() {
+    const box = document.getElementById('calibExtra');
+    if (!box) return;
+    const regs = typeof registro !== 'undefined' ? registro : [];
+    const curva = curvaCalibracao(regs);
+    const pesos = pesosReaisCalc(regs);
+    const temPesos = Object.keys(pesos).some(k => pesos[k].n >= 5);
+    if (!curva.length && !temPesos) { box.style.display = 'none'; return; }
+    box.style.display = 'block';
+    let html = '';
+    if (curva.length) {
+        html += '<div class="calib-tit">📏 Curva de calibração — previsto × realizado</div>';
+        html += curva.map(c => {
+            const dif = c.real - c.prev;
+            const cls = Math.abs(dif) <= 0.07 ? 'kv-good' : dif < 0 ? 'kv-bad' : 'kv-warn';
+            return `<div class="kv ${cls}"><span>previsto ${c.faixa} (${c.n} ops)</span><b>real ${pctTxt(c.real)} · ${dif >= 0 ? '+' : ''}${Math.round(dif * 100)}pp</b></div>`;
+        }).join('');
+        html += '<p class="group-note">Verde = honesto (±7pp) · vermelho = IA otimista (prometeu mais do que entregou).</p>';
+    }
+    if (temPesos) {
+        const NOMES = Object.keys(MAPA_FATOR_LETRA);
+        html += '<div class="calib-tit">⚖️ Acerto REAL por fator (quando alinhado à entrada)</div><div class="calib-fatores">';
+        html += NOMES.filter(n => pesos[MAPA_FATOR_LETRA[n]] && pesos[MAPA_FATOR_LETRA[n]].n >= 5).map(n => {
+            const o = pesos[MAPA_FATOR_LETRA[n]];
+            const cls = o.wr >= 0.55 ? 'chip-dir-up' : o.wr < 0.5 ? 'chip-dir-down' : '';
+            return `<span class="decision-chip"><span class="${cls}">${n} ${pctTxt(o.wr)}</span> <span class="ia-params">(${o.n})</span></span>`;
+        }).join('');
+        html += '</div><p class="group-note">Com 10+ amostras o fator passa a pesar na pontuação dinâmica: o resultado REAL confirma (ou demite) o backtest.</p>';
+    }
+    box.innerHTML = html;
+}
+// ============================================================================
+// BLOCO 24 — RELATÓRIO SEMANAL (HTML autocontido, baixado pelo navegador)
+// ============================================================================
+// Fotografa a performance REAL do período (registro verificado): placar geral
+// com limite inferior de Wilson, quebras por selo/funil/par, curva de
+// calibração, acerto por fator e a configuração vigente. É o espelho honesto:
+// se o edge não aparece aqui, ele não existe.
+
+function _relPct(x) { return (x * 100).toFixed(0) + '%'; }
+function _relLinha(rot, val) { return `<tr><td>${rot}</td><td><b>${val}</b></td></tr>`; }
+
+function gerarRelatorioHTML(dias) {
+    dias = dias || 7;
+    const agora = Math.floor(Date.now() / 1000);
+    const corte = agora - dias * 86400;
+    const regs = (typeof registro !== 'undefined' ? registro : []).filter(r => r.t >= corte);
+    const res = regs.filter(r => r.resultado === 'WIN' || r.resultado === 'LOSS');
+    const wins = res.filter(r => r.resultado === 'WIN').length;
+    const wr = res.length ? wins / res.length : null;
+    const lb = res.length ? wilsonLB(wins, res.length) : null;
+    const payout = Math.max(0.01, (parseFloat(document.getElementById('payout').value) || 87) / 100);
+    const beWR = 1 / (1 + payout);
+
+    const grupo = (rotFn) => {
+        const g = {};
+        res.forEach(r => { const k = rotFn(r); if (k == null) return; g[k] = g[k] || { n: 0, w: 0 }; g[k].n++; if (r.resultado === 'WIN') g[k].w++; });
+        return Object.keys(g).map(k => ({ k, n: g[k].n, w: g[k].w, wr: g[k].w / g[k].n })).sort((a, b) => b.n - a.n);
+    };
+    const porGrade = grupo(r => r.grade || 'sem selo');
+    const porFunil = grupo(r => r.funil == null ? null : (r.funil >= 5 ? 'funil ≥5' : 'funil ≤4'));
+    const porPar = grupo(r => r.par);
+    const curva = typeof curvaCalibracao === 'function' ? curvaCalibracao(regs) : [];
+    const pesos = typeof pesosReaisCalc === 'function' ? pesosReaisCalc(regs) : {};
+
+    const fatoresOn = (confLive.fatores || []).filter(f => f.on).map(f => f.nome).join(' · ') || '—';
+    const portoes = ['useHtf:TF maior', 'useSessao:Sessões', 'useSR:S/R', 'usePA:Price Action', 'useNewsFilter:Notícias', 'usePesoIA:Pesos IA', 'modoSniper:Sniper']
+        .map(s => { const [id, rot] = s.split(':'); const el = document.getElementById(id); return el && el.checked ? rot : null; })
+        .filter(Boolean).join(' · ') || 'nenhum';
+
+    const tbl = (titulo, linhas) => linhas.length
+        ? `<h2>${titulo}</h2><table>${linhas.map(g => `<tr><td>${g.k}</td><td>${g.w}/${g.n}</td><td><b>${_relPct(g.wr)}</b></td></tr>`).join('')}</table>` : '';
+
+    const veredito = wr == null ? 'Sem operações verificadas no período — nada a provar ainda.'
+        : lb >= beWR ? `✅ Edge estatístico PRESENTE no período: mesmo no limite inferior (${_relPct(lb)}), o acerto supera o break-even (${_relPct(beWR)}).`
+        : wr >= beWR ? `⚠️ Acerto acima do break-even (${_relPct(wr)} vs ${_relPct(beWR)}), mas a amostra (${res.length} ops) ainda NÃO garante edge no limite inferior (${_relPct(lb)}). Continue registrando.`
+        : `❌ SEM edge no período: acerto ${_relPct(wr)} abaixo do break-even ${_relPct(beWR)}. O relatório existe para isto — não opere contra a evidência.`;
+
+    return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8">
+<title>QUANT OPS — Relatório ${dias} dias</title>
+<style>
+body{font-family:system-ui,Segoe UI,sans-serif;background:#0b101a;color:#c9d4e5;max-width:820px;margin:24px auto;padding:0 16px;line-height:1.55}
+h1{font-size:22px;background:linear-gradient(100deg,#22D3EE,#8B5CF6,#EC4899);-webkit-background-clip:text;background-clip:text;color:transparent}
+h2{font-size:15px;margin:22px 0 8px;color:#fff;border-left:4px solid #8B5CF6;padding-left:8px}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+td{padding:5px 8px;border-bottom:1px solid rgba(170,181,197,.14)}
+td:last-child{text-align:right}
+.veredito{background:rgba(139,92,246,.10);border:1px solid rgba(139,92,246,.35);border-radius:10px;padding:12px 14px;font-size:14px}
+.nota{font-size:12px;color:#6E7A8C;margin-top:20px;border-top:1px solid rgba(170,181,197,.14);padding-top:10px}
+b{color:#fff}
+</style></head><body>
+<h1>◈ QUANT OPS — Relatório de ${dias} dias</h1>
+<p>Período: ${new Date(corte * 1000).toLocaleDateString('pt-BR')} → ${new Date(agora * 1000).toLocaleDateString('pt-BR')} · gerado em ${new Date().toLocaleString('pt-BR')}</p>
+<div class="veredito">${veredito}</div>
+<h2>Placar geral</h2><table>
+${_relLinha('Entradas registradas', regs.length)}
+${_relLinha('Verificadas (WIN/LOSS)', res.length)}
+${wr != null ? _relLinha('Acerto real', `${_relPct(wr)} (${wins}/${res.length})`) : ''}
+${lb != null ? _relLinha('Limite inferior de Wilson (95%)', _relPct(lb)) : ''}
+${_relLinha('Break-even do payout ' + Math.round(payout * 100) + '%', _relPct(beWR))}
+${wr != null ? _relLinha('Expectativa por operação', ((expectancia(wr, payout) >= 0 ? '+' : '') + expectancia(wr, payout).toFixed(2)) + ' por unidade') : ''}
+</table>
+${tbl('Por selo de qualidade', porGrade)}
+${tbl('Por funil no momento da entrada', porFunil)}
+${tbl('Por par', porPar)}
+${curva.length ? '<h2>Curva de calibração (previsto × realizado)</h2><table>' + curva.map(c => `<tr><td>previsto ${c.faixa}</td><td>${c.n} ops</td><td><b>real ${_relPct(c.real)}</b></td></tr>`).join('') + '</table>' : ''}
+${Object.keys(pesos).length ? '<h2>Acerto real por fator (alinhado à entrada)</h2><table>' + Object.keys(MAPA_FATOR_LETRA).filter(n => pesos[MAPA_FATOR_LETRA[n]]).map(n => { const o = pesos[MAPA_FATOR_LETRA[n]]; return `<tr><td>${n}</td><td>${o.w}/${o.n}</td><td><b>${_relPct(o.wr)}</b></td></tr>`; }).join('') + '</table>' : ''}
+<h2>Configuração vigente</h2><table>
+${_relLinha('Fatores ligados', fatoresOn)}
+${_relLinha('Portões ligados', portoes)}
+${_relLinha('Par / TF / expiração', `${symbolAtual()} · M${tfMinutes()} · ${expMinutes()}m`)}
+</table>
+<p class="nota">⚠️ FERRAMENTA DE ESTUDO — não é recomendação de investimento. Opções binárias/expirações curtas são de altíssimo risco; payout &lt;100% exige acerto sustentado acima do break-even só para empatar. Este relatório mostra a evidência real — decida com ela, não contra ela.</p>
+</body></html>`;
+}
+
+function baixarRelatorio(dias) {
+    try {
+        const html = gerarRelatorioHTML(dias || 7);
+        const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'quantops-relatorio-' + new Date().toISOString().slice(0, 10) + '.html';
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+        showToast('📄 Relatório dos últimos ' + (dias || 7) + ' dias baixado', 'ok');
+    } catch (e) { showToast('Falha ao gerar relatório: ' + e.message, 'err'); }
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    const b = document.getElementById('btnRelatorio');
+    if (b) b.addEventListener('click', () => baixarRelatorio(7));
+});

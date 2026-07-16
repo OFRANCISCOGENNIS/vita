@@ -280,6 +280,81 @@ check('IA aquece sozinha quando o par não tem parâmetros', aqueceu.rodou && aq
 check('com cache existente a IA não re-treina no boot', aqueceu.repetiu === false);
 check('auto-reotimização vem ligada de fábrica', await p.evaluate(() => document.getElementById('autoReopt').checked));
 
+// 4.9.1) Histórico acumulado (IndexedDB): gravar → contar → mesclar p/ IA → limpar
+const hist = await p.evaluate(async () => {
+  await historicoLimpar();
+  const mk = (t0, n) => Array.from({ length: n }, (_, i) => ({ time: t0 + i * 300, open: 1, high: 2, low: 0.5, close: 1.5, volume: 3 }));
+  await historicoGravar('TESTE', 5, mk(1000000, 300));
+  const i1 = await historicoInfo('TESTE', 5);
+  await historicoGravar('TESTE', 5, mk(1000000 + 150 * 300, 300));   // 150 sobrepostas + 150 novas
+  const i2 = await historicoInfo('TESTE', 5);
+  const frescas = mk(1000000 + 400 * 300, 100);
+  const merged = await historicoParaIA('TESTE', 5, frescas);
+  const ordenado = merged.every((v, i) => i === 0 || v.time > merged[i - 1].time);
+  const unico = new Set(merged.map(v => v.time)).size === merged.length;
+  const info3 = await historicoInfo('TESTE', 5);
+  await historicoLimpar();
+  const zerado = (await historicoInfo('TESTE', 5)).n === 0;
+  return { n1: i1.n, n2: i2.n, mergedLen: merged.length, ordenado, unico, n3: info3.n, zerado };
+});
+check('histórico grava 300 velas', hist.n1 === 300, 'n=' + hist.n1);
+check('regravar sobreposto deduplica (450 únicas)', hist.n2 === 450, 'n=' + hist.n2);
+// 300 + 300 (150 sobrepostas) + 100 frescas (50 sobrepostas) = 500 tempos únicos
+check('merge p/ IA: antigo + fresco, ordenado e sem duplicata', hist.mergedLen === 500 && hist.ordenado && hist.unico, 'len=' + hist.mergedLen);
+check('rodada da IA engorda o histórico (500 únicas)', hist.n3 === 500, 'n=' + hist.n3);
+check('limpar zera o histórico', hist.zerado);
+
+// 4.9.2) Calibração real: curva previsto×realizado + pesos por fator
+const calib2 = await p.evaluate(() => {
+  const mk = (pEst, resultado, fatores, dir) => ({ t: 1, dir: dir || 1, resultado, det: { pEst, fatores: fatores || [] } });
+  const regs = [
+    mk(0.62, 'WIN'), mk(0.63, 'WIN'), mk(0.61, 'LOSS'),              // faixa 60–65: 2/3
+    mk(0.52, 'LOSS'), mk(0.53, 'LOSS'),                              // faixa 50–55: 0/2
+  ];
+  const curva = curvaCalibracao(regs);
+  const f60 = curva.find(c => c.faixa === '60–65%'), f50 = curva.find(c => c.faixa === '50–55%');
+  // pesos por fator: Tendência alinhada em 12 entradas, 9 WIN → wr .75 → peso 1.25 (cap)
+  const regsP = Array.from({ length: 12 }, (_, i) =>
+    mk(0.6, i < 9 ? 'WIN' : 'LOSS', [{ nome: 'Tendência', dir: 1 }, { nome: 'RSI', dir: -1 }], 1));
+  const pesos = pesosReaisCalc(regsP);
+  return {
+    f60ok: f60 && f60.n === 3 && Math.abs(f60.real - 2 / 3) < 0.01,
+    f50ok: f50 && f50.n === 2 && f50.real === 0,
+    tendN: pesos.T ? pesos.T.n : 0, tendWr: pesos.T ? pesos.T.wr : 0,
+    rsiIgnorado: !pesos.Mo,                                     // RSI apontou contra: não conta
+    peso: pesoRealFator(pesos, 'T'), pesoNeutro: pesoRealFator(pesos, 'X')
+  };
+});
+check('curva: faixa 60–65% com 3 ops e real 67%', calib2.f60ok);
+check('curva: faixa 50–55% com real 0%', calib2.f50ok);
+check('fator alinhado conta (12 amostras, wr 75%) · contra não conta', calib2.tendN === 12 && Math.abs(calib2.tendWr - 0.75) < 0.01 && calib2.rsiIgnorado);
+check('peso real: wr 75% → ×1.25 (cap) · sem amostra → ×1 neutro', calib2.peso === 1.25 && calib2.pesoNeutro === 1);
+
+// 4.9.3) Relatório semanal: HTML gerado com placar e veredito
+const rel = await p.evaluate(() => {
+  registro = [
+    { t: Math.floor(Date.now() / 1000) - 3600, par: 'EUR/USD', dir: 1, score: 5, enabled: 6, grade: 'A', funil: 5, resultado: 'WIN', det: { pEst: 0.62, fatores: [] } },
+    { t: Math.floor(Date.now() / 1000) - 7200, par: 'EUR/USD', dir: -1, score: 4, enabled: 6, grade: 'B', funil: 3, resultado: 'LOSS', det: { pEst: 0.55, fatores: [] } }
+  ];
+  const html = gerarRelatorioHTML(7);
+  return {
+    temTitulo: /QUANT OPS — Relatório/.test(html),
+    temPlacar: /Acerto real/.test(html) && /1\/2/.test(html),
+    temBreakEven: /Break-even/.test(html),
+    temAviso: /FERRAMENTA DE ESTUDO/.test(html),
+    temBotao: !!document.getElementById('btnRelatorio')
+  };
+});
+check('relatório: título, placar 1/2, break-even e aviso de risco', rel.temTitulo && rel.temPlacar && rel.temBreakEven && rel.temAviso);
+check('botão 📄 Relatório presente no Registro', rel.temBotao);
+
+// 4.9.4) PWA: sw.js existe e o standalone registra o Service Worker (https)
+import { readFileSync } from 'fs';
+const swSrc = readFileSync(path.join(here, '..', 'sw.js'), 'utf8');
+const htmlBuild = readFileSync(file, 'utf8');
+check('sw.js: network-first com fallback de cache', /quantops-v/.test(swSrc) && /caches\.match/.test(swSrc));
+check('standalone registra o SW (só em http/https)', /serviceWorker/.test(htmlBuild) && /register\(['"]sw\.js/.test(htmlBuild));
+
 // 4.10) Padrões de preço (Fase 2): doji, harami, CHoCH, topo/fundo duplo, triângulo
 const pads = await p.evaluate(() => {
   const doji = ehDoji(10, 10.5, 9.5, 10.02) && !ehDoji(10, 10.5, 9.5, 10.4);
