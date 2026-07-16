@@ -116,8 +116,20 @@ export default function EstudioPage() {
   const seeded = useRef(false);
   const [sheet, setSheet] = useState<Sheet>(null);
   const [rail, setRail] = useState<RailPanel>("ferramentas");
-  const [toolsOpen, setToolsOpen] = useState(true);
+  /** O que o painel direito mostra: painel do menu esquerdo ou Propriedades. */
+  const [rightView, setRightView] = useState<"panel" | "props">("panel");
   const [railOpen, setRailOpen] = useState(true);
+
+  /** Abre um painel do menu esquerdo no lado direito. */
+  function openPanel(id: RailPanel) {
+    setRail(id);
+    setRightView("panel");
+  }
+
+  // selecionar um clipe na timeline traz as Propriedades de volta à direita
+  useEffect(() => {
+    if (selectedClipId) setRightView("props");
+  }, [selectedClipId]);
   const [exportOpen, setExportOpen] = useState(false);
   const [projectsOpen, setProjectsOpen] = useState(false);
   const [saveState, setSaveState] = useState<"salvo" | "salvando">("salvo");
@@ -210,12 +222,14 @@ export default function EstudioPage() {
       if (detail === "bin" || detail === "music" || detail === "record" || detail === "captions" || detail === "inspector") {
         setSheet(detail);
       }
-      // no desktop, o mesmo evento troca o painel do rail
+      // no desktop, o mesmo evento troca o painel direito
       const map: Record<string, RailPanel | undefined> = { bin: "midia", music: "audio", captions: "legendas", record: "gravar" };
       const panel = map[detail];
       if (panel) {
         setRail(panel);
-        setToolsOpen(true);
+        setRightView("panel");
+      } else if (detail === "inspector") {
+        setRightView("props");
       }
     }
     window.addEventListener("studio-open-sheet", onOpenSheet);
@@ -389,10 +403,7 @@ export default function EstudioPage() {
             {RAIL_ITEMS.map((item) => (
               <button
                 key={item.id}
-                onClick={() => {
-                  setRail(item.id);
-                  setToolsOpen(true);
-                }}
+                onClick={() => openPanel(item.id)}
                 aria-pressed={rail === item.id}
                 aria-label={item.label}
                 title={item.label}
@@ -430,7 +441,7 @@ export default function EstudioPage() {
           </div>
         </nav>
 
-        {/* centro: preview + timeline + faixa de ferramentas (desktop) */}
+        {/* centro: preview + timeline (desktop) */}
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           {/* o VÍDEO tem prioridade: altura mínima garantida (cresce com a tela) */}
           <div className="min-h-[max(240px,46dvh)] flex-1 p-2 sm:p-3">
@@ -439,61 +450,50 @@ export default function EstudioPage() {
           <div className="shrink-0 px-2 pb-1 sm:px-3">
             <TimelineTracks />
           </div>
-          {/* faixa inferior larga: encolhe (com scroll próprio) para nunca engolir o vídeo */}
-          <div
-            className={cn(
-              "hidden min-h-0 flex-col border-t border-white/[0.05] bg-surface-1/20 lg:flex",
-              toolsOpen ? "shrink" : "shrink-0",
-            )}
-            style={toolsOpen ? { maxHeight: "32dvh", minHeight: 92 } : undefined}
-          >
-            <button
-              onClick={() => setToolsOpen((v) => !v)}
-              aria-expanded={toolsOpen}
-              className="flex shrink-0 items-center justify-between px-3 pb-1 pt-2 text-left text-[11px] font-semibold uppercase tracking-wide text-zinc-500 transition-colors hover:text-zinc-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
-            >
-              {rail === "ferramentas" ? "Ferramentas de edição" : PANEL_TITLES[rail]}
-              <ChevronDown className={cn("h-3.5 w-3.5 transition-transform duration-300", !toolsOpen && "rotate-180")} aria-hidden />
-            </button>
-            <div
-              className="grid min-h-0 flex-1 transition-[grid-template-rows] duration-300 ease-out motion-reduce:transition-none"
-              style={{ gridTemplateRows: toolsOpen ? "1fr" : "0fr" }}
-            >
-              <div className="min-h-0 overflow-hidden">
-                <div key={rail} className="panel-fade editor-scroll h-full overflow-y-auto px-3 pb-3">
-                  {rail === "ferramentas" && <ToolsPanel onNavigate={setRail} />}
-                  {rail === "midia" && <MediaBin />}
-                  {rail === "audio" && <MusicPanel />}
-                  {rail === "texto" && <TextPanel />}
-                  {rail === "legendas" && <CaptionsPanel />}
-                  {rail === "transicoes" && <TransitionsPanel />}
-                  {rail === "filtros" && <FiltersPanel />}
-                  {rail === "efeitos" && <EffectsPanel />}
-                  {rail === "gravar" && <RecordPanel />}
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
 
-        {/* Propriedades (desktop) */}
-        <aside className="editor-scroll hidden shrink-0 overflow-y-auto border-l border-white/[0.06] bg-surface-1/30 p-3 lg:block lg:w-[292px]">
+        {/* Painel direito contextual: painel do menu esquerdo OU Propriedades */}
+        <aside className="editor-scroll hidden shrink-0 overflow-y-auto border-l border-white/[0.06] bg-surface-1/30 p-3 lg:block lg:w-[300px]">
           <div className="mb-2 flex items-center justify-between">
             <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
-              <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden /> Propriedades
+              <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden />
+              {rightView === "panel" ? PANEL_TITLES[rail] : "Propriedades"}
             </p>
-            {selectedClipId && (
+            {rightView === "panel" ? (
               <button
-                onClick={() => select(null)}
-                aria-label="Fechar propriedades (desmarcar clipe)"
-                title="Desmarcar clipe"
-                className="rounded-lg p-1 text-zinc-500 transition-colors hover:bg-white/5 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+                onClick={() => setRightView("props")}
+                className="rounded-lg border border-line px-2 py-1 text-[10px] font-medium text-zinc-300 transition-colors hover:border-violet-500/50 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
               >
-                <ChevronDown className="h-3.5 w-3.5 rotate-[-90deg]" />
+                Propriedades
               </button>
+            ) : (
+              selectedClipId && (
+                <button
+                  onClick={() => select(null)}
+                  aria-label="Fechar propriedades (desmarcar clipe)"
+                  title="Desmarcar clipe"
+                  className="rounded-lg p-1 text-zinc-500 transition-colors hover:bg-white/5 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+                >
+                  <ChevronDown className="h-3.5 w-3.5 rotate-[-90deg]" />
+                </button>
+              )
             )}
           </div>
-          <ClipInspector />
+          {rightView === "panel" ? (
+            <div key={rail} className="panel-fade">
+              {rail === "ferramentas" && <ToolsPanel onNavigate={openPanel} />}
+              {rail === "midia" && <MediaBin />}
+              {rail === "audio" && <MusicPanel />}
+              {rail === "texto" && <TextPanel />}
+              {rail === "legendas" && <CaptionsPanel />}
+              {rail === "transicoes" && <TransitionsPanel />}
+              {rail === "filtros" && <FiltersPanel />}
+              {rail === "efeitos" && <EffectsPanel />}
+              {rail === "gravar" && <RecordPanel />}
+            </div>
+          ) : (
+            <ClipInspector />
+          )}
         </aside>
       </div>
 
