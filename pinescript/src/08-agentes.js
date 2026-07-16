@@ -1,8 +1,9 @@
 // ============================================================================
 // BLOCO 13 — AGENTES DE ESTUDO (estudo contínuo do mercado em segundo plano)
 // ============================================================================
-// Quatro agentes autônomos que rodam num tick de 60s (quando ativados) e vão
-// melhorando os parâmetros de entrada sem intervenção:
+// Agentes autônomos que rodam num tick de 60s (quando ativados) e vão
+// melhorando os parâmetros de entrada sem intervenção (os agentes 🔧
+// Configurador e ✅ Validador, do bloco 25, entram no mesmo tick):
 //   🧪 Otimizador Contínuo — reotimiza as moedas marcadas em rodízio (uma por
 //      vez, no Web Worker), mantendo o iaCache sempre fresco.
 //   🔭 Sentinela de Regime — vigia a virada de regime do par aberto; aplica na
@@ -36,7 +37,7 @@ function renderAgentes() {
     el.innerHTML = agLog.length ? agLog.map(l =>
         `<div class="reg-row"><span class="reg-hora">${fmtHora(l.t)}</span>` +
         `<span class="ag-nome">${l.agente}</span><span class="ag-msg">${l.msg}</span></div>`
-    ).join('') : '<div class="metric-empty" style="padding:8px 4px;">Ative o estudo contínuo: os agentes reotimizam as moedas em rodízio, vigiam o regime e auditam a calibração — e reportam aqui o que encontram.</div>';
+    ).join('') : '<div class="metric-empty" style="padding:8px 4px;">Ative o estudo contínuo: os agentes reotimizam as moedas em rodízio, vigiam o regime, auditam a calibração, checam a sua CONFIGURAÇÃO (🔧) e VALIDAM a saúde estatística (✅) — com conserto em 1 clique aqui no log.</div>';
 }
 
 // ---- 🔭 Sentinela de Regime ----
@@ -140,6 +141,9 @@ async function agentesTick() {
     try { agenteRegime(); } catch (e) { }
     try { agenteCalibracao(); } catch (e) { }
     try { agenteFatores(); } catch (e) { }
+    // 🔧/✅ configuração e validação (bloco 25) — leves, rodam todo tick
+    try { if (typeof agenteConfigurador === 'function') agenteConfigurador(); } catch (e) { }
+    try { if (typeof agenteValidador === 'function') agenteValidador(); } catch (e) { }
     // o otimizador (pesado) roda a cada 3 ticks, ou antes se algo foi agendado
     if (agTickN % 3 === 0 || agFilaOtim.length) { try { await agenteOtimizador(); } catch (e) { } }
 }

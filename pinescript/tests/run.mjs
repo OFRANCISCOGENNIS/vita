@@ -355,6 +355,76 @@ const htmlBuild = readFileSync(file, 'utf8');
 check('sw.js: network-first com fallback de cache', /quantops-v/.test(swSrc) && /caches\.match/.test(swSrc));
 check('standalone registra o SW (só em http/https)', /serviceWorker/.test(htmlBuild) && /register\(['"]sw\.js/.test(htmlBuild));
 
+// 4.9.5) Agentes de configuração (🔧) e validação (✅) com conserto em 1 clique
+const agCfg = await p.evaluate(() => {
+  // isolamento: fotografa TUDO que os consertos podem tocar e zera o estado dos agentes
+  const IDS = ['timeframe', 'expiracao', 'payout', 'minScore', 'rsiSobrevenda', 'rsiSobrecompra', 'estruturaLookback', 'cooldownVelas'];
+  const bak = {}; IDS.forEach(id => bak[id] = document.getElementById(id).value);
+  const bakFila = agFilaOtim.slice();
+  agLog = []; Object.keys(agVistos).forEach(k => delete agVistos[k]);
+  // execução incoerente: TF 5m com expiração 1m (razão 0.2×)
+  document.getElementById('timeframe').value = '5';
+  document.getElementById('expiracao').value = '1';
+  agenteConfigurador();
+  const msg = agLog.find(l => /expiração 1m/.test(l.msg));
+  // payout inviável
+  document.getElementById('payout').value = '70';
+  agenteConfigurador();
+  const msgPayout = agLog.find(l => /payout 70%/.test(l.msg));
+  // conserto em 1 clique: acha ESPECIFICAMENTE o botão da expiração pelo rótulo
+  renderAgentes();
+  const btn = [...document.querySelectorAll('#agentesLog .ag-fix')].find(b => /ajustar expiração/.test(b.textContent));
+  let consertou = false;
+  if (btn && agAcoes[btn.dataset.fix]) { agAcoes[btn.dataset.fix](); consertou = document.getElementById('expiracao').value === '5'; }
+  agenteConfigurador();   // mesmo problema (payout) não re-loga
+  const dedupe = agLog.filter(l => /payout 70%/.test(l.msg)).length === 1
+    && agLog.filter(l => /expiração 1m/.test(l.msg)).length === 1;
+  // restaura tudo (inclusive a fila e o dedupe) p/ não vazar pros próximos testes
+  IDS.forEach(id => document.getElementById(id).value = bak[id]);
+  agFilaOtim = bakFila; agLog = []; Object.keys(agVistos).forEach(k => delete agVistos[k]);
+  recalcularSinaisApenas();
+  return { avisou: !!msg, temBotao: /ag-fix/.test(msg ? msg.msg : ''), avisouPayout: !!msgPayout, consertou, dedupe };
+});
+check('🔧 Configurador avisa expiração incoerente com botão de conserto', agCfg.avisou && agCfg.temBotao);
+check('🔧 Configurador avisa payout inviável (<80%)', agCfg.avisouPayout);
+check('conserto em 1 clique ajusta a expiração p/ 5m', agCfg.consertou);
+check('dedupe: o mesmo problema não repete no log', agCfg.dedupe);
+const agVal = await p.evaluate(() => {
+  agLog = []; Object.keys(agVistos).forEach(k => delete agVistos[k]);
+  // fator ruim: Tendência alinhada em 12 entradas com 4 WIN (33%)
+  const bakReg = registro;
+  registro = Array.from({ length: 12 }, (_, i) => ({
+    t: 1, dir: 1, resultado: i < 4 ? 'WIN' : 'LOSS',
+    det: { pEst: 0.6, fatores: [{ nome: 'Tendência', dir: 1 }] }
+  }));
+  const bakT = document.getElementById('useTendencia').checked;
+  document.getElementById('useTendencia').checked = true;
+  agenteValidador();
+  const msg = agLog.find(l => /Tendência acerta só/.test(l.msg));
+  // executa o desligamento sugerido
+  renderAgentes();
+  const btns = [...document.querySelectorAll('#agentesLog .ag-fix')];
+  const bDesl = btns.find(b => agAcoes[b.dataset.fix] && /desligar/.test(b.textContent));
+  let desligou = false;
+  if (bDesl) { agAcoes[bDesl.dataset.fix](); desligou = !document.getElementById('useTendencia').checked; }
+  // funil invertido: ≤4 acertando muito mais que ≥5
+  registro = [
+    ...Array.from({ length: 6 }, () => ({ t: 1, dir: 1, funil: 5, resultado: 'LOSS' })),
+    ...Array.from({ length: 6 }, () => ({ t: 1, dir: 1, funil: 3, resultado: 'WIN' }))
+  ];
+  agenteValidador();
+  const msgFunil = agLog.find(l => /INVERTIDO/.test(l.msg));
+  // restaura o estado (registro, toggle, fila de estudo, dedupe e log)
+  registro = bakReg; document.getElementById('useTendencia').checked = bakT;
+  agFilaOtim = []; agLog = [];
+  Object.keys(agVistos).forEach(k => delete agVistos[k]);
+  recalcularSinaisApenas();
+  return { avisou: !!msg, desligou, avisouFunil: !!msgFunil };
+});
+check('✅ Validador detecta fator com acerto real ruim', agVal.avisou);
+check('conserto: desliga o fator ruim em 1 clique', agVal.desligou);
+check('✅ Validador detecta funil invertido', agVal.avisouFunil);
+
 // 4.10) Padrões de preço (Fase 2): doji, harami, CHoCH, topo/fundo duplo, triângulo
 const pads = await p.evaluate(() => {
   const doji = ehDoji(10, 10.5, 9.5, 10.02) && !ehDoji(10, 10.5, 9.5, 10.4);

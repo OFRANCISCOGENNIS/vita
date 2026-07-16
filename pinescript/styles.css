@@ -1979,3 +1979,7 @@ body::before {
 #calibExtra .kv { display: flex; justify-content: space-between; gap: 10px; padding: 3px 0; font-size: 12px; border-bottom: 1px dashed var(--hairline); }
 #calibExtra .kv b { color: var(--ink); }
 #calibExtra .kv-good b { color: var(--call); } #calibExtra .kv-bad b { color: var(--put); } #calibExtra .kv-warn b { color: var(--warning); }
+
+/* ---- Botões de conserto em 1 clique no log dos agentes ---- */
+.ag-fix { font-size: 11px; padding: 1px 8px; margin-left: 4px; border-color: rgba(34, 211, 238, 0.45); color: var(--neon-1, var(--accent)); white-space: nowrap; }
+.ag-fix:hover { background: rgba(34, 211, 238, 0.12); }

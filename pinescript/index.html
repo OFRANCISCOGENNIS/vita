@@ -643,7 +643,7 @@
                             <li>O <strong>Scanner</strong> usa esses parâmetros; clique numa moeda pra abri-la afinada.</li>
                             <li>O <strong>Registro</strong> marca ✓/✗ automaticamente após a expiração e compara o acerto real com o previsto.</li>
                             <li>O backtest roda num <strong>Web Worker</strong> (segundo plano), então a tela não trava durante a otimização.</li>
-                            <li><strong>🕵️ Agentes de Estudo</strong> (opcional): com o estudo contínuo ativado, 4 agentes trabalham sozinhos — 🧪 reotimiza as moedas em rodízio, 🔭 aplica os parâmetros certos quando o regime vira, ⚖️ audita a calibração e 🧠 mede os fatores. O painel mostra o que cada um encontrou.</li>
+                            <li><strong>🕵️ Agentes de Estudo</strong> (opcional): com o estudo contínuo ativado, 6 agentes trabalham sozinhos — 🧪 reotimiza as moedas em rodízio, 🔭 aplica os parâmetros certos quando o regime vira, ⚖️ audita a calibração, 🧠 mede os fatores, 🔧 <strong>Configurador</strong> vigia a coerência da config (expiração×TF, payout, fatores×regime, parâmetros da IA) e ✅ <strong>Validador</strong> vigia a saúde estatística (par sem estudo, curva otimista, funil invertido, fator ruim) — os dois oferecem o <em>conserto em 1 clique</em> direto no log.</li>
                             <li><strong>🧭 Price Action — Entradas</strong>: LTA/LTB (2+ pivôs na direção; 3+ toques validam a linha), zonas de confluência (S/R + fib + LT a ≤0.5 ATR entre si), alinhamento micro (estrutura HH/HL × LH/LL do TF) × macro (TF maior/EMA200) e vela de confirmação. Leitura descritiva: a entrada de qualidade nasce no TESTE de uma zona — nunca "no meio do nada".</li>
                             <li><strong>📐 Filtro Price Action</strong> (portão, nos controles): com ele ligado, o veredito CALL só vale com o preço a ≤ X ATR de um suporte ou da LTA; PUT só perto de resistência ou da LTB. Longe da zona vira <em>AGUARDAR 📐</em> — sem som, notificação ou registro. O chip <em>PA zona</em> mostra o lado da zona mais próxima.</li>
                             <li><strong>🕯 Padrões de preço</strong> (painel 🧭 e retrato da entrada): doji (indecisão), harami (alta/baixa), CHoCH (quebra de caráter da estrutura), topo/fundo duplo (±0.5 ATR) e triângulo/canal (sobre as LTs). Leitura descritiva — NÃO entram na pontuação: padrão sem contexto é ruído; confirme com a zona e o alinhamento micro×macro.</li>
@@ -732,6 +732,7 @@
     <script src="src/17-historico.js"></script>
     <script src="src/18-calibracao.js"></script>
     <script src="src/19-relatorio.js"></script>
+    <script src="src/20-agentes-cfg.js"></script>
     <!-- APP:END -->
 </body>
 </html>
