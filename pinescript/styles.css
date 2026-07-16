@@ -1757,3 +1757,26 @@ button:focus-visible, .scan-item:focus-visible, .ia-row:focus-visible {
     .det-hbox { min-width: 88px; padding: 6px 10px; }
     .det-hval { font-size: 18px; }
 }
+
+/* ---- Detalhe encostado no Registro: painel lateral, não modal central ---- */
+/* Abre deslizando da direita, ao lado do dock do Registro (quando visível),
+   para o olho ir direto da linha clicada ao retrato da entrada. */
+#detalheModal { justify-content: flex-end; align-items: stretch; padding: 0; background: rgba(4, 8, 18, 0.35); }
+#detalheModal .det-card {
+    position: fixed; top: var(--reg-top, 64px); bottom: 0; right: 0;
+    width: min(560px, 94vw); max-width: none; max-height: none;
+    margin: 0; border-radius: 12px 0 0 12px;
+    box-shadow: -16px 0 40px rgba(0, 0, 0, 0.45);
+    animation: detSlideIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+/* com o dock do Registro aberto, encosta NELE (fica imediatamente à esquerda) */
+body.tem-registro #detalheModal .det-card { right: var(--reg-w); border-radius: 12px 0 0 12px; }
+/* painel mais estreito: gráfico em cima, motivos embaixo */
+#detalheModal .det-grid { grid-template-columns: 1fr; }
+@keyframes detSlideIn { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (max-width: 760px) {
+    #detalheModal .det-card, body.tem-registro #detalheModal .det-card {
+        right: 0; left: 0; width: auto; border-radius: 12px 12px 0 0;
+    }
+}
+@media (prefers-reduced-motion: reduce) { #detalheModal .det-card { animation: none !important; } }
