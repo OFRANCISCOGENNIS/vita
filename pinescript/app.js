@@ -2790,6 +2790,7 @@ function renderRegistro() {
             (r.grade ? `<span class="reg-grade grade-${r.grade}">${r.grade}</span>` : '') +
             (r.funil != null ? `<span class="reg-funil" title="funil de qualidade no momento da entrada">${r.funil}/6</span>` : '') +
             (r.paper ? `<span class="reg-paper" title="operação da conta demo (paper trading) · stake ${_pMoney(r.stake || 0)}">🎮</span>` : '') +
+            (r.nota || (r.tags && r.tags.length) ? `<span class="reg-nota" title="tem anotação no diário — clique p/ ver">📝</span>` : '') +
             `<span class="${r.dir === 1 ? 'chip-dir-up' : 'chip-dir-down'}">${r.dir === 1 ? '▲ CALL' : '▼ PUT'} ${r.score}/${r.enabled}</span>${res}</div>`;
     }).join('') : '<div class="metric-empty" style="padding:10px 4px;">Sem entradas A/B ainda · desmarque o filtro p/ ver todas.</div>';
     atualizarCalibracaoIA();
@@ -4888,6 +4889,26 @@ function renderPriceAction() {
 
 let _ultimaEntradaIdx = -1;
 let _detChart = null, _detSerie = null;
+let _detIdx = -1;               // entrada aberta no painel (p/ o diário)
+
+// ---- Diário da operação: nota + tags rápidas gravadas na entrada ----
+const DET_TAGS = ['✅ plano seguido', '⚠️ fora do plano', '😤 emocional', '🎯 zona perfeita', '🌪 mercado ruim'];
+function salvarNotaEntrada(idx, texto, tags) {
+    const r = registro && registro[idx];
+    if (!r) return false;
+    if (texto != null) r.nota = texto.trim().slice(0, 500) || undefined;
+    if (tags != null) r.tags = tags.length ? tags.slice(0, 5) : undefined;
+    localStorage.setItem('registroEntradas', JSON.stringify(registro));
+    renderRegistro();
+    return true;
+}
+function _detRenderTags(r) {
+    const box = document.getElementById('detTags');
+    if (!box) return;
+    const ativas = (r && r.tags) || [];
+    box.innerHTML = DET_TAGS.map(t =>
+        `<button type="button" class="det-tag${ativas.includes(t) ? ' det-tag-on' : ''}" data-tag="${t}">${t}</button>`).join('');
+}
 
 // ---- Retrato da entrada no instante da virada (guardado em registro[i].det) ----
 function snapshotEntrada(verdictKey, gFull, fn) {
@@ -4988,6 +5009,12 @@ function abrirDetalheEntrada(idx) {
     if (d.motivos && d.motivos.length) { rss.style.display = ''; rss.innerHTML = '⚠ ' + d.motivos.join(' · '); }
     else rss.style.display = 'none';
 
+    // diário: nota + tags desta entrada
+    _detIdx = idx;
+    const nota = document.getElementById('detNota');
+    if (nota) nota.value = r.nota || '';
+    _detRenderTags(r);
+
     modal.style.display = 'flex';
     requestAnimationFrame(() => _detDesenharGrafico(r));
 }
@@ -5040,6 +5067,23 @@ function _detDesenharGrafico(r) {
 document.addEventListener('DOMContentLoaded', function () {
     const modal = document.getElementById('detalheModal');
     if (modal) modal.addEventListener('click', e => { if (e.target.id === 'detalheModal') fecharDetalhe(); });
+    // diário: nota salva sozinha (debounce) · tags alternam no clique
+    const nota = document.getElementById('detNota');
+    let notaTimer = null;
+    if (nota) nota.addEventListener('input', () => {
+        clearTimeout(notaTimer);
+        notaTimer = setTimeout(() => { if (_detIdx >= 0) salvarNotaEntrada(_detIdx, nota.value, null); }, 600);
+    });
+    const tags = document.getElementById('detTags');
+    if (tags) tags.addEventListener('click', e => {
+        const b = e.target.closest('.det-tag');
+        if (!b || _detIdx < 0 || !registro[_detIdx]) return;
+        const atuais = (registro[_detIdx].tags || []).slice();
+        const i = atuais.indexOf(b.dataset.tag);
+        if (i >= 0) atuais.splice(i, 1); else atuais.push(b.dataset.tag);
+        salvarNotaEntrada(_detIdx, null, atuais);
+        _detRenderTags(registro[_detIdx]);
+    });
     const x = document.getElementById('detFechar');
     if (x) x.addEventListener('click', fecharDetalhe);
     // clique numa linha do Registro abre o detalhe (delegação)
@@ -5690,6 +5734,7 @@ ${tbl('Por funil no momento da entrada', porFunil)}
 ${tbl('Por par', porPar)}
 ${curva.length ? '<h2>Curva de calibração (previsto × realizado)</h2><table>' + curva.map(c => `<tr><td>previsto ${c.faixa}</td><td>${c.n} ops</td><td><b>real ${_relPct(c.real)}</b></td></tr>`).join('') + '</table>' : ''}
 ${Object.keys(pesos).length ? '<h2>Acerto real por fator (alinhado à entrada)</h2><table>' + Object.keys(MAPA_FATOR_LETRA).filter(n => pesos[MAPA_FATOR_LETRA[n]]).map(n => { const o = pesos[MAPA_FATOR_LETRA[n]]; return `<tr><td>${n}</td><td>${o.w}/${o.n}</td><td><b>${_relPct(o.wr)}</b></td></tr>`; }).join('') + '</table>' : ''}
+${(() => { const notas = regs.filter(r => r.nota || (r.tags && r.tags.length)).slice(-8); return notas.length ? '<h2>Diário da semana</h2><table>' + notas.map(r => `<tr><td>${new Date(r.t * 1000).toLocaleString('pt-BR').slice(0, 16)} · ${r.par} ${r.dir === 1 ? '▲' : '▼'}${r.resultado ? ' · ' + r.resultado : ''}</td><td>${(r.tags || []).join(' ')} ${r.nota ? '— ' + r.nota : ''}</td></tr>`).join('') + '</table>' : ''; })()}
 <h2>Configuração vigente</h2><table>
 ${_relLinha('Fatores ligados', fatoresOn)}
 ${_relLinha('Portões ligados', portoes)}
@@ -5875,5 +5920,69 @@ document.addEventListener('DOMContentLoaded', function () {
         try { resultado = agAcoes[b.dataset.fix]() || 'aplicado'; } catch (err) { resultado = 'falhou: ' + err.message; }
         delete agAcoes[b.dataset.fix];
         agentesLog('✔ Conserto', resultado);
+    });
+});
+// ============================================================================
+// BLOCO 26 — BACKUP COMPLETO (exporta/importa TUDO em um arquivo)
+// ============================================================================
+// O app vive no navegador: limpar os dados do site apaga meses de registro,
+// IA treinada e configuração. Este bloco fotografa TODAS as chaves do
+// localStorage do QUANT OPS num JSON único (download) e restaura de volta.
+// (O histórico de velas do IndexedDB fica de fora: é grande e se reconstrói
+// sozinho — o que é insubstituível é o registro e o aprendizado.)
+
+const BACKUP_CHAVES = [
+    'ctrlEstado', 'filtrosSalvos', 'registroEntradas', 'iaCache', 'pesoFatores',
+    'scanSel', 'pilotoCfg', 'paineisVis', 'agentesOn', 'autoReopt', 'regSoA',
+    'modoSniper', 'tema', 'ctrlVisivel', 'cardsRecolhidos', 'tdKey'
+];
+
+function coletarBackup() {
+    const o = { app: 'QUANT OPS', versao: 1, data: new Date().toISOString(), chaves: {} };
+    BACKUP_CHAVES.forEach(k => {
+        const v = localStorage.getItem(k);
+        if (v != null) o.chaves[k] = v;
+    });
+    return o;
+}
+
+function aplicarBackup(o) {
+    if (!o || o.app !== 'QUANT OPS' || !o.chaves) throw new Error('arquivo não é um backup do QUANT OPS');
+    let n = 0;
+    BACKUP_CHAVES.forEach(k => {
+        if (k in o.chaves) { localStorage.setItem(k, o.chaves[k]); n++; }
+    });
+    return n;
+}
+
+function exportarBackup() {
+    try {
+        const blob = new Blob([JSON.stringify(coletarBackup(), null, 1)], { type: 'application/json' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'quantops-backup-' + new Date().toISOString().slice(0, 10) + '.json';
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+        showToast('💾 Backup completo baixado — guarde em local seguro', 'ok');
+    } catch (e) { showToast('Falha no backup: ' + e.message, 'err'); }
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    const bE = document.getElementById('btnBackupExp');
+    const bI = document.getElementById('backupImp');
+    if (bE) bE.addEventListener('click', exportarBackup);
+    if (bI) bI.addEventListener('change', function () {
+        const f = this.files && this.files[0];
+        if (!f) return;
+        const rd = new FileReader();
+        rd.onload = () => {
+            try {
+                const n = aplicarBackup(JSON.parse(rd.result));
+                showToast(`📂 Backup restaurado (${n} conjuntos) — recarregando…`, 'ok');
+                setTimeout(() => location.reload(), 900);
+            } catch (e) { showToast('Backup inválido: ' + e.message, 'err'); }
+            this.value = '';
+        };
+        rd.readAsText(f);
     });
 });

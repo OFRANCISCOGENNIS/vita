@@ -425,6 +425,44 @@ check('✅ Validador detecta fator com acerto real ruim', agVal.avisou);
 check('conserto: desliga o fator ruim em 1 clique', agVal.desligou);
 check('✅ Validador detecta funil invertido', agVal.avisouFunil);
 
+// 4.9.6) Backup completo + diário da operação
+const bkp = await p.evaluate(() => {
+  // backup: coletar → alterar → aplicar → restaurado
+  localStorage.setItem('modoSniper', '1');
+  const b = coletarBackup();
+  const temChaves = b.app === 'QUANT OPS' && 'modoSniper' in b.chaves && 'registroEntradas' in b.chaves;
+  localStorage.setItem('modoSniper', '0');
+  const n = aplicarBackup(b);
+  const restaurou = localStorage.getItem('modoSniper') === '1';
+  localStorage.setItem('modoSniper', '0');
+  // backup inválido é rejeitado
+  let rejeitou = false;
+  try { aplicarBackup({ app: 'OUTRO' }); } catch (e) { rejeitou = true; }
+  // diário: nota + tags persistem e marcam a linha com 📝
+  registro = [{ t: dados[10].time, par: 'EUR/USD', dir: 1, score: 5, enabled: 6, grade: 'A' }];
+  abrirDetalheEntrada(0);
+  salvarNotaEntrada(0, 'testei a zona e segurei a entrada', ['✅ plano seguido', '🎯 zona perfeita']);
+  const salvo = JSON.parse(localStorage.getItem('registroEntradas'))[0];
+  document.getElementById('regSoA').checked = false; renderRegistro();
+  const badge = !!document.querySelector('#registroBody .reg-nota');
+  // reabrir mostra a nota e as tags ativas
+  abrirDetalheEntrada(0);
+  const notaNaTela = document.getElementById('detNota').value.includes('segurei');
+  const tagsOn = document.querySelectorAll('#detTags .det-tag-on').length;
+  fecharDetalhe();
+  // relatório inclui o diário
+  const rel = gerarRelatorioHTML(7000);   // janela larga p/ pegar o t simulado
+  const noRelatorio = /Diário da semana/.test(rel) && /segurei a entrada/.test(rel);
+  return { temChaves, n, restaurou, rejeitou, notaSalva: salvo.nota, tagsSalvas: (salvo.tags || []).length, badge, notaNaTela, tagsOn, noRelatorio };
+});
+check('backup coleta as chaves do app', bkp.temChaves && bkp.n >= 2);
+check('backup restaura o valor alterado', bkp.restaurou);
+check('backup de outro app é rejeitado', bkp.rejeitou);
+check('diário: nota e 2 tags persistem no registro', /segurei/.test(bkp.notaSalva) && bkp.tagsSalvas === 2);
+check('linha do Registro ganha o badge 📝', bkp.badge);
+check('reabrir o detalhe mostra nota e tags ativas', bkp.notaNaTela && bkp.tagsOn === 2);
+check('relatório inclui a seção Diário da semana', bkp.noRelatorio);
+
 // 4.10) Padrões de preço (Fase 2): doji, harami, CHoCH, topo/fundo duplo, triângulo
 const pads = await p.evaluate(() => {
   const doji = ehDoji(10, 10.5, 9.5, 10.02) && !ehDoji(10, 10.5, 9.5, 10.4);

@@ -74,6 +74,7 @@ ${tbl('Por funil no momento da entrada', porFunil)}
 ${tbl('Por par', porPar)}
 ${curva.length ? '<h2>Curva de calibração (previsto × realizado)</h2><table>' + curva.map(c => `<tr><td>previsto ${c.faixa}</td><td>${c.n} ops</td><td><b>real ${_relPct(c.real)}</b></td></tr>`).join('') + '</table>' : ''}
 ${Object.keys(pesos).length ? '<h2>Acerto real por fator (alinhado à entrada)</h2><table>' + Object.keys(MAPA_FATOR_LETRA).filter(n => pesos[MAPA_FATOR_LETRA[n]]).map(n => { const o = pesos[MAPA_FATOR_LETRA[n]]; return `<tr><td>${n}</td><td>${o.w}/${o.n}</td><td><b>${_relPct(o.wr)}</b></td></tr>`; }).join('') + '</table>' : ''}
+${(() => { const notas = regs.filter(r => r.nota || (r.tags && r.tags.length)).slice(-8); return notas.length ? '<h2>Diário da semana</h2><table>' + notas.map(r => `<tr><td>${new Date(r.t * 1000).toLocaleString('pt-BR').slice(0, 16)} · ${r.par} ${r.dir === 1 ? '▲' : '▼'}${r.resultado ? ' · ' + r.resultado : ''}</td><td>${(r.tags || []).join(' ')} ${r.nota ? '— ' + r.nota : ''}</td></tr>`).join('') + '</table>' : ''; })()}
 <h2>Configuração vigente</h2><table>
 ${_relLinha('Fatores ligados', fatoresOn)}
 ${_relLinha('Portões ligados', portoes)}

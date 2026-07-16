@@ -8,6 +8,26 @@
 
 let _ultimaEntradaIdx = -1;
 let _detChart = null, _detSerie = null;
+let _detIdx = -1;               // entrada aberta no painel (p/ o diário)
+
+// ---- Diário da operação: nota + tags rápidas gravadas na entrada ----
+const DET_TAGS = ['✅ plano seguido', '⚠️ fora do plano', '😤 emocional', '🎯 zona perfeita', '🌪 mercado ruim'];
+function salvarNotaEntrada(idx, texto, tags) {
+    const r = registro && registro[idx];
+    if (!r) return false;
+    if (texto != null) r.nota = texto.trim().slice(0, 500) || undefined;
+    if (tags != null) r.tags = tags.length ? tags.slice(0, 5) : undefined;
+    localStorage.setItem('registroEntradas', JSON.stringify(registro));
+    renderRegistro();
+    return true;
+}
+function _detRenderTags(r) {
+    const box = document.getElementById('detTags');
+    if (!box) return;
+    const ativas = (r && r.tags) || [];
+    box.innerHTML = DET_TAGS.map(t =>
+        `<button type="button" class="det-tag${ativas.includes(t) ? ' det-tag-on' : ''}" data-tag="${t}">${t}</button>`).join('');
+}
 
 // ---- Retrato da entrada no instante da virada (guardado em registro[i].det) ----
 function snapshotEntrada(verdictKey, gFull, fn) {
@@ -108,6 +128,12 @@ function abrirDetalheEntrada(idx) {
     if (d.motivos && d.motivos.length) { rss.style.display = ''; rss.innerHTML = '⚠ ' + d.motivos.join(' · '); }
     else rss.style.display = 'none';
 
+    // diário: nota + tags desta entrada
+    _detIdx = idx;
+    const nota = document.getElementById('detNota');
+    if (nota) nota.value = r.nota || '';
+    _detRenderTags(r);
+
     modal.style.display = 'flex';
     requestAnimationFrame(() => _detDesenharGrafico(r));
 }
@@ -160,6 +186,23 @@ function _detDesenharGrafico(r) {
 document.addEventListener('DOMContentLoaded', function () {
     const modal = document.getElementById('detalheModal');
     if (modal) modal.addEventListener('click', e => { if (e.target.id === 'detalheModal') fecharDetalhe(); });
+    // diário: nota salva sozinha (debounce) · tags alternam no clique
+    const nota = document.getElementById('detNota');
+    let notaTimer = null;
+    if (nota) nota.addEventListener('input', () => {
+        clearTimeout(notaTimer);
+        notaTimer = setTimeout(() => { if (_detIdx >= 0) salvarNotaEntrada(_detIdx, nota.value, null); }, 600);
+    });
+    const tags = document.getElementById('detTags');
+    if (tags) tags.addEventListener('click', e => {
+        const b = e.target.closest('.det-tag');
+        if (!b || _detIdx < 0 || !registro[_detIdx]) return;
+        const atuais = (registro[_detIdx].tags || []).slice();
+        const i = atuais.indexOf(b.dataset.tag);
+        if (i >= 0) atuais.splice(i, 1); else atuais.push(b.dataset.tag);
+        salvarNotaEntrada(_detIdx, null, atuais);
+        _detRenderTags(registro[_detIdx]);
+    });
     const x = document.getElementById('detFechar');
     if (x) x.addEventListener('click', fecharDetalhe);
     // clique numa linha do Registro abre o detalhe (delegação)
