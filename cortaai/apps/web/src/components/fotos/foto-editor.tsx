@@ -8,7 +8,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Activity, Brush, Crop, Download, Eye, ImagePlus, ImageUp, Layers, Loader2,
+  Activity, Brush, Crop, Download, Eye, ImageMinus, ImagePlus, ImageUp, Layers, Loader2,
   Palette, Redo2, Smile, Sparkles, SlidersHorizontal, Sun, Type, Undo2, X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -33,6 +33,7 @@ import { RetoquePanel, PinceisPanel } from "./panels-retoque";
 import { FiltrosPanel } from "./panels-filtros";
 import { TextoPanel, CamadasPanel } from "./panels-elementos";
 import { LuzPanel } from "./panels-luz";
+import { FundoPanel } from "./panels-fundo";
 
 // Ordem mobile-first: Luz e Retoque logo no início (a fileira rola de lado no
 // celular e o que fica depois da dobra é difícil de descobrir).
@@ -40,6 +41,7 @@ const TABS: { id: FotosTab; label: string; icon: typeof Brush }[] = [
   { id: "ajustes", label: "Ajustes", icon: SlidersHorizontal },
   { id: "luz", label: "Luz", icon: Sun },
   { id: "retoque", label: "Retoque", icon: Smile },
+  { id: "fundo", label: "Fundo (IA)", icon: ImageMinus },
   { id: "filtros", label: "Filtros", icon: Sparkles },
   { id: "recortar", label: "Recortar", icon: Crop },
   { id: "curvas", label: "Curvas", icon: Activity },
@@ -418,6 +420,7 @@ export function FotoEditor() {
           {s.activeTab === "cor" && <CorHslPanel />}
           {s.activeTab === "recortar" && <RecortarPanel />}
           {s.activeTab === "retoque" && <RetoquePanel />}
+          {s.activeTab === "fundo" && <FundoPanel />}
           {s.activeTab === "pinceis" && <PinceisPanel />}
           {s.activeTab === "filtros" && <FiltrosPanel />}
           {s.activeTab === "luz" && <LuzPanel />}
