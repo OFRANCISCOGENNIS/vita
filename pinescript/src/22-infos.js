@@ -16,6 +16,7 @@ const INFO_PAINEIS = {
     iaPanel: ['🤖 IA', 'Busca em grade + walk-forward que encontra os parâmetros de maior acerto por par e regime. Roda em segundo plano (Web Worker). Atalho: I.'],
     agentesPanel: ['🕵️ Agentes', '6 agentes autônomos: otimizador em rodízio, sentinela de regime, auditor de calibração, professor de fatores, 🔧 configurador e ✅ validador — com conserto em 1 clique no log.'],
     pilotoPanel: ['🎮 Piloto Automático', 'Paper trading numa conta DEMO simulada: registra sozinho as entradas que passam no gatilho (nível A / funil ≥5) e acompanha saldo, acerto e drawdown. Não toca em corretora.'],
+    riscoPanel: ['🛡 Gestão de Risco', 'Calcula o stake ideal (banca × risco%), a meta e o stop do dia em R$, e um guardião que lê o placar real de hoje: avisa quando você bate a meta, o stop ou uma sequência de perdas. Saber a hora de parar é a habilidade nº 1 em binárias.'],
     proPanel: ['📊 Volume Profile & Níveis', 'Perfil de volume com POC/área de valor + níveis automáticos no gráfico (Fibonacci e S/R).'],
     bookPanel: ['📖 Book & Times/Trades', 'Profundidade do book e fita de negócios ao vivo (Binance): pressão compra×venda e agressões grandes em destaque.'],
     painelPA: ['🧭 Price Action — Entradas', 'S/R + Fibonacci + LTA/LTB + micro×macro + padrões (doji, harami, CHoCH, topo/fundo duplo, triângulo). A entrada de qualidade nasce no TESTE de uma zona de confluência.'],

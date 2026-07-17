@@ -811,6 +811,34 @@ const menu = await p.evaluate(() => {
 check('⋯ Ferramentas agrupa os 8 botões (nenhum solto na barra)', menu.dentro && menu.foraDaBarra);
 check('menu ⋯ abre e fecha após ação', menu.abriu && menu.fechou);
 check('indicador do ⋯ acende com ferramenta ativa', menu.indicador);
+// Gestão de risco + guardião de banca
+const risco = await p.evaluate(() => {
+  // plano puro: banca 1000, risco 2% → stake 20; stop 6% → 60 → aguenta 3 perdas
+  const plano = planoRisco({ banca: 1000, riscoPct: 2, metaPct: 6, stopPct: 6, payout: 87 });
+  // dia batendo o STOP: 0W 3L com stake 20 → -60 = -stop
+  const sitStop = situacaoDia({ w: 0, l: 3, seq: -3 }, plano, 3);
+  // dia batendo a META: 5W 0L → +5*20*0.87 = +87 ≥ 60
+  const sitMeta = situacaoDia({ w: 5, l: 0, seq: 5 }, plano, 3);
+  // sequência de perdas antes do stop (stake menor)
+  const p2 = planoRisco({ banca: 1000, riscoPct: 0.5, metaPct: 20, stopPct: 20, payout: 87 });
+  const sitSeq = situacaoDia({ w: 0, l: 3, seq: -3 }, p2, 3);
+  // render no painel
+  document.getElementById('riscoBanca').value = '1000';
+  document.getElementById('riscoPct').value = '2';
+  renderRisco();
+  const temPlano = /Stake sugerido/.test(document.getElementById('riscoPlano').textContent);
+  return {
+    stake: plano.stake, aguenta: plano.perdasAguenta,
+    estStop: sitStop.estado, plStop: sitStop.plRS,
+    estMeta: sitMeta.estado, estSeq: sitSeq.estado, temPlano,
+    temPanel: !!document.getElementById('riscoPanel')
+  };
+});
+check('plano: stake = banca × risco% (20) e aguenta 3 perdas até o stop', risco.stake === 20 && risco.aguenta === 3);
+check('guardião: 3 perdas atingem o STOP diário', risco.estStop === 'stop' && risco.plStop === -60);
+check('guardião: meta batida = estado meta', risco.estMeta === 'meta');
+check('guardião: sequência de perdas antes do stop = alerta seq', risco.estSeq === 'seq');
+check('painel de risco renderiza o plano', risco.temPlano && risco.temPanel);
 // Volume no gráfico principal (estilo TradingView): histograma no rodapé
 const vol = await p.evaluate(() => {
   const alta = barraVolume({ time: 1, open: 10, high: 12, low: 9, close: 11, volume: 500 });
@@ -1290,7 +1318,7 @@ const rail = await p.evaluate(() => {
   document.querySelector('.rail-btn[data-p="painelFluxo"]').click();   // fecha de volta
   return { botoes, fluxoOculto, decisaoVisivel, precoVisivel, abriu, salvo, iconeAtivo, scanRevelado };
 });
-check('rail tem 17 painéis + botão "todos"', rail.botoes === 18, 'botoes=' + rail.botoes);
+check('rail tem 18 painéis + botão "todos"', rail.botoes === 19, 'botoes=' + rail.botoes);
 check('minimalista: secundários ocultos, decisão+gráfico visíveis', rail.fluxoOculto && rail.decisaoVisivel && rail.precoVisivel, JSON.stringify(rail));
 check('clique no ícone abre o painel, persiste e marca o ícone', rail.abriu && rail.salvo && rail.iconeAtivo);
 check('railMostrar revela painel auto-aberto (scanner)', rail.scanRevelado);

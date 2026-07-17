@@ -67,6 +67,7 @@ function renderRegistro() {
     atualizarCalibracaoIA();
     if (typeof renderPiloto === 'function') renderPiloto();   // conta demo acompanha o registro
     try { if (typeof renderPlacarDia === 'function') renderPlacarDia(); } catch (e) { }   // tile "Hoje"
+    try { if (typeof renderRisco === 'function') renderRisco(); } catch (e) { }           // guardião de banca
 }
 
 // ---- Verificador automático de WIN/LOSS ----

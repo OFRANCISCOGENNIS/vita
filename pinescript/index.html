@@ -414,6 +414,21 @@
                     <p class="group-note">Registra sozinho as entradas que passam no gatilho como operações simuladas e acompanha saldo/WR/drawdown. Payout usa o campo <strong>Payout (%)</strong>. Não executa nada na corretora — a operação real, se quiser, é manual.</p>
                 </div>
 
+                <!-- GESTÃO DE RISCO + GUARDIÃO DE BANCA -->
+                <div class="chart-container" id="riscoPanel">
+                    <h2>🛡 Gestão de Risco <span id="riscoTag" class="tv-sync-tag">—</span></h2>
+                    <div class="piloto-cfg">
+                        <label>Banca (R$) <input type="number" id="riscoBanca" value="1000" min="1" step="50"></label>
+                        <label>Risco por op. (%) <input type="number" id="riscoPct" value="2" min="0.1" max="20" step="0.5"></label>
+                        <label>Meta do dia (%) <input type="number" id="riscoMeta" value="6" min="1" max="100" step="1"></label>
+                        <label>Stop do dia (%) <input type="number" id="riscoStop" value="6" min="1" max="100" step="1"></label>
+                        <label>Alerta após N perdas <input type="number" id="riscoSeqMax" value="3" min="1" max="10" step="1"></label>
+                    </div>
+                    <div id="riscoPlano" class="qo-kv"></div>
+                    <div id="riscoGuardiao" class="risco-guardiao"></div>
+                    <p class="group-note">Stake sugerido = banca × risco%. O <strong>guardião</strong> lê o placar REAL de hoje (Registro) e avisa quando você bate a meta ou o stop — em binárias, saber a hora de PARAR vale mais que qualquer sinal. Não bloqueia nada, só te lembra.</p>
+                </div>
+
                 <!-- FERRAMENTAS PRO (estilo Profit): Volume Profile + Níveis no gráfico -->
                 <div class="chart-container" id="proPanel">
                     <h2>📊 Volume Profile & Níveis <span id="proMeta" class="tv-sync-tag"></span></h2>
@@ -822,6 +837,7 @@
     <script src="src/26-extra.js"></script>
     <script src="src/27-ferramentas.js"></script>
     <script src="src/28-toolsmenu.js"></script>
+    <script src="src/29-risco.js"></script>
     <!-- APP:END -->
 </body>
 </html>

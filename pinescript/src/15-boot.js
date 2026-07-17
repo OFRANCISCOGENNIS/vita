@@ -18,7 +18,8 @@
 const BOOT_IDS = FILTRO_IDS.concat([
     'fonte', 'timeframe', 'expiracao', 'payout', 'numCandles', 'volatility',
     'emaRapida', 'emaLenta', 'rsiLen', 'atrLen', 'atrMediaLen', 'iaMinVal', 'somAtivo',
-    'zonasAtivo', 'niveisAtivo'   // marcações do gráfico voltam como você deixou
+    'zonasAtivo', 'niveisAtivo',   // marcações do gráfico voltam como você deixou
+    'riscoBanca', 'riscoPct', 'riscoMeta', 'riscoStop', 'riscoSeqMax'   // plano de risco
 ]);
 
 let _bootUltimoEstado = '';

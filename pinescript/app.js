@@ -2936,6 +2936,7 @@ function renderRegistro() {
     atualizarCalibracaoIA();
     if (typeof renderPiloto === 'function') renderPiloto();   // conta demo acompanha o registro
     try { if (typeof renderPlacarDia === 'function') renderPlacarDia(); } catch (e) { }   // tile "Hoje"
+    try { if (typeof renderRisco === 'function') renderRisco(); } catch (e) { }           // guardião de banca
 }
 
 // ---- Verificador automático de WIN/LOSS ----
@@ -4825,6 +4826,7 @@ const PAINEIS_MENU = [
     { id: 'iaPanel', ico: '🤖', cor: '#8B5CF6', rot: 'IA — melhores parâmetros' },
     { id: 'agentesPanel', ico: '🕵️', cor: '#6366F1', rot: 'Agentes de Estudo' },
     { id: 'pilotoPanel', ico: '🎮', cor: '#34D399', rot: 'Piloto Automático (conta demo)' },
+    { id: 'riscoPanel', ico: '🛡', cor: '#F59E0B', rot: 'Gestão de Risco & Guardião de Banca' },
     { id: 'proPanel', ico: '📶', cor: '#818CF8', rot: 'Volume Profile & Níveis (fib/S-R)' },
     { id: 'bookPanel', ico: '📖', cor: '#4ADE80', rot: 'Book de Ofertas & Times/Trades' },
     { id: 'painelPA', ico: '🧭', cor: '#2DD4BF', rot: 'Price Action — estudo de entradas (S/R · fib · LTA/LTB · micro×macro)' },
@@ -5385,7 +5387,8 @@ document.addEventListener('DOMContentLoaded', function () {
 const BOOT_IDS = FILTRO_IDS.concat([
     'fonte', 'timeframe', 'expiracao', 'payout', 'numCandles', 'volatility',
     'emaRapida', 'emaLenta', 'rsiLen', 'atrLen', 'atrMediaLen', 'iaMinVal', 'somAtivo',
-    'zonasAtivo', 'niveisAtivo'   // marcações do gráfico voltam como você deixou
+    'zonasAtivo', 'niveisAtivo',   // marcações do gráfico voltam como você deixou
+    'riscoBanca', 'riscoPct', 'riscoMeta', 'riscoStop', 'riscoSeqMax'   // plano de risco
 ]);
 
 let _bootUltimoEstado = '';
@@ -6176,6 +6179,7 @@ const INFO_PAINEIS = {
     iaPanel: ['🤖 IA', 'Busca em grade + walk-forward que encontra os parâmetros de maior acerto por par e regime. Roda em segundo plano (Web Worker). Atalho: I.'],
     agentesPanel: ['🕵️ Agentes', '6 agentes autônomos: otimizador em rodízio, sentinela de regime, auditor de calibração, professor de fatores, 🔧 configurador e ✅ validador — com conserto em 1 clique no log.'],
     pilotoPanel: ['🎮 Piloto Automático', 'Paper trading numa conta DEMO simulada: registra sozinho as entradas que passam no gatilho (nível A / funil ≥5) e acompanha saldo, acerto e drawdown. Não toca em corretora.'],
+    riscoPanel: ['🛡 Gestão de Risco', 'Calcula o stake ideal (banca × risco%), a meta e o stop do dia em R$, e um guardião que lê o placar real de hoje: avisa quando você bate a meta, o stop ou uma sequência de perdas. Saber a hora de parar é a habilidade nº 1 em binárias.'],
     proPanel: ['📊 Volume Profile & Níveis', 'Perfil de volume com POC/área de valor + níveis automáticos no gráfico (Fibonacci e S/R).'],
     bookPanel: ['📖 Book & Times/Trades', 'Profundidade do book e fita de negócios ao vivo (Binance): pressão compra×venda e agressões grandes em destaque.'],
     painelPA: ['🧭 Price Action — Entradas', 'S/R + Fibonacci + LTA/LTB + micro×macro + padrões (doji, harami, CHoCH, topo/fundo duplo, triângulo). A entrada de qualidade nasce no TESTE de uma zona de confluência.'],
@@ -7097,4 +7101,94 @@ document.addEventListener('DOMContentLoaded', function () {
     // indicador acompanha ações que mudam estado por atalho/tecla (F, etc.)
     setInterval(atualizarIndicadorFerramentas, 1200);
     atualizarIndicadorFerramentas();
+});
+// ============================================================================
+// BLOCO 34 — GESTÃO DE RISCO + GUARDIÃO DE BANCA
+// ============================================================================
+// Dinheiro é o que separa quem sobrevive de quem quebra. Este painel calcula o
+// STAKE ideal (banca × risco%), a META e o STOP do dia em R$, e um GUARDIÃO que
+// lê o placar REAL de hoje (Registro) para avisar quando bateu a meta, o stop
+// ou uma sequência de perdas — a hora de PARAR. Não bloqueia nada; alerta.
+
+// ---- Plano de risco (função pura) ----
+function planoRisco(cfg) {
+    const banca = Math.max(0, +cfg.banca || 0);
+    const riscoPct = Math.max(0, +cfg.riscoPct || 0);
+    const stake = banca * riscoPct / 100;
+    const metaRS = banca * (+cfg.metaPct || 0) / 100;
+    const stopRS = banca * (+cfg.stopPct || 0) / 100;
+    const payout = Math.max(0.01, (+cfg.payout || 87) / 100);
+    // quantas perdas SEGUIDAS a banca aguenta até bater o stop do dia
+    const perdasAguenta = stake > 0 ? Math.floor(stopRS / stake) : 0;
+    return { banca, stake, metaRS, stopRS, payout, beWR: 1 / (1 + payout), perdasAguenta };
+}
+
+// ---- Situação do dia (função pura): P&L estimado × meta/stop/sequência ----
+function situacaoDia(placar, plano, seqMax) {
+    const w = placar.w || 0, l = placar.l || 0, seq = placar.seq || 0;
+    // P&L do dia estimado com o stake atual: WIN = +stake·payout · LOSS = −stake
+    const plRS = w * plano.stake * plano.payout - l * plano.stake;
+    let estado = 'ok', msg = 'Dentro do plano — siga disciplinado.';
+    if (plano.stopRS > 0 && plRS <= -plano.stopRS) {
+        estado = 'stop'; msg = '🛑 STOP DIÁRIO ATINGIDO — pare por hoje. Amanhã a banca ainda está de pé.';
+    } else if (plano.metaRS > 0 && plRS >= plano.metaRS) {
+        estado = 'meta'; msg = '🎯 META DO DIA BATIDA — considere encerrar e proteger o lucro.';
+    } else if (seq <= -(seqMax || 3)) {
+        estado = 'seq'; msg = `❄ ${-seq} perdas seguidas — respire, revise o setup antes da próxima.`;
+    }
+    return { plRS, estado, msg };
+}
+
+function _rMoney(v) { return 'R$ ' + (v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+
+function riscoCfgAtual() {
+    const g = id => document.getElementById(id);
+    return {
+        banca: parseFloat(g('riscoBanca').value) || 0,
+        riscoPct: parseFloat(g('riscoPct').value) || 0,
+        metaPct: parseFloat(g('riscoMeta').value) || 0,
+        stopPct: parseFloat(g('riscoStop').value) || 0,
+        payout: parseFloat((document.getElementById('payout') || {}).value) || 87
+    };
+}
+
+let _riscoUltimoEstado = '';
+function renderRisco() {
+    if (!document.getElementById('riscoPlano')) return;
+    const cfg = riscoCfgAtual();
+    const plano = planoRisco(cfg);
+    const seqMax = parseInt(document.getElementById('riscoSeqMax').value) || 3;
+    document.getElementById('riscoPlano').innerHTML =
+        kv('Stake sugerido por operação', _rMoney(plano.stake), 'kv-good') +
+        kv('Meta do dia', _rMoney(plano.metaRS)) +
+        kv('Stop do dia', _rMoney(plano.stopRS), 'kv-bad') +
+        kv('Break-even do payout', pctTxt(plano.beWR)) +
+        kv('Perdas seguidas que a banca aguenta', plano.perdasAguenta + ' ops');
+
+    const placar = typeof placarDoDia === 'function' ? placarDoDia(typeof registro !== 'undefined' ? registro : []) : { w: 0, l: 0, seq: 0 };
+    const sit = situacaoDia(placar, plano, seqMax);
+    const g = document.getElementById('riscoGuardiao');
+    const cls = sit.estado === 'stop' || sit.estado === 'seq' ? 'guard-stop' : sit.estado === 'meta' ? 'guard-meta' : 'guard-ok';
+    g.className = 'risco-guardiao ' + cls;
+    g.innerHTML = `<div class="guard-pl">Hoje: <strong>${sit.plRS >= 0 ? '+' : ''}${_rMoney(sit.plRS)}</strong> · ${placar.w || 0}W · ${placar.l || 0}L</div><div class="guard-msg">${sit.msg}</div>`;
+
+    const tag = document.getElementById('riscoTag');
+    if (tag) { tag.textContent = sit.estado === 'stop' ? '🛑 STOP' : sit.estado === 'meta' ? '🎯 META' : sit.estado === 'seq' ? '❄ pausa' : '● ativo'; }
+
+    // avisa UMA vez quando cruza p/ stop/meta/sequência (não repete a cada render)
+    const chave = sit.estado + Math.round(sit.plRS);
+    if (sit.estado !== 'ok' && chave !== _riscoUltimoEstado) {
+        _riscoUltimoEstado = chave;
+        showToast(sit.msg, sit.estado === 'meta' ? 'ok' : 'err');
+    }
+    if (sit.estado === 'ok') _riscoUltimoEstado = '';
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    ['riscoBanca', 'riscoPct', 'riscoMeta', 'riscoStop', 'riscoSeqMax'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('input', renderRisco);
+    });
+    renderRisco();
+    setInterval(renderRisco, 10000);   // acompanha o placar do dia
 });

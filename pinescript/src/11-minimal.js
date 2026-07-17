@@ -16,6 +16,7 @@ const PAINEIS_MENU = [
     { id: 'iaPanel', ico: '🤖', cor: '#8B5CF6', rot: 'IA — melhores parâmetros' },
     { id: 'agentesPanel', ico: '🕵️', cor: '#6366F1', rot: 'Agentes de Estudo' },
     { id: 'pilotoPanel', ico: '🎮', cor: '#34D399', rot: 'Piloto Automático (conta demo)' },
+    { id: 'riscoPanel', ico: '🛡', cor: '#F59E0B', rot: 'Gestão de Risco & Guardião de Banca' },
     { id: 'proPanel', ico: '📶', cor: '#818CF8', rot: 'Volume Profile & Níveis (fib/S-R)' },
     { id: 'bookPanel', ico: '📖', cor: '#4ADE80', rot: 'Book de Ofertas & Times/Trades' },
     { id: 'painelPA', ico: '🧭', cor: '#2DD4BF', rot: 'Price Action — estudo de entradas (S/R · fib · LTA/LTB · micro×macro)' },
