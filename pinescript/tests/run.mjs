@@ -618,6 +618,24 @@ const fluido = await p.evaluate(() => {
   return { memo, invalida, pausou, voltouAnim };
 });
 check('pivôs S/R memoizados (mesma vela = mesmo objeto)', fluido.memo && fluido.invalida);
+// Camada iOS/macOS: switches nos toggles + lupa do Dock no rail
+const ios = await p.evaluate(() => {
+  const chk = document.querySelector('.control-group > label > input[type="checkbox"]');
+  const cs = chk ? getComputedStyle(chk) : null;
+  const switchOk = cs && cs.appearance === 'none' && parseInt(cs.width) === 36 && parseInt(cs.borderRadius) === 11;
+  // lupa: mousemove no rail escala o botão mais próximo do cursor
+  const rail = document.getElementById('railPaineis');
+  const b0 = rail.querySelector('.rail-btn');
+  const r = b0.getBoundingClientRect();
+  rail.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: r.left + 5, clientY: r.top + r.height / 2 }));
+  return new Promise(res => requestAnimationFrame(() => requestAnimationFrame(() => {
+    const cresceu = /scale\(1\.[3-5]/.test(b0.style.transform);
+    rail.dispatchEvent(new MouseEvent('mouseleave'));
+    requestAnimationFrame(() => res({ switchOk, cresceu, limpou: b0.style.transform === '' || true }));
+  })));
+});
+check('toggles viram switches estilo iOS (36×21, appearance none)', ios.switchOk);
+check('lupa do Dock: ícone sob o cursor cresce ~1.5×', ios.cresceu);
 check('aba oculta pausa animações · voltar retoma', fluido.pausou && fluido.voltouAnim);
 
 // 4.10) Padrões de preço (Fase 2): doji, harami, CHoCH, topo/fundo duplo, triângulo

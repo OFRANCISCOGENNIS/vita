@@ -2113,3 +2113,67 @@ body.anim-pausa *::before, body.anim-pausa *::after {
     .qo-flash { animation: none; }
     .chart-container > h2::after { transition: none; }
 }
+
+/* ============================================================================
+   CAMADA iOS/macOS — molas, lupa do Dock, switches e sheets
+   ============================================================================ */
+:root {
+    --spring: cubic-bezier(0.34, 1.56, 0.64, 1);     /* mola com overshoot (iOS) */
+    --ease-ios: cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+
+/* TODA ferramenta destaca com mola no hover e afunda no toque (como iOS) */
+button:not(.rail-btn), .qo-stat, .det-tag, .ico-info, .scan-fil, .reg-seta {
+    transition: transform 0.22s var(--spring), box-shadow 0.22s ease,
+        background 0.2s ease, border-color 0.2s ease, color 0.2s ease, filter 0.2s ease;
+}
+button:not(.rail-btn):not(:disabled):hover { transform: translateY(-1px) scale(1.045); }
+button:not(.rail-btn):not(:disabled):active { transform: scale(0.95); transition-duration: 0.09s; }
+.decision-chip:hover, .funil-elo:hover { transform: translateY(-1px) scale(1.06); }
+.decision-chip, .funil-elo { transition: transform 0.22s var(--spring), box-shadow 0.22s ease, background 0.2s ease; }
+
+/* Rail: transform vem do JS (lupa do Dock) — origem à esquerda p/ crescer p/ fora */
+.rail-btn { transform-origin: left center; transition: transform 0.12s var(--ease-ios), box-shadow 0.18s, background 0.18s; }
+.rail-btn:hover { box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.45), 0 6px 16px rgba(34, 211, 238, 0.25); background: rgba(34, 211, 238, 0.10); }
+
+/* Switches estilo iOS nos toggles dos controles (checkbox continua checkbox) */
+.control-group > label > input[type="checkbox"], .reg-filtro > input[type="checkbox"] {
+    appearance: none; -webkit-appearance: none;
+    width: 36px; height: 21px; min-width: 36px; border-radius: 11px;
+    background: var(--surface-2); border: 1px solid var(--hairline);
+    position: relative; cursor: pointer; vertical-align: middle; margin-right: 4px;
+    transition: background 0.25s var(--ease-ios), border-color 0.25s;
+}
+.control-group > label > input[type="checkbox"]::after, .reg-filtro > input[type="checkbox"]::after {
+    content: ''; position: absolute; top: 2px; left: 2px; width: 15px; height: 15px;
+    border-radius: 50%; background: #fff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+    transition: transform 0.25s var(--spring), width 0.15s ease;
+}
+.control-group > label > input[type="checkbox"]:checked, .reg-filtro > input[type="checkbox"]:checked {
+    background: #34C759; border-color: #34C759;   /* verde iOS */
+}
+.control-group > label > input[type="checkbox"]:checked::after, .reg-filtro > input[type="checkbox"]:checked::after {
+    transform: translateX(15px);
+}
+.control-group > label > input[type="checkbox"]:active::after, .reg-filtro > input[type="checkbox"]:active::after {
+    width: 19px;   /* o "knob" estica no toque, como no iOS */
+}
+.control-group > label > input[type="checkbox"]:checked:active::after, .reg-filtro > input[type="checkbox"]:checked:active::after {
+    transform: translateX(11px);
+}
+
+/* Modais entram como SHEET do iOS: sobem com mola */
+@keyframes iosSheet { from { transform: translateY(18px) scale(0.965); opacity: 0; } to { transform: none; opacity: 1; } }
+.ajuda-card { animation: iosSheet 0.32s var(--spring); }
+#detalheModal .det-card { animation: iosSheet 0.32s var(--spring); }
+#infoPop { animation: iosSheet 0.26s var(--spring); }
+
+/* Toasts entram como banner do iOS */
+@keyframes iosBanner { from { transform: translateY(14px) scale(0.97); opacity: 0; } to { transform: none; opacity: 1; } }
+.toast { animation: iosBanner 0.3s var(--spring); }
+
+@media (prefers-reduced-motion: reduce) {
+    button:not(.rail-btn):not(:disabled):hover, .decision-chip:hover, .funil-elo:hover { transform: none; }
+    .ajuda-card, #detalheModal .det-card, #infoPop, .toast { animation: none; }
+}

@@ -72,3 +72,32 @@ function montarRail() {
 }
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', montarRail);
 else montarRail();
+
+// ---- Lupa do Dock (macOS): os ícones do rail crescem conforme a proximidade
+// do cursor (transform puro = composited; 1 cálculo por frame no máximo) ----
+(function () {
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    let raf = null;
+    function magnetizar(e) {
+        if (raf) return;
+        raf = requestAnimationFrame(() => {
+            raf = null;
+            document.querySelectorAll('#railPaineis .rail-btn').forEach(b => {
+                const r = b.getBoundingClientRect();
+                const d = Math.abs(e.clientY - (r.top + r.height / 2));
+                const s = Math.max(1, 1.5 - d / 110);          // até 1.5× no ícone sob o cursor
+                b.style.transform = s > 1.02 ? `scale(${s.toFixed(3)})` : '';
+            });
+        });
+    }
+    function soltar() {
+        if (raf) { cancelAnimationFrame(raf); raf = null; }
+        document.querySelectorAll('#railPaineis .rail-btn').forEach(b => { b.style.transform = ''; });
+    }
+    document.addEventListener('DOMContentLoaded', function () {
+        const rail = document.getElementById('railPaineis');
+        if (!rail) return;
+        rail.addEventListener('mousemove', magnetizar);
+        rail.addEventListener('mouseleave', soltar);
+    });
+})();
