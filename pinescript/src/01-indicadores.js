@@ -68,6 +68,8 @@ function expectancia(wr, payout) { return wr * payout - (1 - wr); }
 function breakEven(payout) { return 1 / (1 + payout); }
 // Formata percentual inteiro (0.69 → "69%") — usado nas métricas de acerto.
 function pctTxt(x) { return (x * 100).toFixed(0) + '%'; }
+// Escapa texto do usuário antes de ir para innerHTML (nomes de filtro etc.)
+function escHTML(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 
 // ============================================================================
 // BLOCO 2 — LEITURA DE CONTROLES

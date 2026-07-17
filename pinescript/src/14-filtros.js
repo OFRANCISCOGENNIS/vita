@@ -45,7 +45,7 @@ function filtrosRenderSelect() {
     const nomes = Object.keys(_filtrosLer()).sort((a, b) => a.localeCompare(b));
     const atual = sel.value;
     sel.innerHTML = '<option value="">— aplicar filtro salvo —</option>' +
-        nomes.map(n => `<option value="${n.replace(/"/g, '&quot;')}">${n}</option>`).join('');
+        nomes.map(n => `<option value="${escHTML(n)}">${escHTML(n)}</option>`).join('');
     if (nomes.includes(atual)) sel.value = atual;
 }
 

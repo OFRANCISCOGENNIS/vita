@@ -839,6 +839,19 @@ check('guardião: 3 perdas atingem o STOP diário', risco.estStop === 'stop' && 
 check('guardião: meta batida = estado meta', risco.estMeta === 'meta');
 check('guardião: sequência de perdas antes do stop = alerta seq', risco.estSeq === 'seq');
 check('painel de risco renderiza o plano', risco.temPlano && risco.temPanel);
+// Polimento: escape de HTML em entradas do usuário
+const seg = await p.evaluate(() => {
+  const esc = escHTML('<img src=x onerror=alert(1)> "aspas" & <b>');
+  // filtro com nome perigoso não injeta tag no seletor
+  localStorage.setItem('filtrosSalvos', JSON.stringify({ '<b>x</b>': {} }));
+  filtrosRenderSelect();
+  const sel = document.getElementById('filtrosSalvos');
+  const injetou = !!sel.querySelector('b');
+  localStorage.removeItem('filtrosSalvos'); filtrosRenderSelect();
+  return { esc, semTag: !/<img|<b>/.test(esc) && /&lt;/.test(esc), injetou };
+});
+check('escHTML neutraliza tags e aspas', seg.semTag);
+check('nome de filtro perigoso não injeta no seletor', !seg.injetou);
 // Volume no gráfico principal (estilo TradingView): histograma no rodapé
 const vol = await p.evaluate(() => {
   const alta = barraVolume({ time: 1, open: 10, high: 12, low: 9, close: 11, volume: 500 });

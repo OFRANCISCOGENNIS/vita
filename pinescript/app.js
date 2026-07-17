@@ -221,6 +221,8 @@ function expectancia(wr, payout) { return wr * payout - (1 - wr); }
 function breakEven(payout) { return 1 / (1 + payout); }
 // Formata percentual inteiro (0.69 → "69%") — usado nas métricas de acerto.
 function pctTxt(x) { return (x * 100).toFixed(0) + '%'; }
+// Escapa texto do usuário antes de ir para innerHTML (nomes de filtro etc.)
+function escHTML(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 
 // ============================================================================
 // BLOCO 2 — LEITURA DE CONTROLES
@@ -5315,7 +5317,7 @@ function filtrosRenderSelect() {
     const nomes = Object.keys(_filtrosLer()).sort((a, b) => a.localeCompare(b));
     const atual = sel.value;
     sel.innerHTML = '<option value="">— aplicar filtro salvo —</option>' +
-        nomes.map(n => `<option value="${n.replace(/"/g, '&quot;')}">${n}</option>`).join('');
+        nomes.map(n => `<option value="${escHTML(n)}">${escHTML(n)}</option>`).join('');
     if (nomes.includes(atual)) sel.value = atual;
 }
 
@@ -7015,7 +7017,9 @@ async function compararAtivos() {
     const inp = document.getElementById('cmpSym');
     const out = document.getElementById('cmpResultado');
     if (!inp || !out) return;
-    const symB = (inp.value || '').trim().toUpperCase();
+    // símbolos são alfanuméricos: sanitiza (rejeita lixo e neutraliza injeção)
+    const symB = (inp.value || '').trim().toUpperCase().replace(/[^A-Z0-9/]/g, '');
+    inp.value = symB;
     if (!symB) { showToast('Digite o ativo para comparar (ex.: ETHUSDT ou EURUSD).', 'err'); return; }
     if (symB === symbolAtual()) { showToast('Escolha um ativo diferente do atual.', 'err'); return; }
     out.textContent = '⏳ carregando ' + symB + '…';
@@ -7048,6 +7052,12 @@ document.addEventListener('DOMContentLoaded', function () {
     });
     const hx = document.getElementById('histAlertaFechar');
     if (hx) hx.addEventListener('click', () => document.getElementById('histAlertaModal').style.display = 'none');
+    const hl = document.getElementById('histAlertaLimpar');
+    if (hl) hl.addEventListener('click', () => {
+        alertasHist = []; localStorage.removeItem('alertasHist');
+        const b = document.getElementById('btnAlertaHist'); if (b) b.textContent = '📜 Histórico de alertas';
+        abrirHistAlertas();
+    });
     const hm = document.getElementById('histAlertaModal');
     if (hm) hm.addEventListener('click', e => { if (e.target.id === 'histAlertaModal') hm.style.display = 'none'; });
     const bC = document.getElementById('btnComparar');
