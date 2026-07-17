@@ -10,7 +10,7 @@
 import { Eraser, Eye, Sparkle, Wand2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "@/store/toast";
-import { applySkinSmooth, portraitRetouch, type LiquifyMode } from "@/lib/photo-engine";
+import { applySkinSmooth, bronzeSkinCanvas, glowSkinCanvas, matteSkinCanvas, portraitRetouch, type LiquifyMode } from "@/lib/photo-engine";
 import { getMaskCanvas, usePhotoEditorStore, type ToolId } from "@/store/photo-editor";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
@@ -131,12 +131,47 @@ export function RetoquePanel() {
     }, 30);
   }
 
+  /** Acabamentos de pele PRO (1 clique): matte, glow e bronzear. */
+  function skinFinish(kind: "matte" | "glow" | "bronze") {
+    const msgs = { matte: "Aplicando pele matte…", glow: "Aplicando glow…", bronze: "Bronzeando a pele…" } as const;
+    setBusy(msgs[kind]);
+    setTimeout(() => {
+      try {
+        applyPixelOp((base) =>
+          kind === "matte" ? matteSkinCanvas(base, 60) : kind === "glow" ? glowSkinCanvas(base, 55) : bronzeSkinCanvas(base, 50),
+        );
+      } finally {
+        setBusy(null);
+      }
+    }, 30);
+  }
+
   return (
     <div className="space-y-4">
       <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Retoque (beleza)</h3>
       <Button size="sm" variant="secondary" className="w-full" onClick={autoRetouch}>
         <Wand2 className="h-3.5 w-3.5" aria-hidden /> Auto — retocar em 1 clique
       </Button>
+
+      {/* acabamento de pele estilo Facetune PRO (1 clique, seletivo por tom de pele) */}
+      <section className="space-y-2 rounded-xl border border-fuchsia-500/25 bg-fuchsia-500/5 p-3">
+        <h4 className="text-[11px] font-semibold uppercase tracking-wider text-fuchsia-300">Acabamento de pele (PRO)</h4>
+        <div className="grid grid-cols-3 gap-1.5">
+          <Button size="sm" variant="secondary" onClick={() => skinFinish("matte")}>
+            Matte
+          </Button>
+          <Button size="sm" variant="secondary" onClick={() => skinFinish("glow")}>
+            Glow
+          </Button>
+          <Button size="sm" variant="secondary" onClick={() => skinFinish("bronze")}>
+            Bronzear
+          </Button>
+        </div>
+        <p className="text-[10px] leading-relaxed text-zinc-500">
+          Matte tira o brilho oleoso, Glow dá luz difusa e Bronzear aquece o tom — só nas áreas de pele, preservando
+          textura, olhos e fundo.
+        </p>
+      </section>
       <ToolGrid tools={RETOQUE_TOOLS} />
       {activeDef && (
         <p className="rounded-lg bg-surface-2/80 px-2.5 py-2 text-[11px] leading-relaxed text-zinc-400">

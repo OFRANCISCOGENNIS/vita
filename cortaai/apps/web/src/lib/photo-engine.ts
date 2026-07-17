@@ -1929,3 +1929,136 @@ export function sharpenPhotoCanvas(src: HTMLCanvasElement, amount = 60): HTMLCan
   out.getContext("2d")!.putImageData(img, 0, 0);
   return out;
 }
+
+// ------------------------------------------------ acabamento de pele (PRO)
+
+/**
+ * Pele MATTE (estilo Facetune Pro): reduz o brilho especular — realces fortes
+ * em áreas de PELE são puxados para o tom médio, tirando o "oleoso" sem borrar
+ * textura. `strength` 0..100. Devolve um novo canvas.
+ */
+export function matteSkinCanvas(src: HTMLCanvasElement, strength = 60): HTMLCanvasElement {
+  const w = src.width;
+  const h = src.height;
+  const sctx = src.getContext("2d");
+  if (!sctx) return src;
+  const img = sctx.getImageData(0, 0, w, h);
+  const d = img.data;
+  const k = Math.max(0, Math.min(1, strength / 100));
+  for (let i = 0; i < d.length; i += 4) {
+    const r = d[i];
+    const g = d[i + 1];
+    const b = d[i + 2];
+    const skin = skinWeight(r, g, b);
+    if (skin <= 0) continue;
+    const L = 0.299 * r + 0.587 * g + 0.114 * b;
+    if (L <= 170) continue; // só realces (brilho especular)
+    const excess = (L - 170) / 85; // 0..1
+    const pull = 1 - excess * 0.45 * k * skin;
+    d[i] = Math.round(r * pull);
+    d[i + 1] = Math.round(g * pull);
+    d[i + 2] = Math.round(b * pull);
+  }
+  const out = makeCanvas(w, h);
+  out.getContext("2d")!.putImageData(img, 0, 0);
+  return out;
+}
+
+/**
+ * GLOW de pele (estilo Facetune Pro): brilho suave e difuso só nas áreas de
+ * pele — mistura uma versão borrada e clareada, ponderada pelo tom de pele.
+ */
+export function glowSkinCanvas(src: HTMLCanvasElement, strength = 55): HTMLCanvasElement {
+  const w = src.width;
+  const h = src.height;
+  const sctx = src.getContext("2d");
+  if (!sctx) return src;
+  const img = sctx.getImageData(0, 0, w, h);
+  const orig = img.data;
+  const blurred = new ImageData(new Uint8ClampedArray(orig), w, h);
+  boxBlurImageData(blurred, Math.max(3, Math.round(Math.min(w, h) / 60)), 2);
+  const bd = blurred.data;
+  const k = Math.max(0, Math.min(1, strength / 100));
+  for (let i = 0; i < orig.length; i += 4) {
+    const skin = skinWeight(orig[i], orig[i + 1], orig[i + 2]);
+    if (skin <= 0) continue;
+    const a = skin * k * 0.5;
+    // screen suave com a versão borrada (bloom)
+    for (let c = 0; c < 3; c++) {
+      const o = orig[i + c];
+      const s = 255 - ((255 - o) * (255 - bd[i + c])) / 255; // screen
+      orig[i + c] = Math.round(o + (s - o) * a);
+    }
+  }
+  const out = makeCanvas(w, h);
+  out.getContext("2d")!.putImageData(img, 0, 0);
+  return out;
+}
+
+/**
+ * BRONZEAR (estilo Facetune Pro): tom bronzeado quente só na pele, preservando
+ * luminosidade e textura (multiplicação suave por um tom âmbar).
+ */
+export function bronzeSkinCanvas(src: HTMLCanvasElement, strength = 50): HTMLCanvasElement {
+  const w = src.width;
+  const h = src.height;
+  const sctx = src.getContext("2d");
+  if (!sctx) return src;
+  const img = sctx.getImageData(0, 0, w, h);
+  const d = img.data;
+  const k = Math.max(0, Math.min(1, strength / 100));
+  // tom âmbar de bronzeado (multiplicadores por canal)
+  const TR = 1.04;
+  const TG = 0.88;
+  const TB = 0.72;
+  for (let i = 0; i < d.length; i += 4) {
+    const skin = skinWeight(d[i], d[i + 1], d[i + 2]);
+    if (skin <= 0) continue;
+    const a = skin * k;
+    d[i] = Math.min(255, Math.round(d[i] * (1 + (TR - 1) * a)));
+    d[i + 1] = Math.round(d[i + 1] * (1 + (TG - 1) * a));
+    d[i + 2] = Math.round(d[i + 2] * (1 + (TB - 1) * a));
+  }
+  const out = makeCanvas(w, h);
+  out.getContext("2d")!.putImageData(img, 0, 0);
+  return out;
+}
+
+/**
+ * BACKDROP (estilo Facetune Pro): compõe a pessoa RECORTADA (canvas com alpha,
+ * vindo da IA) sobre um fundo novo — cor sólida, imagem (cover) ou o original
+ * desfocado. Devolve um novo canvas do mesmo tamanho.
+ */
+export function composeBackdrop(
+  cutout: HTMLCanvasElement,
+  bg: { kind: "color"; color: string } | { kind: "blur"; original: HTMLCanvasElement; strength?: number } | { kind: "image"; image: HTMLCanvasElement | HTMLImageElement },
+): HTMLCanvasElement {
+  const w = cutout.width;
+  const h = cutout.height;
+  const out = makeCanvas(w, h);
+  const ctx = out.getContext("2d")!;
+  if (bg.kind === "color") {
+    ctx.fillStyle = bg.color;
+    ctx.fillRect(0, 0, w, h);
+  } else if (bg.kind === "blur") {
+    const src = bg.original.getContext("2d");
+    if (src) {
+      const img = src.getImageData(0, 0, bg.original.width, bg.original.height);
+      const radius = Math.max(6, Math.round((Math.min(w, h) / 24) * ((bg.strength ?? 70) / 100 + 0.4)));
+      boxBlurImageData(img, radius, 2);
+      const tmp = makeCanvas(bg.original.width, bg.original.height);
+      tmp.getContext("2d")!.putImageData(img, 0, 0);
+      ctx.drawImage(tmp, 0, 0, w, h);
+    }
+  } else {
+    // cover: preenche mantendo proporção
+    const iw = bg.image instanceof HTMLImageElement ? bg.image.naturalWidth : bg.image.width;
+    const ih = bg.image instanceof HTMLImageElement ? bg.image.naturalHeight : bg.image.height;
+    const scale = Math.max(w / Math.max(1, iw), h / Math.max(1, ih));
+    const dw = iw * scale;
+    const dh = ih * scale;
+    ctx.drawImage(bg.image, (w - dw) / 2, (h - dh) / 2, dw, dh);
+  }
+  ctx.drawImage(cutout, 0, 0);
+  return out;
+}
