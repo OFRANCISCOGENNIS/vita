@@ -765,6 +765,30 @@ check('placar do dia: 3W·1L, sequência 🔥3, ignora ontem', extra.pDia.w === 
 check('tile "Hoje" presente na topbar', extra.temTile);
 check('🕐 sessões pintam faixas no gráfico e desligam limpo', extra.faixas >= 1 && extra.limpou, 'faixas=' + extra.faixas);
 check('🖥 modo foco esconde sidebar+rail · Esc sai', extra.focou && extra.saiu);
+// Exportar PNG · histórico de alertas · força relativa
+const ferr = await p.evaluate(() => {
+  // força relativa (função pura): A subiu 10%, B subiu 4% → A mais forte
+  const dA = [{ close: 100 }, { close: 110 }], dB = [{ close: 50 }, { close: 52 }];
+  const fr = forcaRelativa(dA, dB);
+  // export: takeScreenshot devolve um canvas
+  const url = (typeof exportarGraficoPNG === 'function') && chartPreco && typeof chartPreco.takeScreenshot === 'function';
+  // histórico de alertas: registra e persiste
+  localStorage.removeItem('alertasHist'); alertasHist = [];
+  registrarAlertaDisparado('BTCUSDT', 60000, 60010);
+  const histOk = alertasHist.length === 1 && JSON.parse(localStorage.getItem('alertasHist')).length === 1;
+  abrirHistAlertas();
+  const modalOk = document.getElementById('histAlertaModal').style.display === 'flex'
+    && /cruzou/.test(document.getElementById('histAlertaBody').textContent);
+  document.getElementById('histAlertaFechar').click();
+  return {
+    frOk: Math.abs(fr.pctA - 10) < 0.01 && Math.abs(fr.pctB - 4) < 0.01 && fr.vencedor === 'A',
+    exportApi: url, histOk, modalOk
+  };
+});
+check('força relativa: A +10% vs B +4% → A vence', ferr.frOk);
+check('exportar PNG: takeScreenshot disponível', ferr.exportApi);
+check('alerta disparado entra no histórico e persiste', ferr.histOk);
+check('modal do histórico abre com os disparos', ferr.modalOk);
 // Volume no gráfico principal (estilo TradingView): histograma no rodapé
 const vol = await p.evaluate(() => {
   const alta = barraVolume({ time: 1, open: 10, high: 12, low: 9, close: 11, volume: 500 });

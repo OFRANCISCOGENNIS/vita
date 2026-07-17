@@ -68,6 +68,7 @@ function alertasVerificar() {
         showToast(`🔔 ALERTA: ${lbl} cruzou ${_precoTxt(a.price)} (agora ${_precoTxt(c)})`, 'ok');
         try { tocarSom(c >= a.price ? 1 : -1); } catch (e) { }
         try { notificar(`🔔 Alerta de preço — ${lbl}`, `cruzou ${_precoTxt(a.price)} · agora ${_precoTxt(c)}`); } catch (e) { }
+        try { if (typeof registrarAlertaDisparado === 'function') registrarAlertaDisparado(a.sym, a.price, c); } catch (e) { }
         return false;   // one-shot: consome
     });
     if (disparou) { _salvarAlertas(); alertasRedesenhar(); }

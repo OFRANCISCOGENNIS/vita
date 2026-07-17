@@ -2334,3 +2334,14 @@ body.modo-foco .main-content { padding-left: var(--spacing); padding-right: var(
 #btnFoco.is-active, #btnSessoes.is-active {
     background: rgba(34, 211, 238, 0.14); border-color: var(--neon-1); color: var(--neon-1);
 }
+
+/* ---- Barra de comparação de ativos ---- */
+.cmp-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 8px; padding: 6px 2px; }
+.cmp-lbl { font-size: 12px; font-weight: 700; color: var(--ink-2); }
+#cmpSym {
+    background: var(--surface-2); color: var(--ink); border: 1px solid var(--hairline);
+    border-radius: 8px; padding: 6px 10px; font-size: 12.5px; width: 150px; text-transform: uppercase;
+}
+#cmpSym:focus { border-color: var(--neon-1); box-shadow: 0 0 0 3px rgba(34,211,238,0.12); outline: none; }
+.cmp-res { font-size: 12.5px; font-weight: 600; color: var(--ink-2); }
+body.modo-foco .cmp-bar { display: none; }

@@ -499,9 +499,17 @@
                             <button id="btnAlerta" class="btn-ghost" type="button" title="Alerta de preço: arme e clique no gráfico no nível desejado — som + notificação quando o preço cruzar">🔔+</button>
                             <button id="btnSessoes" class="btn-ghost" type="button" title="Pintar as sessões no fundo do gráfico: Londres (azul), NY (violeta) e a sobreposição Londres+NY (ciano — o horário de mais volume)">🕐</button>
                             <button id="btnFoco" class="btn-ghost" type="button" title="Modo foco: só decisão + gráfico (tecla F · Esc sai)">🖥</button>
+                            <button id="btnExportPNG" class="btn-ghost" type="button" title="Exportar o gráfico atual como imagem PNG">📷</button>
+                            <button id="btnAlertaHist" class="btn-ghost" type="button" title="Histórico de alertas de preço disparados">📜</button>
                             <span id="alertaChips" class="alerta-chips"></span>
                         </div>
                         <div id="chartPreco" class="tv-chart tv-chart-main"></div>
+                    </div>
+                    <div class="cmp-bar">
+                        <span class="cmp-lbl">⚖ Comparar com:</span>
+                        <input type="text" id="cmpSym" placeholder="ETHUSDT / EURUSD" spellcheck="false" autocomplete="off">
+                        <button id="btnComparar" class="btn-mini" type="button">Comparar força</button>
+                        <span id="cmpResultado" class="cmp-res"></span>
                     </div>
                     <div class="chart-legend" id="legendPreco"></div>
                 </div>
@@ -758,6 +766,15 @@
             </div>
         </div>
 
+        <!-- MODAL HISTÓRICO DE ALERTAS -->
+        <div id="histAlertaModal" class="ajuda-overlay" style="display:none;">
+            <div class="ajuda-card" style="max-width:520px;">
+                <button id="histAlertaFechar" class="ajuda-x" type="button" aria-label="Fechar">✕</button>
+                <h2>📜 Alertas de preço disparados</h2>
+                <div id="histAlertaBody" class="qo-kv"></div>
+            </div>
+        </div>
+
         <!-- FOOTER -->
         <footer class="footer">
             <p>⚠️ <strong>FERRAMENTA DE ESTUDO.</strong> Não é recomendação. Opções binárias/expirações curtas (1m/5m) são de altíssimo risco — spread e taxas corroem o edge. Sinais exigem backtest e validação antes de qualquer uso real.</p>
@@ -793,6 +810,7 @@
     <script src="src/24-chartbar.js"></script>
     <script src="src/25-execucao.js"></script>
     <script src="src/26-extra.js"></script>
+    <script src="src/27-ferramentas.js"></script>
     <!-- APP:END -->
 </body>
 </html>
