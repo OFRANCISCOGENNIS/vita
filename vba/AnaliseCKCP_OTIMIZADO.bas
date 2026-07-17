@@ -1356,7 +1356,7 @@ Private Sub CarregarCatalogoServicos()
     Set wb = Workbooks.Open(caminho, ReadOnly:=True, UpdateLinks:=0)
     Set ws = wb.Worksheets(1)
 
-    Dim cCod As Long, c1 As Long, c2 As Long, c3 As Long, cTA As Long, cSeg As Long, cTxt As Long
+    Dim cCod As Long, c1 As Long, c2 As Long, c3 As Long, cTA As Long, cSeg As Long, cTxt As Long, cUN As Long
     cCod = ColLike(ws, Array("COD SERVICO", "COD_SERVICO", "SERVICO"))
     c1 = ColLike(ws, Array("CLS1"))
     c2 = ColLike(ws, Array("CLS2"))
@@ -1364,6 +1364,7 @@ Private Sub CarregarCatalogoServicos()
     cTA = ColLike(ws, Array("TIPO APLICACAO", "TIPO_APLICACAO", "TIPO APLIC"))
     cSeg = ColLike(ws, Array("SEGMENTO"))
     cTxt = ColLike(ws, Array("TEXTO BREVE", "TEXTO_BREVE", "DENOMINACAO", "DESCRICAO"))
+    cUN = ColLike(ws, Array("UN BASICA", "UNID.MEDIDA", "UNIDADE", "UN"))
     If cCod = 0 Then wb.Close SaveChanges:=False: Exit Sub
     If dDescSrv Is Nothing Then Set dDescSrv = CreateObject("Scripting.Dictionary")
 
@@ -1380,7 +1381,8 @@ Private Sub CarregarCatalogoServicos()
                 TextoMatriz(arr, i, c2) & "|" & _
                 TextoMatriz(arr, i, c3) & "|" & _
                 TextoMatriz(arr, i, cTA) & "|" & _
-                TextoMatriz(arr, i, cSeg)
+                TextoMatriz(arr, i, cSeg) & "|" & _
+                TextoMatriz(arr, i, cUN)
         End If
         ' Descricao vinda do arquivo (embutido em dDescSrv tem prioridade)
         If cod <> "" And cTxt > 0 And Not dDescSrv.Exists(cod) Then
@@ -1395,7 +1397,7 @@ SemCat:
     If Not wb Is Nothing Then wb.Close SaveChanges:=False
 End Sub
 
-' Devolve parte do catlogo de servio: 0=CLS1,1=CLS2,2=CLS3,3=TIPO_APLIC,4=SEGMENTO
+' Devolve parte do catlogo de servio: 0=CLS1,1=CLS2,2=CLS3,3=TIPO_APLIC,4=SEGMENTO,5=UND
 Private Function SrvInfo(codSrv As Variant, idx As Long) As String
     SrvInfo = ""
     If dCatSrv Is Nothing Then Exit Function
@@ -4485,31 +4487,38 @@ Prox:
         If Not (Round(dQ(ks(r)), 2) = 0 And Round(dV(ks(r)), 2) = 0) Then nKeep = nKeep + 1
     Next r
 
-    Dim outp() As Variant: ReDim outp(0 To nKeep, 1 To 13)
+    Dim outp() As Variant: ReDim outp(0 To nKeep, 1 To 14)
     outp(0, 1) = "PEP4NIVEL": outp(0, 2) = "PEP3": outp(0, 3) = "TIPO_PEP"
     outp(0, 4) = "COD_SERVICO": outp(0, 5) = "DESCRICAO_SERVICO"
     outp(0, 6) = "CLASSE_CUSTO"
-    outp(0, 7) = "QTD_ENTRADA": outp(0, 8) = "VALOR_MOEDA"
-    outp(0, 9) = "CLS1": outp(0, 10) = "CLS2": outp(0, 11) = "CLS3"
-    outp(0, 12) = "TIPO_APLICACAO": outp(0, 13) = "GRUPO_PERC"
+    outp(0, 7) = "UND": outp(0, 8) = "QTD_ENTRADA": outp(0, 9) = "VALOR_MOEDA"
+    outp(0, 10) = "CLS1": outp(0, 11) = "CLS2": outp(0, 12) = "CLS3"
+    outp(0, 13) = "TIPO_APLICACAO": outp(0, 14) = "GRUPO_PERC"
 
     ki = 0
+    Dim codSrvOut As String, und As String
     For r = 0 To dFirst.Count - 1
         k = ks(r): fi = dFirst(k)
         If Round(dQ(k), 2) = 0 And Round(dV(k), 2) = 0 Then GoTo PulaZero   ' QTD=0 e VALOR=0
         ki = ki + 1
         pep = Trim$(CStr(dados(fi, cPEP)))
+        codSrvOut = NormCod(dados(fi, cMaterial))
         outp(ki, 1) = pep: outp(ki, 2) = PEP3(pep): outp(ki, 3) = TipoPEPANEEL(pep)
-        outp(ki, 4) = NormCod(dados(fi, cMaterial))
-        outp(ki, 5) = DescServico(NormCod(dados(fi, cMaterial)))
+        outp(ki, 4) = codSrvOut
+        outp(ki, 5) = DescServico(codSrvOut)
         outp(ki, 6) = ValorCampo(fi, cClasse)
-        outp(ki, 7) = Round(dQ(k), 2)
-        outp(ki, 8) = Round(dV(k), 2)
-        outp(ki, 9) = SrvInfoLinha(fi, 0)    ' CLS1
-        outp(ki, 10) = SrvInfoLinha(fi, 1)   ' CLS2
-        outp(ki, 11) = SrvInfoLinha(fi, 2)   ' CLS3
-        outp(ki, 12) = SrvInfoLinha(fi, 3)   ' TIPO_APLICACAO
-        outp(ki, 13) = GrupoPerc(pep)
+        ' UND: unidade de medida (M, UN, M3...). Preferencia: coluna UML do
+        ' proprio lancamento SAP; fallback: catalogo de servicos (UN).
+        und = Trim$(TextoCampo(fi, cUML))
+        If und = "" Then und = SrvInfo(codSrvOut, 5)
+        outp(ki, 7) = und
+        outp(ki, 8) = Round(dQ(k), 2)
+        outp(ki, 9) = Round(dV(k), 2)
+        outp(ki, 10) = SrvInfoLinha(fi, 0)    ' CLS1
+        outp(ki, 11) = SrvInfoLinha(fi, 1)    ' CLS2
+        outp(ki, 12) = SrvInfoLinha(fi, 2)    ' CLS3
+        outp(ki, 13) = SrvInfoLinha(fi, 3)    ' TIPO_APLICACAO
+        outp(ki, 14) = GrupoPerc(pep)
 PulaZero:
     Next r
     EscreverAba "SERVICO", outp
@@ -4970,6 +4979,7 @@ Private Sub Gerar_Regras()
     s = s & "OBSERVACOES|Motivo do REPROVADO (OBS1)|A coluna OBS1 da aba MATERIAL vs SERVICO traz o motivo da linha: familia UC fora da margem (com MAT/SRV) e, na propagacao, qual ODI reprovou e quais familias (ou ODI sem UC)." & vbLf
     s = s & "OBSERVACOES|Veredito do PEP3 (OBS2)|A coluna OBS2 repete em TODAS as linhas do PEP3 o motivo do veredito: APROVADO (nenhuma familia UC fora da margem) ou REPROVADO (com o motivo agregado)." & vbLf
     s = s & "FILTRAGEM|Linhas NULO ignoradas|Linhas com MAT = 0 e SRV = 0 (NULO) nao sao trazidas para a aba MATERIAL vs SERVICO." & vbLf
+    s = s & "ABA SERVICO|Unidade de medida (UND)|Preferencia: UML do proprio lancamento SAP; se vazio, usa a unidade (UN) do catalogo SERVICOS_ATUAIS pelo COD_SERVICO." & vbLf
 
     Dim linhas() As String: linhas = Split(s, vbLf)
     Dim i As Long, cnt As Long
