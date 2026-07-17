@@ -7,6 +7,8 @@ import { useAuthStore } from '@/lib/store';
 
 const NAV = [
   { href: '/painel', label: 'Dashboard', icon: '📊' },
+  { href: '/radar', label: 'Radar de Tendências', icon: '📡' },
+  { href: '/planner', label: 'Planejador de Posts', icon: '🗓️' },
   { href: '/campanhas', label: 'Campanhas', icon: '🎯' },
   { href: '/recomendacoes', label: 'Recomendações IA', icon: '🤖' },
   { href: '/chat', label: 'Assistente', icon: '💬' },

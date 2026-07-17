@@ -109,6 +109,8 @@ apps/web  (Next.js 14) ──HTTP/WS──▶ apps/api (NestJS)
 
 ## Funcionalidades
 
+- ✅ **Radar de Tendências**: produtos em alta (o que está vendendo) por país/marketplace com score de demanda, crescimento e insight de como aproveitar; vídeos em alta no mundo por rede (TikTok/Reels/Shorts/YouTube) com formato, gancho e por que funciona — YouTube via Data API real com `YOUTUBE_API_KEY`
+- ✅ **Planejador de Postagem**: melhores janelas por rede + análise do seu vídeo pela IA antes de subir (ganchos, título/hashtags por rede, horário e dica de tráfego pago)
 - ✅ Dashboard unificado com 12 KPIs, comparação vs. período anterior, evolução gasto×receita, funil, distribuição por plataforma, mapa de calor de horários, cards de destaque e alertas de anomalias
 - ✅ Tabela de campanhas unificada (3 plataformas) com colunas configuráveis, ordenação, busca, virtualização e ações com confirmação (pausar/ativar/verba/duplicar)
 - ✅ Diagnóstico automático da IA + recomendações priorizadas com "aplicar com 1 clique" e desfazer

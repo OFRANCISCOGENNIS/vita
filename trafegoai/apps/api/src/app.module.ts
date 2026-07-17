@@ -28,6 +28,8 @@ import { ClientsController } from './clients/clients.controller';
 import { BillingController } from './billing/billing.controller';
 import { BillingService } from './billing/billing.service';
 import { NotificationsController } from './notifications/notifications.controller';
+import { RadarController } from './radar/radar.controller';
+import { RadarService } from './radar/radar.service';
 import { SyncService } from './jobs/sync.service';
 import { RealtimeGateway } from './realtime/realtime.gateway';
 
@@ -54,6 +56,7 @@ import { RealtimeGateway } from './realtime/realtime.gateway';
     ClientsController,
     BillingController,
     NotificationsController,
+    RadarController,
   ],
   providers: [
     PrismaService,
@@ -72,6 +75,7 @@ import { RealtimeGateway } from './realtime/realtime.gateway';
     SyncService,
     RealtimeGateway,
     BillingService,
+    RadarService,
   ],
 })
 export class AppModule {}
