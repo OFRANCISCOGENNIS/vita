@@ -4751,24 +4751,25 @@ else configurarPro();
 // esquerda — clicou, abre/fecha; estado persistente. Os fluxos que auto-abrem
 // um painel (Scanner, IA, Estudo, Heatmap) chamam railMostrar() para revelar.
 
+// cor = halo/brilho do ícone (tema de cada ferramenta, no estilo "app icon")
 const PAINEIS_MENU = [
-    { id: 'painelIntel', ico: '🧠', rot: 'Inteligência: Price Action · Liquidez · Smart Money · Volume/Delta · Análise da Operação' },
-    { id: 'painelSub', ico: '📊', rot: 'RSI & ATR (gráficos)' },
-    { id: 'painelFluxo', ico: '🔄', rot: 'Fluxo de Volume (compra × venda)' },
-    { id: 'heatPanel', ico: '🗺️', rot: 'Heatmap de Ativos' },
-    { id: 'scanPanel', ico: '🔎', rot: 'Scanner — melhores entradas' },
-    { id: 'iaPanel', ico: '🤖', rot: 'IA — melhores parâmetros' },
-    { id: 'agentesPanel', ico: '🕵️', rot: 'Agentes de Estudo' },
-    { id: 'pilotoPanel', ico: '🎮', rot: 'Piloto Automático (conta demo)' },
-    { id: 'proPanel', ico: '📶', rot: 'Volume Profile & Níveis (fib/S-R)' },
-    { id: 'bookPanel', ico: '📖', rot: 'Book de Ofertas & Times/Trades' },
-    { id: 'painelPA', ico: '🧭', rot: 'Price Action — estudo de entradas (S/R · fib · LTA/LTB · micro×macro)' },
-    { id: 'painelEntradas', ico: '🔔', rot: 'Avisos de Entrada (tabela)' },
-    { id: 'painelMetricas', ico: '📐', rot: 'Métricas de Análise (backtest)' },
-    { id: 'estudoPanel', ico: '📚', rot: 'Estudos de Mercado' },
-    { id: 'painelTV', ico: '📺', rot: 'Gráfico oficial TradingView' },
-    { id: 'painelNews', ico: '📰', rot: 'Notícias em tempo real' },
-    { id: 'painelStatus', ico: '🎯', rot: 'Status resumido' }
+    { id: 'painelIntel', ico: '🧠', cor: '#EC4899', rot: 'Inteligência: Price Action · Liquidez · Smart Money · Volume/Delta · Análise da Operação' },
+    { id: 'painelSub', ico: '📊', cor: '#3B82F6', rot: 'RSI & ATR (gráficos)' },
+    { id: 'painelFluxo', ico: '🔄', cor: '#22C55E', rot: 'Fluxo de Volume (compra × venda)' },
+    { id: 'heatPanel', ico: '🗺️', cor: '#14B8A6', rot: 'Heatmap de Ativos' },
+    { id: 'scanPanel', ico: '🔎', cor: '#22D3EE', rot: 'Scanner — melhores entradas' },
+    { id: 'iaPanel', ico: '🤖', cor: '#8B5CF6', rot: 'IA — melhores parâmetros' },
+    { id: 'agentesPanel', ico: '🕵️', cor: '#6366F1', rot: 'Agentes de Estudo' },
+    { id: 'pilotoPanel', ico: '🎮', cor: '#34D399', rot: 'Piloto Automático (conta demo)' },
+    { id: 'proPanel', ico: '📶', cor: '#818CF8', rot: 'Volume Profile & Níveis (fib/S-R)' },
+    { id: 'bookPanel', ico: '📖', cor: '#4ADE80', rot: 'Book de Ofertas & Times/Trades' },
+    { id: 'painelPA', ico: '🧭', cor: '#2DD4BF', rot: 'Price Action — estudo de entradas (S/R · fib · LTA/LTB · micro×macro)' },
+    { id: 'painelEntradas', ico: '🔔', cor: '#FBBF24', rot: 'Avisos de Entrada (tabela)' },
+    { id: 'painelMetricas', ico: '📐', cor: '#A78BFA', rot: 'Métricas de Análise (backtest)' },
+    { id: 'estudoPanel', ico: '📚', cor: '#A855F7', rot: 'Estudos de Mercado' },
+    { id: 'painelTV', ico: '📺', cor: '#60A5FA', rot: 'Gráfico oficial TradingView' },
+    { id: 'painelNews', ico: '📰', cor: '#38BDF8', rot: 'Notícias em tempo real' },
+    { id: 'painelStatus', ico: '🎯', cor: '#4ADE80', rot: 'Status resumido' }
 ];
 
 let paineisVis = JSON.parse(localStorage.getItem('paineisVis') || 'null');
@@ -4797,8 +4798,8 @@ function montarRail() {
     const rail = document.getElementById('railPaineis');
     if (!rail) return;
     rail.innerHTML = PAINEIS_MENU.map(p =>
-        `<button class="rail-btn" type="button" data-p="${p.id}" title="${p.rot}" aria-pressed="false">${p.ico}</button>`
-    ).join('') + '<button class="rail-btn rail-all" type="button" data-all="1" title="Mostrar/ocultar todos os painéis">👁</button>';
+        `<button class="rail-btn" type="button" data-p="${p.id}" title="${p.rot}" aria-pressed="false" style="--ico:${p.cor}"><span class="rail-ico">${p.ico}</span></button>`
+    ).join('') + '<button class="rail-btn rail-all" type="button" data-all="1" title="Mostrar/ocultar todos os painéis" style="--ico:#A78BFA"><span class="rail-ico">👁</span></button>';
     rail.addEventListener('click', ev => {
         const b = ev.target.closest('.rail-btn');
         if (!b) return;
