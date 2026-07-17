@@ -2313,3 +2313,24 @@ button:not(.rail-btn):not(:disabled):active { transform: scale(0.95); transition
 .alerta-chip button:hover { background: rgba(245, 158, 11, 0.25); }
 #btnAlerta.is-active { background: rgba(245, 158, 11, 0.18); border-color: var(--warning); color: var(--warning); }
 @media (prefers-reduced-motion: reduce) { .vela-timer.vela-urgente { animation: none; } }
+
+/* ---- Sessões pintadas no gráfico ---- */
+#sessoesOverlay { position: absolute; inset: 0; pointer-events: none; z-index: 1; overflow: hidden; }
+.sess-faixa { position: absolute; top: 0; bottom: 0; }
+
+/* ---- Modo foco: só decisão + gráfico ---- */
+body.modo-foco .sidebar,
+body.modo-foco .rail,
+body.modo-foco #registroPanel,
+body.modo-foco .qo-intel,
+body.modo-foco #painelSub, body.modo-foco #painelFluxo, body.modo-foco #painelIntel,
+body.modo-foco #heatPanel, body.modo-foco #scanPanel, body.modo-foco #iaPanel,
+body.modo-foco #agentesPanel, body.modo-foco #pilotoPanel, body.modo-foco #proPanel,
+body.modo-foco #bookPanel, body.modo-foco #painelPA, body.modo-foco #painelEntradas,
+body.modo-foco #painelMetricas, body.modo-foco #estudoPanel, body.modo-foco #painelTV,
+body.modo-foco #painelNews, body.modo-foco #painelStatus, body.modo-foco #trainPanel,
+body.modo-foco .footer { display: none !important; }
+body.modo-foco .main-content { padding-left: var(--spacing); padding-right: var(--spacing); }
+#btnFoco.is-active, #btnSessoes.is-active {
+    background: rgba(34, 211, 238, 0.14); border-color: var(--neon-1); color: var(--neon-1);
+}

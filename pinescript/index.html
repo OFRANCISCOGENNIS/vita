@@ -35,6 +35,7 @@
             <div class="qo-stat"><small>Operações Aprovadas</small><span id="qoAprov" class="qo-good">—</span></div>
             <div class="qo-stat"><small>Bloqueadas</small><span id="qoBloq" class="qo-bad">—</span></div>
             <div class="qo-stat"><small>Expectativa Matemática</small><span id="qoExpect">—</span></div>
+            <div class="qo-stat"><small>Hoje</small><span id="qoHoje">—</span></div>
             <div class="qo-acoes">
                 <button id="btnAnaliseTop" class="qo-toggle" type="button" title="Leitura completa do gráfico: estrutura, zonas, liquidez, plano de trade, cenários e notas">🎓 Análise</button>
                 <button id="btnControles" class="qo-toggle" type="button" aria-expanded="true" title="Mostrar/ocultar as configurações (atalho C)">⚙️ Controles</button>
@@ -496,6 +497,8 @@
                             <span id="tickVar" class="tick-var">—</span>
                             <span id="velaTimer" class="vela-timer"></span>
                             <button id="btnAlerta" class="btn-ghost" type="button" title="Alerta de preço: arme e clique no gráfico no nível desejado — som + notificação quando o preço cruzar">🔔+</button>
+                            <button id="btnSessoes" class="btn-ghost" type="button" title="Pintar as sessões no fundo do gráfico: Londres (azul), NY (violeta) e a sobreposição Londres+NY (ciano — o horário de mais volume)">🕐</button>
+                            <button id="btnFoco" class="btn-ghost" type="button" title="Modo foco: só decisão + gráfico (tecla F · Esc sai)">🖥</button>
                             <span id="alertaChips" class="alerta-chips"></span>
                         </div>
                         <div id="chartPreco" class="tv-chart tv-chart-main"></div>
@@ -789,6 +792,7 @@
     <script src="src/23-zonas.js"></script>
     <script src="src/24-chartbar.js"></script>
     <script src="src/25-execucao.js"></script>
+    <script src="src/26-extra.js"></script>
     <!-- APP:END -->
 </body>
 </html>

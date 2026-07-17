@@ -66,6 +66,7 @@ function renderRegistro() {
     }).join('') : '<div class="metric-empty" style="padding:10px 4px;">Sem entradas A/B ainda · desmarque o filtro p/ ver todas.</div>';
     atualizarCalibracaoIA();
     if (typeof renderPiloto === 'function') renderPiloto();   // conta demo acompanha o registro
+    try { if (typeof renderPlacarDia === 'function') renderPlacarDia(); } catch (e) { }   // tile "Hoje"
 }
 
 // ---- Verificador automático de WIN/LOSS ----

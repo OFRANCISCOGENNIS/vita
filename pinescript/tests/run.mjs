@@ -737,6 +737,34 @@ check('countdown da vela: M5 aberta há 90s → faltam 210s', exec.faltam === 21
 check('alerta de preço: cria linha+chip e persiste', exec.criou && exec.chip && exec.temBtn);
 check('preço cruza → alerta dispara e se consome', exec.consumiu);
 check('ticker mostra preço e variação %', exec.tickOk);
+// Placar do dia · sessões no gráfico · modo foco
+const extra = await p.evaluate(() => {
+  const agora = Math.floor(Date.now() / 1000);
+  // placar: 3W 1L hoje, com 2 vitórias seguidas no fim
+  const regs = [
+    { t: agora - 9000, resultado: 'LOSS' }, { t: agora - 7000, resultado: 'WIN' },
+    { t: agora - 5000, resultado: 'WIN' }, { t: agora - 3000, resultado: 'WIN' },
+    { t: agora - 90000, resultado: 'WIN' }   // ontem: fora do placar
+  ];
+  const pDia = placarDoDia(regs, agora);
+  // sessões: liga → overlay com faixas; desliga → some
+  alternarSessoes(true);
+  const faixas = document.querySelectorAll('#sessoesOverlay .sess-faixa').length;
+  alternarSessoes(false);
+  const limpou = !document.getElementById('sessoesOverlay');
+  // foco: liga esconde sidebar/rail; Esc sai
+  alternarFoco(true);
+  const focou = document.body.classList.contains('modo-foco')
+    && getComputedStyle(document.querySelector('.sidebar')).display === 'none'
+    && getComputedStyle(document.getElementById('railPaineis')).display === 'none';
+  document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+  const saiu = !document.body.classList.contains('modo-foco');
+  return { pDia, faixas, limpou, focou, saiu, temTile: !!document.getElementById('qoHoje') };
+});
+check('placar do dia: 3W·1L, sequência 🔥3, ignora ontem', extra.pDia.w === 3 && extra.pDia.l === 1 && extra.pDia.seq === 3 && extra.pDia.total === 4, JSON.stringify(extra.pDia));
+check('tile "Hoje" presente na topbar', extra.temTile);
+check('🕐 sessões pintam faixas no gráfico e desligam limpo', extra.faixas >= 1 && extra.limpou, 'faixas=' + extra.faixas);
+check('🖥 modo foco esconde sidebar+rail · Esc sai', extra.focou && extra.saiu);
 // Volume no gráfico principal (estilo TradingView): histograma no rodapé
 const vol = await p.evaluate(() => {
   const alta = barraVolume({ time: 1, open: 10, high: 12, low: 9, close: 11, volume: 500 });
