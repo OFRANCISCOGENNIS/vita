@@ -69,8 +69,8 @@ function tracarLTs(on) {
         s.setData([{ time: dados[lt.i0].time, value: lt.p0 }, { time: dados[dados.length - 1].time, value: lt.atual }]);
         return s;
     };
-    if (lta) serieLTA = mk(lta, 'rgba(34, 197, 94, 0.8)');
-    if (ltb) serieLTB = mk(ltb, 'rgba(239, 68, 68, 0.8)');
+    if (lta) serieLTA = mk(lta, 'rgba(34, 197, 94, 0.65)');
+    if (ltb) serieLTB = mk(ltb, 'rgba(239, 68, 68, 0.65)');
 }
 
 // ---- Painel 🧭: monta a leitura completa da entrada ----

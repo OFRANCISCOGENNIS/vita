@@ -529,7 +529,7 @@ const zonas = await p.evaluate(() => {
   desenharZonasSR(true);
   const faixas = document.querySelectorAll('#zonasOverlay .zona-faixa').length;
   const rotulo = document.querySelector('#zonasOverlay .zona-rot');
-  const temRotulo = rotulo && /ZONA DE (SUPORTE|RESISTÊNCIA)/.test(rotulo.textContent) && /toque/.test(rotulo.textContent);
+  const temRotulo = rotulo && /^[RS] (forte|média|fraca)/i.test(rotulo.textContent) && /\d+×/.test(rotulo.textContent);
   const marcs = marcadoresEstrutura();
   const temHHHL = marcs.some(m => /HH|HL|LH|LL/.test(m.text));
   // desliga → overlay some
@@ -1393,7 +1393,7 @@ const pro = await p.evaluate(() => {
 check('volumeProfile: POC no bucket de maior volume (~10.1)', pro.precoPoc > 9.5 && pro.precoPoc < 10.7, 'poc=' + pro.precoPoc);
 check('fibNiveis: perna de alta e 50% no meio da perna', pro.alta && Math.abs(pro.meio - (sobreMeio => sobreMeio)((129 + 99) / 2)) < 0.75, 'meio=' + pro.meio);
 check('bookImbalance: só compra=+1 · equilibrado=0', pro.imbC === 1 && pro.imbE === 0);
-check('níveis no gráfico: liga cria linhas (fib+S/R), desliga remove', pro.nLinhas >= 7 && pro.zerou, 'linhas=' + pro.nLinhas);
+check('níveis no gráfico: liga cria linhas (fib+S/R), desliga remove', pro.nLinhas >= 4 && pro.zerou, 'linhas=' + pro.nLinhas);
 check('Volume Profile renderiza 24 faixas com POC marcado', pro.vpLinhas === 24 && pro.temPoc, 'linhas=' + pro.vpLinhas);
 // Book: mensagem clara quando o par não é Binance ao ligar
 const bookMsgTxt = await p.evaluate(() => {

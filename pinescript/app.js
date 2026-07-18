@@ -4686,16 +4686,19 @@ function alternarNiveis(on) {
     const add = (price, color, style, title) => {
         try { linhasNiveis.push(serieVelas.createPriceLine({ price, color, lineWidth: 1, lineStyle: style, axisLabelVisible: false, title })); } catch (e) { }
     };
+    // Fib: só os níveis que decidem (38.2 · 50 · 61.8, a "zona de ouro") — 0/100
+    // coincidem com os extremos (redundantes) e 23.6/78.6 poluem. Bem suaves.
     const fib = fibNiveis(dados);
-    if (fib) fib.niveis.forEach(n => add(n.preco, 'rgba(139,127,240,0.55)', 2, 'fib ' + Math.round(n.k * 1000) / 10));
-    // S/R: os 2 níveis confirmados mais próximos acima/abaixo do preço
+    if (fib) fib.niveis.filter(n => n.k === 0.382 || n.k === 0.5 || n.k === 0.618)
+        .forEach(n => add(n.preco, 'rgba(139,127,240,0.4)', 2, 'fib ' + Math.round(n.k * 1000) / 10));
+    // S/R: só o nível confirmado MAIS PRÓXIMO acima e abaixo do preço (linha discreta)
     try {
         const piv = acharPivotsSR();
         const close = dados[dados.length - 1].close;
-        piv.res.map(p => p.price).filter(p => p > close).sort((a, b) => a - b).slice(0, 2)
-            .forEach(p => add(p, 'rgba(239,68,68,0.6)', 0, 'R'));
-        piv.sup.map(p => p.price).filter(p => p < close).sort((a, b) => b - a).slice(0, 2)
-            .forEach(p => add(p, 'rgba(34,197,94,0.6)', 0, 'S'));
+        piv.res.map(p => p.price).filter(p => p > close).sort((a, b) => a - b).slice(0, 1)
+            .forEach(p => add(p, 'rgba(239,68,68,0.45)', 0, 'R'));
+        piv.sup.map(p => p.price).filter(p => p < close).sort((a, b) => b - a).slice(0, 1)
+            .forEach(p => add(p, 'rgba(34,197,94,0.45)', 0, 'S'));
     } catch (e) { }
 }
 
@@ -4998,8 +5001,8 @@ function tracarLTs(on) {
         s.setData([{ time: dados[lt.i0].time, value: lt.p0 }, { time: dados[dados.length - 1].time, value: lt.atual }]);
         return s;
     };
-    if (lta) serieLTA = mk(lta, 'rgba(34, 197, 94, 0.8)');
-    if (ltb) serieLTB = mk(ltb, 'rgba(239, 68, 68, 0.8)');
+    if (lta) serieLTA = mk(lta, 'rgba(34, 197, 94, 0.65)');
+    if (ltb) serieLTB = mk(ltb, 'rgba(239, 68, 68, 0.65)');
 }
 
 // ---- Painel 🧭: monta a leitura completa da entrada ----
@@ -6396,11 +6399,13 @@ function _reposicionarZonasAgora() {
         if (y1 == null || y2 == null) return '';
         const forte = zn.forca === 'FORTE';
         const cor = lado === 'res'
-            ? (forte ? 'rgba(239,68,68,0.16)' : 'rgba(239,68,68,0.07)')
-            : (forte ? 'rgba(34,197,94,0.16)' : 'rgba(34,197,94,0.07)');
-        const borda = lado === 'res' ? 'rgba(239,68,68,0.6)' : 'rgba(34,197,94,0.6)';
+            ? (forte ? 'rgba(239,68,68,0.13)' : 'rgba(239,68,68,0.05)')
+            : (forte ? 'rgba(34,197,94,0.13)' : 'rgba(34,197,94,0.05)');
+        const borda = lado === 'res' ? 'rgba(239,68,68,0.5)' : 'rgba(34,197,94,0.5)';
+        // rótulo CURTO, encostado na borda esquerda, num pill legível (não cobre as velas)
+        const abrev = (lado === 'res' ? 'R' : 'S') + ' ' + (forte ? 'forte' : zn.forca === 'MÉDIA' ? 'média' : 'fraca');
         return `<div class="zona-faixa" style="top:${Math.min(y1, y2)}px;height:${Math.max(3, Math.abs(y2 - y1))}px;background:${cor};border-top:1px dashed ${borda};border-bottom:1px dashed ${borda};">` +
-            `<span class="zona-rot" style="color:${borda}">ZONA DE ${zn.tipo} ${zn.forca} · ${zn.n} toque${zn.n > 1 ? 's' : ''}</span></div>`;
+            `<span class="zona-rot" style="color:${borda}">${abrev} · ${zn.n}×</span></div>`;
     };
     ov.innerHTML = z.resist.map(x => faixa(x, 'res')).join('') + z.supor.map(x => faixa(x, 'sup')).join('');
 }

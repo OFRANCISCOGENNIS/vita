@@ -55,11 +55,13 @@ function _reposicionarZonasAgora() {
         if (y1 == null || y2 == null) return '';
         const forte = zn.forca === 'FORTE';
         const cor = lado === 'res'
-            ? (forte ? 'rgba(239,68,68,0.16)' : 'rgba(239,68,68,0.07)')
-            : (forte ? 'rgba(34,197,94,0.16)' : 'rgba(34,197,94,0.07)');
-        const borda = lado === 'res' ? 'rgba(239,68,68,0.6)' : 'rgba(34,197,94,0.6)';
+            ? (forte ? 'rgba(239,68,68,0.13)' : 'rgba(239,68,68,0.05)')
+            : (forte ? 'rgba(34,197,94,0.13)' : 'rgba(34,197,94,0.05)');
+        const borda = lado === 'res' ? 'rgba(239,68,68,0.5)' : 'rgba(34,197,94,0.5)';
+        // rótulo CURTO, encostado na borda esquerda, num pill legível (não cobre as velas)
+        const abrev = (lado === 'res' ? 'R' : 'S') + ' ' + (forte ? 'forte' : zn.forca === 'MÉDIA' ? 'média' : 'fraca');
         return `<div class="zona-faixa" style="top:${Math.min(y1, y2)}px;height:${Math.max(3, Math.abs(y2 - y1))}px;background:${cor};border-top:1px dashed ${borda};border-bottom:1px dashed ${borda};">` +
-            `<span class="zona-rot" style="color:${borda}">ZONA DE ${zn.tipo} ${zn.forca} · ${zn.n} toque${zn.n > 1 ? 's' : ''}</span></div>`;
+            `<span class="zona-rot" style="color:${borda}">${abrev} · ${zn.n}×</span></div>`;
     };
     ov.innerHTML = z.resist.map(x => faixa(x, 'res')).join('') + z.supor.map(x => faixa(x, 'sup')).join('');
 }

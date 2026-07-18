@@ -65,16 +65,19 @@ function alternarNiveis(on) {
     const add = (price, color, style, title) => {
         try { linhasNiveis.push(serieVelas.createPriceLine({ price, color, lineWidth: 1, lineStyle: style, axisLabelVisible: false, title })); } catch (e) { }
     };
+    // Fib: só os níveis que decidem (38.2 · 50 · 61.8, a "zona de ouro") — 0/100
+    // coincidem com os extremos (redundantes) e 23.6/78.6 poluem. Bem suaves.
     const fib = fibNiveis(dados);
-    if (fib) fib.niveis.forEach(n => add(n.preco, 'rgba(139,127,240,0.55)', 2, 'fib ' + Math.round(n.k * 1000) / 10));
-    // S/R: os 2 níveis confirmados mais próximos acima/abaixo do preço
+    if (fib) fib.niveis.filter(n => n.k === 0.382 || n.k === 0.5 || n.k === 0.618)
+        .forEach(n => add(n.preco, 'rgba(139,127,240,0.4)', 2, 'fib ' + Math.round(n.k * 1000) / 10));
+    // S/R: só o nível confirmado MAIS PRÓXIMO acima e abaixo do preço (linha discreta)
     try {
         const piv = acharPivotsSR();
         const close = dados[dados.length - 1].close;
-        piv.res.map(p => p.price).filter(p => p > close).sort((a, b) => a - b).slice(0, 2)
-            .forEach(p => add(p, 'rgba(239,68,68,0.6)', 0, 'R'));
-        piv.sup.map(p => p.price).filter(p => p < close).sort((a, b) => b - a).slice(0, 2)
-            .forEach(p => add(p, 'rgba(34,197,94,0.6)', 0, 'S'));
+        piv.res.map(p => p.price).filter(p => p > close).sort((a, b) => a - b).slice(0, 1)
+            .forEach(p => add(p, 'rgba(239,68,68,0.45)', 0, 'R'));
+        piv.sup.map(p => p.price).filter(p => p < close).sort((a, b) => b - a).slice(0, 1)
+            .forEach(p => add(p, 'rgba(34,197,94,0.45)', 0, 'S'));
     } catch (e) { }
 }
 
