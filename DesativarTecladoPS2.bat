@@ -8,7 +8,6 @@ title Desativar Teclado Padrao PS/2
 ::  Para reativar, use o TogglarTecladoNotebook.bat.
 :: ============================================================
 
-:: --- Verifica / solicita elevacao de administrador ---
 net session >nul 2>&1
 if %errorlevel% neq 0 (
     echo Solicitando privilegios de administrador...
@@ -19,8 +18,7 @@ if %errorlevel% neq 0 (
 echo Desativando o Teclado Padrao PS/2 ...
 echo.
 
-powershell -NoProfile -Command ^
-  "Get-PnpDevice -Class Keyboard ^| Where-Object { ($_.FriendlyName -match 'PS/2') -or ($_.InstanceId -like 'ACPI\*') } ^| ForEach-Object { Write-Host ('-> ' + $_.FriendlyName); Disable-PnpDevice -InstanceId $_.InstanceId -Confirm:$false }"
+powershell -NoProfile -Command "$ks = Get-PnpDevice -Class Keyboard; foreach ($k in $ks) { if (($k.FriendlyName -match 'PS/2') -or ($k.InstanceId -like 'ACPI\*')) { Write-Host ('-> ' + $k.FriendlyName); Disable-PnpDevice -InstanceId $k.InstanceId -Confirm:$false } }"
 
 echo.
 echo Teclado interno PS/2 DESATIVADO.

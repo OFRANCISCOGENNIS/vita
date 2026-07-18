@@ -1,5 +1,5 @@
 @echo off
-setlocal enabledelayedexpansion
+setlocal
 title Ativar/Desativar Teclado do Notebook
 
 :: ============================================================
@@ -8,7 +8,6 @@ title Ativar/Desativar Teclado do Notebook
 ::  Nao afeta teclados USB externos (apenas o PS/2 / ACPI interno).
 :: ============================================================
 
-:: --- Verifica / solicita elevacao de administrador ---
 net session >nul 2>&1
 if %errorlevel% neq 0 (
     echo Solicitando privilegios de administrador...
@@ -21,16 +20,11 @@ echo   TECLADO INTERNO DO NOTEBOOK - ATIVAR / DESATIVAR
 echo ============================================================
 echo.
 
-:: Filtro dos teclados internos (PS/2 e ACPI). Ignora teclados USB.
-set "FILTRO=($_.Class -eq 'Keyboard') -and (($_.FriendlyName -match 'PS/2') -or ($_.InstanceId -like 'ACPI\*')) -and ($_.InstanceId -notlike '*USB*')"
-
-:: --- Descobre estado atual ---
-for /f "delims=" %%S in ('powershell -NoProfile -Command ^
-    "$d = Get-PnpDevice ^| Where-Object { %FILTRO% } ^| Select-Object -First 1; if ($d) { $d.Status } else { 'NAOENCONTRADO' }"') do set "STATUS=%%S"
+:: --- Descobre estado atual do teclado interno ---
+for /f "delims=" %%S in ('powershell -NoProfile -Command "$d = Get-PnpDevice -Class Keyboard ^| Where-Object { ($_.FriendlyName -match 'PS/2') -or ($_.InstanceId -like 'ACPI\*') } ^| Select-Object -First 1; if ($d) { $d.Status } else { 'NAOENCONTRADO' }"') do set "STATUS=%%S"
 
 if "%STATUS%"=="NAOENCONTRADO" (
-    echo Nenhum teclado interno PS/2/ACPI foi localizado.
-    echo Listando todos os teclados detectados:
+    echo Nenhum teclado interno PS/2/ACPI foi localizado. Teclados detectados:
     echo.
     powershell -NoProfile -Command "Get-PnpDevice -Class Keyboard | Format-Table Status, FriendlyName, InstanceId -AutoSize"
     echo.
@@ -43,13 +37,11 @@ echo.
 
 if /i "%STATUS%"=="OK" (
     echo Desativando o teclado interno...
-    powershell -NoProfile -Command ^
-        "Get-PnpDevice ^| Where-Object { %FILTRO% } ^| Disable-PnpDevice -Confirm:$false"
+    powershell -NoProfile -Command "$ks = Get-PnpDevice -Class Keyboard; foreach ($k in $ks) { if (($k.FriendlyName -match 'PS/2') -or ($k.InstanceId -like 'ACPI\*')) { Disable-PnpDevice -InstanceId $k.InstanceId -Confirm:$false } }"
     echo Teclado interno DESATIVADO.
 ) else (
     echo Ativando o teclado interno...
-    powershell -NoProfile -Command ^
-        "Get-PnpDevice ^| Where-Object { %FILTRO% } ^| Enable-PnpDevice -Confirm:$false"
+    powershell -NoProfile -Command "$ks = Get-PnpDevice -Class Keyboard; foreach ($k in $ks) { if (($k.FriendlyName -match 'PS/2') -or ($k.InstanceId -like 'ACPI\*')) { Enable-PnpDevice -InstanceId $k.InstanceId -Confirm:$false } }"
     echo Teclado interno ATIVADO.
 )
 
