@@ -1009,14 +1009,17 @@ function atualizarMarcadores() {
     // crosshair). Centenas de textos deixavam tudo lento e ilegível: mantemos os
     // 150 sinais mais recentes e SÓ os últimos 40 carregam texto (os antigos
     // ficam como setas — a tabela 🔔 Avisos continua com o histórico completo).
-    const rec = entradas.slice(-150);
-    const comTexto = rec.length - 40;
+    // LIMPEZA: os textos "CALL 3/6 • 5m" espalhados poluíam o gráfico. Agora só
+    // SETAS pequenas (últimos 80 sinais) e texto SÓ no mais recente (o acionável);
+    // o histórico completo com detalhes fica na tabela 🔔 Avisos de Entrada.
+    const rec = entradas.slice(-80);
     const marc = rec.map((e, i) => ({
         time: dados[e.index].time,
         position: e.dir === 'CALL' ? 'belowBar' : 'aboveBar',
-        color: e.dir === 'CALL' ? '#26a69a' : '#ef5350',
+        color: e.dir === 'CALL' ? 'rgba(38,166,154,0.9)' : 'rgba(239,83,80,0.9)',
         shape: e.dir === 'CALL' ? 'arrowUp' : 'arrowDown',
-        text: i >= comTexto ? `${e.dir} ${e.score}/${e.enabled}` : undefined
+        size: 1,
+        text: i === rec.length - 1 ? `${e.dir} ${e.score}/${e.enabled}` : undefined
     }));
     // Zonas S/R ligadas (bloco 28): rótulos HH/HL/LH/LL nos pivôs + reposiciona as faixas
     try {
@@ -4696,9 +4699,9 @@ function alternarNiveis(on) {
         const piv = acharPivotsSR();
         const close = dados[dados.length - 1].close;
         piv.res.map(p => p.price).filter(p => p > close).sort((a, b) => a - b).slice(0, 1)
-            .forEach(p => add(p, 'rgba(239,68,68,0.45)', 0, 'R'));
+            .forEach(p => add(p, 'rgba(239,68,68,0.4)', 2, 'R'));
         piv.sup.map(p => p.price).filter(p => p < close).sort((a, b) => b - a).slice(0, 1)
-            .forEach(p => add(p, 'rgba(34,197,94,0.45)', 0, 'S'));
+            .forEach(p => add(p, 'rgba(34,197,94,0.4)', 2, 'S'));
     } catch (e) { }
 }
 
@@ -4997,12 +5000,12 @@ function tracarLTs(on) {
     const lta = calcularLT(piv.sup, dados.length, 'LTA', 0.35, atrV);
     const ltb = calcularLT(piv.res, dados.length, 'LTB', 0.35, atrV);
     const mk = (lt, cor) => {
-        const s = chartPreco.addLineSeries({ color: cor, lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
+        const s = chartPreco.addLineSeries({ color: cor, lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
         s.setData([{ time: dados[lt.i0].time, value: lt.p0 }, { time: dados[dados.length - 1].time, value: lt.atual }]);
         return s;
     };
-    if (lta) serieLTA = mk(lta, 'rgba(34, 197, 94, 0.65)');
-    if (ltb) serieLTB = mk(ltb, 'rgba(239, 68, 68, 0.65)');
+    if (lta) serieLTA = mk(lta, 'rgba(34, 197, 94, 0.55)');
+    if (ltb) serieLTB = mk(ltb, 'rgba(239, 68, 68, 0.55)');
 }
 
 // ---- Painel 🧭: monta a leitura completa da entrada ----

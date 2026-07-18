@@ -75,9 +75,9 @@ function alternarNiveis(on) {
         const piv = acharPivotsSR();
         const close = dados[dados.length - 1].close;
         piv.res.map(p => p.price).filter(p => p > close).sort((a, b) => a - b).slice(0, 1)
-            .forEach(p => add(p, 'rgba(239,68,68,0.45)', 0, 'R'));
+            .forEach(p => add(p, 'rgba(239,68,68,0.4)', 2, 'R'));
         piv.sup.map(p => p.price).filter(p => p < close).sort((a, b) => b - a).slice(0, 1)
-            .forEach(p => add(p, 'rgba(34,197,94,0.45)', 0, 'S'));
+            .forEach(p => add(p, 'rgba(34,197,94,0.4)', 2, 'S'));
     } catch (e) { }
 }
 

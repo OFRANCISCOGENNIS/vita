@@ -65,12 +65,12 @@ function tracarLTs(on) {
     const lta = calcularLT(piv.sup, dados.length, 'LTA', 0.35, atrV);
     const ltb = calcularLT(piv.res, dados.length, 'LTB', 0.35, atrV);
     const mk = (lt, cor) => {
-        const s = chartPreco.addLineSeries({ color: cor, lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
+        const s = chartPreco.addLineSeries({ color: cor, lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
         s.setData([{ time: dados[lt.i0].time, value: lt.p0 }, { time: dados[dados.length - 1].time, value: lt.atual }]);
         return s;
     };
-    if (lta) serieLTA = mk(lta, 'rgba(34, 197, 94, 0.65)');
-    if (ltb) serieLTB = mk(ltb, 'rgba(239, 68, 68, 0.65)');
+    if (lta) serieLTA = mk(lta, 'rgba(34, 197, 94, 0.55)');
+    if (ltb) serieLTB = mk(ltb, 'rgba(239, 68, 68, 0.55)');
 }
 
 // ---- Painel 🧭: monta a leitura completa da entrada ----

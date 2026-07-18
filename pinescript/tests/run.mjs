@@ -737,7 +737,7 @@ const rota = await p.evaluate(() => {
 check('forex sem chave → Yahoo keyless (evita o branco do demo)', rota.forexKeyless);
 check('forex com chave real → Twelve Data', rota.forexComChave);
 check('cripto sempre volta p/ Binance', rota.criptoBinance);
-// Dieta de marcadores: ≤150 no gráfico, texto só nos 40 mais recentes
+// Dieta de marcadores: ≤80 setas no gráfico, texto SÓ no mais recente
 const md = await p.evaluate(() => {
   const bak = serieVelas.setMarkers.bind(serieVelas);
   let captura = null;
@@ -747,8 +747,8 @@ const md = await p.evaluate(() => {
   const setas = captura.filter(m => m.shape === 'arrowUp' || m.shape === 'arrowDown');
   return { total: setas.length, comTexto: setas.filter(m => m.text).length, entradas: entradas.length };
 });
-check('marcadores no gráfico limitados a 150 sinais', md.total <= 150 && md.total === Math.min(150, md.entradas), JSON.stringify(md));
-check('texto só nos 40 marcadores mais recentes', md.comTexto <= 40);
+check('marcadores no gráfico limitados a 80 setas', md.total <= 80 && md.total === Math.min(80, md.entradas), JSON.stringify(md));
+check('texto só no marcador mais recente (gráfico limpo)', md.comTexto <= 1);
 // Ferramentas de execução: countdown da vela, alerta de preço e ticker
 const exec = await p.evaluate(() => {
   // countdown puro: vela M5 aberta há 90s → faltam 210s

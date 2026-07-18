@@ -216,14 +216,17 @@ function atualizarMarcadores() {
     // crosshair). Centenas de textos deixavam tudo lento e ilegível: mantemos os
     // 150 sinais mais recentes e SÓ os últimos 40 carregam texto (os antigos
     // ficam como setas — a tabela 🔔 Avisos continua com o histórico completo).
-    const rec = entradas.slice(-150);
-    const comTexto = rec.length - 40;
+    // LIMPEZA: os textos "CALL 3/6 • 5m" espalhados poluíam o gráfico. Agora só
+    // SETAS pequenas (últimos 80 sinais) e texto SÓ no mais recente (o acionável);
+    // o histórico completo com detalhes fica na tabela 🔔 Avisos de Entrada.
+    const rec = entradas.slice(-80);
     const marc = rec.map((e, i) => ({
         time: dados[e.index].time,
         position: e.dir === 'CALL' ? 'belowBar' : 'aboveBar',
-        color: e.dir === 'CALL' ? '#26a69a' : '#ef5350',
+        color: e.dir === 'CALL' ? 'rgba(38,166,154,0.9)' : 'rgba(239,83,80,0.9)',
         shape: e.dir === 'CALL' ? 'arrowUp' : 'arrowDown',
-        text: i >= comTexto ? `${e.dir} ${e.score}/${e.enabled}` : undefined
+        size: 1,
+        text: i === rec.length - 1 ? `${e.dir} ${e.score}/${e.enabled}` : undefined
     }));
     // Zonas S/R ligadas (bloco 28): rótulos HH/HL/LH/LL nos pivôs + reposiciona as faixas
     try {
