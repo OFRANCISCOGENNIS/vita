@@ -10,6 +10,11 @@ exigem GPU e modelos gigantes:
 - Gerar vídeo por IA (texto → vídeo)
 - (espaço para: super-resolução pesada, expansão/remix por IA…)
 
+> 💡 **Prefere rodar o modelo você mesmo, sem provedor pago?** Use o wrapper do
+> [Wan2.2](https://github.com/Wan-Video/Wan2.2) em [`wan22/`](./wan22/) — roda o
+> modelo aberto da Alibaba na sua própria GPU (TI2V-5B cabe numa RTX 4090) e o
+> frontend consome as duas variantes pela mesma tela **Gerar vídeo (IA)**.
+
 > ⚠️ **Ninguém hospeda isso por você.** Você sobe num provedor de sua escolha e
 > paga a inferência. Sem uma chave configurada, os endpoints de IA respondem
 > `501` (não configurado) e o app continua funcionando normalmente sem eles.

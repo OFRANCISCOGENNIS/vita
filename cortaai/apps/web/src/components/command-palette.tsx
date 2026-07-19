@@ -22,6 +22,7 @@ import {
   Settings,
   ShieldCheck,
   SunMoon,
+  Wand2,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -96,6 +97,7 @@ export function CommandPalette({ isEditor = false }: { isEditor?: boolean }) {
       nav("/app", "Painel", "Ir para o painel", LayoutDashboard, "dashboard inicio home"),
       nav("/app/novo", "Novo vídeo", "Enviar um vídeo para editar", PlusCircle, "criar upload novo projeto"),
       nav("/app/fotos", "Editor de Fotos", "Editar e retocar imagens", ImagePlus, "fotos imagem retoque"),
+      nav("/app/gerar", "Gerar vídeo (IA)", "Texto ou imagem vira vídeo (Wan2.2, self-host)", Wand2, "gerar ia wan video texto"),
       nav("/app/capa", "Estúdio de Capa", "Desenhar capas e thumbnails", ImageIcon, "capa thumbnail"),
       nav("/app/projetos", "Projetos", "Seus projetos", FolderOpen, "obras"),
       nav("/app/exportacoes", "Exportações", "Renderizações e downloads", Download, "renders downloads"),

@@ -1,0 +1,4 @@
+# Dependências do WRAPPER (o Wan2.2 em si tem o próprio requirements.txt).
+fastapi>=0.111
+uvicorn>=0.30
+pydantic>=2

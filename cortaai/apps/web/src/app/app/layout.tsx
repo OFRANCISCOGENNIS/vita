@@ -19,6 +19,7 @@ import {
   PlusCircle,
   Settings,
   ShieldCheck,
+  Wand2,
   X,
 } from "lucide-react";
 import { Logo } from "@/components/logo";
@@ -37,6 +38,7 @@ const NAV = [
   { href: "/app/estudio", label: "Estúdio de vídeo", icon: Clapperboard },
   { href: "/app/capa", label: "Estúdio de Capa", icon: ImageIcon, tour: "capa" },
   { href: "/app/fotos", label: "Editor de Fotos", icon: ImagePlus },
+  { href: "/app/gerar", label: "Gerar vídeo (IA)", icon: Wand2 },
   { href: "/app/projetos", label: "Projetos", icon: FolderOpen },
   { href: "/app/exportacoes", label: "Exportações", icon: Download, tour: "exportacoes" },
   { href: "/app/biblioteca", label: "Biblioteca", icon: Library },
