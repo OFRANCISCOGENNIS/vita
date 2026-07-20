@@ -1185,7 +1185,9 @@ const macroBar=(name,g,kcalShare,total,color,src)=>`
   <div class="track"><div class="fill" style="width:${Math.round(kcalShare/total*100)}%;background:${color}"></div></div>
   <div class="src">${src}</div></div>`;
 
-let VIEW="today",WEEKSEL=(new Date().getDay()+6)%7,SWAP=null,WLOG=null;
+let VIEW="today",WEEKSEL=(new Date().getDay()+6)%7,SWAP=null,WLOG=null,CHECKIN_TEXT="";
+function dateStrAgo(n){const d=new Date();d.setDate(d.getDate()-n);return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");}
+function avgInWindow(arr,getD,getV,lo,hi){const vs=arr.filter(x=>{const d=getD(x);return d>=lo&&d<=hi;}).map(getV);return vs.length?vs.reduce((s,x)=>s+x,0)/vs.length:null;}
 let CALC={mode:"1rm",rmLoad:100,rmReps:5,rmTarget:8,hrRest:60,paceKm:5,paceMin:25,actType:"corrida_leve",actMin:30,cooper:2400};
 function render(){
   const p=P();
@@ -1682,6 +1684,31 @@ function render(){
     </div>
     <div class="src" style="margin-top:12px">Marque os hábitos do dia na aba Hábitos — a sequência conta com 3+ concluídos.</div></div>`;
 
+  // ---- CHECK-IN SEMANAL AUTOMÁTICO ----
+  const today0=todayKey(),d7=dateStrAgo(6),d8=dateStrAgo(7),d14=dateStrAgo(13);
+  const wiAll=(_pt&&_pt.weighins)||[];
+  const wThis=avgInWindow(wiAll,x=>x.d,x=>x.kg,d7,today0);
+  const wPrev=avgInWindow(wiAll,x=>x.d,x=>x.kg,d14,d8);
+  const wDeltaWk=(wThis!=null&&wPrev!=null)?R(wThis-wPrev,2):null;
+  const flAll=(_pt&&_pt.foodlog)||{};
+  const adhWk=(()=>{const sc=[];Object.keys(flAll).forEach(d=>{if(d>=d7&&d<=today0){const items=(flAll[d]||[]).map(e=>({food:FOODS.find(f=>f.n===e.n),g:e.g})).filter(x=>x.food);if(items.length){const c=sumIntake(items);sc.push(adherenceScore({kcal:c.kcal,p:c.p},{kcal:m.kcal,p:m.protein}).ad);}}});return sc.length?Math.round(sc.reduce((a,x)=>a+x,0)/sc.length):null;})();
+  const wlogAll=(_pt&&_pt.wlog)||{};const sessDates=new Set();Object.values(wlogAll).forEach(a=>a.forEach(s=>{if(s.d>=d7&&s.d<=today0)sessDates.add(s.d);}));
+  const workoutsWk=sessDates.size;
+  CHECKIN_TEXT=`📋 Check-in semanal — ${_nm} (${dstr})\n`
+    +`Peso: ${wThis!=null?R(wThis,1)+" kg":"sem pesagem"}${wDeltaWk!=null?` (${wDeltaWk>0?"+":""}${wDeltaWk} kg vs semana anterior)`:""}\n`
+    +`Aderência (diário): ${adhWk!=null?adhWk+"%":"—"}\n`
+    +`Treinos registrados: ${workoutsWk}/${p.days}\n`
+    +`Sequência de hábitos: ${st2} dias\n`
+    +`Ação recomendada: ${adapt.act} — ${adapt.why}`;
+  const cardCheckin=`<div class="card span-12"><h3>Check-in da semana <span class="pill accent">${dstr}</span> <button class="minibtn" id="copyCheckin">⧉ Copiar resumo</button></h3><div class="cap">últimos 7 dias vs semana anterior · pronto para enviar ao paciente</div>
+    <div class="tiles" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr))">
+      <div class="tile"><div class="k">Peso médio</div><div class="v tnum">${wThis!=null?R(wThis,1):"—"}<small> kg</small></div><div class="meta" style="color:${wDeltaWk==null?"var(--muted)":(p.goal==="hypertrophy"?wDeltaWk>0:wDeltaWk<0)?"var(--good)":"var(--accent)"}">${wDeltaWk!=null?(wDeltaWk>0?"+":"")+wDeltaWk+" kg vs anterior":"1 semana p/ comparar"}</div></div>
+      <div class="tile"><div class="k">Aderência</div><div class="v tnum" style="color:${adhWk==null?"var(--muted)":adhWk>=75?"var(--good)":adhWk>=60?"var(--warn)":"var(--crit)"}">${adhWk!=null?adhWk+"%":"—"}</div><div class="meta">diário da semana</div></div>
+      <div class="tile"><div class="k">Treinos</div><div class="v tnum">${workoutsWk}<small>/${p.days}</small></div><div class="meta">registrados</div></div>
+      <div class="tile"><div class="k">Sequência</div><div class="v tnum">${st2}</div><div class="meta">dias de hábitos</div></div>
+    </div>
+    <div class="src" style="margin-top:12px">Ação recomendada: <b>${adapt.act}</b> — ${adapt.why}</div></div>`;
+
   // ---- EVOLUÇÃO CONSOLIDADA (timeline multi-métrica de dados reais) ----
   const evoPanel=(label,series,unit,dir)=>{
     if(series.length<2)return `<div class="evop"><div class="evohd"><span class="evol">${label}</span></div><div class="src" style="padding:16px 0;text-align:center">Registre 2+ pontos</div></div>`;
@@ -1738,7 +1765,7 @@ function render(){
     habits:{title:"Hábitos",sub:"Checklist diário e sequência por regras determinísticas sobre o que você registra.",html:cardHabits+cardStreak+cardCoach},
     pacientes:{title:"Pacientes",sub:"Visão do profissional: todos os pacientes, quem precisa de atenção primeiro.",html:cardRoster},
     agenda:{title:"Agenda do dia",sub:"Cronograma de refeições, hidratação e treino por horário — ajuste à sua rotina.",html:cardAgenda+cardAgendaSum},
-    evolucao:{title:"Evolução",sub:"Linha do tempo de todas as métricas — peso, gordura, cintura, força e aderência num só lugar.",html:cardEvolution},
+    evolucao:{title:"Evolução",sub:"Check-in semanal + linha do tempo de todas as métricas num só lugar.",html:cardCheckin+cardEvolution},
     metas:{title:"Metas & medidas",sub:"Alvos com previsão de data + circunferências e dobras com %gordura por Jackson-Pollock.",html:cardGoals+cardGoalsHelp+cardMeasures+cardMeasEvo},
     fotos:{title:"Fotos de evolução",sub:"Registro visual do progresso, comparação antes/depois. Tudo local — as imagens não saem do dispositivo.",html:cardPhotos+cardCompare},
     devices:{title:"Dispositivos",sub:"Importe passos, FC de repouso, sono e peso de wearables — alimenta hábitos, evolução e zonas de FC.",html:cardDevices+cardDevSummary},
@@ -1788,6 +1815,7 @@ $("#views").addEventListener("click",e=>{
   const rmm=e.target.closest("[data-rmmeas]");if(rmm){removeMeasure(+rmm.dataset.rmmeas);return;}
   if(e.target.closest("#labSnapshot")){saveLabSnapshot();return;}
   const opt=e.target.closest("[data-openpt]");if(opt){pSetActive(opt.dataset.openpt);loadProfile();VIEW="today";$("#nav").querySelectorAll("button").forEach(x=>x.classList.toggle("on",x.dataset.v==="today"));render();return;}
+  if(e.target.closest("#copyCheckin")){const txt=CHECKIN_TEXT;const done=()=>alert("Resumo copiado — cole no WhatsApp/e-mail do paciente.");if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(txt).then(done).catch(()=>alert(txt));}else alert(txt);return;}
   const cm=e.target.closest("[data-cmode]");if(cm){CALC.mode=cm.dataset.cmode;render();return;}
   const sw=e.target.closest("[data-swap]");if(sw){SWAP=SWAP===sw.dataset.swap?null:sw.dataset.swap;render();return;}
 });
