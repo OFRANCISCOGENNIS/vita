@@ -382,6 +382,8 @@ h1.title{font-size:clamp(26px,3vw,34px);font-weight:800;letter-spacing:-.02em;ma
         <select class="themebtn" id="patientsel" aria-label="Paciente"></select>
         <button class="themebtn" id="addpatient" aria-label="Novo paciente">+ Paciente</button>
         <button class="themebtn" id="exportPdf" aria-label="Exportar prontuário">⭳ Prontuário</button>
+        <button class="themebtn" id="backupBtn" aria-label="Backup dos dados">⭳ Backup</button>
+        <label class="themebtn" aria-label="Restaurar backup" style="cursor:pointer">⭱ Restaurar<input type="file" accept=".json,application/json" id="restoreFile" style="display:none"></label>
         <button class="themebtn" id="theme" aria-label="Alternar tema"><span id="themeic">◐</span><span id="themetx">Tema</span></button>
         <div class="avatar" id="avatar">RA</div>
       </div>
@@ -951,6 +953,24 @@ function adaptationSuggestion(st){
 }
 function applyAdapt(delta,src){pUpdate(p=>{p.kcalAdjustPct=Math.max(-30,Math.min((p.kcalAdjustPct||0)+delta,20));p.adaptlog=p.adaptlog||[];p.adaptlog.push({d:todayKey(),delta,src});});render();}
 function resetAdapt(){pUpdate(p=>{p.kcalAdjustPct=0;});render();}
+/* backup / portabilidade (LGPD): exporta e importa todos os pacientes em JSON */
+function exportBackup(){
+  const data={app:"vita",v:1,exported:todayKey(),active:pActiveId(),patients:pAll()};
+  const a=document.createElement("a");a.href="data:application/json;charset=utf-8,"+encodeURIComponent(JSON.stringify(data,null,2));a.download="vita-backup-"+todayKey()+".json";a.click();
+}
+function importBackup(text){
+  let d;try{d=JSON.parse(text);}catch(e){alert("Arquivo inválido (não é JSON).");return;}
+  const incoming=Array.isArray(d)?d:(d.patients||[]);
+  if(!incoming.length){alert("Nenhum paciente encontrado no arquivo.");return;}
+  const byId={};pAll().forEach(x=>byId[x.id]=x);
+  let added=0,replaced=0;
+  for(const pp of incoming){if(!pp||!pp.id)continue;if(byId[pp.id])replaced++;else added++;byId[pp.id]=pp;}
+  const merged=Object.values(byId);
+  try{localStorage.setItem("vita.patients",JSON.stringify(merged));}catch(e){alert("Sem espaço no navegador para importar (backup grande, com fotos?). Remova pacientes antigos primeiro.");return;}
+  if(d.active&&byId[d.active])pSetActive(d.active);
+  loadProfile();render();
+  alert("Backup restaurado: "+added+" novo(s), "+replaced+" atualizado(s).");
+}
 
 /* --- coach por regras (Módulo 12): mensagens selecionadas por estado --- */
 const COACH=[
@@ -1420,6 +1440,8 @@ $("#views").addEventListener("click",e=>{
 $("#patientsel").addEventListener("change",e=>{pSetActive(e.target.value);loadProfile();render();});
 $("#addpatient").addEventListener("click",()=>{pAdd();loadProfile();render();});
 $("#exportPdf").addEventListener("click",()=>printMode("print-report"));
+$("#backupBtn").addEventListener("click",exportBackup);
+$("#restoreFile").addEventListener("change",e=>{const f=e.target.files&&e.target.files[0];if(!f)return;const fr=new FileReader();fr.onload=()=>importBackup(fr.result);fr.readAsText(f);e.target.value="";});
 function printMode(cls){document.body.classList.add(cls);window.print();setTimeout(()=>document.body.classList.remove(cls),400);}
 if(window.matchMedia)window.matchMedia("print").addEventListener&&window.matchMedia("print").addEventListener("change",ev=>{if(!ev.matches)document.body.classList.remove("print-shop","print-report");});
 // inputs/selects das calculadoras — 'change' (não 'input') p/ não perder foco no re-render
