@@ -8020,9 +8020,6 @@ End Sub
 '  GerarRelatorio para nao apagar as marcacoes ao reprocessar a base.
 '  Nao-destrutiva: se a aba ja existe, preserva o que foi preenchido.
 '==============================================================================
-Private gChkWs As Worksheet
-Private gChkLin As Long
-
 Public Sub GerarChecklistCKCP()
     Dim ws As Worksheet
     On Error Resume Next
@@ -8039,7 +8036,6 @@ Public Sub GerarChecklistCKCP()
     Set ws = ActiveWorkbook.Worksheets.Add( _
         After:=ActiveWorkbook.Worksheets(ActiveWorkbook.Worksheets.Count))
     ws.Name = "CHECKLIST CKCP"
-    Set gChkWs = ws
 
     Dim corHdr As Long, corBanda As Long
     corHdr = RGB(0, 105, 65): corBanda = RGB(0, 60, 38)
@@ -8078,36 +8074,36 @@ Public Sub GerarChecklistCKCP()
     ws.Rows(4).RowHeight = 24
 
     ' --- Linhas (uma chamada AddChk por etapa; evita limite de continuacao) ---
-    gChkLin = 4
-    AddChk "ANALISE CKCP", "DADOS CADASTRAIS", "ANALISE CKCP - Check Dados Cadastrais"
-    AddChk "ANALISE CKCP", "STATUS DESCASADO", "ANALISE CKCP - Check Status Descasados 3o Nivel"
-    AddChk "SAP", "1o CHECK DE COMPROMISSO DE SERVICO", "SAP - TRANSACAO CJI5 - Layout /DANILO"
-    AddChk "SAP", "CHECK DE MATERIAL ATRELADO", "SAP - TRANSACAO MBBS - Layout /ESTOQUE"
-    AddChk "CUSTO DE OBRAS", "GERAR INVENTARIO DE MATERIAL", "CUSTO DE OBRAS - MODULO FGM - INVENTARIO DE MATERIAL"
-    AddChk "SAP", "GERAR ANALISE DE CUSTO", "SAP - TRANSACAO CJI3 - Layout /BPR_RAW - ANALISE DE CUSTO"
-    AddChk "ANALISE DE CUSTO", "CLASSIFICAR OS CUSTOS", "ANALISE DE CUSTO - Classificar os custos da base"
-    AddChk "ANALISE DE CUSTO", "AJUSTES CONTABIL DE MATERIAL", "ANALISE DE CUSTO - MATERIAL > AJUSTE CONTABIL DE MATERIAL"
-    AddChk "ANALISE DE CUSTO", "ANALISE DE CUSTO ""RISCO""", "ANALISE DE CUSTO - RISCO - SAP - TRANSACAO CJI3 > AREA SOLUCIONADORA"
-    AddChk "ANALISE DE CUSTO", "CHECK DE VALOR DO SERVICO", "ANALISE DE CUSTO - SERVICO > VERIFICAR DISCREPANCIAS E VALORES NEGATIVOS"
-    AddChk "ANALISE DE CUSTO", "CHECK DE APROPRIACAO CORRETA DE SERVICO", "ANALISE DE CUSTO - SERVICO > IDENTIFICAR SE OS SERVICOS DE INSTALACAO ESTAO NA ODI E DE DESATIVACAO NA ODD"
-    AddChk "ANALISE DE CUSTO", "ANALISE ADERENCIA MAT X SERV", "ANALISE DE CUSTO - MATERIAL vs SERVICO > ORGANIZAR A PLANILHA PARA MELHOR ANALISE"
-    AddChk "ANALISE DE CUSTO", "CHECK DE ATIVACAO DIRETA", "ANALISE DE CUSTO - ANALISE DE CA > CUSTO APENAS NA ODI - SENDO 25% (+- 5%) - SENDO 8% NO IOP"
-    AddChk "ANALISE DE CUSTO", "CHECK DE FRETE", "ANALISE DE CUSTO - Verificar frete"
-    AddChk "ANALISE DE CUSTO", "CHECK DO PRECO UNITARIO DE MATERIAL", "ANALISE DE CUSTO - PRECO UNITARIO > PRIORIZAR UC/UAR"
-    AddChk "ANALISE DE CUSTO", "CHECK PEP SEM UC", "ANALISE DE CUSTO - ANALISE DE CA > REVISAR COLUNA MAT.UC"
-    AddChk "ANALISE DE CUSTO", "CHECK DE CUSTO DE SUPORTE", "ANALISE DE CUSTO - RAZAO CJ > VERIFICAR CUSTOS DE SUPORTE (VIAGEM, ALIMENTACAO E HOSPEDAGEM) (2026)"
-    AddChk "ANALISE DE CUSTO", "ZERAR MOP", "RETIRAR O MOP PARA REDISTRIBUICAO NAS OBRAS"
-    AddChk "ANALISE DE CUSTO", "INSERIR MOP", "TRANSFERIR DA ORDEM DE AJUSTE DE MOP CONFORME PORCENTAGEM ACERTADA * EXCETO ODS PLPT"
-    AddChk "CUSTO DE OBRAS", "CHECK OBRAS DEVOLVIDAS PELO CADASTRO", "DEVOLVER AS OBRAS NAO CADASTRADAS"
-    AddChk "SAP", "CONFIRMAR DIAGRAMA", "SAP - TRANSACAO CN53N - LSMW - Confirmar diagrama"
-    AddChk "SAP", "2o CHECK DE COMPROMISSO DE SERVICO", "SAP - TRANSACAO CJI5 - Layout /DANILO"
-    AddChk "SAP", "COLOCAR PEP APROVADO NA EXCECAO", "SAP - TRANSACAO ZCHECK00 - ZCHECK11 - PRIMEIRO NIVEL DO PEP"
-    AddChk "SAP", "ALTERACAO DE STATUS", "SAP - LSMW > PS_CJ20N - ENTE_ENTE_2 - PS_STAT - ENTECKCP"
-    AddChk "SAP", "CHECK FINAL DOS STATUS", "SAP - TRANSACAO CN43N - Layout /PEPS"
-    AddChk "CAPITALIZACAO", "ENVIAR EMAIL PARA ATIVOS IMOB.", "CAPITALIZACAO - CARREGAR INFORMACOES"
-    AddChk "SIS.CONFORMIDADE", "CARGA DA BASE NO SIS.CONFORMIDADE", "ANALISE CKCP > CARREGAR BASE DE ANALISE NO SIS"
+    Dim linha As Long: linha = 4
+    AddChk ws, linha, "ANALISE CKCP", "DADOS CADASTRAIS", "ANALISE CKCP - Check Dados Cadastrais"
+    AddChk ws, linha, "ANALISE CKCP", "STATUS DESCASADO", "ANALISE CKCP - Check Status Descasados 3o Nivel"
+    AddChk ws, linha, "SAP", "1o CHECK DE COMPROMISSO DE SERVICO", "SAP - TRANSACAO CJI5 - Layout /DANILO"
+    AddChk ws, linha, "SAP", "CHECK DE MATERIAL ATRELADO", "SAP - TRANSACAO MBBS - Layout /ESTOQUE"
+    AddChk ws, linha, "CUSTO DE OBRAS", "GERAR INVENTARIO DE MATERIAL", "CUSTO DE OBRAS - MODULO FGM - INVENTARIO DE MATERIAL"
+    AddChk ws, linha, "SAP", "GERAR ANALISE DE CUSTO", "SAP - TRANSACAO CJI3 - Layout /BPR_RAW - ANALISE DE CUSTO"
+    AddChk ws, linha, "ANALISE DE CUSTO", "CLASSIFICAR OS CUSTOS", "ANALISE DE CUSTO - Classificar os custos da base"
+    AddChk ws, linha, "ANALISE DE CUSTO", "AJUSTES CONTABIL DE MATERIAL", "ANALISE DE CUSTO - MATERIAL > AJUSTE CONTABIL DE MATERIAL"
+    AddChk ws, linha, "ANALISE DE CUSTO", "ANALISE DE CUSTO ""RISCO""", "ANALISE DE CUSTO - RISCO - SAP - TRANSACAO CJI3 > AREA SOLUCIONADORA"
+    AddChk ws, linha, "ANALISE DE CUSTO", "CHECK DE VALOR DO SERVICO", "ANALISE DE CUSTO - SERVICO > VERIFICAR DISCREPANCIAS E VALORES NEGATIVOS"
+    AddChk ws, linha, "ANALISE DE CUSTO", "CHECK DE APROPRIACAO CORRETA DE SERVICO", "ANALISE DE CUSTO - SERVICO > IDENTIFICAR SE OS SERVICOS DE INSTALACAO ESTAO NA ODI E DE DESATIVACAO NA ODD"
+    AddChk ws, linha, "ANALISE DE CUSTO", "ANALISE ADERENCIA MAT X SERV", "ANALISE DE CUSTO - MATERIAL vs SERVICO > ORGANIZAR A PLANILHA PARA MELHOR ANALISE"
+    AddChk ws, linha, "ANALISE DE CUSTO", "CHECK DE ATIVACAO DIRETA", "ANALISE DE CUSTO - ANALISE DE CA > CUSTO APENAS NA ODI - SENDO 25% (+- 5%) - SENDO 8% NO IOP"
+    AddChk ws, linha, "ANALISE DE CUSTO", "CHECK DE FRETE", "ANALISE DE CUSTO - Verificar frete"
+    AddChk ws, linha, "ANALISE DE CUSTO", "CHECK DO PRECO UNITARIO DE MATERIAL", "ANALISE DE CUSTO - PRECO UNITARIO > PRIORIZAR UC/UAR"
+    AddChk ws, linha, "ANALISE DE CUSTO", "CHECK PEP SEM UC", "ANALISE DE CUSTO - ANALISE DE CA > REVISAR COLUNA MAT.UC"
+    AddChk ws, linha, "ANALISE DE CUSTO", "CHECK DE CUSTO DE SUPORTE", "ANALISE DE CUSTO - RAZAO CJ > VERIFICAR CUSTOS DE SUPORTE (VIAGEM, ALIMENTACAO E HOSPEDAGEM) (2026)"
+    AddChk ws, linha, "ANALISE DE CUSTO", "ZERAR MOP", "RETIRAR O MOP PARA REDISTRIBUICAO NAS OBRAS"
+    AddChk ws, linha, "ANALISE DE CUSTO", "INSERIR MOP", "TRANSFERIR DA ORDEM DE AJUSTE DE MOP CONFORME PORCENTAGEM ACERTADA * EXCETO ODS PLPT"
+    AddChk ws, linha, "CUSTO DE OBRAS", "CHECK OBRAS DEVOLVIDAS PELO CADASTRO", "DEVOLVER AS OBRAS NAO CADASTRADAS"
+    AddChk ws, linha, "SAP", "CONFIRMAR DIAGRAMA", "SAP - TRANSACAO CN53N - LSMW - Confirmar diagrama"
+    AddChk ws, linha, "SAP", "2o CHECK DE COMPROMISSO DE SERVICO", "SAP - TRANSACAO CJI5 - Layout /DANILO"
+    AddChk ws, linha, "SAP", "COLOCAR PEP APROVADO NA EXCECAO", "SAP - TRANSACAO ZCHECK00 - ZCHECK11 - PRIMEIRO NIVEL DO PEP"
+    AddChk ws, linha, "SAP", "ALTERACAO DE STATUS", "SAP - LSMW > PS_CJ20N - ENTE_ENTE_2 - PS_STAT - ENTECKCP"
+    AddChk ws, linha, "SAP", "CHECK FINAL DOS STATUS", "SAP - TRANSACAO CN43N - Layout /PEPS"
+    AddChk ws, linha, "CAPITALIZACAO", "ENVIAR EMAIL PARA ATIVOS IMOB.", "CAPITALIZACAO - CARREGAR INFORMACOES"
+    AddChk ws, linha, "SIS.CONFORMIDADE", "CARGA DA BASE NO SIS.CONFORMIDADE", "ANALISE CKCP > CARREGAR BASE DE ANALISE NO SIS"
 
-    Dim ultLin As Long: ultLin = gChkLin
+    Dim ultLin As Long: ultLin = linha
     Dim nItens As Long: nItens = ultLin - 4
 
     ' % concluido
@@ -8159,22 +8155,22 @@ Public Sub GerarChecklistCKCP()
     ws.Range("A5").Select
     ActiveWindow.FreezePanes = True
 
-    Set gChkWs = Nothing
     MsgBox "Aba CHECKLIST CKCP criada com " & nItens & " etapas." & vbLf & _
            "Preencha CORTE ID e marque o STATUS de cada etapa (dropdown)." & vbLf & _
            "O % CONCLUIDO atualiza automaticamente.", vbInformation, "Checklist CKCP"
 End Sub
 
-' Escreve uma linha do checklist (usa gChkWs/gChkLin do GerarChecklistCKCP).
-Private Sub AddChk(ByVal categoria As String, ByVal etapa As String, ByVal orientacao As String)
-    gChkLin = gChkLin + 1
-    Dim n As Long: n = gChkLin - 4
-    gChkWs.Cells(gChkLin, 1).Value = n
-    gChkWs.Cells(gChkLin, 2).Value = categoria
-    gChkWs.Cells(gChkLin, 3).Value = etapa
-    gChkWs.Cells(gChkLin, 4).Value = orientacao
-    gChkWs.Cells(gChkLin, 3).Font.Bold = True
-    gChkWs.Cells(gChkLin, 7).NumberFormat = "dd/mm/yyyy"
+' Escreve uma linha do checklist. lin (ByRef) e incrementado a cada chamada.
+Private Sub AddChk(ws As Worksheet, ByRef lin As Long, _
+                   ByVal categoria As String, ByVal etapa As String, ByVal orientacao As String)
+    lin = lin + 1
+    Dim n As Long: n = lin - 4
+    ws.Cells(lin, 1).Value = n
+    ws.Cells(lin, 2).Value = categoria
+    ws.Cells(lin, 3).Value = etapa
+    ws.Cells(lin, 4).Value = orientacao
+    ws.Cells(lin, 3).Font.Bold = True
+    ws.Cells(lin, 7).NumberFormat = "dd/mm/yyyy"
     If (n Mod 2) = 0 Then _
-        gChkWs.Range(gChkWs.Cells(gChkLin, 1), gChkWs.Cells(gChkLin, 8)).Interior.Color = RGB(246, 249, 247)
+        ws.Range(ws.Cells(lin, 1), ws.Cells(lin, 8)).Interior.Color = RGB(246, 249, 247)
 End Sub
