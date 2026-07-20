@@ -124,6 +124,46 @@ function oneRepMaxEpley({ loadKg, reps }) {
   return { value: round(value, 1), formula: 'EPLEY_1RM', source: 'Epley 1985', confidence: reps <= 10 ? 'high' : 'low' };
 }
 
+function oneRepMaxBrzycki({ loadKg, reps }) {
+  if (reps < 1 || reps >= 37) throw new Error('reps entre 1 e 36');
+  const value = reps === 1 ? loadKg : loadKg * (36 / (37 - reps));
+  return { value: round(value, 1), formula: 'BRZYCKI_1RM', source: 'Brzycki 1993', confidence: reps <= 10 ? 'high' : 'low' };
+}
+
+// Percentuais de 1RM por repetições-alvo (tabela de treino padrão).
+function loadForReps({ oneRm, reps }) {
+  const pct = { 1: 1.0, 2: 0.97, 3: 0.94, 4: 0.92, 5: 0.89, 6: 0.86, 8: 0.81, 10: 0.75, 12: 0.71, 15: 0.65 };
+  const p = pct[reps] != null ? pct[reps] : Math.max(0.5, 1 - 0.0333 * (reps - 1)); // Epley invertido
+  return { value: round(oneRm * p, 1), pctOfMax: Math.round(p * 100), formula: '1RM×%', source: 'Tabela de intensidade (ACSM)', confidence: reps <= 12 ? 'high' : 'low' };
+}
+
+// Pace de corrida: min/km a partir de distância (km) e tempo (min).
+function pacePerKm({ distanceKm, totalMinutes }) {
+  if (distanceKm <= 0) throw new Error('distanceKm > 0');
+  const minPerKm = totalMinutes / distanceKm;
+  const mm = Math.floor(minPerKm);
+  const ss = Math.round((minPerKm - mm) * 60);
+  const [MM, SS] = ss === 60 ? [mm + 1, 0] : [mm, ss];
+  return { value: round(minPerKm, 3), label: `${MM}:${String(SS).padStart(2, '0')}/km`, speedKmh: round(60 / minPerKm, 1), formula: 'PACE', source: 'aritmética', confidence: 'high' };
+}
+
+// Gasto calórico por atividade via MET (1 MET = 1 kcal/kg/h — Compêndio de Ainsworth).
+const MET = {
+  caminhada: 3.5, corrida_leve: 8.3, corrida_forte: 11.0, ciclismo: 8.0,
+  natacao: 7.0, musculacao: 5.0, hiit: 8.5, funcional: 6.0, yoga: 2.5, futebol: 7.0,
+};
+function activityKcal({ activity, weightKg, minutes }) {
+  const met = MET[activity];
+  if (met == null) throw new Error(`atividade inválida: ${activity}`);
+  return { value: Math.round(met * weightKg * (minutes / 60)), met, formula: 'MET_KCAL', source: 'Ainsworth Compendium 2011', confidence: 'medium' };
+}
+
+// VO2máx estimado pelo teste de Cooper (distância em metros em 12 min).
+function vo2maxCooper({ distanceM }) {
+  const value = (distanceM - 504.9) / 44.73;
+  return { value: round(value, 1), formula: 'VO2MAX_COOPER', source: 'Cooper 1968', confidence: 'medium', errorMargin: '±10%' };
+}
+
 function hrMaxTanaka({ age }) {
   return { value: Math.round(208 - 0.7 * age), formula: 'TANAKA_HRMAX', source: 'Tanaka 2001', confidence: 'medium', errorMargin: '±7-10 bpm' };
 }
@@ -156,6 +196,8 @@ function ffmi({ weightKg, heightCm, bodyFatPct }) {
 module.exports = {
   bmr, bmrMifflinStJeor, bmrKatchMcArdle, bmrHarrisBenedict,
   tdee, targetKcal, macros, waterMl,
-  bodyFatUsNavy, oneRepMaxEpley, hrMaxTanaka, hrZonesKarvonen, bmi, ffmi,
-  ACTIVITY_FACTORS,
+  bodyFatUsNavy, oneRepMaxEpley, oneRepMaxBrzycki, loadForReps,
+  pacePerKm, activityKcal, vo2maxCooper,
+  hrMaxTanaka, hrZonesKarvonen, bmi, ffmi,
+  ACTIVITY_FACTORS, MET,
 };

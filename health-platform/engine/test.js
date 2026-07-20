@@ -79,9 +79,42 @@ test('Zonas Karvonen coerentes (z1<z5, dentro de FCrep..FCmáx)', () => {
 test('água diária 80kg + 60min treino = 3550 ml', () => {
   assert.strictEqual(F.waterMl({ weightKg: 80, trainingMinPerDay: 60 }).value, 35 * 80 + 750);
 });
+test('Brzycki 1RM: 100kg × 10 = 133,3 kg; 1 rep = a própria carga', () => {
+  assert.strictEqual(F.oneRepMaxBrzycki({ loadKg: 100, reps: 10 }).value, 133.3);
+  assert.strictEqual(F.oneRepMaxBrzycki({ loadKg: 120, reps: 1 }).value, 120);
+});
+test('Brzycki rejeita reps fora de 1..36', () => {
+  assert.throws(() => F.oneRepMaxBrzycki({ loadKg: 100, reps: 40 }));
+});
+test('carga para reps: 5 reps ≈ 89% do 1RM', () => {
+  const r = F.loadForReps({ oneRm: 100, reps: 5 });
+  assert.strictEqual(r.pctOfMax, 89);
+  assert.strictEqual(r.value, 89);
+});
+test('pace: 10 km em 50 min = 5:00/km e 12 km/h', () => {
+  const r = F.pacePerKm({ distanceKm: 10, totalMinutes: 50 });
+  assert.strictEqual(r.label, '5:00/km');
+  assert.strictEqual(r.speedKmh, 12);
+});
+test('pace arredonda segundos sem estourar (7,5 km em 40 min ≈ 5:20/km)', () => {
+  assert.strictEqual(F.pacePerKm({ distanceKm: 7.5, totalMinutes: 40 }).label, '5:20/km');
+});
+test('gasto por atividade (MET): corrida leve 30min a 80kg = 332 kcal', () => {
+  const r = F.activityKcal({ activity: 'corrida_leve', weightKg: 80, minutes: 30 });
+  assert.strictEqual(r.value, Math.round(8.3 * 80 * 0.5));
+  assert.strictEqual(r.met, 8.3);
+});
+test('atividade inválida lança erro', () => {
+  assert.throws(() => F.activityKcal({ activity: 'teletransporte', weightKg: 80, minutes: 30 }));
+});
+test('VO2máx Cooper: 2400 m em 12 min ≈ 42,4 ml/kg/min', () => {
+  assert.strictEqual(F.vo2maxCooper({ distanceM: 2400 }).value, 42.4);
+});
 test('formulas: determinismo', () => {
   deterministic(() => F.macros(maleProfile));
   deterministic(() => F.hrZonesKarvonen({ age: 41, hrRest: 55 }));
+  deterministic(() => F.pacePerKm({ distanceKm: 21.1, totalMinutes: 105 }));
+  deterministic(() => F.activityKcal({ activity: 'ciclismo', weightKg: 72, minutes: 45 }));
 });
 
 // ---------------------------------------------------------------------------
