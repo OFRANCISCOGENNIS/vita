@@ -11,6 +11,7 @@ const D = require('./dietGenerator');
 const W = require('./workoutGenerator');
 const A = require('./adaptation');
 const C = require('./coach');
+const NA = require('./nutritionAnalysis');
 
 let passed = 0;
 function test(name, fn) {
@@ -448,6 +449,59 @@ test('estado vazio não quebra e não inventa mensagem falsa', () => {
 });
 test('coach: determinismo', () => {
   deterministic(() => C.selectCoachMessages({ waterPctToday: 40, streakDays: 7, proteinGapPct: 20 }));
+});
+
+// ---------------------------------------------------------------------------
+console.log('nutritionAnalysis.js');
+// ---------------------------------------------------------------------------
+const F_CHICKEN = { name: 'Frango', category: 'meats', protein_g: 32, carb_g: 0, pdcaas: 0.92, glycemic_index: null, tags: ['animal'], micros: { potassium_mg: 256, magnesium_mg: 29, iron_mg: 1, zinc_mg: 1.8, calcium_mg: 12, vitc_mg: 0, vita_mcg: 16, omega3_g: 0.03, sodium_mg: 82 } };
+const F_RICE = { name: 'Arroz', category: 'cereals', protein_g: 2.6, carb_g: 25.8, pdcaas: 0.5, glycemic_index: 50, tags: ['vegan'], micros: { potassium_mg: 42, magnesium_mg: 43, iron_mg: 0.3, zinc_mg: 0.7, calcium_mg: 5, vitc_mg: 0, vita_mcg: 0, omega3_g: 0.01, sodium_mg: 1 } };
+const F_BEANS = { name: 'Feijão', category: 'legumes', protein_g: 4.8, carb_g: 13.6, pdcaas: 0.68, glycemic_index: 30, tags: ['vegan'], micros: { potassium_mg: 355, magnesium_mg: 42, iron_mg: 1.3, zinc_mg: 0.7, calcium_mg: 27, vitc_mg: 0, vita_mcg: 0, omega3_g: 0.1, sodium_mg: 2 } };
+
+test('micros: soma proporcional às gramas e compara à meta por sexo', () => {
+  const micros = NA.analyzeMicros([{ food: F_BEANS, grams: 200 }], 'F');
+  const k = micros.find((x) => x.key === 'potassium_mg');
+  assert.strictEqual(k.amount, 710); // 355×2
+  assert.strictEqual(k.target, 2600); // F
+  assert.strictEqual(k.status, 'low');
+});
+test('micros: sódio é teto (>100% vira "over")', () => {
+  const salty = { name: 'x', micros: { sodium_mg: 3000 } };
+  const s = NA.analyzeMicros([{ food: salty, grams: 100 }], 'M').find((x) => x.key === 'sodium_mg');
+  assert.strictEqual(s.kind, 'ceiling');
+  assert.strictEqual(s.status, 'over');
+});
+test('qualidade proteica: arroz+feijão sem animal → complementados, +0,1', () => {
+  const q = NA.proteinQuality([{ food: F_RICE, grams: 200 }, { food: F_BEANS, grams: 200 }]);
+  assert.strictEqual(q.complemented, true);
+  // média ponderada (0.5×5.2 + 0.68×9.6)/14.8 = 0.617 → +0.1 = 0.72
+  assert.ok(q.score > 0.7 && q.score <= 0.8);
+});
+test('qualidade proteica: cereal isolado → limitante = lisina', () => {
+  const q = NA.proteinQuality([{ food: F_RICE, grams: 200 }]);
+  assert.strictEqual(q.complemented, false);
+  assert.strictEqual(q.limiting, 'lisina');
+});
+test('qualidade proteica: frango eleva score e zera limitante', () => {
+  const q = NA.proteinQuality([{ food: F_CHICKEN, grams: 200 }]);
+  assert.strictEqual(q.limiting, null);
+  assert.ok(q.score >= 0.9);
+});
+test('distribuição proteica: alvo 0,4 g/kg e leucina ≥2,5 g', () => {
+  const d = NA.proteinDistribution([{ slot: 'almoço', proteinG: 40 }, { slot: 'lanche', proteinG: 10 }], 80);
+  assert.strictEqual(d.perMealTargetG, 32); // 0,4×80
+  assert.strictEqual(d.rows[0].adequate, true);  // 40≥32 e leucina 3,4≥2,5
+  assert.strictEqual(d.rows[1].adequate, false); // 10<32
+  assert.strictEqual(d.nAdequate, 1);
+});
+test('carga glicêmica: soma IG×carbo/100 e classifica', () => {
+  const gl = NA.glycemicLoad([{ food: F_RICE, grams: 200 }]); // IG50, carbo 51,6 → GL 25,8→26
+  assert.strictEqual(gl.glDay, 26);
+  assert.strictEqual(gl.status, 'low');
+});
+test('nutritionAnalysis: determinismo', () => {
+  deterministic(() => NA.analyzeMicros([{ food: F_BEANS, grams: 150 }, { food: F_RICE, grams: 100 }], 'M'));
+  deterministic(() => NA.proteinQuality([{ food: F_RICE, grams: 200 }, { food: F_BEANS, grams: 200 }]));
 });
 
 // ---------------------------------------------------------------------------

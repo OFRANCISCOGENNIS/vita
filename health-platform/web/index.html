@@ -313,6 +313,7 @@ h1.title{font-size:clamp(26px,3vw,34px);font-weight:800;letter-spacing:-.02em;ma
       <button data-v="nutri" aria-label="Nutrição"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg><span class="railtip">Nutrição</span></button>
       <button data-v="week" aria-label="Semana"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4M7 13h3M14 13h3M7 17h3"/></svg><span class="railtip">Semana</span></button>
       <button data-v="train" aria-label="Treino"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M6.5 6.5l11 11M4 8l-2 2 3 3M20 16l2-2-3-3M8 4l-2 2M16 20l2-2"/></svg><span class="railtip">Treino</span></button>
+      <button data-v="analise" aria-label="Análise"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 3v18h18"/><path d="M7 15l3-4 3 2 4-6"/></svg><span class="railtip">Análise</span></button>
       <button data-v="calc" aria-label="Calculadoras"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M8 6h8M8 10h2M8 14h2M8 18h2M14 10h2v8h-2z"/></svg><span class="railtip">Calculadoras</span></button>
       <button data-v="labs" aria-label="Exames"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M10 2v7.5L4.5 19a2 2 0 0 0 1.7 3h11.6a2 2 0 0 0 1.7-3L14 9.5V2"/><path d="M8 2h8M7 15h10"/></svg><span class="railtip">Exames</span></button>
       <button data-v="habits" aria-label="Hábitos"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3c1 3-2 4-2 7a4 4 0 0 0 8 0c0-1-.5-2-1-3 0 0 3 2 3 6a8 8 0 0 1-16 0c0-5 5-7 8-10z"/></svg><span class="railtip">Hábitos</span></button>
@@ -328,6 +329,8 @@ h1.title{font-size:clamp(26px,3vw,34px);font-weight:800;letter-spacing:-.02em;ma
         <div class="sub" id="viewsub">Tudo abaixo é calculado por fórmula nomeada — mesmo input, mesmo output.</div>
       </div>
       <div class="toprt">
+        <select class="themebtn" id="patientsel" aria-label="Paciente"></select>
+        <button class="themebtn" id="addpatient" aria-label="Novo paciente">+ Paciente</button>
         <button class="themebtn" id="theme" aria-label="Alternar tema"><span id="themeic">◐</span><span id="themetx">Tema</span></button>
         <div class="avatar" id="avatar">RA</div>
       </div>
@@ -336,6 +339,7 @@ h1.title{font-size:clamp(26px,3vw,34px);font-weight:800;letter-spacing:-.02em;ma
     <div id="guardslot"></div>
 
     <section class="profile" aria-label="Seu perfil">
+      <div class="field wide"><label>Nome do paciente</label><input id="pname" type="text" value="Paciente 1" maxlength="40"></div>
       <div class="field"><label>Sexo</label>
         <div class="seg" id="sexseg"><button data-sex="M" class="on">M</button><button data-sex="F">F</button></div>
       </div>
@@ -454,6 +458,46 @@ function findSubs(food,pool,limit=3){
     .map(({f,s})=>({n:f.n,g:Math.round(food.kcal/Math.max(f.kcal,1)*100),sim:Math.round((1-Math.min(s,1))*1000)/1000}));
 }
 
+/* --- análise nutricional de precisão (micros vs DRI, PDCAAS, carga glicêmica) --- */
+const MTG={k:{M:3400,F:2600,l:"Potássio",u:"mg"},mg:{M:400,F:310,l:"Magnésio",u:"mg"},fe:{M:8,F:18,l:"Ferro",u:"mg"},zn:{M:11,F:8,l:"Zinco",u:"mg"},ca:{M:1000,F:1000,l:"Cálcio",u:"mg"},vc:{M:90,F:75,l:"Vitamina C",u:"mg"},va:{M:900,F:700,l:"Vitamina A",u:"µg"},o3:{M:1.6,F:1.1,l:"Ômega-3",u:"g"},na:{M:2300,F:2300,l:"Sódio",u:"mg",ceil:1}};
+function analyzeMicros(items,sex){
+  const tot={};Object.keys(MTG).forEach(k=>tot[k]=0);
+  for(const{food,g}of items){const mi=food.mi||{};Object.keys(MTG).forEach(k=>tot[k]+=(mi[k]||0)*g/100);}
+  return Object.keys(MTG).map(k=>{const t=MTG[k],target=t[sex]!=null?t[sex]:t.M,amount=Math.round(tot[k]*10)/10,pct=Math.round(amount/target*100);
+    let st;if(t.ceil)st=pct>100?"over":"ok";else if(pct<70)st="low";else if(pct<=140)st="ok";else st="high";
+    return{k,l:t.l,u:t.u,amount,target,pct,ceil:!!t.ceil,st};});
+}
+function proteinQuality(items){
+  let pt=0,w=0,leg=false,cer=false,ani=false;
+  for(const{food,g}of items){const p=food.p*g/100;if(p<=0)continue;pt+=p;w+=(food.pd!=null?food.pd:.7)*p;
+    if(food.c==="legumes")leg=true;if(food.c==="cereals"||food.c==="tubers")cer=true;if(["meats","fish","eggs","dairy"].includes(food.c))ani=true;}
+  if(pt===0)return{score:0,pt:0,comp:false,lim:null};
+  let s=w/pt;const comp=!ani&&leg&&cer;if(comp)s=Math.min(1,s+.1);
+  const lim=ani?null:(leg&&!cer?"metionina":(!leg&&cer?"lisina":null));
+  return{score:Math.round(s*100)/100,pt:Math.round(pt),comp,lim};
+}
+function glycemicLoad(items){let gl=0,ct=0;for(const{food,g}of items){const carb=food.ch*g/100;ct+=carb;if(food.gi!=null)gl+=food.gi*carb/100;}gl=Math.round(gl);return{gl,ct:Math.round(ct),st:gl<=80?"low":gl<=120?"medium":"high"};}
+function proteinDist(meals,kg){const target=Math.round(.4*kg);const rows=meals.map(m=>{const p=Math.round(m.p||0),leu=Math.round(.085*p*10)/10;return{s:m.s,p,leu,target,ad:p>=target&&leu>=2.5,pct:Math.round(p/target*100)};});return{target,rows,nAd:rows.filter(r=>r.ad).length,n:rows.length};}
+
+/* --- prontuário: múltiplos pacientes com histórico próprio --- */
+function pAll(){try{return JSON.parse(localStorage.getItem("vita.patients")||"[]");}catch(e){return[];}}
+function pSave(a){try{localStorage.setItem("vita.patients",JSON.stringify(a));}catch(e){}}
+function pActiveId(){return localStorage.getItem("vita.active")||"";}
+function pSetActive(id){try{localStorage.setItem("vita.active",id);}catch(e){}}
+function pActive(){const a=pAll();return a.find(x=>x.id===pActiveId())||a[0]||null;}
+function pUpdate(fn){const a=pAll(),i=a.findIndex(x=>x.id===(pActiveId()||(a[0]&&a[0].id)));if(i<0)return;fn(a[i]);pSave(a);}
+function pNewId(){return "p"+(pAll().reduce((m,x)=>Math.max(m,+(String(x.id||"p0").slice(1))||0),0)+1);}
+function pAdd(name){const a=pAll(),id=pNewId();a.push({id,name:name||("Paciente "+(a.length+1)),profile:{},labs:{},weighins:[],habits:{}});pSave(a);pSetActive(id);}
+function pEnsure(){
+  let a=pAll();
+  if(!a.length){
+    let oldP=null,oldH={};try{oldP=JSON.parse(localStorage.getItem("vita.profile")||"null");}catch(e){}try{oldH=JSON.parse(localStorage.getItem("vita.habits")||"{}");}catch(e){}
+    a=[{id:"p1",name:(oldP&&oldP.name)||"Paciente 1",profile:oldP||{},labs:(oldP&&oldP.labs)||{},weighins:[],habits:oldH||{}}];
+    pSave(a);pSetActive("p1");
+  }
+  if(!pActiveId())pSetActive(a[0].id);
+}
+
 /* --- guardrails --- */
 function guardrails(p){
   const f=[];
@@ -464,32 +508,33 @@ function guardrails(p){
 }
 
 /* --- base de alimentos (SEED/TACO, por 100 g) --- */
+// gi=índice glicêmico; pd=PDCAAS; mi=micros/100g {k,mg,fe,zn,ca,vc,va,o3,na} (mg; va µg; o3 g)
 const FOODS=[
-  {n:"Frango grelhado",c:"meats",kcal:159,p:32,ch:0,f:2.5,t:["animal","gf","lf","keto"]},
-  {n:"Tilápia grelhada",c:"fish",kcal:96,p:20.1,ch:0,f:1.7,t:["animal","gf","lf","keto"]},
-  {n:"Patinho grelhado",c:"meats",kcal:219,p:35.9,ch:0,f:7.3,t:["animal","gf","lf","keto"]},
-  {n:"Ovo cozido",c:"eggs",kcal:146,p:13.3,ch:.6,f:9.5,t:["veg","gf","lf","keto"]},
-  {n:"Atum em água",c:"fish",kcal:118,p:26.2,ch:0,f:1,t:["animal","gf","lf","keto"]},
-  {n:"Queijo minas",c:"dairy",kcal:264,p:17.4,ch:3.2,f:20.2,t:["veg","gf","keto"]},
-  {n:"Iogurte natural",c:"dairy",kcal:51,p:4.1,ch:1.9,f:3,t:["veg","gf"]},
-  {n:"Tofu firme",c:"legumes",kcal:76,p:8.1,ch:1.9,f:4.8,t:["vegan","veg","gf","lf"]},
-  {n:"Proteína de soja (PTS)",c:"legumes",kcal:336,p:52,ch:30,f:1.2,t:["vegan","veg","gf","lf"]},
-  {n:"Seitan",c:"legumes",kcal:121,p:24,ch:4,f:1,t:["vegan","veg","lf"]},
-  {n:"Grão-de-bico cozido",c:"legumes",kcal:164,p:8.9,ch:27.4,f:2.6,t:["vegan","veg","gf"]},
-  {n:"Arroz integral",c:"cereals",kcal:124,p:2.6,ch:25.8,f:1,t:["vegan","veg","gf"]},
-  {n:"Feijão carioca",c:"legumes",kcal:76,p:4.8,ch:13.6,f:.5,t:["vegan","veg","gf"]},
-  {n:"Lentilha cozida",c:"legumes",kcal:93,p:6.3,ch:16.3,f:.5,t:["vegan","veg","gf"]},
-  {n:"Batata-doce",c:"tubers",kcal:77,p:.6,ch:18.4,f:.1,t:["vegan","veg","gf"]},
-  {n:"Mandioca cozida",c:"tubers",kcal:125,p:.6,ch:30.1,f:.3,t:["vegan","veg","gf"]},
-  {n:"Macarrão integral",c:"cereals",kcal:126,p:4.9,ch:25.9,f:.9,t:["vegan","veg"]},
-  {n:"Aveia em flocos",c:"cereals",kcal:394,p:13.9,ch:66.6,f:8.5,t:["vegan","veg"]},
-  {n:"Pão francês",c:"cereals",kcal:300,p:8,ch:58.6,f:3.1,t:["vegan","veg"]},
-  {n:"Banana prata",c:"fruits",kcal:98,p:1.3,ch:26,f:.1,t:["vegan","veg","gf"]},
-  {n:"Mamão papaia",c:"fruits",kcal:40,p:.5,ch:10.4,f:.1,t:["vegan","veg","gf"]},
-  {n:"Azeite extra virgem",c:"oils",kcal:884,p:0,ch:0,f:100,t:["vegan","veg","gf","keto"]},
-  {n:"Pasta de amendoim",c:"oils",kcal:589,p:22.5,ch:21.6,f:46.9,t:["vegan","veg","gf","keto"]},
-  {n:"Abacate",c:"fruits",kcal:96,p:1.2,ch:6,f:8.4,t:["vegan","veg","gf","keto"]},
-  {n:"Castanha-de-caju",c:"oils",kcal:570,p:18.5,ch:29.1,f:46.3,t:["vegan","veg","gf","keto"]},
+  {n:"Frango grelhado",c:"meats",kcal:159,p:32,ch:0,f:2.5,t:["animal","gf","lf","keto"],gi:null,pd:.92,mi:{k:256,mg:29,fe:1,zn:1.8,ca:12,vc:0,va:16,o3:.03,na:82}},
+  {n:"Tilápia grelhada",c:"fish",kcal:96,p:20.1,ch:0,f:1.7,t:["animal","gf","lf","keto"],gi:null,pd:.9,mi:{k:302,mg:27,fe:.6,zn:.4,ca:10,vc:0,va:0,o3:.2,na:56}},
+  {n:"Patinho grelhado",c:"meats",kcal:219,p:35.9,ch:0,f:7.3,t:["animal","gf","lf","keto"],gi:null,pd:.92,mi:{k:330,mg:24,fe:2.6,zn:5,ca:18,vc:0,va:0,o3:.02,na:55}},
+  {n:"Ovo cozido",c:"eggs",kcal:146,p:13.3,ch:.6,f:9.5,t:["veg","gf","lf","keto"],gi:null,pd:1,mi:{k:126,mg:10,fe:1.2,zn:1,ca:50,vc:0,va:149,o3:.03,na:124}},
+  {n:"Atum em água",c:"fish",kcal:118,p:26.2,ch:0,f:1,t:["animal","gf","lf","keto"],gi:null,pd:.9,mi:{k:237,mg:27,fe:1.3,zn:.7,ca:11,vc:0,va:16,o3:.28,na:247}},
+  {n:"Queijo minas",c:"dairy",kcal:264,p:17.4,ch:3.2,f:20.2,t:["veg","gf","keto"],gi:null,pd:1,mi:{k:93,mg:18,fe:.3,zn:2.8,ca:579,vc:0,va:160,o3:.2,na:31}},
+  {n:"Iogurte natural",c:"dairy",kcal:51,p:4.1,ch:1.9,f:3,t:["veg","gf"],gi:35,pd:1,mi:{k:155,mg:12,fe:.05,zn:.6,ca:143,vc:.5,va:27,o3:.01,na:47}},
+  {n:"Tofu firme",c:"legumes",kcal:76,p:8.1,ch:1.9,f:4.8,t:["vegan","veg","gf","lf"],gi:null,pd:.9,mi:{k:121,mg:58,fe:1.6,zn:.8,ca:350,vc:.1,va:0,o3:.6,na:7}},
+  {n:"Proteína de soja (PTS)",c:"legumes",kcal:336,p:52,ch:30,f:1.2,t:["vegan","veg","gf","lf"],gi:null,pd:.98,mi:{k:780,mg:290,fe:9,zn:4,ca:240,vc:0,va:0,o3:.4,na:20}},
+  {n:"Seitan",c:"legumes",kcal:121,p:24,ch:4,f:1,t:["vegan","veg","lf"],gi:null,pd:.25,mi:{k:100,mg:25,fe:5.2,zn:1,ca:40,vc:0,va:0,o3:0,na:29}},
+  {n:"Grão-de-bico cozido",c:"legumes",kcal:164,p:8.9,ch:27.4,f:2.6,t:["vegan","veg","gf"],gi:28,pd:.71,mi:{k:291,mg:48,fe:2.9,zn:1.5,ca:49,vc:1.3,va:1,o3:.1,na:7}},
+  {n:"Arroz integral",c:"cereals",kcal:124,p:2.6,ch:25.8,f:1,t:["vegan","veg","gf"],gi:50,pd:.5,mi:{k:42,mg:43,fe:.3,zn:.7,ca:5,vc:0,va:0,o3:.01,na:1}},
+  {n:"Feijão carioca",c:"legumes",kcal:76,p:4.8,ch:13.6,f:.5,t:["vegan","veg","gf"],gi:30,pd:.68,mi:{k:355,mg:42,fe:1.3,zn:.7,ca:27,vc:0,va:0,o3:.1,na:2}},
+  {n:"Lentilha cozida",c:"legumes",kcal:93,p:6.3,ch:16.3,f:.5,t:["vegan","veg","gf"],gi:29,pd:.52,mi:{k:369,mg:36,fe:3.3,zn:1.3,ca:19,vc:1.5,va:0,o3:.1,na:2}},
+  {n:"Batata-doce",c:"tubers",kcal:77,p:.6,ch:18.4,f:.1,t:["vegan","veg","gf"],gi:63,pd:0,mi:{k:337,mg:25,fe:.6,zn:.3,ca:30,vc:12.8,va:709,o3:.01,na:27}},
+  {n:"Mandioca cozida",c:"tubers",kcal:125,p:.6,ch:30.1,f:.3,t:["vegan","veg","gf"],gi:46,pd:0,mi:{k:271,mg:21,fe:.3,zn:.3,ca:16,vc:20,va:1,o3:0,na:14}},
+  {n:"Macarrão integral",c:"cereals",kcal:126,p:4.9,ch:25.9,f:.9,t:["vegan","veg"],gi:48,pd:.42,mi:{k:44,mg:30,fe:1.5,zn:1,ca:15,vc:0,va:0,o3:.03,na:3}},
+  {n:"Aveia em flocos",c:"cereals",kcal:394,p:13.9,ch:66.6,f:8.5,t:["vegan","veg"],gi:55,pd:.57,mi:{k:429,mg:177,fe:4.7,zn:4,ca:54,vc:0,va:0,o3:.1,na:5}},
+  {n:"Pão francês",c:"cereals",kcal:300,p:8,ch:58.6,f:3.1,t:["vegan","veg"],gi:75,pd:.42,mi:{k:120,mg:22,fe:1.6,zn:.7,ca:16,vc:0,va:0,o3:.02,na:580}},
+  {n:"Banana prata",c:"fruits",kcal:98,p:1.3,ch:26,f:.1,t:["vegan","veg","gf"],gi:52,pd:0,mi:{k:358,mg:27,fe:.3,zn:.2,ca:5,vc:8.7,va:3,o3:.03,na:0}},
+  {n:"Mamão papaia",c:"fruits",kcal:40,p:.5,ch:10.4,f:.1,t:["vegan","veg","gf"],gi:59,pd:0,mi:{k:182,mg:21,fe:.3,zn:.1,ca:20,vc:61,va:47,o3:0,na:8}},
+  {n:"Azeite extra virgem",c:"oils",kcal:884,p:0,ch:0,f:100,t:["vegan","veg","gf","keto"],gi:null,pd:0,mi:{k:1,mg:0,fe:.6,zn:0,ca:1,vc:0,va:0,o3:.76,na:2}},
+  {n:"Pasta de amendoim",c:"oils",kcal:589,p:22.5,ch:21.6,f:46.9,t:["vegan","veg","gf","keto"],gi:14,pd:.52,mi:{k:649,mg:168,fe:1.9,zn:2.9,ca:43,vc:0,va:0,o3:.03,na:17}},
+  {n:"Abacate",c:"fruits",kcal:96,p:1.2,ch:6,f:8.4,t:["vegan","veg","gf","keto"],gi:15,pd:0,mi:{k:485,mg:29,fe:.6,zn:.6,ca:12,vc:10,va:7,o3:.11,na:7}},
+  {n:"Castanha-de-caju",c:"oils",kcal:570,p:18.5,ch:29.1,f:46.3,t:["vegan","veg","gf","keto"],gi:25,pd:.5,mi:{k:660,mg:292,fe:6.7,zn:5.8,ca:37,vc:.5,va:0,o3:.06,na:12}},
 ];
 const MEALS=[{s:"Café da manhã",t:"07:00",pct:.25},{s:"Almoço",t:"12:00",pct:.35},{s:"Lanche",t:"16:00",pct:.15},{s:"Jantar",t:"20:00",pct:.25}];
 const WEEK_DAYS=["Segunda","Terça","Quarta","Quinta","Sexta","Sábado","Domingo"];
@@ -578,8 +623,8 @@ const HABITS=[
   {k:"protein",n:"Proteína na meta",ic:"🍳"},
 ];
 function todayKey(){const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");}
-function loadHab(){try{return JSON.parse(localStorage.getItem("vita.habits")||"{}");}catch(e){return{};}}
-function saveHab(h){try{localStorage.setItem("vita.habits",JSON.stringify(h));}catch(e){}}
+function loadHab(){const p=pActive();return(p&&p.habits)||{};}
+function saveHab(h){pUpdate(p=>{p.habits=h;});}
 // Streak: dias consecutivos (terminando hoje ou ontem) com ≥3 hábitos feitos.
 function streak(h){
   let s=0;const d=new Date();
@@ -643,25 +688,44 @@ function weightSeries(p){
 const $=s=>document.querySelector(s);
 function chipsOn(id){return [...document.querySelectorAll("#"+id+" button.on")].map(b=>b.dataset.v);}
 
-/* --- persistência do perfil + anamnese + exames (localStorage) --- */
+/* --- persistência por paciente (perfil + anamnese + exames) --- */
 function saveProfile(){
-  try{localStorage.setItem("vita.profile",JSON.stringify({
-    sex:document.querySelector("#sexseg .on").dataset.sex,
-    weight:$("#weight").value,height:$("#height").value,age:$("#age").value,bf:$("#bf").value,waist:$("#waist").value,
-    goal:$("#goal").value,activity:$("#activity").value,days:$("#days").value,strategy:$("#strategy").value,
-    allergies:chipsOn("allergies"),equipment:chipsOn("equipment"),injuries:chipsOn("injuries"),labs:LABVALS,
-  }));}catch(e){}
+  pUpdate(pt=>{
+    pt.name=$("#pname").value||pt.name;
+    pt.profile={
+      sex:document.querySelector("#sexseg .on").dataset.sex,
+      weight:$("#weight").value,height:$("#height").value,age:$("#age").value,bf:$("#bf").value,waist:$("#waist").value,
+      goal:$("#goal").value,activity:$("#activity").value,days:$("#days").value,strategy:$("#strategy").value,
+      allergies:chipsOn("allergies"),equipment:chipsOn("equipment"),injuries:chipsOn("injuries"),
+    };
+    pt.labs=LABVALS;
+  });
 }
 function loadProfile(){
-  let d;try{d=JSON.parse(localStorage.getItem("vita.profile")||"null");}catch(e){d=null;}
-  if(!d)return;
-  const set=(id,v)=>{if(v!=null&&$("#"+id))$("#"+id).value=v;};
+  const pt=pActive();if(!pt)return;
+  $("#pname").value=pt.name||"Paciente";
+  const d=pt.profile||{};
+  const set=(id,v)=>{if(v!=null&&v!==""&&$("#"+id))$("#"+id).value=v;};
   set("weight",d.weight);set("height",d.height);set("age",d.age);set("bf",d.bf);set("waist",d.waist);
   set("goal",d.goal);set("activity",d.activity);set("days",d.days);set("strategy",d.strategy);
-  if(d.sex)document.querySelectorAll("#sexseg button").forEach(b=>b.classList.toggle("on",b.dataset.sex===d.sex));
-  const applyChips=(id,vals)=>{if(!vals)return;document.querySelectorAll("#"+id+" button").forEach(b=>b.classList.toggle("on",vals.includes(b.dataset.v)));};
-  applyChips("allergies",d.allergies);applyChips("equipment",d.equipment);applyChips("injuries",d.injuries);
-  if(d.labs)LABVALS=d.labs;
+  document.querySelectorAll("#sexseg button").forEach(b=>b.classList.toggle("on",b.dataset.sex===(d.sex||"M")));
+  const applyChips=(id,vals,def)=>{const v=vals||def||[];document.querySelectorAll("#"+id+" button").forEach(b=>b.classList.toggle("on",v.includes(b.dataset.v)));};
+  applyChips("allergies",d.allergies,[]);
+  applyChips("equipment",d.equipment,["bodyweight","dumbbell","barbell","machine","cable"]);
+  applyChips("injuries",d.injuries,[]);
+  LABVALS=pt.labs||{};
+  // popula o seletor de pacientes no header
+  const sel=$("#patientsel");if(sel){sel.innerHTML=pAll().map(x=>`<option value="${x.id}" ${x.id===pActiveId()?"selected":""}>${x.name}</option>`).join("");}
+}
+// registra uma medição do dia no histórico do paciente (peso, %gord, cintura)
+function logMeasurement(){
+  const p=P();
+  pUpdate(pt=>{
+    pt.weighins=(pt.weighins||[]).filter(w=>w.d!==todayKey());
+    pt.weighins.push({d:todayKey(),kg:p.weightKg,bf:p.bf,waist:p.waist});
+    pt.weighins.sort((a,b)=>a.d.localeCompare(b.d));
+  });
+  render();
 }
 function P(){
   return{
@@ -720,7 +784,8 @@ function render(){
   const guards=guardrails(p);
   // hash de determinismo
   $("#hash").textContent="#"+Math.abs([p.sex,p.weightKg,p.heightCm,p.age,p.bf,p.goal,p.activity,p.days].join("|").split("").reduce((a,ch)=>(a*31+ch.charCodeAt(0))|0,7)).toString(16).slice(0,6);
-  $("#avatar").textContent=p.sex==="M"?"RA":"MA";
+  const _pt=pActive();const _nm=(_pt&&_pt.name)||"Paciente";
+  $("#avatar").textContent=_nm.trim().split(/\s+/).map(w=>w[0]).slice(0,2).join("").toUpperCase()||"P";
 
   // guardrail banners
   $("#guardslot").innerHTML=guards.map(g=>`
@@ -754,14 +819,17 @@ function render(){
     </div>
     <div class="src" style="margin-top:12px">RFM ${rfmV??"—"}% (Woolcott 2018) vs %informado ${p.bf}% · diferença ${rfmV?((rfmV-p.bf>0?"+":"")+R(rfmV-p.bf,1)):"—"} pp</div></div>`;
 
-  // trend
-  const ws=weightSeries(p),tr=trend(ws),cur=ws[ws.length-1].y,first=ws[0].y,perWk=R(tr.slope*7,2);
-  const plateau=p.goal==="fat_loss"&&Math.abs(tr.slope*14/tr.mean)*100<0.3;
+  // trend — usa medições reais do paciente se houver ≥2; senão série de demonstração
+  const realW=(_pt&&_pt.weighins)||[];
+  const usingReal=realW.length>=2;
+  const ws=usingReal?realW.map((w,i)=>({x:i,y:w.kg})):weightSeries(p);
+  const tr=trend(ws),cur=ws[ws.length-1].y,first=ws[0].y,perWk=R(tr.slope*7,2);
+  const plateau=p.goal==="fat_loss"&&Math.abs(tr.slope*14/tr.mean)*100<0.3&&ws.length>=8;
   const rapid=p.goal==="fat_loss"&&(-(tr.slope*7)/tr.mean*100)>1.5;
   const status=rapid?{c:"crit",t:"perda acelerada"}:plateau?{c:"warn",t:"platô detectado"}:{c:"good",t:"em tendência"};
-  const cardTrend=`<div class="card span-7"><h3>Evolução do peso <span class="pill ${status.c}">${status.t}</span></h3><div class="cap">regressão linear · 14 dias · tendência, não ruído</div>
+  const cardTrend=`<div class="card span-7"><h3>Evolução do peso <span class="pill ${status.c}">${status.t}</span> <button class="minibtn" id="logMeas">+ Registrar medição</button></h3><div class="cap">${usingReal?`${realW.length} medições reais · regressão linear`:"série de demonstração · registre medições para acompanhar de verdade"}</div>
     <div class="trendhead"><div class="now tnum">${cur}<small> kg</small></div>
-      <div style="text-align:right"><div class="mono tnum" style="font-size:20px;font-weight:800;color:${perWk<0?'var(--good)':perWk>0?'var(--accent)':'var(--muted)'}">${perWk>0?'+':''}${perWk} kg/sem</div><div class="src">Δ 14 d: ${(cur-first>0?'+':'')+R(cur-first,1)} kg</div></div></div>
+      <div style="text-align:right"><div class="mono tnum" style="font-size:20px;font-weight:800;color:${perWk<0?'var(--good)':perWk>0?'var(--accent)':'var(--muted)'}">${perWk>0?'+':''}${perWk} kg/sem</div><div class="src">Δ período: ${(cur-first>0?'+':'')+R(cur-first,1)} kg</div></div></div>
     ${sparkline(ws)}
     <div class="deltarow">
       <span>${rapid?'Freio automático: <b>+10% kcal</b> sugerido (Garthe 2011)':plateau?'Ação da regra: <b>−5% kcal</b> + 2000 passos/dia':'Nenhum ajuste necessário — <b>seguir plano</b>'}</span>
@@ -869,6 +937,28 @@ function render(){
     <div class="cores"><div class="k">Sua faixa Z2</div><div class="v tnum">${hz.z2.min}–${hz.z2.max}<small> bpm</small></div><div class="meta">Karvonen · manter conversável</div></div></div>
     <div class="src" style="margin-top:12px">Z2 aumenta densidade mitocondrial e oxidação de gordura — a base sobre a qual as zonas altas rendem. ${["performance","running","cycling"].includes(p.goal)?"Volume elevado pelo objetivo de endurance.":"150–200 min/sem cobrem saúde e longevidade."}</div></div>`;
 
+  // ---- ANÁLISE NUTRICIONAL DE PRECISÃO (micros vs DRI, PDCAAS, leucina, GL) ----
+  const dayItems=dietBlocked?[]:plan.flatMap(ms=>ms.items.map(it=>({food:FOODS.find(f=>f.n===it.n),g:it.g}))).filter(x=>x.food);
+  const micros=analyzeMicros(dayItems,p.sex);
+  const pq=proteinQuality(dayItems);
+  const gload=glycemicLoad(dayItems);
+  const pdist=proteinDist(plan,p.weightKg);
+  const MST={low:{p:"warn",t:"baixo"},ok:{p:"good",t:"ok"},high:{p:"accent",t:"alto"},over:{p:"crit",t:"excesso"}};
+  const cardMicros=`<div class="card span-7"><h3>Micronutrientes do dia <span class="pill accent">vs DRI</span></h3><div class="cap">completude do plano de hoje · metas por sexo (IOM/DRI) · sódio é teto</div>
+    <div class="zones">${micros.map(mo=>{const st=MST[mo.st];const pct=Math.min(mo.pct,140);return`<div class="zrow"><div class="zlab" style="flex:0 0 92px"><b>${mo.l}</b><span>${mo.amount} / ${mo.target} ${mo.u}</span></div>
+      <div class="vbar"><div class="vmav" style="left:${mo.ceil?100/1.4*1:71.4}%"></div><div class="vfill ${mo.st==='low'?'below':mo.st==='ok'?'prod':mo.st==='high'?'high':'over'}" style="width:${Math.min(pct/1.4,100)}%"></div></div>
+      <div class="zval tnum" style="flex:0 0 44px">${mo.pct}%</div><span class="pill ${st.p}">${st.t}</span></div>`;}).join("")}</div>
+    <div class="src" style="margin-top:10px">Barra cheia = 140% da meta. ${micros.filter(mo=>mo.st==="low").length} nutriente(s) abaixo de 70% — priorize alimentos-fonte.</div></div>`;
+  const cardProtQual=`<div class="card span-5"><h3>Qualidade proteica</h3><div class="cap">PDCAAS ponderado + complementaridade</div>
+    <div class="ringwrap" style="width:150px;height:150px;margin:0 auto">${ring(pq.score,150)}<div class="center"><div class="big tnum" style="font-size:34px">${pq.score.toFixed(2)}</div><div class="unit">PDCAAS</div></div></div>
+    <div class="src" style="margin-top:12px;text-align:center">${pq.comp?"✅ Leguminosa + cereal se complementam (aminoácido limitante corrigido).":pq.lim?`⚠️ Fonte vegetal isolada — limitante provável: <b>${pq.lim}</b>.`:"Fontes de alta qualidade (animal/soja)."}<br>${pq.pt} g de proteína analisados · FAO/WHO + Young & Pellett 1994</div></div>`;
+  const cardProtDist=`<div class="card span-7"><h3>Distribuição de proteína <span class="pill ${pdist.nAd>=pdist.n-1?"good":"warn"}">${pdist.nAd}/${pdist.n} refeições ok</span></h3><div class="cap">alvo ${pdist.target} g/refeição (0,4 g/kg) · leucina ≥2,5 g · Schoenfeld & Aragon 2018</div>
+    <div class="list">${pdist.rows.map(r=>`<div class="li"><div class="nm"><b>${r.s}</b><span>leucina ~${r.leu} g</span></div><div class="rt"><b class="tnum">${r.p} g</b> · ${r.pct}% do alvo</div><span class="pill ${r.ad?"good":"warn"}">${r.ad?"✓":"baixa"}</span></div>`).join("")}</div></div>`;
+  const cardGL=`<div class="card span-5"><h3>Carga glicêmica do dia</h3><div class="cap">Σ IG×carbo/100 · Foster-Powell 2002</div>
+    <div class="calcout"><div class="cores"><div class="k">GL total</div><div class="v tnum">${gload.gl}</div><div class="meta">${gload.st==="low"?"baixa (≤80)":gload.st==="medium"?"média (81–120)":"alta (>120)"}</div></div>
+    <div class="cores"><div class="k">Carboidrato</div><div class="v tnum">${gload.ct}<small> g</small></div><div class="meta">total do dia</div></div></div>
+    <div class="src" style="margin-top:12px"><span class="pill ${gload.st==="low"?"good":gload.st==="medium"?"warn":"crit"}">${gload.st==="low"?"resposta glicêmica suave":gload.st==="medium"?"moderada":"considere trocar fontes de alto IG"}</span></div></div>`;
+
   // ---- coach por regras: estado agregado ----
   const coachState={redFlags:guards.filter(g=>g.sev==="crit").length,rapidLoss:rapid,plateau:plateau,dietBlocked,strategyName:stratName,
     waterPctToday:doneToday.includes("water")?100:40,proteinDoneToday:doneToday.includes("protein"),streakDays:st2};
@@ -918,6 +1008,7 @@ function render(){
     today:{title:"Hoje",sub:"Tudo abaixo é calculado por fórmula nomeada — mesmo input, mesmo output.",html:cardCoach+cardEnergy+cardMacros+cardBody+cardTrend+cardReady+cardMeals+cardWorkout},
     nutri:{title:"Nutrição",sub:"Meta calórica e macros pelo motor; plano montado por seleção na base de alimentos.",html:cardEnergy+cardMacros+cardMeals+cardBody},
     week:{title:"Semana",sub:"7 dias com rotação determinística de fontes + lista de compras agregada.",html:cardWeek+cardShop},
+    analise:{title:"Análise de precisão",sub:"Micronutrientes vs DRI, qualidade proteica (PDCAAS), leucina por refeição e carga glicêmica.",html:cardMicros+cardProtQual+cardProtDist+cardGL+cardMacros},
     train:{title:"Treino",sub:"Split por frequência, volume graduado por landmarks e base aeróbica em Zona 2.",html:cardWorkout+cardVolume+cardZone2+cardReady+cardTrend},
     calc:{title:"Calculadoras",sub:"1RM, zonas de FC, pace, gasto calórico e VO₂máx — todas determinísticas.",html:cardCalc+cardBody},
     labs:{title:"Exames",sub:"Comparação com faixas de referência armazenadas — educativo, nunca prescreve.",html:cardLabs+cardLabSummary},
@@ -928,6 +1019,8 @@ function render(){
   $("#viewtitle").textContent=v.title;$("#viewsub").textContent=v.sub;
   $("#views").className="grid";$("#views").innerHTML=v.html;
   saveProfile(); // persiste perfil + anamnese + exames a cada mudança
+  // mantém o seletor de pacientes do header em dia (nome ao vivo)
+  const sel=$("#patientsel");if(sel)sel.innerHTML=pAll().map(x=>`<option value="${x.id}" ${x.id===pActiveId()?"selected":""}>${x.name}</option>`).join("");
 }
 
 /* interações */
@@ -937,9 +1030,13 @@ $("#views").addEventListener("click",e=>{
   const w=e.target.closest("[data-w]");if(w){WEEKSEL=+w.dataset.w;render();return;}
   const h=e.target.closest(".hab");if(h){toggleHabit(h.dataset.h);return;}
   if(e.target.closest("#exportShop")){window.print();return;}
+  if(e.target.closest("#logMeas")){logMeasurement();return;}
   const cm=e.target.closest("[data-cmode]");if(cm){CALC.mode=cm.dataset.cmode;render();return;}
   const sw=e.target.closest("[data-swap]");if(sw){SWAP=SWAP===sw.dataset.swap?null:sw.dataset.swap;render();return;}
 });
+// troca de paciente + novo paciente
+$("#patientsel").addEventListener("change",e=>{pSetActive(e.target.value);loadProfile();render();});
+$("#addpatient").addEventListener("click",()=>{pAdd();loadProfile();render();});
 // inputs/selects das calculadoras — 'change' (não 'input') p/ não perder foco no re-render
 $("#views").addEventListener("change",e=>{const c=e.target.closest("[data-calc]");if(c){CALC[c.dataset.calc]=c.value;render();}});
 // chips multi-seleção da anamnese
@@ -964,6 +1061,7 @@ function applyTheme(t){document.documentElement.setAttribute("data-theme",t);$("
 let theme=matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";applyTheme(theme);
 $("#theme").addEventListener("click",()=>{theme=theme==="dark"?"light":"dark";applyTheme(theme);});
 
-loadProfile(); // restaura sessão anterior antes do primeiro render
+pEnsure();     // garante ao menos um paciente (migra dados antigos se houver)
+loadProfile(); // restaura o paciente ativo antes do primeiro render
 render();
 </script>
