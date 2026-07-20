@@ -473,7 +473,11 @@ function bmrMifflin({weightKg,heightCm,age,sex}){const b=10*weightKg+6.25*height
 function bmrKatch(lbm){return R(370+21.6*lbm,0);}
 function bmr(p){if(p.bf!=null&&p.bf>0){const lbm=p.weightKg*(1-p.bf/100);return{value:bmrKatch(lbm),formula:"KATCH_MCARDLE",source:"Katch-McArdle"};}return{value:bmrMifflin(p),formula:"MIFFLIN_ST_JEOR",source:"Mifflin-St Jeor 1990"};}
 function tdee(p){const b=bmr(p);return{value:R(b.value*AF[p.activity],0),b};}
-function targetKcal(p){const t=tdee(p).value,adj=GOAL[p.goal]||GOAL.maintenance,floor=bmr(p).value*1.1;const raw=t*(1+adj.d/100);return{value:R(Math.max(raw,floor),0),source:adj.g,floored:raw<floor,tdee:t};}
+function targetKcal(p){const t=tdee(p).value,adj=GOAL[p.goal]||GOAL.maintenance,floor=bmr(p).value*1.1;
+  // ajuste de adaptação acumulado (aplicado pelo motor de adaptação, com piso de segurança)
+  const adaptMult=1+((p.kcalAdjustPct||0)/100);
+  const raw=t*(1+adj.d/100)*adaptMult;
+  return{value:R(Math.max(raw,floor),0),source:adj.g,floored:raw<floor,tdee:t,adaptPct:p.kcalAdjustPct||0};}
 function macros(p){
   const kc=targetKcal(p);let protein,psrc;
   if(p.goal==="fat_loss"&&p.bf>0){const lbm=p.weightKg*(1-p.bf/100);protein=R(2.6*lbm,0);psrc="Helms: 2,3–3,1 g/kg MM (déficit)";}
@@ -926,8 +930,27 @@ function P(){
     bf:+$("#bf").value,waist:+$("#waist").value,goal:$("#goal").value,activity:$("#activity").value,days:+$("#days").value,
     strategy:$("#strategy").value,
     allergies:chipsOn("allergies"),equipment:chipsOn("equipment"),conditions:chipsOn("injuries"),
+    kcalAdjustPct:(pActive()&&pActive().kcalAdjustPct)||0,
   };
 }
+/* adaptação: adesão acumulada + tendência de peso → ajuste de kcal por regra */
+function recentAdherence(mKcal,mProt,days){
+  const p=pActive();if(!p||!p.foodlog)return null;
+  const keys=Object.keys(p.foodlog).sort().slice(-(days||14));const scores=[];
+  for(const d of keys){const items=(p.foodlog[d]||[]).map(e=>({food:FOODS.find(f=>f.n===e.n),g:e.g})).filter(x=>x.food);if(!items.length)continue;const c=sumIntake(items);scores.push(adherenceScore({kcal:c.kcal,p:c.p},{kcal:mKcal,p:mProt}).ad);}
+  return scores.length?{avg:Math.round(scores.reduce((s,x)=>s+x,0)/scores.length),n:scores.length}:null;
+}
+function adaptationSuggestion(st){
+  if(st.rapid)return{delta:10,act:"Freio de perda rápida",why:"Perda >1,5%/semana eleva perda de massa magra (Garthe 2011). Subir 10% das calorias.",src:"RAPID_LOSS_BRAKE",sev:"crit"};
+  if(st.goal==="fat_loss"&&st.plateau){
+    if(st.adhAvg!=null&&st.adhAvg<80)return{delta:0,act:"Melhorar adesão antes de cortar",why:`Adesão média ${st.adhAvg}% (<80%). Aproximar o consumo rende mais que cortar caloria.`,src:"ADHERENCE_FIRST",sev:"warn"};
+    return{delta:-5,act:"Ajuste de platô",why:"Peso estagnou ~14 dias com boa adesão. −5% kcal + 2000 passos/dia (piso 1,1×TMB).",src:"PLATEAU_WEIGHT_14D",sev:"accent"};
+  }
+  if(st.adhAvg!=null&&st.adhAvg<60)return{delta:0,act:"Simplificar plano",why:`Adesão média ${st.adhAvg}%. Reduza fricção antes de qualquer ajuste calórico.`,src:"ADHERENCE_LOW",sev:"warn"};
+  return{delta:0,act:"Manter plano",why:"Sem gatilho de ajuste — a tendência está saudável. Siga o plano.",src:"ON_TRACK",sev:"good"};
+}
+function applyAdapt(delta,src){pUpdate(p=>{p.kcalAdjustPct=Math.max(-30,Math.min((p.kcalAdjustPct||0)+delta,20));p.adaptlog=p.adaptlog||[];p.adaptlog.push({d:todayKey(),delta,src});});render();}
+function resetAdapt(){pUpdate(p=>{p.kcalAdjustPct=0;});render();}
 
 /* --- coach por regras (Módulo 12): mensagens selecionadas por estado --- */
 const COACH=[
@@ -1028,6 +1051,23 @@ function render(){
     <div class="deltarow">
       <span>${rapid?'Freio automático: <b>+10% kcal</b> sugerido (Garthe 2011)':plateau?'Ação da regra: <b>−5% kcal</b> + 2000 passos/dia':'Nenhum ajuste necessário — <b>seguir plano</b>'}</span>
     </div></div>`;
+
+  // ---- ADAPTAÇÃO AUTOMÁTICA: adesão acumulada + tendência → ajuste de kcal ----
+  const adhRec=recentAdherence(m.kcal,m.protein,14);
+  const adapt=adaptationSuggestion({goal:p.goal,plateau,rapid,adhAvg:adhRec?adhRec.avg:null});
+  const curAdj=p.kcalAdjustPct||0;
+  const projKcal=Math.round(m.kcal*(1+adapt.delta/100));
+  const cardAdapt=`<div class="card span-5"><h3>Adaptação automática <span class="pill ${adapt.sev}">${adapt.act}</span></h3><div class="cap">motor de regras sobre ${usingReal?realW.length+" pesagens":"tendência"} + ${adhRec?adhRec.n+" dias de diário":"sem diário ainda"}</div>
+    <div class="tiles" style="margin-bottom:12px">
+      <div class="tile"><div class="k">Adesão média (14d)</div><div class="v tnum">${adhRec?adhRec.avg+"%":"—"}</div><div class="meta">${adhRec?adhRec.n+" dias registrados":"registre no diário"}</div></div>
+      <div class="tile"><div class="k">Tendência peso</div><div class="v tnum">${perWk>0?"+":""}${perWk}<small> kg/sem</small></div><div class="meta">${status.t}</div></div>
+    </div>
+    <div class="src" style="font-size:12.5px;margin-bottom:12px">${adapt.why}</div>
+    <div class="logadd">
+      ${adapt.delta!==0?`<button class="minibtn" data-applyadapt="${adapt.delta}" data-adaptsrc="${adapt.src}">Aplicar ${adapt.delta>0?"+":""}${adapt.delta}% → ${projKcal} kcal</button>`:`<span class="pill good" style="align-self:center">nenhuma ação necessária</span>`}
+      ${curAdj!==0?`<button class="minibtn" id="resetAdapt">Resetar ajuste (${curAdj>0?"+":""}${curAdj}%)</button>`:""}
+    </div>
+    ${curAdj!==0?`<div class="src" style="margin-top:10px">Ajuste ativo: <b>${curAdj>0?"+":""}${curAdj}%</b> — a meta calórica (${m.kcal} kcal) já reflete isso.</div>`:""}</div>`;
 
   // readiness gauge (deriva de atividade + objetivo, determinístico)
   const readiness=Math.min(99,Math.round(58+AF[p.activity]*14+(p.goal==="maintenance"?8:0)));
@@ -1332,7 +1372,7 @@ function render(){
   $("#report").innerHTML=reportHtml;
 
   const VIEWS={
-    today:{title:"Hoje",sub:"Tudo abaixo é calculado por fórmula nomeada — mesmo input, mesmo output.",html:cardCoach+cardEnergy+cardMacros+cardBody+cardTrend+cardReady+cardMeals+cardWorkout},
+    today:{title:"Hoje",sub:"Tudo abaixo é calculado por fórmula nomeada — mesmo input, mesmo output.",html:cardCoach+cardEnergy+cardMacros+cardBody+cardTrend+cardAdapt+cardReady+cardMeals+cardWorkout},
     nutri:{title:"Nutrição",sub:"Meta calórica e macros pelo motor; plano montado por seleção na base de alimentos.",html:cardEnergy+cardMacros+cardMeals+cardBody},
     week:{title:"Semana",sub:"7 dias com rotação determinística de fontes + lista de compras agregada.",html:cardWeek+cardShop},
     diario:{title:"Diário alimentar",sub:"Registre o consumo real; a Análise passa a usar o que foi comido, não o plano.",html:cardDiary+cardIntake},
@@ -1371,6 +1411,8 @@ $("#views").addEventListener("click",e=>{
   const ls=e.target.closest("[data-logset]");if(ls){const g=k=>{const el=document.querySelector('[data-wl="'+k+'"]');return el?el.value:"";};logSet(ls.dataset.logset,g("reps"),g("load"),g("rir"));return;}
   const us=e.target.closest("[data-undoset]");if(us){undoLastSet(us.dataset.undoset);return;}
   const wl=e.target.closest("[data-wlog]");if(wl){WLOG=WLOG===wl.dataset.wlog?null:wl.dataset.wlog;render();return;}
+  const aa=e.target.closest("[data-applyadapt]");if(aa){applyAdapt(+aa.dataset.applyadapt,aa.dataset.adaptsrc);return;}
+  if(e.target.closest("#resetAdapt")){resetAdapt();return;}
   const cm=e.target.closest("[data-cmode]");if(cm){CALC.mode=cm.dataset.cmode;render();return;}
   const sw=e.target.closest("[data-swap]");if(sw){SWAP=SWAP===sw.dataset.swap?null:sw.dataset.swap;render();return;}
 });
