@@ -709,6 +709,47 @@ const ctrl = await p.evaluate(() => {
 });
 check('desligar fator principal reflete no chip na hora', ctrl.desligou && ctrl.religou);
 check('mudar período do indicador recomputa ao vivo', ctrl.recomputou);
+// Semáforo de decisão + Multi-Timeframe
+const sem = await p.evaluate(() => {
+  // biasTF puro: EMA rápida acima da lenta = alta
+  const sobe = Array.from({ length: 30 }, (_, i) => ({ close: 100 + i }));
+  const cai = Array.from({ length: 30 }, (_, i) => ({ close: 130 - i }));
+  const bAlta = biasTF(sobe), bBaixa = biasTF(cai);
+  // semáforo: força estados via confLive
+  const bak = JSON.parse(JSON.stringify({ l: confLive.long, s: confLive.short, e: confLive.enabled }));
+  mtfEstado = { m1: 1, m5: 1, m15: 1, alinhado: true, dir: 1 };
+  // sinal CALL forte, selo A + funil alto → ENTRAR (mockando grade/funil)
+  const bakG = window.calcularGrade, bakF = window.avaliarFunil;
+  window.calcularGrade = () => ({ grade: 'A' }); window.avaliarFunil = () => ({ okCount: 5 });
+  confLive.long = 6; confLive.short = 0; confLive.enabled = 6; confLive.minScore = 3; confLive.confMode = 'score'; confLive.usePA = false;
+  const sEntrar = semaforoDecisao(false);
+  // MTF contra → EVITAR
+  mtfEstado = { m1: -1, m5: -1, m15: -1, alinhado: true, dir: -1 };
+  const sContra = semaforoDecisao(false);
+  // sem sinal → ESPERAR
+  mtfEstado = { m1: null, m5: null, m15: null, alinhado: null, dir: 0 };
+  confLive.long = 1; confLive.short = 1;
+  const sEsperar = semaforoDecisao(false);
+  // notícia → EVITAR
+  confLive.long = 6; confLive.short = 0;
+  const sNews = semaforoDecisao(true);
+  window.calcularGrade = bakG; window.avaliarFunil = bakF;
+  confLive.long = bak.l; confLive.short = bak.s; confLive.enabled = bak.e;
+  renderSemaforo(false);
+  return {
+    bAlta, bBaixa,
+    entrar: sEntrar.nivel === 'entrar' && sEntrar.dir === 1,
+    contra: sContra.nivel === 'evitar',
+    esperar: sEsperar.nivel === 'esperar',
+    news: sNews.nivel === 'evitar' && /notícia/.test(sNews.motivo),
+    temBox: !!document.getElementById('semaforo')
+  };
+});
+check('biasTF: EMAs subindo = alta, caindo = baixa', sem.bAlta === 1 && sem.bBaixa === -1);
+check('semáforo ENTRAR: sinal + selo A + funil ≥5', sem.entrar);
+check('semáforo EVITAR contra os timeframes maiores', sem.contra);
+check('semáforo ESPERAR sem confluência', sem.esperar);
+check('semáforo EVITAR com notícia próxima', sem.news && sem.temBox);
 check('botões de timeframe no gráfico trocam o TF (M15)', quick.tfMudou);
 check('trocar moeda cripto pelo gráfico muda o símbolo', quick.symMudou);
 check('escolher forex pelo gráfico ajusta o par', quick.forexMudou);

@@ -1210,6 +1210,8 @@ function atualizarDecisao() {
 
     // Funil de qualidade: mostra quais dos 6 elos de assertividade estão fechados
     try { renderFunilQualidade(riscoNoticia); } catch (e) { }
+    // Semáforo único (bloco 37): funde tudo em ENTRAR/ESPERAR/EVITAR
+    try { if (typeof renderSemaforo === 'function') renderSemaforo(riscoNoticia); } catch (e) { }
     // Ferramentas Pro (VP/níveis/book) e Price Action acompanham os recálculos.
     // FLUIDEZ: são painéis informativos pesados (pivôs+LTs+volume profile) —
     // no máximo 1 render a cada 600ms; recálculos em rajada não os re-renderizam.

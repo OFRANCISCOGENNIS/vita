@@ -330,6 +330,12 @@
 
                 <!-- PAINEL DE DECISÃO (assertividade: entrar ou aguardar, e por quê) -->
                 <div class="chart-container decision-panel">
+                    <!-- SEMÁFORO ÚNICO: funde confluência + selo + funil + zona + MTF + risco -->
+                    <div id="semaforo" class="semaforo semaforo-esperar">
+                        <span class="sem-luz">🟡</span>
+                        <span class="sem-txt"><strong id="semTitulo">ESPERAR</strong><small id="semMotivo">carregando…</small></span>
+                        <span id="mtfRow" class="mtf-row" title="tendência por timeframe — só entra quando alinham"></span>
+                    </div>
                     <div class="decision-main">
                         <span class="decision-label">Decisão agora</span>
                         <span id="decisionVerdict" class="decision-verdict verdict-wait">AGUARDAR</span>
@@ -851,6 +857,7 @@
     <script src="src/29-risco.js"></script>
     <script src="src/30-watchlist.js"></script>
     <script src="src/31-divergencia.js"></script>
+    <script src="src/32-semaforo.js"></script>
     <!-- APP:END -->
 </body>
 </html>
