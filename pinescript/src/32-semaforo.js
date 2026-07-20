@@ -99,7 +99,7 @@ function semaforoDecisao(riscoNoticia) {
     return { nivel: 'esperar', dir, titulo: 'ESPERAR', motivo: `${ladoTxt} · ${grade ? 'selo ' + grade : ''}${funil != null ? ' · funil ' + funil + '/6' : ''} — aguarde grau A + funil ≥5` };
 }
 
-let _ultimoRiscoNoticia = false;
+let _ultimoRiscoNoticia = false, _semNivelAnt = null;
 function renderSemaforo(riscoNoticia) {
     _ultimoRiscoNoticia = riscoNoticia;
     const box = document.getElementById('semaforo');
@@ -110,6 +110,17 @@ function renderSemaforo(riscoNoticia) {
     const l = box.querySelector('.sem-luz'); if (l) l.textContent = luz;
     const t = document.getElementById('semTitulo'); if (t) t.textContent = s.titulo;
     const m = document.getElementById('semMotivo'); if (m) m.textContent = s.motivo;
+
+    // GATILHO ACIONÁVEL: quando o semáforo ABRE no verde (transição p/ ENTRAR),
+    // avisa sem você olhar — som + notificação + toast. É o gatilho mais
+    // confiável (já funde selo A + funil + MTF + risco). Uma vez por transição.
+    if (s.nivel === 'entrar' && _semNivelAnt !== 'entrar' && !(typeof treino !== 'undefined' && treino)) {
+        const lbl = (typeof PARES_YAHOO !== 'undefined' && PARES_YAHOO[symbolAtual()]) ? PARES_YAHOO[symbolAtual()].label : symbolAtual();
+        // som fica com a virada do veredito (bloco 6); aqui, notificação + toast
+        try { if (typeof showToast === 'function') showToast('🟢 ' + s.titulo + ' — ' + s.motivo, 'ok'); } catch (e) { }
+        try { if (typeof notificar === 'function') notificar('🟢 ' + s.titulo + ' — ' + lbl, s.motivo, typeof _ultimaEntradaIdx !== 'undefined' ? _ultimaEntradaIdx : undefined); } catch (e) { }
+    }
+    _semNivelAnt = s.nivel;
 }
 
 document.addEventListener('DOMContentLoaded', function () {

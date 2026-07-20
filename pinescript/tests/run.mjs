@@ -1071,22 +1071,32 @@ const vis0 = await p.$eval('.sidebar', e => getComputedStyle(e).display !== 'non
 await p.keyboard.press('c'); await p.waitForTimeout(150);
 check('atalho C recolhe controles', vis0 && await p.$eval('.sidebar', e => getComputedStyle(e).display === 'none'));
 
-// 7.5) Notificação só para entradas nível A
+// 7.5) Notificação disparada pelo SEMÁFORO no verde (selo A + funil ≥5)
 const notif = await p.evaluate(() => {
   const chamadas = [];
   window.notificar = (t) => chamadas.push(t);   // espião (ignora guardas de permissão)
   const gStub = grade => () => ({ grade, estrelas: 4, score: 80, motivos: [], regime: null, pEst: null, pLB: null, pN: 0, expOp: null, expOpLB: null, kelly: null });
-  const orig = window.calcularGrade;
-  const base = { long: 6, short: 0, enabled: 6, minScore: 3, confMode: 'score', fatores: (confLive && confLive.fatores) || [] };
-  window.calcularGrade = gStub('C'); confLive = Object.assign({}, base); ultimoVerdictSom = 'WAIT'; atualizarDecisao();
+  const origG = window.calcularGrade, origF = window.avaliarFunil;
+  mtfEstado = { m1: null, m5: null, m15: null, alinhado: null, dir: 0 };
+  const base = { long: 6, short: 0, enabled: 6, minScore: 3, confMode: 'score', usePA: false, fatores: (confLive && confLive.fatores) || [] };
+  // selo C → semáforo vermelho, NÃO notifica
+  window.calcularGrade = gStub('C'); window.avaliarFunil = () => ({ okCount: 6 });
+  confLive = Object.assign({}, base); ultimoVerdictSom = 'WAIT'; _semNivelAnt = null; atualizarDecisao();
   const aposC = chamadas.length;
-  window.calcularGrade = gStub('A'); confLive = Object.assign({}, base); ultimoVerdictSom = 'WAIT'; atualizarDecisao();
-  const aposA = chamadas.length;
-  window.calcularGrade = orig;
-  return { aposC, aposA };
+  // selo A mas funil 3 → amarelo, NÃO notifica
+  window.calcularGrade = gStub('A'); window.avaliarFunil = () => ({ okCount: 3 });
+  confLive = Object.assign({}, base); ultimoVerdictSom = 'WAIT'; _semNivelAnt = null; atualizarDecisao();
+  const aposAf3 = chamadas.length;
+  // selo A + funil 5 → VERDE, notifica
+  window.avaliarFunil = () => ({ okCount: 5 });
+  confLive = Object.assign({}, base); ultimoVerdictSom = 'WAIT'; _semNivelAnt = 'esperar'; atualizarDecisao();
+  const aposAf5 = chamadas.length;
+  window.calcularGrade = origG; window.avaliarFunil = origF;
+  return { aposC, aposAf3, aposAf5 };
 });
-check('notificação NÃO dispara em nível C', notif.aposC === 0, 'C=' + notif.aposC);
-check('notificação dispara em nível A', notif.aposA === 1, 'A=' + notif.aposA);
+check('semáforo NÃO notifica em selo C', notif.aposC === 0, 'C=' + notif.aposC);
+check('semáforo NÃO notifica em A com funil <5', notif.aposAf3 === 0, 'Af3=' + notif.aposAf3);
+check('semáforo notifica no VERDE (A + funil ≥5)', notif.aposAf5 === 1, 'Af5=' + notif.aposAf5);
 
 // 7.51) Funil gravado por entrada + Modo Sniper + placar por funil
 const funReg = await p.evaluate(() => {

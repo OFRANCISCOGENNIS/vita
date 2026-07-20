@@ -1201,12 +1201,10 @@ function atualizarDecisao() {
         }
         // Notificação de navegador — SÓ nível A; no 🎯 Modo Sniper, exige também
         // funil ≥5 (o topo do topo — pouquíssimas, mas as melhores).
-        const sniperEl = document.getElementById('modoSniper');
-        const sniper = sniperEl && sniperEl.checked;
-        if (ehEntrada && gGrade === 'A' && (!sniper || (fn && fn.okCount >= 5))) {
-            const lbl = PARES_YAHOO[symbolAtual()] ? PARES_YAHOO[symbolAtual()].label : symbolAtual();
-            notificar(`🅰 ${verdictKey === 'CALL' ? '▲ CALL' : '▼ PUT'} — ${lbl}`, `Nível A${fn ? ' · funil ' + fn.okCount + '/6' : ''} · ${Math.max(long, short)}/${enabled} fatores · exp ${document.getElementById('expiracao').value}m`, _ultimaEntradaIdx);
-        }
+        // A NOTIFICAÇÃO de navegador passou a ser disparada pelo SEMÁFORO (bloco
+        // 37) quando ele abre no 🟢 ENTRAR — gatilho mais confiável, pois já
+        // exige selo A + funil ≥5 + MTF não-contra + guardião OK. Aqui fica só o
+        // som na virada do veredito (acima).
         ultimoVerdictSom = verdictKey;
     }
 
