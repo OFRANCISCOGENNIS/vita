@@ -408,6 +408,28 @@ h1.title{font-size:clamp(26px,3vw,34px);font-weight:800;letter-spacing:-.02em;ma
   body.print-report #report{display:block!important}
 }
 
+/* mobile polish */
+@media(max-width:600px){
+  .app{grid-template-columns:58px 1fr}
+  .rail{padding:12px 0}
+  .brand{width:34px;height:34px;font-size:16px;margin-bottom:8px;border-radius:10px}
+  .nav button{width:40px;height:38px}
+  .nav button svg{width:19px;height:19px}
+  .railtip{display:none}
+  .main{padding:16px 12px 48px}
+  h1.title{font-size:22px}
+  .toprt{flex-wrap:wrap}
+  .themebtn{height:36px;padding:0 10px;font-size:12px}
+  .profile{padding:12px;gap:12px}
+  .field input,.field select{height:36px;min-width:64px;font-size:13px}
+  .card{padding:14px;border-radius:12px}
+  .ringwrap{width:150px!important;height:150px!important}
+  .ringwrap svg{width:100%;height:100%} /* SVG tem viewBox — escala junto */
+  .ringwrap .big{font-size:30px!important}
+  .trendhead .now{font-size:26px}
+  .calcinputs .field input,.calcinputs .field select{min-width:88px}
+}
+
 .footer{margin-top:32px;padding-top:18px;border-top:1px solid var(--border);
   font-size:11.5px;color:var(--faint);font-family:var(--mono);display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
 .footer a{color:var(--muted);text-decoration:none}
@@ -1376,7 +1398,7 @@ function render(){
     const food=FOODS.find(f=>f.n===it.n);
     const open=SWAP===it.n;
     const subs=open&&food?findSubs(food,pool):[];
-    return `<div class="li swap ${open?'op':''}" data-swap="${it.n}" role="button" tabindex="0"><span class="idx tnum">${String(i+1).padStart(2,'0')}</span><div class="nm"><b>${it.n} <span class="swapic">⇄</span></b><span>${it.g} g</span></div><div class="rt"><b class="tnum">${it.kcal}</b> kcal · ${it.p}g P</div></div>`+
+    return `<div class="li swap ${open?'op':''}" data-swap="${it.n}" role="button" tabindex="0" aria-expanded="${open}"><span class="idx tnum">${String(i+1).padStart(2,'0')}</span><div class="nm"><b>${it.n} <span class="swapic">⇄</span></b><span>${it.g} g</span></div><div class="rt"><b class="tnum">${it.kcal}</b> kcal · ${it.p}g P</div></div>`+
       (open?`<div class="subs">${subs.length?`<div class="subttl">Substituições isocalóricas (${it.g} g de ${it.n} ≈)</div>${subs.map(s=>`<div class="subrow"><b>${s.n}</b><span class="tnum">${s.g} g</span><span class="pill ${s.sim>.9?'good':s.sim>.8?'accent':'warn'}">${Math.round(s.sim*100)}% match</span></div>`).join("")}`:`<div class="src">Sem substituto próximo na base filtrada.</div>`}</div>`:"");
   };
   const cardMeals=`<div class="card span-6"><h3>Plano alimentar · ${WEEK_DAYS[todayIdx]} ${blockedBadge}</h3><div class="cap">${dietBlocked?`dieta ${stratName} contraindicada para a condição selecionada`:`${stratName} · ${totKcal} kcal · ${totP} g proteína · toque num item para trocar`}</div>
@@ -1477,7 +1499,7 @@ function render(){
         ${histHtml?`<div class="subttl" style="margin-top:10px">Últimas sessões</div>${histHtml}`:""}
       </div>`;
     }
-    return`<div class="li swap ${open?'op':''}" data-wlog="${it.n}" role="button" tabindex="0"><span class="idx tnum">${String(i+1).padStart(2,'0')}</span><div class="nm"><b>${it.n} <span class="swapic">✎</span></b><span>${it.mu}${hist.length?` · ${hist.length} sess.`:""}</span></div><div class="rt"><b class="tnum">${it.sets}×${it.lo}–${it.hi}</b> · RIR ${it.rir} · ${isDeload?Math.round(per.intMult*100)+"% carga":it.rest+"s"}${nl.change==="increase"?' <span class="pill good">↑</span>':""}</div></div>`+panel;
+    return`<div class="li swap ${open?'op':''}" data-wlog="${it.n}" role="button" tabindex="0" aria-expanded="${open}"><span class="idx tnum">${String(i+1).padStart(2,'0')}</span><div class="nm"><b>${it.n} <span class="swapic">✎</span></b><span>${it.mu}${hist.length?` · ${hist.length} sess.`:""}</span></div><div class="rt"><b class="tnum">${it.sets}×${it.lo}–${it.hi}</b> · RIR ${it.rir} · ${isDeload?Math.round(per.intMult*100)+"% carga":it.rest+"s"}${nl.change==="increase"?' <span class="pill good">↑</span>':""}</div></div>`+panel;
   };
   const cardWorkout=`<div class="card span-6"><h3>Treino gerado <span class="pill ${isDeload?"warn":"accent"}">${isDeload?"DELOAD":"Sem "+mw+"/"+per.mesoLen}</span>${wpr.barred.length?` <span class="pill warn">${wpr.barred.length} barrado${wpr.barred.length>1?"s":""}</span>`:""}</h3><div class="cap">split ${wp.map(d=>d.type.slice(0,3)).join("/")} · ${p.days}× semana · toque num exercício para registrar séries</div>
     <div class="wtabs" style="margin-bottom:12px"><button class="minibtn" id="mesoPrev">◀ semana</button><span class="pill ${isDeload?"warn":"good"}" style="align-self:center">${isDeload?"deload":"acúmulo "+(per.prog||0)+"%"}</span><button class="minibtn" id="mesoNext">semana ▶</button></div>
@@ -1557,7 +1579,7 @@ function render(){
   const exList=EX.filter(e=>EXFILTER==="all"||e.mu===EXFILTER);
   const cardExLib=`<div class="card span-12"><h3>Biblioteca de exercícios <span class="pill accent">${EX.length}</span></h3><div class="cap">músculo, equipamento, nível e dica de execução · toque para ver a instrução</div>
     <div class="wtabs" id="exfilter" style="margin-bottom:12px">${exMuscles.map(mu=>`<button data-exfilter="${mu}" class="${mu===EXFILTER?"on":""}">${mu==="all"?"Todos":mu}</button>`).join("")}</div>
-    <div class="list">${exList.map(ex=>{const open=EXOPEN===ex.c;return`<div class="li swap ${open?"op":""}" data-exopen="${ex.c}" role="button" tabindex="0"><span class="tlic" style="margin:0">${ex.comp?"🏋️":"🎯"}</span><div class="nm"><b>${ex.n} <span class="swapic">${open?"▾":"▸"}</span></b><span>${ex.mu} · ${ex.eq.map(q=>EQLBL[q]||q).join("/")} · ${LVLBL[ex.lv]}</span></div><div class="rt">${ex.ctr.length?`<span class="pill warn">lesão: ${ex.ctr.join(",")}</span>`:""}</div></div>`+(open?`<div class="subs"><div class="subttl">Execução</div><div style="font-size:13px;line-height:1.5">${ex.cue}</div></div>`:"");}).join("")}</div>
+    <div class="list">${exList.map(ex=>{const open=EXOPEN===ex.c;return`<div class="li swap ${open?"op":""}" data-exopen="${ex.c}" role="button" tabindex="0" aria-expanded="${open}"><span class="tlic" style="margin:0">${ex.comp?"🏋️":"🎯"}</span><div class="nm"><b>${ex.n} <span class="swapic">${open?"▾":"▸"}</span></b><span>${ex.mu} · ${ex.eq.map(q=>EQLBL[q]||q).join("/")} · ${LVLBL[ex.lv]}</span></div><div class="rt">${ex.ctr.length?`<span class="pill warn">lesão: ${ex.ctr.join(",")}</span>`:""}</div></div>`+(open?`<div class="subs"><div class="subttl">Execução</div><div style="font-size:13px;line-height:1.5">${ex.cue}</div></div>`:"");}).join("")}</div>
     <div class="src" style="margin-top:12px">Dicas gerais e educativas — priorize técnica sobre carga. Dor (além do esforço muscular) é sinal de parar e reavaliar.</div></div>`;
 
   // ---- DIÁRIO ALIMENTAR: consumo real de hoje ----
@@ -2012,9 +2034,11 @@ $("#views").addEventListener("change",e=>{
 });
 // chips multi-seleção da anamnese
 $("#anamnese").addEventListener("click",e=>{const b=e.target.closest(".chips[data-multi] button");if(!b)return;b.classList.toggle("on");render();});
+// teclado: Enter/Espaço ativa qualquer elemento interativo com role="button"
 $("#views").addEventListener("keydown",e=>{
-  const h=e.target.closest(".hab");
-  if(h&&(e.key==="Enter"||e.key===" ")){e.preventDefault();toggleHabit(h.dataset.h);}
+  if(e.key!=="Enter"&&e.key!==" ")return;
+  const b=e.target.closest('[role="button"]');
+  if(b){e.preventDefault();b.click();}
 });
 $("#views").addEventListener("change",e=>{
   const l=e.target.closest("[data-lab]");if(l){LABVALS[l.dataset.lab]=l.value;render();}
