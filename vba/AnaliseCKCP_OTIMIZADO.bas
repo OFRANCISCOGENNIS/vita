@@ -202,6 +202,9 @@ Sub GerarRelatorio()
     gEtapa = "Gerar_RacionalizacaoCOM": Gerar_RacionalizacaoCOM
     gEtapa = "Gerar_Regras": Gerar_Regras
 
+    ' Checklist do processo: criado automaticamente (preserva marcacoes se ja existir)
+    gEtapa = "GerarChecklistCKCP": GerarChecklistCKCP True
+
     ' FASE 5: ordena as guias por fluxo de leitura e ativa o painel
     gEtapa = "OrganizarAbas": OrganizarAbas
 
@@ -6492,8 +6495,8 @@ End Sub
 ' e deixa o PAINEL EXECUTIVO ativo ao final.
 Private Sub OrganizarAbas()
     Dim ordem As Variant, i As Long, ws As Worksheet, pos As Long
-    ordem = Array("PAINEL EXECUTIVO", "PORTFOLIO OBRA", "ALERTAS CRITICOS", _
-                  "MATERIAL vs SERVICO", "MATERIAL", "SERVICO", _
+    ordem = Array("PAINEL EXECUTIVO", "CHECKLIST CKCP", "PORTFOLIO OBRA", _
+                  "ALERTAS CRITICOS", "MATERIAL vs SERVICO", "MATERIAL", "SERVICO", _
                   "SERVICO SEM MATERIAL", "ANALISE DE CA", _
                   "NAO CLASSIFICADOS", "RACIONALIZACAO COM", "RAZAO CJ", "REGRAS")
     pos = 0
@@ -8066,16 +8069,19 @@ End Sub
 '  GerarRelatorio para nao apagar as marcacoes ao reprocessar a base.
 '  Nao-destrutiva: se a aba ja existe, preserva o que foi preenchido.
 '==============================================================================
-Public Sub GerarChecklistCKCP()
+Public Sub GerarChecklistCKCP(Optional ByVal silencioso As Boolean = False)
     Dim ws As Worksheet
     On Error Resume Next
     Set ws = ActiveWorkbook.Worksheets("CHECKLIST CKCP")
     On Error GoTo 0
     If Not ws Is Nothing Then
-        ws.Activate
-        MsgBox "A aba CHECKLIST CKCP ja existe e suas marcacoes foram mantidas." & vbLf & _
-               "Para recria-la do zero, exclua a aba e rode novamente.", _
-               vbInformation, "Checklist CKCP"
+        ' Aba ja existe: preserva as marcacoes. Silencioso no fluxo automatico.
+        If Not silencioso Then
+            ws.Activate
+            MsgBox "A aba CHECKLIST CKCP ja existe e suas marcacoes foram mantidas." & vbLf & _
+                   "Para recria-la do zero, exclua a aba e rode novamente.", _
+                   vbInformation, "Checklist CKCP"
+        End If
         Exit Sub
     End If
 
@@ -8201,9 +8207,10 @@ Public Sub GerarChecklistCKCP()
     ws.Range("A5").Select
     ActiveWindow.FreezePanes = True
 
-    MsgBox "Aba CHECKLIST CKCP criada com " & nItens & " etapas." & vbLf & _
-           "Preencha CORTE ID e marque o STATUS de cada etapa (dropdown)." & vbLf & _
-           "O % CONCLUIDO atualiza automaticamente.", vbInformation, "Checklist CKCP"
+    If Not silencioso Then _
+        MsgBox "Aba CHECKLIST CKCP criada com " & nItens & " etapas." & vbLf & _
+               "Preencha CORTE ID e marque o STATUS de cada etapa (dropdown)." & vbLf & _
+               "O % CONCLUIDO atualiza automaticamente.", vbInformation, "Checklist CKCP"
 End Sub
 
 ' Escreve uma linha do checklist. lin (ByRef) e incrementado a cada chamada.
