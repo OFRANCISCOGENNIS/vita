@@ -255,6 +255,13 @@ h1.title{font-size:clamp(26px,3vw,34px);font-weight:800;letter-spacing:-.02em;ma
 .zlab{flex:1}.zlab b{font-size:13px;display:block}.zlab span{font-size:11px;color:var(--muted);font-family:var(--mono)}
 .zval{font-family:var(--mono);font-weight:700;font-size:14px}.zval small{color:var(--muted);font-weight:500}
 
+/* anamnese guiada */
+.anamsec{margin-bottom:16px}
+.anamsec-t{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--faint);margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid var(--border)}
+.anamq{display:flex;align-items:center;gap:12px;justify-content:space-between;padding:7px 0;flex-wrap:wrap}
+.anamq-t{font-size:13.5px;flex:1;min-width:180px}
+.anamseg{height:34px}.anamseg button{padding:0 14px}
+
 /* registro de treino */
 .wlogp .wsetrow{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
 .setchip{font-family:var(--mono);font-size:11px;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:3px 8px}
@@ -367,6 +374,7 @@ h1.title{font-size:clamp(26px,3vw,34px);font-weight:800;letter-spacing:-.02em;ma
       <button data-v="habits" aria-label="Hábitos"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3c1 3-2 4-2 7a4 4 0 0 0 8 0c0-1-.5-2-1-3 0 0 3 2 3 6a8 8 0 0 1-16 0c0-5 5-7 8-10z"/></svg><span class="railtip">Hábitos</span></button>
       <button data-v="fotos" aria-label="Fotos"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 7h4l2-3h6l2 3h4v13H3z"/><circle cx="12" cy="13" r="4"/></svg><span class="railtip">Fotos</span></button>
       <button data-v="devices" aria-label="Dispositivos"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="7" y="2" width="10" height="20" rx="3"/><path d="M11 6h2M12 16v.5"/></svg><span class="railtip">Dispositivos</span></button>
+      <button data-v="anamnese" aria-label="Anamnese"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 3h6v3H9zM8 11h8M8 15h5"/></svg><span class="railtip">Anamnese</span></button>
       <button data-v="safe" aria-label="Segurança"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6z"/><path d="M9 12l2 2 4-4"/></svg><span class="railtip">Segurança</span></button>
     </nav>
   </aside>
@@ -566,7 +574,11 @@ function pEnsure(){
 
 /* --- guardrails --- */
 function guardrails(p){
-  const f=[];
+  const f=[];const an=p.anamnese||{};
+  if(an.chest_pain)f.push({sev:"crit",code:"Dor torácica ao esforço",msg:"Dor no peito ao esforço exige avaliação cardiológica ANTES de treinar. Se for atual, procure emergência."});
+  if(an.pregnancy)f.push({sev:"crit",code:"Gestação/lactação",msg:"Estado que exige acompanhamento individualizado. O sistema não gera déficit nem estratégias restritivas."});
+  if(an.t1_diabetes)f.push({sev:"crit",code:"Diabetes tipo 1",msg:"Exige plano supervisionado por equipe de saúde. Jejum e cetogênica ficam bloqueados."});
+  if([an.extreme_restriction,an.compensatory,an.body_image].filter(Boolean).length>=2)f.push({sev:"crit",code:"Sinais de transtorno alimentar",msg:"Suas respostas indicam um padrão que merece cuidado especializado. Procure profissional de saúde mental e nutricionista. CVV: 188."});
   if(p.goal==="fat_loss"&&bmi(p)<17.5)f.push({sev:"crit",code:"IMC<17,5 + emagrecimento",msg:"Emagrecer com IMC abaixo de 17,5 não é seguro. Recomendamos avaliação médica e nutricional antes de qualquer déficit."});
   if(p.age<16)f.push({sev:"crit",code:"Menor de 16",msg:"Menores de 16 anos precisam de responsável cadastrado."});
   const t=targetKcal(p);if(t.floored)f.push({sev:"warn",code:"Piso calórico 1,1×TMB",msg:"A meta calórica atingiu o piso de segurança de 1,1×TMB — o motor não corta abaixo disso para preservar massa magra e metabolismo."});
@@ -931,9 +943,56 @@ function P(){
     weightKg:+$("#weight").value,heightCm:+$("#height").value,age:+$("#age").value,
     bf:+$("#bf").value,waist:+$("#waist").value,goal:$("#goal").value,activity:$("#activity").value,days:+$("#days").value,
     strategy:$("#strategy").value,
-    allergies:chipsOn("allergies"),equipment:chipsOn("equipment"),conditions:chipsOn("injuries"),
+    allergies:chipsOn("allergies"),equipment:chipsOn("equipment"),
+    conditions:mergedConditions(),
     kcalAdjustPct:(pActive()&&pActive().kcalAdjustPct)||0,
+    anamnese:(pActive()&&pActive().anamnese)||{},
   };
+}
+/* condições p/ filtros de dieta/treino: chips + derivadas da anamnese guiada */
+function mergedConditions(){
+  const s=new Set(chipsOn("injuries"));
+  const an=(pActive()&&pActive().anamnese)||{};
+  if(an.t1_diabetes)s.add("t1_diabetes");
+  if(Array.isArray(an.injuries))an.injuries.forEach(x=>s.add(x));
+  return [...s];
+}
+/* anamnese guiada (Módulo 2): questionário progressivo por paciente */
+const ANAMNESE=[
+  {sec:"Bandeiras de segurança",qs:[
+    {c:"chest_pain",t:"Sente dor no peito ao se esforçar?",type:"bool"},
+    {c:"pregnancy",t:"Está grávida ou amamentando?",type:"bool"},
+    {c:"t1_diabetes",t:"Tem diabetes tipo 1?",type:"bool"},
+    {c:"syncope",t:"Já desmaiou ou teve tontura forte ao treinar?",type:"bool"},
+  ]},
+  {sec:"Sinais alimentares (2+ pausam a recomendação)",qs:[
+    {c:"extreme_restriction",t:"Faz restrição alimentar extrema?",type:"bool"},
+    {c:"compensatory",t:"Usa compensação (vômito, laxante, treino punitivo)?",type:"bool"},
+    {c:"body_image",t:"Sente forte distorção da imagem corporal?",type:"bool"},
+  ]},
+  {sec:"Histórico médico",qs:[
+    {c:"hypertension",t:"Tem hipertensão diagnosticada?",type:"bool"},
+    {c:"cardiopathy",t:"Alguma cardiopatia?",type:"bool"},
+    {c:"injuries",t:"Lesões ativas?",type:"multi",opts:[["knee","Joelho"],["shoulder","Ombro"],["lumbar","Lombar"],["wrist","Punho"]]},
+    {c:"medications",t:"Usa medicação contínua?",type:"bool"},
+  ]},
+  {sec:"Contexto e hábitos",qs:[
+    {c:"experience",t:"Experiência de treino",type:"choice",opts:[["never","Nunca"],["lt6m","<6m"],["6m2y","6m–2a"],["gt2y",">2a"]]},
+    {c:"sleep",t:"Sono médio (h/noite)",type:"num",ph:"h"},
+    {c:"stress",t:"Estresse no dia a dia (1–10)",type:"num",ph:"1-10"},
+  ]},
+];
+const ANAM_TOTAL=ANAMNESE.reduce((s,g)=>s+g.qs.length,0);
+function anamnese(){return(pActive()&&pActive().anamnese)||{};}
+function setAnam(code,val){pUpdate(p=>{p.anamnese=p.anamnese||{};if(val===null||val===""||(Array.isArray(val)&&!val.length))delete p.anamnese[code];else p.anamnese[code]=val;});render();}
+function toggleAnamMulti(code,v){const an=anamnese();const cur=new Set(Array.isArray(an[code])?an[code]:[]);cur.has(v)?cur.delete(v):cur.add(v);setAnam(code,[...cur]);}
+function anamRow(q,an){
+  const v=an[q.c];let ctrl="";
+  if(q.type==="bool")ctrl=`<div class="seg anamseg"><button data-anambool="${q.c}" data-v="1" class="${v===true?'on':''}">Sim</button><button data-anambool="${q.c}" data-v="0" class="${v===false?'on':''}">Não</button></div>`;
+  else if(q.type==="multi")ctrl=`<div class="chips">${q.opts.map(([ov,ol])=>`<button data-anammulti="${q.c}" data-v="${ov}" class="${Array.isArray(v)&&v.includes(ov)?'on':''}">${ol}</button>`).join("")}</div>`;
+  else if(q.type==="choice")ctrl=`<div class="chips">${q.opts.map(([ov,ol])=>`<button data-anamchoice="${q.c}" data-v="${ov}" class="${v===ov?'on':''}">${ol}</button>`).join("")}</div>`;
+  else ctrl=`<input class="wnum" data-anamnum="${q.c}" type="number" step="any" value="${v!=null?v:''}" placeholder="${q.ph||''}" style="width:96px">`;
+  return `<div class="anamq"><span class="anamq-t">${q.t}</span>${ctrl}</div>`;
 }
 /* adaptação: adesão acumulada + tendência de peso → ajuste de kcal por regra */
 function recentAdherence(mKcal,mProt,days){
@@ -1391,6 +1450,21 @@ function render(){
   </div>`;
   $("#report").innerHTML=reportHtml;
 
+  // ---- ANAMNESE GUIADA ----
+  const an=anamnese();
+  const anAnswered=Object.keys(an).filter(k=>{const v=an[k];return !(v===null||v===""||(Array.isArray(v)&&!v.length));}).length;
+  const anFlags=[];
+  if(an.chest_pain)anFlags.push("Dor torácica");
+  if(an.pregnancy)anFlags.push("Gestação/lactação");
+  if(an.t1_diabetes)anFlags.push("Diabetes tipo 1");
+  if([an.extreme_restriction,an.compensatory,an.body_image].filter(Boolean).length>=2)anFlags.push("Sinais de transtorno alimentar");
+  const cardAnam=`<div class="card span-8"><h3>Anamnese guiada <span class="pill ${anFlags.length?"crit":anAnswered>=ANAM_TOTAL*0.7?"good":"accent"}">${anAnswered}/${ANAM_TOTAL} respondidas</span></h3><div class="cap">preenche condições e dispara bandeiras de segurança · por paciente</div>
+    ${anFlags.length?`<div class="banner crit" style="margin:0 0 14px"><span class="ic">⛔</span><div><b>Bandeiras ativas: ${anFlags.join(", ")}</b><div class="msg">A recomendação padrão é pausada. Veja a aba Segurança e procure um profissional habilitado.</div></div></div>`:""}
+    ${ANAMNESE.map(g=>`<div class="anamsec"><div class="anamsec-t">${g.sec}</div>${g.qs.map(q=>anamRow(q,an)).join("")}</div>`).join("")}
+    <div class="src" style="margin-top:12px">Respostas alimentam guardrails, filtros de dieta/treino (ex.: DM1 bloqueia keto) e o prontuário.</div></div>`;
+  const cardAnamHelp=`<div class="card span-4"><h3>Por que responder</h3><div class="cap">segurança determinística</div>
+    <div class="src" style="font-size:12.5px;line-height:1.6">Cada resposta é uma regra codificada:<br>• <b>Dor torácica / gestação / DM1</b> → pausa a recomendação padrão.<br>• <b>2+ sinais alimentares</b> → orienta cuidado especializado.<br>• <b>Lesões</b> → filtram exercícios no treino.<br>• <b>DM1</b> → bloqueia dieta cetogênica.<br>• <b>Experiência</b> → ajusta a dificuldade dos exercícios.<br><br>Nada é diagnóstico — o sistema <b>educa, não diagnostica</b>.</div></div>`;
+
   const VIEWS={
     today:{title:"Hoje",sub:"Tudo abaixo é calculado por fórmula nomeada — mesmo input, mesmo output.",html:cardCoach+cardEnergy+cardMacros+cardBody+cardTrend+cardAdapt+cardReady+cardMeals+cardWorkout},
     nutri:{title:"Nutrição",sub:"Meta calórica e macros pelo motor; plano montado por seleção na base de alimentos.",html:cardEnergy+cardMacros+cardMeals+cardBody},
@@ -1403,6 +1477,7 @@ function render(){
     habits:{title:"Hábitos",sub:"Checklist diário e sequência por regras determinísticas sobre o que você registra.",html:cardHabits+cardStreak+cardCoach},
     fotos:{title:"Fotos de evolução",sub:"Registro visual do progresso, comparação antes/depois. Tudo local — as imagens não saem do dispositivo.",html:cardPhotos+cardCompare},
     devices:{title:"Dispositivos",sub:"Importe passos, FC de repouso, sono e peso de wearables — alimenta hábitos, evolução e zonas de FC.",html:cardDevices+cardDevSummary},
+    anamnese:{title:"Anamnese guiada",sub:"Questionário progressivo que preenche condições e dispara bandeiras de segurança em tempo real.",html:cardAnam+cardAnamHelp},
     safe:{title:"Segurança",sub:"Guardrails determinísticos. Educa, não diagnostica.",html:(guards.length?"":`<div class="card span-12"><h3>Nenhuma bandeira vermelha ativa <span class="pill good">tudo certo</span></h3><div class="cap">o motor libera as recomendações padrão</div><div class="src" style="font-size:12px">Regras monitoradas: dor torácica ao esforço · IMC &lt;17,5 com meta de emagrecer · indícios de transtorno alimentar · gestação/lactação · diabetes tipo 1 · menor de 16 sem responsável · exame em faixa crítica · piso calórico 1,1×TMB · freio de perda &gt;1,5%/semana.</div></div>`)+cardTrend+cardBody},
   };
   const v=VIEWS[VIEW];
@@ -1433,6 +1508,9 @@ $("#views").addEventListener("click",e=>{
   const wl=e.target.closest("[data-wlog]");if(wl){WLOG=WLOG===wl.dataset.wlog?null:wl.dataset.wlog;render();return;}
   const aa=e.target.closest("[data-applyadapt]");if(aa){applyAdapt(+aa.dataset.applyadapt,aa.dataset.adaptsrc);return;}
   if(e.target.closest("#resetAdapt")){resetAdapt();return;}
+  const ab=e.target.closest("[data-anambool]");if(ab){setAnam(ab.dataset.anambool,ab.dataset.v==="1");return;}
+  const am=e.target.closest("[data-anammulti]");if(am){toggleAnamMulti(am.dataset.anammulti,am.dataset.v);return;}
+  const ac=e.target.closest("[data-anamchoice]");if(ac){setAnam(ac.dataset.anamchoice,anamnese()[ac.dataset.anamchoice]===ac.dataset.v?null:ac.dataset.v);return;}
   const cm=e.target.closest("[data-cmode]");if(cm){CALC.mode=cm.dataset.cmode;render();return;}
   const sw=e.target.closest("[data-swap]");if(sw){SWAP=SWAP===sw.dataset.swap?null:sw.dataset.swap;render();return;}
 });
@@ -1447,6 +1525,7 @@ if(window.matchMedia)window.matchMedia("print").addEventListener&&window.matchMe
 // inputs/selects das calculadoras — 'change' (não 'input') p/ não perder foco no re-render
 $("#views").addEventListener("change",e=>{
   const c=e.target.closest("[data-calc]");if(c){CALC[c.dataset.calc]=c.value;render();return;}
+  const anum=e.target.closest("[data-anamnum]");if(anum){setAnam(anum.dataset.anamnum,anum.value===""?null:+anum.value);return;}
   const pf=e.target.closest("#photofile");if(pf&&pf.files&&pf.files[0]){handlePhotoFile(pf.files[0],($("#photopose")||{value:"frente"}).value);pf.value="";return;}
   const wf=e.target.closest("#wearfile");if(wf&&wf.files&&wf.files[0]){const fr=new FileReader();fr.onload=()=>importWearableText(fr.result);fr.readAsText(wf.files[0]);wf.value="";}
 });
