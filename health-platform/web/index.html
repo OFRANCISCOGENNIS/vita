@@ -837,6 +837,15 @@ function todayLog(){const p=pActive();return(p&&p.foodlog&&p.foodlog[todayKey()]
 function addLogItem(n,g){if(!n||!(g>0))return;pUpdate(p=>{p.foodlog=p.foodlog||{};const t=todayKey();p.foodlog[t]=p.foodlog[t]||[];p.foodlog[t].push({n,g:Math.round(g)});});render();}
 function removeLogItem(i){pUpdate(p=>{const t=todayKey();if(p.foodlog&&p.foodlog[t])p.foodlog[t].splice(i,1);});render();}
 function setMesoWeek(delta){pUpdate(p=>{p.mesoWeek=Math.max(1,Math.min((p.mesoWeek||1)+delta,5));});render();}
+/* hidratação: contador de ml por dia; bater a meta marca o hábito água sozinho */
+function waterToday(){const p=pActive();return(p&&p.water&&p.water[todayKey()])||0;}
+function addWater(ml,targetMl){
+  pUpdate(p=>{p.water=p.water||{};const t=todayKey();
+    p.water[t]=Math.max(0,(p.water[t]||0)+ml);
+    if(p.water[t]>=targetMl){p.habits=p.habits||{};const h=new Set(p.habits[t]||[]);h.add("water");p.habits[t]=[...h];}
+  });render();
+}
+
 /* gamificação: conquistas por regras determinísticas sobre dados reais + XP/nível */
 const ACHIEVEMENTS=[
   {c:"FIRST_LOG",n:"Primeiro registro",ic:"📓",xp:50,d:"Registrou o primeiro item no diário alimentar",when:s=>s.foodDays>=1},
@@ -1475,6 +1484,16 @@ function render(){
     <div class="list">${wp.map((d,di)=>`<div class="daytag">Dia ${d.day} · ${d.type} <button class="minibtn" data-startsess="${di}" style="margin-left:8px">▶ Iniciar sessão</button></div>${d.items.map(exItem).join("")}`).join("")}</div>
     ${isDeload?`<div class="src" style="margin-top:12px">Semana de deload: metade das séries, 80% da carga, longe da falha. Recupera para o próximo mesociclo render mais.</div>`:wpr.barred.length?`<div class="src" style="margin-top:12px">Excluídos pela lesão: ${wpr.barred.map(e=>e.n).join(", ")}.</div>`:""}</div>`;
 
+  // ---- hidratação: contador rápido de copos ----
+  const waterMlToday=waterToday();
+  const waterPct=Math.min(100,Math.round(waterMlToday/wm*100));
+  const glasses=Math.floor(waterMlToday/250);
+  const cardWater=`<div class="card span-4"><h3>Água de hoje <span class="pill ${waterPct>=100?"good":waterPct>=50?"accent":"warn"}">${waterPct}%</span></h3><div class="cap">meta ${(wm/1000).toFixed(2)} L · 35 ml/kg + treino</div>
+    <div class="trendhead" style="margin-bottom:8px"><div class="now tnum" style="font-size:30px">${(waterMlToday/1000).toFixed(2)}<small> L</small></div><div class="mono tnum" style="color:var(--muted);font-size:13px">${"💧".repeat(Math.min(glasses,8))}${glasses>8?" +"+(glasses-8):""}</div></div>
+    <div class="track" style="margin-bottom:14px"><div class="fill" style="width:${waterPct}%;background:#4AA8FF"></div></div>
+    <div class="logadd"><button class="minibtn" data-water="250">+ copo 250 ml</button><button class="minibtn" data-water="500">+ garrafa 500 ml</button><button class="minibtn" data-water="-250">−250</button></div>
+    ${waterPct>=100?`<div class="src" style="margin-top:10px;color:var(--good)">Meta batida — hábito "água" marcado automaticamente. ✓</div>`:`<div class="src" style="margin-top:10px">Faltam ${((wm-waterMlToday)/1000).toFixed(2)} L. Ao bater a meta, o hábito marca sozinho.</div>`}</div>`;
+
   // ---- gamificação: conquistas + XP/nível ----
   const achs=achievementsFor(_pt||{});
   const doneAchs=achs.filter(a=>a.done);
@@ -1885,7 +1904,7 @@ function render(){
     <div class="src" style="font-size:12.5px;line-height:1.6">Cada resposta é uma regra codificada:<br>• <b>Dor torácica / gestação / DM1</b> → pausa a recomendação padrão.<br>• <b>2+ sinais alimentares</b> → orienta cuidado especializado.<br>• <b>Lesões</b> → filtram exercícios no treino.<br>• <b>DM1</b> → bloqueia dieta cetogênica.<br>• <b>Experiência</b> → ajusta a dificuldade dos exercícios.<br><br>Nada é diagnóstico — o sistema <b>educa, não diagnostica</b>.</div></div>`;
 
   const VIEWS={
-    today:{title:"Hoje",sub:"Tudo abaixo é calculado por fórmula nomeada — mesmo input, mesmo output.",html:cardCoach+cardEnergy+cardMacros+cardBody+cardTrend+cardAdapt+cardReady+cardMeals+cardWorkoutMain},
+    today:{title:"Hoje",sub:"Tudo abaixo é calculado por fórmula nomeada — mesmo input, mesmo output.",html:cardCoach+cardEnergy+cardMacros+cardBody+cardTrend+cardAdapt+cardReady+cardWater+cardMeals+cardWorkoutMain},
     nutri:{title:"Nutrição",sub:"Meta calórica e macros pelo motor; plano montado por seleção na base de alimentos.",html:cardEnergy+cardMacros+cardMeals+cardBody},
     week:{title:"Semana",sub:"7 dias com rotação determinística de fontes + lista de compras agregada.",html:cardWeek+cardShop},
     diario:{title:"Diário alimentar",sub:"Registre o consumo real; a Análise passa a usar o que foi comido, não o plano.",html:cardDiary+cardIntake},
@@ -1893,7 +1912,7 @@ function render(){
     train:{title:"Treino",sub:"Split por frequência, volume graduado por landmarks, base aeróbica e biblioteca de exercícios.",html:cardWorkoutMain+cardVolume+cardZone2+cardExLib+cardReady+cardTrend},
     calc:{title:"Calculadoras",sub:"1RM, zonas de FC, pace, gasto calórico e VO₂máx — todas determinísticas.",html:cardCalc+cardBody},
     labs:{title:"Exames",sub:"Comparação com faixas de referência + tendência entre exames — educativo, nunca prescreve.",html:cardLabs+cardLabSummary+cardLabTrend},
-    habits:{title:"Hábitos",sub:"Checklist diário, sequência, conquistas e nível — tudo por regras determinísticas.",html:cardHabits+cardStreak+cardGami+cardCoach},
+    habits:{title:"Hábitos",sub:"Checklist diário, sequência, conquistas e nível — tudo por regras determinísticas.",html:cardHabits+cardWater+cardStreak+cardGami+cardCoach},
     pacientes:{title:"Pacientes",sub:"Visão do profissional: todos os pacientes, quem precisa de atenção primeiro.",html:cardRoster+cardNotes},
     agenda:{title:"Agenda do dia",sub:"Cronograma de refeições, hidratação e treino por horário — ajuste à sua rotina.",html:cardAgenda+cardAgendaSum},
     evolucao:{title:"Evolução",sub:"Check-in semanal + linha do tempo de todas as métricas num só lugar.",html:cardCheckin+cardEvolution},
@@ -1950,6 +1969,7 @@ $("#views").addEventListener("click",e=>{
     }return;}
   const xf=e.target.closest("[data-exfilter]");if(xf){EXFILTER=xf.dataset.exfilter;render();return;}
   const xo=e.target.closest("[data-exopen]");if(xo){EXOPEN=EXOPEN===xo.dataset.exopen?null:xo.dataset.exopen;render();return;}
+  const wt=e.target.closest("[data-water]");if(wt){addWater(+wt.dataset.water,waterMl(P()));return;}
   const aa=e.target.closest("[data-applyadapt]");if(aa){applyAdapt(+aa.dataset.applyadapt,aa.dataset.adaptsrc);return;}
   if(e.target.closest("#resetAdapt")){resetAdapt();return;}
   const ab=e.target.closest("[data-anambool]");if(ab){setAnam(ab.dataset.anambool,ab.dataset.v==="1");return;}
