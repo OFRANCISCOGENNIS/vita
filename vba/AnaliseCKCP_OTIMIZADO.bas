@@ -8011,3 +8011,170 @@ Private Sub AplicarBordas(ws As Worksheet, r1 As Integer, r2 As Integer, c2 As I
         .Weight = xlThin
     End With
 End Sub
+
+
+
+'==============================================================================
+'  ABA: CHECKLIST CKCP  (confirmacao manual das etapas do processo)
+'  Macro AVULSA (rode via Alt+F8 > GerarChecklistCKCP). Nao faz parte de
+'  GerarRelatorio para nao apagar as marcacoes ao reprocessar a base.
+'  Nao-destrutiva: se a aba ja existe, preserva o que foi preenchido.
+'==============================================================================
+Private gChkWs As Worksheet
+Private gChkLin As Long
+
+Public Sub GerarChecklistCKCP()
+    Dim ws As Worksheet
+    On Error Resume Next
+    Set ws = ActiveWorkbook.Worksheets("CHECKLIST CKCP")
+    On Error GoTo 0
+    If Not ws Is Nothing Then
+        ws.Activate
+        MsgBox "A aba CHECKLIST CKCP ja existe e suas marcacoes foram mantidas." & vbLf & _
+               "Para recria-la do zero, exclua a aba e rode novamente.", _
+               vbInformation, "Checklist CKCP"
+        Exit Sub
+    End If
+
+    Set ws = ActiveWorkbook.Worksheets.Add( _
+        After:=ActiveWorkbook.Worksheets(ActiveWorkbook.Worksheets.Count))
+    ws.Name = "CHECKLIST CKCP"
+    Set gChkWs = ws
+
+    Dim corHdr As Long, corBanda As Long
+    corHdr = RGB(0, 105, 65): corBanda = RGB(0, 60, 38)
+
+    ws.Activate
+    ActiveWindow.DisplayGridlines = False
+
+    ' --- Banda de titulo ------------------------------------------------------
+    With ws.Range("A1:H1")
+        .Merge: .Interior.Color = corHdr
+        .Font.Color = vbWhite: .Font.Bold = True: .Font.Size = 16
+        .Font.Name = "Segoe UI": .VerticalAlignment = xlCenter
+    End With
+    ws.Cells(1, 1).Value = "CHECKLIST CKCP": ws.Cells(1, 1).IndentLevel = 1
+    ws.Rows(1).RowHeight = 34
+
+    ws.Cells(2, 1).Value = "CORTE ID:": ws.Cells(2, 1).Font.Bold = True
+    ws.Cells(2, 2).Interior.Color = RGB(255, 249, 196)
+    ws.Range("A2:B2").Borders.LineStyle = xlContinuous
+    ws.Cells(2, 4).Value = "% CONCLUIDO:": ws.Cells(2, 4).Font.Bold = True
+    ws.Rows(2).RowHeight = 20
+
+    ' --- Cabecalho da tabela --------------------------------------------------
+    Dim hdr As Variant, c As Long
+    hdr = Array("N", "CATEGORIA", "ETAPA", "ORIENTACAO", "STATUS", "RESPONSAVEL", "DATA", "OBS")
+    For c = 0 To UBound(hdr)
+        ws.Cells(4, c + 1).Value = hdr(c)
+    Next c
+    With ws.Range("A4:H4")
+        .Interior.Color = corHdr: .Font.Color = vbWhite: .Font.Bold = True
+        .Font.Name = "Segoe UI": .Font.Size = 10
+        .HorizontalAlignment = xlCenter: .VerticalAlignment = xlCenter
+        .Borders(xlEdgeBottom).LineStyle = xlContinuous
+        .Borders(xlEdgeBottom).Weight = xlMedium: .Borders(xlEdgeBottom).Color = corBanda
+    End With
+    ws.Rows(4).RowHeight = 24
+
+    ' --- Linhas (uma chamada AddChk por etapa; evita limite de continuacao) ---
+    gChkLin = 4
+    AddChk "ANALISE CKCP", "DADOS CADASTRAIS", "ANALISE CKCP - Check Dados Cadastrais"
+    AddChk "ANALISE CKCP", "STATUS DESCASADO", "ANALISE CKCP - Check Status Descasados 3o Nivel"
+    AddChk "SAP", "1o CHECK DE COMPROMISSO DE SERVICO", "SAP - TRANSACAO CJI5 - Layout /DANILO"
+    AddChk "SAP", "CHECK DE MATERIAL ATRELADO", "SAP - TRANSACAO MBBS - Layout /ESTOQUE"
+    AddChk "CUSTO DE OBRAS", "GERAR INVENTARIO DE MATERIAL", "CUSTO DE OBRAS - MODULO FGM - INVENTARIO DE MATERIAL"
+    AddChk "SAP", "GERAR ANALISE DE CUSTO", "SAP - TRANSACAO CJI3 - Layout /BPR_RAW - ANALISE DE CUSTO"
+    AddChk "ANALISE DE CUSTO", "CLASSIFICAR OS CUSTOS", "ANALISE DE CUSTO - Classificar os custos da base"
+    AddChk "ANALISE DE CUSTO", "AJUSTES CONTABIL DE MATERIAL", "ANALISE DE CUSTO - MATERIAL > AJUSTE CONTABIL DE MATERIAL"
+    AddChk "ANALISE DE CUSTO", "ANALISE DE CUSTO ""RISCO""", "ANALISE DE CUSTO - RISCO - SAP - TRANSACAO CJI3 > AREA SOLUCIONADORA"
+    AddChk "ANALISE DE CUSTO", "CHECK DE VALOR DO SERVICO", "ANALISE DE CUSTO - SERVICO > VERIFICAR DISCREPANCIAS E VALORES NEGATIVOS"
+    AddChk "ANALISE DE CUSTO", "CHECK DE APROPRIACAO CORRETA DE SERVICO", "ANALISE DE CUSTO - SERVICO > IDENTIFICAR SE OS SERVICOS DE INSTALACAO ESTAO NA ODI E DE DESATIVACAO NA ODD"
+    AddChk "ANALISE DE CUSTO", "ANALISE ADERENCIA MAT X SERV", "ANALISE DE CUSTO - MATERIAL vs SERVICO > ORGANIZAR A PLANILHA PARA MELHOR ANALISE"
+    AddChk "ANALISE DE CUSTO", "CHECK DE ATIVACAO DIRETA", "ANALISE DE CUSTO - ANALISE DE CA > CUSTO APENAS NA ODI - SENDO 25% (+- 5%) - SENDO 8% NO IOP"
+    AddChk "ANALISE DE CUSTO", "CHECK DE FRETE", "ANALISE DE CUSTO - Verificar frete"
+    AddChk "ANALISE DE CUSTO", "CHECK DO PRECO UNITARIO DE MATERIAL", "ANALISE DE CUSTO - PRECO UNITARIO > PRIORIZAR UC/UAR"
+    AddChk "ANALISE DE CUSTO", "CHECK PEP SEM UC", "ANALISE DE CUSTO - ANALISE DE CA > REVISAR COLUNA MAT.UC"
+    AddChk "ANALISE DE CUSTO", "CHECK DE CUSTO DE SUPORTE", "ANALISE DE CUSTO - RAZAO CJ > VERIFICAR CUSTOS DE SUPORTE (VIAGEM, ALIMENTACAO E HOSPEDAGEM) (2026)"
+    AddChk "ANALISE DE CUSTO", "ZERAR MOP", "RETIRAR O MOP PARA REDISTRIBUICAO NAS OBRAS"
+    AddChk "ANALISE DE CUSTO", "INSERIR MOP", "TRANSFERIR DA ORDEM DE AJUSTE DE MOP CONFORME PORCENTAGEM ACERTADA * EXCETO ODS PLPT"
+    AddChk "CUSTO DE OBRAS", "CHECK OBRAS DEVOLVIDAS PELO CADASTRO", "DEVOLVER AS OBRAS NAO CADASTRADAS"
+    AddChk "SAP", "CONFIRMAR DIAGRAMA", "SAP - TRANSACAO CN53N - LSMW - Confirmar diagrama"
+    AddChk "SAP", "2o CHECK DE COMPROMISSO DE SERVICO", "SAP - TRANSACAO CJI5 - Layout /DANILO"
+    AddChk "SAP", "COLOCAR PEP APROVADO NA EXCECAO", "SAP - TRANSACAO ZCHECK00 - ZCHECK11 - PRIMEIRO NIVEL DO PEP"
+    AddChk "SAP", "ALTERACAO DE STATUS", "SAP - LSMW > PS_CJ20N - ENTE_ENTE_2 - PS_STAT - ENTECKCP"
+    AddChk "SAP", "CHECK FINAL DOS STATUS", "SAP - TRANSACAO CN43N - Layout /PEPS"
+    AddChk "CAPITALIZACAO", "ENVIAR EMAIL PARA ATIVOS IMOB.", "CAPITALIZACAO - CARREGAR INFORMACOES"
+    AddChk "SIS.CONFORMIDADE", "CARGA DA BASE NO SIS.CONFORMIDADE", "ANALISE CKCP > CARREGAR BASE DE ANALISE NO SIS"
+
+    Dim ultLin As Long: ultLin = gChkLin
+    Dim nItens As Long: nItens = ultLin - 4
+
+    ' % concluido
+    ws.Cells(2, 5).Formula = "=COUNTIF(E5:E" & ultLin & ",""CONCLUIDO"")/" & nItens
+    ws.Cells(2, 5).NumberFormat = "0%"
+    ws.Cells(2, 5).Font.Bold = True: ws.Cells(2, 5).Font.Color = corHdr
+
+    ' --- Validacao (dropdown) na coluna STATUS --------------------------------
+    Dim sep As String: sep = Application.International(xlListSeparator)
+    With ws.Range(ws.Cells(5, 5), ws.Cells(ultLin, 5)).Validation
+        .Delete
+        .Add Type:=xlValidateList, AlertStyle:=xlValidAlertStop, _
+             Formula1:="CONCLUIDO" & sep & "PENDENTE" & sep & "N/A"
+        .IgnoreBlank = True: .InCellDropdown = True
+    End With
+
+    ' --- Formatacao condicional do STATUS -------------------------------------
+    Dim rgS As Range: Set rgS = ws.Range(ws.Cells(5, 5), ws.Cells(ultLin, 5))
+    rgS.HorizontalAlignment = xlCenter: rgS.Font.Bold = True
+    With rgS.FormatConditions.Add(Type:=xlCellValue, Operator:=xlEqual, Formula1:="=""CONCLUIDO""")
+        .Interior.Color = RGB(198, 239, 206): .Font.Color = RGB(0, 97, 0)
+    End With
+    With rgS.FormatConditions.Add(Type:=xlCellValue, Operator:=xlEqual, Formula1:="=""PENDENTE""")
+        .Interior.Color = RGB(255, 235, 156): .Font.Color = RGB(156, 101, 0)
+    End With
+    With rgS.FormatConditions.Add(Type:=xlCellValue, Operator:=xlEqual, Formula1:="=""N/A""")
+        .Interior.Color = RGB(217, 217, 217): .Font.Color = RGB(89, 89, 89)
+    End With
+
+    ' --- Corpo: fonte, bordas, alinhamento ------------------------------------
+    With ws.Range(ws.Cells(5, 1), ws.Cells(ultLin, 8))
+        .Font.Name = "Segoe UI": .Font.Size = 9
+        .VerticalAlignment = xlCenter: .WrapText = True
+        .Borders.LineStyle = xlContinuous
+        .Borders.Weight = xlHairline: .Borders.Color = RGB(223, 227, 230)
+    End With
+    ws.Range(ws.Cells(5, 1), ws.Cells(ultLin, 1)).HorizontalAlignment = xlCenter
+    ws.Range(ws.Cells(1, 1), ws.Cells(ultLin, 8)).BorderAround _
+        LineStyle:=xlContinuous, Weight:=xlThin, Color:=corBanda
+
+    ' --- Larguras -------------------------------------------------------------
+    ws.Columns(1).ColumnWidth = 4:  ws.Columns(2).ColumnWidth = 16
+    ws.Columns(3).ColumnWidth = 34: ws.Columns(4).ColumnWidth = 60
+    ws.Columns(5).ColumnWidth = 13: ws.Columns(6).ColumnWidth = 16
+    ws.Columns(7).ColumnWidth = 12: ws.Columns(8).ColumnWidth = 24
+
+    ws.Tab.Color = corHdr
+    ws.Rows(4).AutoFilter
+    ws.Range("A5").Select
+    ActiveWindow.FreezePanes = True
+
+    Set gChkWs = Nothing
+    MsgBox "Aba CHECKLIST CKCP criada com " & nItens & " etapas." & vbLf & _
+           "Preencha CORTE ID e marque o STATUS de cada etapa (dropdown)." & vbLf & _
+           "O % CONCLUIDO atualiza automaticamente.", vbInformation, "Checklist CKCP"
+End Sub
+
+' Escreve uma linha do checklist (usa gChkWs/gChkLin do GerarChecklistCKCP).
+Private Sub AddChk(ByVal categoria As String, ByVal etapa As String, ByVal orientacao As String)
+    gChkLin = gChkLin + 1
+    Dim n As Long: n = gChkLin - 4
+    gChkWs.Cells(gChkLin, 1).Value = n
+    gChkWs.Cells(gChkLin, 2).Value = categoria
+    gChkWs.Cells(gChkLin, 3).Value = etapa
+    gChkWs.Cells(gChkLin, 4).Value = orientacao
+    gChkWs.Cells(gChkLin, 3).Font.Bold = True
+    gChkWs.Cells(gChkLin, 7).NumberFormat = "dd/mm/yyyy"
+    If (n Mod 2) = 0 Then _
+        gChkWs.Range(gChkWs.Cells(gChkLin, 1), gChkWs.Cells(gChkLin, 8)).Interior.Color = RGB(246, 249, 247)
+End Sub
