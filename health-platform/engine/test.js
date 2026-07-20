@@ -110,11 +110,31 @@ test('atividade inválida lança erro', () => {
 test('VO2máx Cooper: 2400 m em 12 min ≈ 42,4 ml/kg/min', () => {
   assert.strictEqual(F.vo2maxCooper({ distanceM: 2400 }).value, 42.4);
 });
+test('RFM homem 180cm/85cm cintura = 21,6%', () => {
+  assert.strictEqual(F.bodyFatRfm({ sex: 'M', heightCm: 180, waistCm: 85 }).value, 21.6);
+});
+test('RFM mulher usa base 76 (12 pontos acima do homem p/ mesma proporção)', () => {
+  const m = F.bodyFatRfm({ sex: 'M', heightCm: 165, waistCm: 75 }).value;
+  const f = F.bodyFatRfm({ sex: 'F', heightCm: 165, waistCm: 75 }).value;
+  assert.strictEqual(Math.round((f - m) * 10) / 10, 12);
+});
+test('RFM exige cintura', () => {
+  assert.throws(() => F.bodyFatRfm({ sex: 'M', heightCm: 180 }));
+});
+test('proteína por refeição = 0,4 g/kg (Schoenfeld)', () => {
+  assert.strictEqual(F.macros(maleProfile).proteinPerMealG, 32); // 0,4×80
+  assert.ok(F.macros(maleProfile).sources.perMeal.includes('Schoenfeld'));
+});
+test('meta de Zona 2: saúde 150–200 min; endurance mais', () => {
+  assert.deepStrictEqual([F.zone2Weekly({ goal: 'health' }).minMin, F.zone2Weekly({ goal: 'health' }).maxMin], [150, 200]);
+  assert.ok(F.zone2Weekly({ goal: 'running' }).maxMin > 200);
+});
 test('formulas: determinismo', () => {
   deterministic(() => F.macros(maleProfile));
   deterministic(() => F.hrZonesKarvonen({ age: 41, hrRest: 55 }));
   deterministic(() => F.pacePerKm({ distanceKm: 21.1, totalMinutes: 105 }));
   deterministic(() => F.activityKcal({ activity: 'ciclismo', weightKg: 72, minutes: 45 }));
+  deterministic(() => F.bodyFatRfm({ sex: 'F', heightCm: 168, waistCm: 78 }));
 });
 
 // ---------------------------------------------------------------------------
@@ -319,6 +339,22 @@ test('progressão: uma sessão abaixo do topo → mantém carga', () => {
     { sets: [{ reps: 10, loadKg: 100, rir: 0 }] },
   ];
   assert.strictEqual(W.nextLoad({ history, repMax: 12, isCompound: true }).change, 'keep');
+});
+test('landmarks de volume: classifica peito por MEV/MAV/MRV', () => {
+  assert.strictEqual(W.classifyVolume('chest', 5).status, 'below_mev');   // <8
+  assert.strictEqual(W.classifyVolume('chest', 12).status, 'productive'); // 8..16
+  assert.strictEqual(W.classifyVolume('chest', 20).status, 'high');       // 16..22
+  assert.strictEqual(W.classifyVolume('chest', 26).status, 'above_mrv');  // >22
+});
+test('músculo desconhecido usa landmark padrão sem quebrar', () => {
+  const r = W.classifyVolume('forearms', 10);
+  assert.strictEqual(r.mev, 8);
+  assert.strictEqual(r.status, 'productive');
+});
+test('auditVolume ordena por séries desc e classifica cada músculo', () => {
+  const audit = W.auditVolume({ chest: 12, quadriceps: 6, back: 20 });
+  assert.strictEqual(audit[0].muscle, 'back');
+  assert.strictEqual(audit.find((a) => a.muscle === 'quadriceps').status, 'below_mev');
 });
 test('gerador de treino: determinismo', () => {
   deterministic(() => W.generateWorkoutPlan({ exercises: EXERCISES, goal: 'hypertrophy', daysPerWeek: 5, equipment: ['barbell', 'dumbbell', 'machine', 'cable', 'bodyweight'], level: 'advanced' }));

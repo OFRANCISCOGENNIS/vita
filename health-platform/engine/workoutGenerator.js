@@ -119,4 +119,45 @@ function nextLoad({ history, repMax, isCompound }) {
   return { change: 'increase', nextLoadKg: next, deltaPct: pct, rule: 'PROGRESS_LOAD_TOP_REPS_2X', reason: `Todas as séries no topo da faixa (${repMax} reps) com RIR≥1 em 2 sessões.` };
 }
 
-module.exports = { generateWorkoutPlan, eligibleExercises, nextLoad, SPLITS, GOAL_PARAMS };
+// ---------------------------------------------------------------------------
+// LANDMARKS DE VOLUME MEV/MAV/MRV por músculo (séries/semana).
+// Baseado em Israetel/Renaissance Periodization + dose-resposta Pelland 2024
+// (retornos decrescentes; MRV sustentável só 1–2 semanas → deload).
+// ---------------------------------------------------------------------------
+const VOLUME_LANDMARKS = {
+  chest:      { mev: 8,  mav: 16, mrv: 22 },
+  back:       { mev: 10, mav: 18, mrv: 25 },
+  lats:       { mev: 10, mav: 18, mrv: 25 },
+  quadriceps: { mev: 8,  mav: 16, mrv: 20 },
+  hamstrings: { mev: 6,  mav: 14, mrv: 18 },
+  glutes:     { mev: 4,  mav: 12, mrv: 16 },
+  shoulders:  { mev: 8,  mav: 18, mrv: 26 },
+  biceps:     { mev: 8,  mav: 16, mrv: 26 },
+  triceps:    { mev: 6,  mav: 14, mrv: 18 },
+  calves:     { mev: 8,  mav: 16, mrv: 20 },
+  core:       { mev: 6,  mav: 16, mrv: 25 },
+};
+const DEFAULT_LANDMARK = { mev: 8, mav: 16, mrv: 22 };
+
+// Classifica as séries semanais de um músculo contra seus landmarks.
+function classifyVolume(muscle, sets) {
+  const lm = VOLUME_LANDMARKS[muscle] || DEFAULT_LANDMARK;
+  let status;
+  if (sets < lm.mev) status = 'below_mev';        // submáximo — pode subir
+  else if (sets <= lm.mav) status = 'productive'; // faixa produtiva
+  else if (sets <= lm.mrv) status = 'high';       // alto — sustentável por pouco
+  else status = 'above_mrv';                       // acima do recuperável — reduzir
+  return { muscle, sets, status, ...lm };
+}
+
+// Audita um plano inteiro: séries/músculo/semana → classificação por landmark.
+function auditVolume(weeklyVolume) {
+  return Object.entries(weeklyVolume)
+    .map(([muscle, sets]) => classifyVolume(muscle, sets))
+    .sort((a, b) => b.sets - a.sets || a.muscle.localeCompare(b.muscle));
+}
+
+module.exports = {
+  generateWorkoutPlan, eligibleExercises, nextLoad, SPLITS, GOAL_PARAMS,
+  classifyVolume, auditVolume, VOLUME_LANDMARKS,
+};

@@ -255,6 +255,13 @@ h1.title{font-size:clamp(26px,3vw,34px);font-weight:800;letter-spacing:-.02em;ma
 .zlab{flex:1}.zlab b{font-size:13px;display:block}.zlab span{font-size:11px;color:var(--muted);font-family:var(--mono)}
 .zval{font-family:var(--mono);font-weight:700;font-size:14px}.zval small{color:var(--muted);font-weight:500}
 
+/* barra de volume (landmarks) */
+.vbar{position:relative;flex:1;height:10px;border-radius:6px;background:var(--ring-track);overflow:visible;min-width:80px}
+.vfill{height:100%;border-radius:6px;transition:width .4s}
+.vfill.below{background:var(--warn)}.vfill.prod{background:var(--good)}.vfill.high{background:var(--accent)}.vfill.over{background:var(--crit)}
+.vmev,.vmav{position:absolute;top:-2px;width:2px;height:14px;background:var(--faint);opacity:.7}
+.vmav{background:var(--text);opacity:.4}
+
 /* swaps */
 .li.swap{cursor:pointer}
 .swapic{color:var(--faint);font-size:11px;transition:.15s}
@@ -336,6 +343,7 @@ h1.title{font-size:clamp(26px,3vw,34px);font-weight:800;letter-spacing:-.02em;ma
       <div class="field"><label>Altura · cm</label><input id="height" type="number" value="180" min="130" max="220"></div>
       <div class="field"><label>Idade</label><input id="age" type="number" value="30" min="14" max="90"></div>
       <div class="field"><label>%Gordura</label><input id="bf" type="number" value="20" min="4" max="55" step="0.5"></div>
+      <div class="field"><label>Cintura · cm</label><input id="waist" type="number" value="85" min="50" max="180" step="0.5"></div>
       <div class="field wide"><label>Objetivo</label>
         <select id="goal">
           <option value="fat_loss">Emagrecimento</option>
@@ -423,6 +431,12 @@ function ffmi(p){if(!(p.bf>0))return null;const h=p.heightCm/100,lbm=p.weightKg*
 function waterMl(p,tmin=45){return Math.round(35*p.weightKg+Math.round(tmin/60)*750);}
 function hrZones(age,rest=60){const hrMax=Math.round(208-0.7*age);const z=(lo,hi)=>({min:Math.round(rest+lo*(hrMax-rest)),max:Math.round(rest+hi*(hrMax-rest))});return{hrMax,z2:z(.6,.7),z4:z(.8,.9)};}
 function hrZonesFull(age,rest){const hrMax=Math.round(208-0.7*age);const z=(lo,hi)=>({min:Math.round(rest+lo*(hrMax-rest)),max:Math.round(rest+hi*(hrMax-rest))});return{hrMax,z1:z(.5,.6),z2:z(.6,.7),z3:z(.7,.8),z4:z(.8,.9),z5:z(.9,1)};}
+/* RFM: %gordura por altura+cintura, validado vs DXA (Woolcott & Bergman 2018) */
+function rfm(sex,heightCm,waistCm){if(!(waistCm>0))return null;return R((sex==="M"?64:76)-20*(heightCm/waistCm),1);}
+function zone2Weekly(goal){const endur=["performance","running","cycling"].includes(goal);return{min:endur?240:150,max:endur?400:200,sessionMin:45};}
+/* landmarks MEV/MAV/MRV por músculo (Israetel/RP + Pelland 2024) */
+const VOL={"Quadríceps":{mev:8,mav:16,mrv:20},"Posteriores":{mev:6,mav:14,mrv:18},"Glúteos":{mev:4,mav:12,mrv:16},"Peito":{mev:8,mav:16,mrv:22},"Ombros":{mev:8,mav:18,mrv:26},"Costas":{mev:10,mav:18,mrv:25},"Dorsais":{mev:10,mav:18,mrv:25},"Core":{mev:6,mav:16,mrv:25}};
+function classifyVol(mu,sets){const lm=VOL[mu]||{mev:8,mav:16,mrv:22};let st;if(sets<lm.mev)st="below";else if(sets<=lm.mav)st="prod";else if(sets<=lm.mrv)st="high";else st="over";return{mu,sets,st,...lm};}
 /* --- calculadoras determinísticas (fórmula nomeada + fonte) --- */
 function oneRmEpley(load,reps){return reps<1?null:R(reps===1?load:load*(1+reps/30),1);}
 function oneRmBrzycki(load,reps){return(reps<1||reps>=37)?null:R(reps===1?load:load*(36/(37-reps)),1);}
@@ -633,7 +647,7 @@ function chipsOn(id){return [...document.querySelectorAll("#"+id+" button.on")].
 function saveProfile(){
   try{localStorage.setItem("vita.profile",JSON.stringify({
     sex:document.querySelector("#sexseg .on").dataset.sex,
-    weight:$("#weight").value,height:$("#height").value,age:$("#age").value,bf:$("#bf").value,
+    weight:$("#weight").value,height:$("#height").value,age:$("#age").value,bf:$("#bf").value,waist:$("#waist").value,
     goal:$("#goal").value,activity:$("#activity").value,days:$("#days").value,strategy:$("#strategy").value,
     allergies:chipsOn("allergies"),equipment:chipsOn("equipment"),injuries:chipsOn("injuries"),labs:LABVALS,
   }));}catch(e){}
@@ -642,7 +656,7 @@ function loadProfile(){
   let d;try{d=JSON.parse(localStorage.getItem("vita.profile")||"null");}catch(e){d=null;}
   if(!d)return;
   const set=(id,v)=>{if(v!=null&&$("#"+id))$("#"+id).value=v;};
-  set("weight",d.weight);set("height",d.height);set("age",d.age);set("bf",d.bf);
+  set("weight",d.weight);set("height",d.height);set("age",d.age);set("bf",d.bf);set("waist",d.waist);
   set("goal",d.goal);set("activity",d.activity);set("days",d.days);set("strategy",d.strategy);
   if(d.sex)document.querySelectorAll("#sexseg button").forEach(b=>b.classList.toggle("on",b.dataset.sex===d.sex));
   const applyChips=(id,vals)=>{if(!vals)return;document.querySelectorAll("#"+id+" button").forEach(b=>b.classList.toggle("on",vals.includes(b.dataset.v)));};
@@ -653,7 +667,7 @@ function P(){
   return{
     sex:document.querySelector("#sexseg .on").dataset.sex,
     weightKg:+$("#weight").value,heightCm:+$("#height").value,age:+$("#age").value,
-    bf:+$("#bf").value,goal:$("#goal").value,activity:$("#activity").value,days:+$("#days").value,
+    bf:+$("#bf").value,waist:+$("#waist").value,goal:$("#goal").value,activity:$("#activity").value,days:+$("#days").value,
     strategy:$("#strategy").value,
     allergies:chipsOn("allergies"),equipment:chipsOn("equipment"),conditions:chipsOn("injuries"),
   };
@@ -730,13 +744,15 @@ function render(){
     ${macroBar("Gordura",m.fat,fKcal,m.kcal,COL.fat,m.src.fat)}
     <div class="src" style="margin-top:12px">Fibra ${m.fiber} g · ${m.src.fiber} · Água ${(wm/1000).toFixed(2)} L</div></div>`;
 
+  const rfmV=rfm(p.sex,p.heightCm,p.waist);
   const cardBody=`<div class="card span-3"><h3>Composição</h3><div class="cap">avaliação corporal</div>
     <div class="tiles">
       <div class="tile"><div class="k">IMC</div><div class="v tnum">${bi}</div><div class="meta">${bi<18.5?"abaixo":bi<25?"normal":bi<30?"sobrepeso":"obesidade"}</div></div>
+      <div class="tile"><div class="k">RFM · %gord</div><div class="v tnum">${rfmV??"—"}<small> %</small></div><div class="meta">altura+cintura · vs DXA</div></div>
       <div class="tile"><div class="k">FFMI</div><div class="v tnum">${ff??"—"}</div><div class="meta">${ff?(ff<20?"iniciante":ff<23?"intermediário":"avançado"):"informe %BF"}</div></div>
       <div class="tile"><div class="k">Massa magra</div><div class="v tnum">${p.bf>0?R(p.weightKg*(1-p.bf/100),1):"—"}<small> kg</small></div><div class="meta">Katch-McArdle</div></div>
-      <div class="tile"><div class="k">Z2 · queima</div><div class="v tnum">${hz.z2.min}<small>–${hz.z2.max}</small></div><div class="meta">bpm · Karvonen</div></div>
-    </div></div>`;
+    </div>
+    <div class="src" style="margin-top:12px">RFM ${rfmV??"—"}% (Woolcott 2018) vs %informado ${p.bf}% · diferença ${rfmV?((rfmV-p.bf>0?"+":"")+R(rfmV-p.bf,1)):"—"} pp</div></div>`;
 
   // trend
   const ws=weightSeries(p),tr=trend(ws),cur=ws[ws.length-1].y,first=ws[0].y,perWk=R(tr.slope*7,2);
@@ -836,6 +852,23 @@ function render(){
     <div class="list">${wp.map(d=>`<div class="daytag">Dia ${d.day} · ${d.type}</div>${d.items.map((it,i)=>`<div class="li"><span class="idx tnum">${String(i+1).padStart(2,'0')}</span><div class="nm"><b>${it.n}</b><span>${it.mu}</span></div><div class="rt"><b class="tnum">${it.sets}×${it.lo}–${it.hi}</b> · ${it.rest}s</div></div>`).join("")}`).join("")}</div>
     ${wpr.barred.length?`<div class="src" style="margin-top:12px">Excluídos pela lesão: ${wpr.barred.map(e=>e.n).join(", ")}. O motor nunca prescreve exercício contraindicado.</div>`:""}</div>`;
 
+  // ---- volume semanal vs landmarks MEV/MAV/MRV ----
+  const wvol={};for(const d of wp)for(const it of d.items)wvol[it.mu]=(wvol[it.mu]||0)+it.sets;
+  const vaudit=Object.entries(wvol).map(([mu,s])=>classifyVol(mu,s)).sort((a,b)=>b.sets-a.sets||a.mu.localeCompare(b.mu));
+  const VSTAT={below:{p:"warn",t:"abaixo do MEV"},prod:{p:"good",t:"produtivo"},high:{p:"accent",t:"alto"},over:{p:"crit",t:"acima do MRV"}};
+  const cardVolume=`<div class="card span-6"><h3>Volume por músculo <span class="pill accent">MEV·MAV·MRV</span></h3><div class="cap">séries/semana vs landmarks · Israetel/RP + Pelland 2024</div>
+    <div class="zones">${vaudit.map(v=>{const st=VSTAT[v.st];const pct=Math.min(v.sets/v.mrv*100,100);return`<div class="zrow"><div class="zlab" style="flex:0 0 96px"><b>${v.mu}</b><span>MEV ${v.mev} · MRV ${v.mrv}</span></div>
+      <div class="vbar"><div class="vmev" style="left:${v.mev/v.mrv*100}%"></div><div class="vmav" style="left:${v.mav/v.mrv*100}%"></div><div class="vfill ${v.st}" style="width:${pct}%"></div></div>
+      <div class="zval tnum" style="flex:0 0 auto">${v.sets}<small> séries</small></div><span class="pill ${st.p}">${st.t}</span></div>`;}).join("")}</div>
+    <div class="src" style="margin-top:10px">MEV: mínimo eficaz · MAV: adaptação ótima · MRV: máximo recuperável (só 1–2 semanas → deload).</div></div>`;
+
+  // ---- meta de Zona 2 (base aeróbica/mitocondrial) ----
+  const z2=zone2Weekly(p.goal);
+  const cardZone2=`<div class="card span-6"><h3>Base aeróbica · Zona 2</h3><div class="cap">San Millán · lactato 1,5–2 mmol · mitocôndria</div>
+    <div class="calcout"><div class="cores"><div class="k">Meta semanal Z2</div><div class="v tnum">${z2.min}–${z2.max}<small> min</small></div><div class="meta">sessões ≥ ${z2.sessionMin} min</div></div>
+    <div class="cores"><div class="k">Sua faixa Z2</div><div class="v tnum">${hz.z2.min}–${hz.z2.max}<small> bpm</small></div><div class="meta">Karvonen · manter conversável</div></div></div>
+    <div class="src" style="margin-top:12px">Z2 aumenta densidade mitocondrial e oxidação de gordura — a base sobre a qual as zonas altas rendem. ${["performance","running","cycling"].includes(p.goal)?"Volume elevado pelo objetivo de endurance.":"150–200 min/sem cobrem saúde e longevidade."}</div></div>`;
+
   // ---- coach por regras: estado agregado ----
   const coachState={redFlags:guards.filter(g=>g.sev==="crit").length,rapidLoss:rapid,plateau:plateau,dietBlocked,strategyName:stratName,
     waterPctToday:doneToday.includes("water")?100:40,proteinDoneToday:doneToday.includes("protein"),streakDays:st2};
@@ -885,7 +918,7 @@ function render(){
     today:{title:"Hoje",sub:"Tudo abaixo é calculado por fórmula nomeada — mesmo input, mesmo output.",html:cardCoach+cardEnergy+cardMacros+cardBody+cardTrend+cardReady+cardMeals+cardWorkout},
     nutri:{title:"Nutrição",sub:"Meta calórica e macros pelo motor; plano montado por seleção na base de alimentos.",html:cardEnergy+cardMacros+cardMeals+cardBody},
     week:{title:"Semana",sub:"7 dias com rotação determinística de fontes + lista de compras agregada.",html:cardWeek+cardShop},
-    train:{title:"Treino",sub:"Split por frequência, faixas por objetivo, progressão dupla automática.",html:cardWorkout+cardReady+cardTrend},
+    train:{title:"Treino",sub:"Split por frequência, volume graduado por landmarks e base aeróbica em Zona 2.",html:cardWorkout+cardVolume+cardZone2+cardReady+cardTrend},
     calc:{title:"Calculadoras",sub:"1RM, zonas de FC, pace, gasto calórico e VO₂máx — todas determinísticas.",html:cardCalc+cardBody},
     labs:{title:"Exames",sub:"Comparação com faixas de referência armazenadas — educativo, nunca prescreve.",html:cardLabs+cardLabSummary},
     habits:{title:"Hábitos",sub:"Checklist diário e sequência por regras determinísticas sobre o que você registra.",html:cardHabits+cardStreak+cardCoach},

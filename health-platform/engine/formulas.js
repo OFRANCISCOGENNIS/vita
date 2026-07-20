@@ -66,6 +66,25 @@ function bodyFatUsNavy({ sex, heightCm, waistCm, neckCm, hipCm }) {
 }
 
 // ---------------------------------------------------------------------------
+// %Gordura — RFM (Relative Fat Mass): só altura + cintura, validado vs DXA,
+// mais preciso que IMC (Woolcott & Bergman 2018, NHANES). sex: 'M'|'F'.
+// ---------------------------------------------------------------------------
+function bodyFatRfm({ sex, heightCm, waistCm }) {
+  if (!(waistCm > 0)) throw new Error('waistCm obrigatório para RFM');
+  const base = sex === 'M' ? 64 : 76;
+  const value = base - 20 * (heightCm / waistCm);
+  return { value: round(value, 1), formula: 'RFM', source: 'Woolcott & Bergman 2018 (NHANES/DXA)', confidence: 'medium', errorMargin: '±~5% vs DXA' };
+}
+
+// Meta semanal de Zona 2 (base aeróbica/mitocondrial) por objetivo.
+// San Millán: 150–200 min/sem saúde; mais para endurance. Sessões ≥45 min.
+function zone2Weekly({ goal }) {
+  const min = goal === 'performance' || goal === 'running' || goal === 'cycling' ? 240 : 150;
+  const max = goal === 'performance' || goal === 'running' || goal === 'cycling' ? 400 : 200;
+  return { minMin: min, maxMin: max, sessionMin: 45, source: 'San Millán (Zona 2, lactato 1,5–2 mmol)' };
+}
+
+// ---------------------------------------------------------------------------
 // Meta calórica + macros (Módulo 4) — faixas ISSN codificadas
 // ---------------------------------------------------------------------------
 const GOAL_KCAL_ADJUST = {
@@ -97,15 +116,18 @@ function macros(profile) {
     proteinG = round(2.6 * lbm, 0);
     proteinSrc = 'Helms 2014: 2,3-3,1 g/kg LBM em déficit';
   } else {
+    // 1,8 g/kg: dentro do teto de 1,6 g/kg (Morton 2018, IC até 2,2) com margem.
     proteinG = round(1.8 * profile.weightKg, 0);
-    proteinSrc = 'ISSN 2017: 1,4-2,0 g/kg';
+    proteinSrc = 'Morton 2018: teto 1,6 g/kg (IC 2,2)';
   }
   const fatG = round(0.8 * profile.weightKg, 0); // ISSN: mínimo 0,6-0,8 g/kg
   const carbG = round(Math.max(0, (kcal.value - proteinG * 4 - fatG * 9) / 4), 0);
   const fiberG = round(14 * kcal.value / 1000, 0); // IOM/DRI: 14 g/1000 kcal
+  // Proteína por refeição p/ maximizar síntese: ~0,4 g/kg (Schoenfeld & Aragon 2018).
+  const proteinPerMealG = round(0.4 * profile.weightKg, 0);
   return {
-    kcal: kcal.value, proteinG, fatG, carbG, fiberG,
-    sources: { kcal: kcal.source, protein: proteinSrc, fat: 'ISSN 2017: ≥0,8 g/kg', fiber: 'IOM/DRI 2005' },
+    kcal: kcal.value, proteinG, fatG, carbG, fiberG, proteinPerMealG,
+    sources: { kcal: kcal.source, protein: proteinSrc, fat: 'ISSN 2017: ≥0,8 g/kg', fiber: 'IOM/DRI 2005', perMeal: 'Schoenfeld & Aragon 2018: ~0,4 g/kg/refeição' },
     confidence: kcal.confidence,
   };
 }
@@ -196,7 +218,8 @@ function ffmi({ weightKg, heightCm, bodyFatPct }) {
 module.exports = {
   bmr, bmrMifflinStJeor, bmrKatchMcArdle, bmrHarrisBenedict,
   tdee, targetKcal, macros, waterMl,
-  bodyFatUsNavy, oneRepMaxEpley, oneRepMaxBrzycki, loadForReps,
+  bodyFatUsNavy, bodyFatRfm, zone2Weekly,
+  oneRepMaxEpley, oneRepMaxBrzycki, loadForReps,
   pacePerKm, activityKcal, vo2maxCooper,
   hrMaxTanaka, hrZonesKarvonen, bmi, ffmi,
   ACTIVITY_FACTORS, MET,
