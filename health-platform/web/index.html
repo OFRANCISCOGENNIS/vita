@@ -573,6 +573,60 @@ const FOODS=[
   {n:"Pasta de amendoim",c:"oils",kcal:589,p:22.5,ch:21.6,f:46.9,t:["vegan","veg","gf","keto"],gi:14,pd:.52,mi:{k:649,mg:168,fe:1.9,zn:2.9,ca:43,vc:0,va:0,o3:.03,na:17}},
   {n:"Abacate",c:"fruits",kcal:96,p:1.2,ch:6,f:8.4,t:["vegan","veg","gf","keto"],gi:15,pd:0,mi:{k:485,mg:29,fe:.6,zn:.6,ca:12,vc:10,va:7,o3:.11,na:7}},
   {n:"Castanha-de-caju",c:"oils",kcal:570,p:18.5,ch:29.1,f:46.3,t:["vegan","veg","gf","keto"],gi:25,pd:.5,mi:{k:660,mg:292,fe:6.7,zn:5.8,ca:37,vc:.5,va:0,o3:.06,na:12}},
+  /* carnes e aves */
+  {n:"Alcatra grelhada",c:"meats",kcal:241,p:31.9,ch:0,f:11.6,t:["animal","gf","lf","keto"],gi:null,pd:.92,mi:{k:325,mg:22,fe:2.4,zn:4.8,ca:9,vc:0,va:0,o3:.03,na:53}},
+  {n:"Coxão mole cozido",c:"meats",kcal:219,p:32.4,ch:0,f:8.9,t:["animal","gf","lf","keto"],gi:null,pd:.92,mi:{k:299,mg:21,fe:2.7,zn:5.5,ca:7,vc:0,va:0,o3:.02,na:48}},
+  {n:"Coxa de frango assada",c:"meats",kcal:215,p:28.5,ch:0,f:10.6,t:["animal","gf","lf","keto"],gi:null,pd:.92,mi:{k:230,mg:21,fe:1.3,zn:2.6,ca:11,vc:0,va:30,o3:.06,na:88}},
+  {n:"Lombo suíno assado",c:"meats",kcal:210,p:35.7,ch:0,f:6.4,t:["animal","gf","lf","keto"],gi:null,pd:.92,mi:{k:373,mg:26,fe:.9,zn:2.4,ca:6,vc:0,va:2,o3:.03,na:59}},
+  {n:"Fígado bovino grelhado",c:"meats",kcal:225,p:29.9,ch:4.5,f:9,t:["animal","gf","lf","keto"],gi:null,pd:.92,mi:{k:364,mg:22,fe:5.8,zn:5.2,ca:8,vc:1.3,va:9442,o3:.05,na:88}},
+  /* peixes */
+  {n:"Salmão grelhado",c:"fish",kcal:243,p:26.1,ch:0,f:14.5,t:["animal","gf","lf","keto"],gi:null,pd:.9,mi:{k:389,mg:30,fe:.4,zn:.6,ca:16,vc:0,va:13,o3:2.2,na:63}},
+  {n:"Sardinha assada",c:"fish",kcal:164,p:32.2,ch:0,f:3.9,t:["animal","gf","lf","keto"],gi:null,pd:.9,mi:{k:427,mg:45,fe:1.3,zn:2.4,ca:438,vc:0,va:9,o3:1.4,na:161}},
+  {n:"Merluza assada",c:"fish",kcal:122,p:26.6,ch:0,f:.9,t:["animal","gf","lf","keto"],gi:null,pd:.9,mi:{k:390,mg:29,fe:.3,zn:.4,ca:29,vc:0,va:11,o3:.25,na:110}},
+  /* laticínios e ovos */
+  {n:"Iogurte grego natural",c:"dairy",kcal:97,p:9,ch:3.9,f:5,t:["veg","gf","keto"],gi:11,pd:1,mi:{k:141,mg:11,fe:.1,zn:.5,ca:110,vc:0,va:25,o3:.02,na:36}},
+  {n:"Queijo cottage",c:"dairy",kcal:98,p:11.1,ch:3.4,f:4.3,t:["veg","gf","keto"],gi:10,pd:1,mi:{k:104,mg:8,fe:.1,zn:.4,ca:83,vc:0,va:37,o3:.01,na:364}},
+  {n:"Ricota",c:"dairy",kcal:140,p:12.6,ch:3.8,f:8.1,t:["veg","gf","keto"],gi:10,pd:1,mi:{k:105,mg:11,fe:.4,zn:1.2,ca:253,vc:0,va:120,o3:.09,na:283}},
+  {n:"Leite desnatado",c:"dairy",kcal:35,p:3.4,ch:4.9,f:.2,t:["veg","gf"],gi:32,pd:1,mi:{k:156,mg:10,fe:.1,zn:.4,ca:123,vc:.9,va:59,o3:0,na:52}},
+  {n:"Clara de ovo cozida",c:"eggs",kcal:52,p:10.9,ch:.7,f:.2,t:["veg","gf","lf","keto"],gi:null,pd:1,mi:{k:163,mg:11,fe:.1,zn:0,ca:7,vc:0,va:0,o3:0,na:166}},
+  /* cereais e grãos */
+  {n:"Arroz branco cozido",c:"cereals",kcal:128,p:2.5,ch:28.1,f:.2,t:["vegan","veg","gf"],gi:73,pd:.5,mi:{k:15,mg:2,fe:.1,zn:.5,ca:4,vc:0,va:0,o3:0,na:1}},
+  {n:"Quinoa cozida",c:"cereals",kcal:120,p:4.4,ch:21.3,f:1.9,t:["vegan","veg","gf"],gi:53,pd:.73,mi:{k:172,mg:64,fe:1.5,zn:1.1,ca:17,vc:0,va:0,o3:.09,na:7}},
+  {n:"Cuscuz de milho",c:"cereals",kcal:113,p:2.2,ch:25.3,f:.7,t:["vegan","veg","gf"],gi:65,pd:.5,mi:{k:60,mg:15,fe:.5,zn:.4,ca:2,vc:0,va:8,o3:.01,na:120}},
+  {n:"Tapioca (goma hidratada)",c:"cereals",kcal:240,p:0,ch:59.4,f:0,t:["vegan","veg","gf"],gi:93,pd:0,mi:{k:6,mg:1,fe:.1,zn:0,ca:9,vc:0,va:0,o3:0,na:2}},
+  {n:"Pão integral",c:"cereals",kcal:253,p:9.4,ch:49.9,f:2.9,t:["vegan","veg"],gi:53,pd:.42,mi:{k:220,mg:57,fe:2.3,zn:1.3,ca:66,vc:0,va:0,o3:.05,na:506}},
+  {n:"Milho verde cozido",c:"cereals",kcal:98,p:3.2,ch:17.1,f:2.4,t:["vegan","veg","gf"],gi:52,pd:.5,mi:{k:206,mg:31,fe:.5,zn:.7,ca:2,vc:4.8,va:20,o3:.02,na:1}},
+  /* leguminosas */
+  {n:"Feijão preto cozido",c:"legumes",kcal:77,p:4.5,ch:14,f:.5,t:["vegan","veg","gf"],gi:30,pd:.68,mi:{k:256,mg:40,fe:1.5,zn:.7,ca:29,vc:0,va:0,o3:.11,na:2}},
+  {n:"Ervilha cozida",c:"legumes",kcal:63,p:4.5,ch:10.5,f:.2,t:["vegan","veg","gf"],gi:39,pd:.67,mi:{k:127,mg:22,fe:1.1,zn:.9,ca:19,vc:8.6,va:38,o3:.02,na:2}},
+  {n:"Edamame cozido",c:"legumes",kcal:121,p:11.9,ch:8.9,f:5.2,t:["vegan","veg","gf","lf"],gi:18,pd:.9,mi:{k:436,mg:64,fe:2.3,zn:1.4,ca:63,vc:6.1,va:15,o3:.36,na:6}},
+  /* tubérculos */
+  {n:"Batata inglesa cozida",c:"tubers",kcal:52,p:1.2,ch:11.9,f:0,t:["vegan","veg","gf"],gi:78,pd:0,mi:{k:239,mg:15,fe:.2,zn:.2,ca:4,vc:3.6,va:0,o3:0,na:2}},
+  {n:"Inhame cozido",c:"tubers",kcal:97,p:2,ch:23,f:.1,t:["vegan","veg","gf"],gi:51,pd:0,mi:{k:670,mg:18,fe:.5,zn:.2,ca:14,vc:12,va:6,o3:0,na:8}},
+  /* verduras e legumes */
+  {n:"Brócolis cozido",c:"vegetables",kcal:25,p:2.1,ch:4.4,f:.5,t:["vegan","veg","gf","keto"],gi:15,pd:.6,mi:{k:227,mg:15,fe:.5,zn:.4,ca:51,vc:42,va:69,o3:.1,na:41}},
+  {n:"Espinafre refogado",c:"vegetables",kcal:67,p:2.7,ch:5.1,f:4.5,t:["vegan","veg","gf","keto"],gi:15,pd:.55,mi:{k:466,mg:87,fe:2.7,zn:.8,ca:112,vc:9.8,va:524,o3:.14,na:70}},
+  {n:"Couve refogada",c:"vegetables",kcal:90,p:3.1,ch:8.7,f:5.5,t:["vegan","veg","gf","keto"],gi:15,pd:.55,mi:{k:403,mg:44,fe:.7,zn:.4,ca:177,vc:76,va:508,o3:.18,na:12}},
+  {n:"Tomate cru",c:"vegetables",kcal:15,p:1.1,ch:3.1,f:.2,t:["vegan","veg","gf","keto"],gi:15,pd:0,mi:{k:222,mg:11,fe:.2,zn:.1,ca:7,vc:21,va:54,o3:0,na:1}},
+  {n:"Cenoura crua",c:"vegetables",kcal:34,p:1.3,ch:7.7,f:.2,t:["vegan","veg","gf"],gi:16,pd:0,mi:{k:315,mg:11,fe:.2,zn:.2,ca:23,vc:5.1,va:1626,o3:0,na:65}},
+  {n:"Abobrinha refogada",c:"vegetables",kcal:26,p:1.1,ch:4.3,f:.6,t:["vegan","veg","gf","keto"],gi:15,pd:0,mi:{k:216,mg:15,fe:.3,zn:.3,ca:18,vc:5.6,va:14,o3:.04,na:1}},
+  {n:"Alface crespa",c:"vegetables",kcal:11,p:1.3,ch:1.7,f:.2,t:["vegan","veg","gf","keto"],gi:15,pd:0,mi:{k:267,mg:11,fe:.4,zn:.2,ca:38,vc:15,va:206,o3:.06,na:3}},
+  {n:"Beterraba cozida",c:"vegetables",kcal:32,p:1.3,ch:7.2,f:.1,t:["vegan","veg","gf"],gi:64,pd:0,mi:{k:245,mg:17,fe:.3,zn:.3,ca:15,vc:3.1,va:2,o3:0,na:58}},
+  /* frutas */
+  {n:"Maçã com casca",c:"fruits",kcal:56,p:.3,ch:15.2,f:0,t:["vegan","veg","gf"],gi:38,pd:0,mi:{k:75,mg:2,fe:.1,zn:0,ca:2,vc:2.4,va:3,o3:0,na:0}},
+  {n:"Laranja pera",c:"fruits",kcal:37,p:1,ch:8.9,f:.1,t:["vegan","veg","gf"],gi:43,pd:0,mi:{k:163,mg:9,fe:.1,zn:.1,ca:22,vc:53.7,va:11,o3:0,na:0}},
+  {n:"Morango",c:"fruits",kcal:30,p:.9,ch:6.8,f:.3,t:["vegan","veg","gf","keto"],gi:40,pd:0,mi:{k:184,mg:10,fe:.3,zn:.1,ca:11,vc:63.6,va:1,o3:.07,na:1}},
+  {n:"Manga palmer",c:"fruits",kcal:72,p:.4,ch:19.4,f:.2,t:["vegan","veg","gf"],gi:51,pd:0,mi:{k:148,mg:8,fe:.1,zn:0,ca:8,vc:65.5,va:54,o3:.01,na:1}},
+  {n:"Uva itália",c:"fruits",kcal:53,p:.7,ch:13.6,f:.2,t:["vegan","veg","gf"],gi:59,pd:0,mi:{k:162,mg:5,fe:.1,zn:0,ca:7,vc:2,va:3,o3:0,na:1}},
+  {n:"Kiwi",c:"fruits",kcal:51,p:1.3,ch:11.5,f:.6,t:["vegan","veg","gf"],gi:50,pd:0,mi:{k:269,mg:11,fe:.3,zn:.1,ca:24,vc:70.8,va:4,o3:.04,na:2}},
+  /* oleaginosas e gorduras */
+  {n:"Castanha-do-pará",c:"oils",kcal:643,p:14.5,ch:15.1,f:63.5,t:["vegan","veg","gf","keto"],gi:25,pd:.5,mi:{k:600,mg:365,fe:2.3,zn:4.2,ca:146,vc:.7,va:0,o3:.05,na:2}},
+  {n:"Amêndoas",c:"oils",kcal:581,p:18.6,ch:29.5,f:47.3,t:["vegan","veg","gf","keto"],gi:15,pd:.5,mi:{k:687,mg:237,fe:3.7,zn:2.6,ca:237,vc:0,va:0,o3:0,na:3}},
+  {n:"Chia",c:"oils",kcal:486,p:16.5,ch:42.1,f:30.7,t:["vegan","veg","gf","keto"],gi:1,pd:.6,mi:{k:407,mg:335,fe:7.7,zn:4.6,ca:631,vc:1.6,va:54,o3:17.8,na:16}},
+  {n:"Linhaça",c:"oils",kcal:495,p:14.1,ch:43.3,f:32.3,t:["vegan","veg","gf","keto"],gi:1,pd:.6,mi:{k:869,mg:347,fe:4.7,zn:4.4,ca:211,vc:.6,va:0,o3:22.8,na:9}},
+  /* suplementos e prontos */
+  {n:"Whey protein (pó)",c:"supplements",kcal:400,p:80,ch:8,f:6,t:["veg","gf","keto"],gi:15,pd:1,mi:{k:500,mg:60,fe:1,zn:1.5,ca:500,vc:0,va:0,o3:0,na:200}},
+  {n:"Proteína vegana (pó)",c:"supplements",kcal:390,p:75,ch:10,f:5,t:["vegan","veg","gf","lf","keto"],gi:15,pd:.85,mi:{k:400,mg:100,fe:8,zn:3,ca:150,vc:0,va:0,o3:.5,na:350}},
 ];
 const MEALS=[{s:"Café da manhã",t:"07:00",pct:.25},{s:"Almoço",t:"12:00",pct:.35},{s:"Lanche",t:"16:00",pct:.15},{s:"Jantar",t:"20:00",pct:.25}];
 const WEEK_DAYS=["Segunda","Terça","Quarta","Quinta","Sexta","Sábado","Domingo"];
@@ -1021,7 +1075,7 @@ function render(){
   const macroRow=(lab,cons,tgt,col)=>`<div class="macro"><div class="mh"><b>${lab}</b><span class="g mono tnum">${cons} / ${tgt} g</span></div><div class="track"><div class="fill" style="width:${Math.min(cons/Math.max(tgt,1)*100,100)}%;background:${col}"></div></div></div>`;
   const cardDiary=`<div class="card span-7"><h3>Diário de hoje <span class="pill ${hasLog?(adh.st==="high"?"good":adh.st==="ok"?"warn":"crit"):"accent"}">${hasLog?"aderência "+adh.ad+"%":"nada registrado"}</span></h3><div class="cap">registre o que comeu · comparado ao alvo do paciente</div>
     <div class="logadd">
-      <select id="logfood">${FOODS.map(f=>`<option value="${f.n}">${f.n}</option>`).join("")}</select>
+      <select id="logfood">${(()=>{const CAT={meats:"Carnes e aves",fish:"Peixes",eggs:"Ovos",dairy:"Laticínios",legumes:"Leguminosas",cereals:"Cereais e grãos",tubers:"Tubérculos",vegetables:"Verduras e legumes",fruits:"Frutas",oils:"Óleos e oleaginosas",supplements:"Suplementos"};const order=Object.keys(CAT);return order.filter(c=>FOODS.some(f=>f.c===c)).map(c=>`<optgroup label="${CAT[c]}">${FOODS.filter(f=>f.c===c).map(f=>`<option value="${f.n}">${f.n}</option>`).join("")}</optgroup>`).join("");})()}</select>
       <input id="loggrams" type="number" value="100" min="5" step="5" aria-label="gramas">
       <button class="minibtn" id="addlog">+ Adicionar</button>
     </div>
