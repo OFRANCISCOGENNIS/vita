@@ -255,6 +255,17 @@ h1.title{font-size:clamp(26px,3vw,34px);font-weight:800;letter-spacing:-.02em;ma
 .zlab{flex:1}.zlab b{font-size:13px;display:block}.zlab span{font-size:11px;color:var(--muted);font-family:var(--mono)}
 .zval{font-family:var(--mono);font-weight:700;font-size:14px}.zval small{color:var(--muted);font-weight:500}
 
+/* roster do profissional */
+.rtable{display:flex;flex-direction:column;gap:2px}
+.rhead,.rrow{display:grid;grid-template-columns:1.4fr 1.1fr .8fr .9fr .7fr .9fr;gap:10px;align-items:center;padding:10px 12px}
+.rhead{font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);border-bottom:1px solid var(--border)}
+.rrow{border-radius:10px;cursor:pointer;transition:.15s}
+.rrow:hover{background:var(--surface-2)}
+.rrow.active{background:color-mix(in srgb,var(--accent) 10%,transparent)}
+.rrow .rn b{font-size:14px}
+.rmuted{color:var(--muted);font-size:12.5px}
+@media(max-width:720px){.rhead{display:none}.rrow{grid-template-columns:1fr auto;gap:6px}.rrow>span:nth-child(2),.rrow>span:nth-child(4),.rrow>span:nth-child(5){display:none}}
+
 /* agenda do dia */
 .tl{display:flex;flex-direction:column}
 .tlrow{display:flex;align-items:flex-start;gap:12px;padding:10px 0;border-left:2px solid var(--border);margin-left:44px;padding-left:16px;position:relative}
@@ -388,6 +399,7 @@ h1.title{font-size:clamp(26px,3vw,34px);font-weight:800;letter-spacing:-.02em;ma
   <aside class="rail">
     <div class="brand">V</div>
     <nav class="nav" id="nav">
+      <button data-v="pacientes" aria-label="Pacientes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.3 2.7-5 6-5s6 1.7 6 5"/><path d="M16 6a3 3 0 0 1 0 6M18 20c0-2.5-1-4-3-4.5"/></svg><span class="railtip">Pacientes</span></button>
       <button class="on" data-v="today" aria-label="Hoje"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg><span class="railtip">Hoje</span></button>
       <button data-v="nutri" aria-label="Nutrição"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg><span class="railtip">Nutrição</span></button>
       <button data-v="agenda" aria-label="Agenda"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span class="railtip">Agenda</span></button>
@@ -1067,6 +1079,24 @@ function recentAdherence(mKcal,mProt,days){
   for(const d of keys){const items=(p.foodlog[d]||[]).map(e=>({food:FOODS.find(f=>f.n===e.n),g:e.g})).filter(x=>x.food);if(!items.length)continue;const c=sumIntake(items);scores.push(adherenceScore({kcal:c.kcal,p:c.p},{kcal:mKcal,p:mProt}).ad);}
   return scores.length?{avg:Math.round(scores.reduce((s,x)=>s+x,0)/scores.length),n:scores.length}:null;
 }
+/* status resumido de um paciente (para o roster do profissional) — lê o objeto direto */
+function profFromPatient(pt){const pr=pt.profile||{};return{sex:pr.sex||"M",weightKg:+pr.weight||0,heightCm:+pr.height||0,age:+pr.age||30,bf:+pr.bf||0,goal:pr.goal||"maintenance",activity:pr.activity||"moderate",days:+pr.days||3,kcalAdjustPct:pt.kcalAdjustPct||0};}
+function patientStatus(pt){
+  const prof=profFromPatient(pt);
+  const dates=[];(pt.weighins||[]).forEach(w=>dates.push(w.d));Object.keys(pt.foodlog||{}).forEach(d=>dates.push(d));Object.values(pt.wlog||{}).forEach(a=>a.forEach(s=>dates.push(s.d)));(pt.measures||[]).forEach(mm=>dates.push(mm.d));Object.keys(pt.habits||{}).forEach(d=>dates.push(d));
+  dates.sort();const lastDate=dates.length?dates[dates.length-1]:null;
+  const daysSince=lastDate?Math.round((new Date(todayKey())-new Date(lastDate))/864e5):null;
+  const wi=pt.weighins||[],lastW=wi.length?wi[wi.length-1]:null;
+  let adh=null;
+  if(pt.foodlog&&prof.weightKg>0){const m=macros(prof);const keys=Object.keys(pt.foodlog).sort().slice(-14);const sc=[];for(const d of keys){const items=(pt.foodlog[d]||[]).map(e=>({food:FOODS.find(f=>f.n===e.n),g:e.g})).filter(x=>x.food);if(!items.length)continue;const c=sumIntake(items);sc.push(adherenceScore({kcal:c.kcal,p:c.p},{kcal:m.kcal,p:m.protein}).ad);}if(sc.length)adh=Math.round(sc.reduce((a,x)=>a+x,0)/sc.length);}
+  const an=pt.anamnese||{};let rf=0;
+  if(an.chest_pain)rf++;if(an.pregnancy)rf++;if(an.t1_diabetes)rf++;
+  if([an.extreme_restriction,an.compensatory,an.body_image].filter(Boolean).length>=2)rf++;
+  if(prof.goal==="fat_loss"&&prof.heightCm>0&&prof.weightKg>0&&bmi(prof)<17.5)rf++;
+  // prioridade de atenção: red flags > inatividade > baixa adesão
+  const attention=rf*1000+(daysSince!=null?Math.min(daysSince,30)*10:0)+(adh!=null?(100-adh)/10:0);
+  return{id:pt.id,name:pt.name,daysSince,lastW,adh,rf,goal:prof.goal,attention};
+}
 function adaptationSuggestion(st){
   if(st.rapid)return{delta:10,act:"Freio de perda rápida",why:"Perda >1,5%/semana eleva perda de massa magra (Garthe 2011). Subir 10% das calorias.",src:"RAPID_LOSS_BRAKE",sev:"crit"};
   if(st.goal==="fat_loss"&&st.plateau){
@@ -1609,6 +1639,25 @@ function render(){
       <div class="tile"><div class="k">Cintura/quadril</div><div class="v tnum">${(lastM.waist&&lastM.hip)?R(lastM.waist/lastM.hip,2):"—"}</div><div class="meta">RCQ · risco cardiometab.</div></div>
     </div>`:`<div class="src">A %gordura por dobras (Jackson-Pollock) tem erro de ±3–4% — melhor que bioimpedância caseira quando bem medida. Sempre pelo mesmo avaliador e lado do corpo.</div>`}</div>`;
 
+  // ---- PAINEL DO PROFISSIONAL (roster de pacientes) ----
+  const roster=pAll().map(patientStatus).sort((a,b)=>b.attention-a.attention||a.name.localeCompare(b.name));
+  const activeId=pActiveId();
+  const needAtt=roster.filter(r=>r.rf>0||(r.daysSince!=null&&r.daysSince>=4)||(r.adh!=null&&r.adh<60)).length;
+  const GLBL={fat_loss:"Emagrecimento",hypertrophy:"Hipertrofia",maintenance:"Manutenção",performance:"Performance"};
+  const cardRoster=`<div class="card span-12"><h3>Pacientes <span class="pill ${needAtt?"warn":"good"}">${roster.length} · ${needAtt} precisam de atenção</span></h3><div class="cap">ordenado por prioridade · toque para abrir o paciente</div>
+    <div class="rtable">
+      <div class="rhead"><span>Paciente</span><span>Objetivo</span><span>Aderência</span><span>Última ativ.</span><span>Peso</span><span>Alerta</span></div>
+      ${roster.map(r=>`<div class="rrow ${r.id===activeId?"active":""}" data-openpt="${r.id}" role="button" tabindex="0">
+        <span class="rn"><b>${r.name}</b></span>
+        <span class="rmuted">${GLBL[r.goal]||r.goal}</span>
+        <span>${r.adh!=null?`<span class="pill ${r.adh>=75?"good":r.adh>=60?"warn":"crit"}">${r.adh}%</span>`:`<span class="rmuted">—</span>`}</span>
+        <span class="rmuted tnum">${r.daysSince==null?"sem dados":r.daysSince===0?"hoje":r.daysSince+"d atrás"}</span>
+        <span class="rmuted tnum">${r.lastW?r.lastW.kg+" kg":"—"}</span>
+        <span>${r.rf>0?`<span class="pill crit">${r.rf} bandeira${r.rf>1?"s":""}</span>`:r.daysSince!=null&&r.daysSince>=7?`<span class="pill warn">inativo</span>`:`<span class="pill good">ok</span>`}</span>
+      </div>`).join("")}
+    </div>
+    <div class="src" style="margin-top:12px">Prioridade: bandeiras de segurança &gt; inatividade &gt; baixa aderência. Aderência e alertas vêm do diário, pesagens e anamnese de cada paciente.</div></div>`;
+
   // ---- AGENDA DO DIA (cronograma por horário) ----
   const evs=[];
   if(!dietBlocked)plan.forEach(ms=>evs.push({t:ms.t,ic:"🍽️",tt:ms.s,dt:`${ms.kcal} kcal · ${ms.p} g proteína${ms.items.length?" · "+ms.items.map(i=>i.n).join(", "):""}`}));
@@ -1687,6 +1736,7 @@ function render(){
     calc:{title:"Calculadoras",sub:"1RM, zonas de FC, pace, gasto calórico e VO₂máx — todas determinísticas.",html:cardCalc+cardBody},
     labs:{title:"Exames",sub:"Comparação com faixas de referência + tendência entre exames — educativo, nunca prescreve.",html:cardLabs+cardLabSummary+cardLabTrend},
     habits:{title:"Hábitos",sub:"Checklist diário e sequência por regras determinísticas sobre o que você registra.",html:cardHabits+cardStreak+cardCoach},
+    pacientes:{title:"Pacientes",sub:"Visão do profissional: todos os pacientes, quem precisa de atenção primeiro.",html:cardRoster},
     agenda:{title:"Agenda do dia",sub:"Cronograma de refeições, hidratação e treino por horário — ajuste à sua rotina.",html:cardAgenda+cardAgendaSum},
     evolucao:{title:"Evolução",sub:"Linha do tempo de todas as métricas — peso, gordura, cintura, força e aderência num só lugar.",html:cardEvolution},
     metas:{title:"Metas & medidas",sub:"Alvos com previsão de data + circunferências e dobras com %gordura por Jackson-Pollock.",html:cardGoals+cardGoalsHelp+cardMeasures+cardMeasEvo},
@@ -1737,6 +1787,7 @@ $("#views").addEventListener("click",e=>{
   }
   const rmm=e.target.closest("[data-rmmeas]");if(rmm){removeMeasure(+rmm.dataset.rmmeas);return;}
   if(e.target.closest("#labSnapshot")){saveLabSnapshot();return;}
+  const opt=e.target.closest("[data-openpt]");if(opt){pSetActive(opt.dataset.openpt);loadProfile();VIEW="today";$("#nav").querySelectorAll("button").forEach(x=>x.classList.toggle("on",x.dataset.v==="today"));render();return;}
   const cm=e.target.closest("[data-cmode]");if(cm){CALC.mode=cm.dataset.cmode;render();return;}
   const sw=e.target.closest("[data-swap]");if(sw){SWAP=SWAP===sw.dataset.swap?null:sw.dataset.swap;render();return;}
 });
