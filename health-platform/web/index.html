@@ -768,6 +768,16 @@ const LABMSG={
   critical:{pill:"crit",t:"crítico",m:"Valor em faixa crítica — procure um médico o quanto antes."},
 };
 let LABVALS={};
+/* histórico datado de exames por marcador (tendência ao longo do tempo) */
+function labHistory(){const p=pActive();return(p&&p.labHistory)||{};}
+function saveLabSnapshot(){
+  const filled=LABS.filter(l=>LABVALS[l.c]!=null&&LABVALS[l.c]!=="");
+  if(!filled.length){alert("Preencha ao menos um marcador antes de registrar.");return;}
+  pUpdate(p=>{p.labHistory=p.labHistory||{};const t=todayKey();
+    for(const l of filled){p.labHistory[l.c]=p.labHistory[l.c]||[];const ex=p.labHistory[l.c].find(x=>x.d===t);const v=+LABVALS[l.c];if(ex)ex.v=v;else p.labHistory[l.c].push({d:t,v});p.labHistory[l.c].sort((a,b)=>a.d<b.d?-1:a.d>b.d?1:0);}
+  });
+  render();alert(filled.length+" marcador(es) registrado(s) no histórico de hoje.");
+}
 
 /* --- hábitos: estado persistente + streak determinístico --- */
 const HABITS=[
@@ -1265,7 +1275,7 @@ function render(){
   // ---- exames: entrada + interpretação por faixa (educativo) ----
   const filled=LABS.filter(l=>LABVALS[l.c]!=null&&LABVALS[l.c]!=="");
   const anyCrit=filled.some(l=>interpretLab(+LABVALS[l.c],labRange(l,p.sex))==="critical");
-  const cardLabs=`<div class="card span-8"><h3>Exames laboratoriais <span class="pill ${anyCrit?'crit':filled.length?'good':'accent'}">${anyCrit?'valor crítico':filled.length?filled.length+' informados':'informe valores'}</span></h3>
+  const cardLabs=`<div class="card span-8"><h3>Exames laboratoriais <span class="pill ${anyCrit?'crit':filled.length?'good':'accent'}">${anyCrit?'valor crítico':filled.length?filled.length+' informados':'informe valores'}</span> <button class="minibtn" id="labSnapshot">📌 Registrar no histórico</button></h3>
     <div class="cap">interpretação educativa por faixa de referência · nunca sugere dose ou medicamento</div>
     <div class="list">${LABS.map(l=>{
       const r=labRange(l,p.sex);const v=LABVALS[l.c];
@@ -1287,6 +1297,16 @@ function render(){
       <div class="tile"><div class="k">Faixas por</div><div class="v" style="font-size:16px">sexo ${p.sex}</div><div class="meta">ferritina, HDL, creatinina</div></div>
     </div>
     <div class="src" style="margin-top:12px">A faixa verde na barra é a referência; o traço é o seu valor. Faixas segmentadas por sexo aplicadas automaticamente.</div></div>`;
+
+  // ---- exames: tendência ao longo do tempo (histórico datado) ----
+  const lh=labHistory();
+  const trendMarkers=LABS.filter(l=>(lh[l.c]||[]).length>=2);
+  const cardLabTrend=`<div class="card span-12"><h3>Tendência dos exames <span class="pill accent">${trendMarkers.length} com histórico</span></h3><div class="cap">evolução de cada marcador entre exames · registre com 📌 a cada novo exame</div>
+    ${trendMarkers.length?`<div class="evogrid">${trendMarkers.map(l=>{
+      const h=lh[l.c],series=h.map((x,i)=>({x:i,y:x.v})),cur=h[h.length-1].v,first=h[0].v,d=R(cur-first,1);
+      const st=interpretLab(cur,labRange(l,p.sex)),msg=LABMSG[st];
+      return`<div class="evop"><div class="evohd"><span class="evol">${l.n}</span><span class="evocur tnum">${cur}<small> ${l.u}</small></span></div>${sparkline(series)}<div class="evod"><span class="pill ${msg.pill}">${msg.t}</span> <span class="tnum" style="color:var(--muted)">${d>0?"+":""}${d} desde ${h[0].d.slice(5)}</span></div></div>`;
+    }).join("")}</div><div class="src" style="margin-top:12px">Tendência é só o histórico dos seus valores — interpretação e conduta são do profissional habilitado.</div>`:`<div class="src" style="padding:16px 0">Sem histórico ainda. Preencha os exames e toque em 📌 <b>Registrar no histórico</b> — a cada novo exame, a tendência aparece aqui.</div>`}</div>`;
 
   // ---- hábitos: checklist do dia + streak ----
   const hab=loadHab(),tk2=todayKey(),doneToday=hab[tk2]||[];
@@ -1631,7 +1651,7 @@ function render(){
     analise:{title:"Análise de precisão",sub:"Micronutrientes vs DRI, qualidade proteica (PDCAAS), leucina por refeição, carga glicêmica e lacunas com fontes alimentares.",html:cardMicros+cardProtQual+cardProtDist+cardGL+cardSupp+cardMacros},
     train:{title:"Treino",sub:"Split por frequência, volume graduado por landmarks e base aeróbica em Zona 2.",html:cardWorkout+cardVolume+cardZone2+cardReady+cardTrend},
     calc:{title:"Calculadoras",sub:"1RM, zonas de FC, pace, gasto calórico e VO₂máx — todas determinísticas.",html:cardCalc+cardBody},
-    labs:{title:"Exames",sub:"Comparação com faixas de referência armazenadas — educativo, nunca prescreve.",html:cardLabs+cardLabSummary},
+    labs:{title:"Exames",sub:"Comparação com faixas de referência + tendência entre exames — educativo, nunca prescreve.",html:cardLabs+cardLabSummary+cardLabTrend},
     habits:{title:"Hábitos",sub:"Checklist diário e sequência por regras determinísticas sobre o que você registra.",html:cardHabits+cardStreak+cardCoach},
     evolucao:{title:"Evolução",sub:"Linha do tempo de todas as métricas — peso, gordura, cintura, força e aderência num só lugar.",html:cardEvolution},
     metas:{title:"Metas & medidas",sub:"Alvos com previsão de data + circunferências e dobras com %gordura por Jackson-Pollock.",html:cardGoals+cardGoalsHelp+cardMeasures+cardMeasEvo},
@@ -1681,6 +1701,7 @@ $("#views").addEventListener("click",e=>{
     addMeasure(entry);return;
   }
   const rmm=e.target.closest("[data-rmmeas]");if(rmm){removeMeasure(+rmm.dataset.rmmeas);return;}
+  if(e.target.closest("#labSnapshot")){saveLabSnapshot();return;}
   const cm=e.target.closest("[data-cmode]");if(cm){CALC.mode=cm.dataset.cmode;render();return;}
   const sw=e.target.closest("[data-swap]");if(sw){SWAP=SWAP===sw.dataset.swap?null:sw.dataset.swap;render();return;}
 });
