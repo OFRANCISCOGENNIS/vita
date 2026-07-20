@@ -255,6 +255,20 @@ h1.title{font-size:clamp(26px,3vw,34px);font-weight:800;letter-spacing:-.02em;ma
 .zlab{flex:1}.zlab b{font-size:13px;display:block}.zlab span{font-size:11px;color:var(--muted);font-family:var(--mono)}
 .zval{font-family:var(--mono);font-weight:700;font-size:14px}.zval small{color:var(--muted);font-weight:500}
 
+/* fotos de evolução */
+.photobtn{display:inline-flex;align-items:center;height:38px;cursor:pointer}
+.pgal{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px}
+.pgal .pth{position:relative;margin:0}
+.pth img{width:100%;aspect-ratio:3/4;object-fit:cover;border-radius:10px;border:1px solid var(--border);display:block}
+.pth figcaption{font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:4px;text-align:center}
+.pthrm{position:absolute;top:5px;right:5px;background:rgba(0,0,0,.55);color:#fff;border-radius:6px;line-height:1}
+.cmp{margin-bottom:16px}
+.cmphd{font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--faint);margin-bottom:8px}
+.cmprow{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.cmprow figure{margin:0}
+.cmprow img{width:100%;aspect-ratio:3/4;object-fit:cover;border-radius:10px;border:1px solid var(--border);display:block}
+.cmprow figcaption{font-family:var(--mono);font-size:10.5px;color:var(--muted);margin-top:5px;text-align:center}
+
 /* diário alimentar */
 .logadd{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
 .logadd select{flex:1;min-width:150px;background:var(--surface-2);border:1px solid var(--border);color:var(--text);height:38px;border-radius:10px;padding:0 10px;font-size:13.5px}
@@ -345,6 +359,7 @@ h1.title{font-size:clamp(26px,3vw,34px);font-weight:800;letter-spacing:-.02em;ma
       <button data-v="calc" aria-label="Calculadoras"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M8 6h8M8 10h2M8 14h2M8 18h2M14 10h2v8h-2z"/></svg><span class="railtip">Calculadoras</span></button>
       <button data-v="labs" aria-label="Exames"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M10 2v7.5L4.5 19a2 2 0 0 0 1.7 3h11.6a2 2 0 0 0 1.7-3L14 9.5V2"/><path d="M8 2h8M7 15h10"/></svg><span class="railtip">Exames</span></button>
       <button data-v="habits" aria-label="Hábitos"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3c1 3-2 4-2 7a4 4 0 0 0 8 0c0-1-.5-2-1-3 0 0 3 2 3 6a8 8 0 0 1-16 0c0-5 5-7 8-10z"/></svg><span class="railtip">Hábitos</span></button>
+      <button data-v="fotos" aria-label="Fotos"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 7h4l2-3h6l2 3h4v13H3z"/><circle cx="12" cy="13" r="4"/></svg><span class="railtip">Fotos</span></button>
       <button data-v="safe" aria-label="Segurança"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6z"/><path d="M9 12l2 2 4-4"/></svg><span class="railtip">Segurança</span></button>
     </nav>
   </aside>
@@ -722,6 +737,30 @@ function todayLog(){const p=pActive();return(p&&p.foodlog&&p.foodlog[todayKey()]
 function addLogItem(n,g){if(!n||!(g>0))return;pUpdate(p=>{p.foodlog=p.foodlog||{};const t=todayKey();p.foodlog[t]=p.foodlog[t]||[];p.foodlog[t].push({n,g:Math.round(g)});});render();}
 function removeLogItem(i){pUpdate(p=>{const t=todayKey();if(p.foodlog&&p.foodlog[t])p.foodlog[t].splice(i,1);});render();}
 function setMesoWeek(delta){pUpdate(p=>{p.mesoWeek=Math.max(1,Math.min((p.mesoWeek||1)+delta,5));});render();}
+/* fotos de evolução: guardadas localmente (nunca enviadas), reduzidas p/ caber */
+function patientPhotos(){const p=pActive();return(p&&p.photos)||[];}
+function handlePhotoFile(file,pose){
+  if(!file||!/^image\//.test(file.type))return;
+  const fr=new FileReader();
+  fr.onload=()=>{const img=new Image();img.onload=()=>{
+    const max=440,scale=Math.min(1,max/Math.max(img.width,img.height));
+    const cw=Math.max(1,Math.round(img.width*scale)),chh=Math.max(1,Math.round(img.height*scale));
+    const cv=document.createElement("canvas");cv.width=cw;cv.height=chh;
+    cv.getContext("2d").drawImage(img,0,0,cw,chh);
+    addPhoto(pose,cv.toDataURL("image/jpeg",0.72));
+  };img.onerror=()=>alert("Não consegui ler essa imagem.");img.src=fr.result;};
+  fr.readAsDataURL(file);
+}
+function addPhoto(pose,url){
+  const a=pAll(),i=a.findIndex(x=>x.id===(pActiveId()||(a[0]&&a[0].id)));if(i<0)return;
+  a[i].photos=a[i].photos||[];
+  a[i].photos.push({d:todayKey(),pose,url});
+  if(a[i].photos.length>15)a[i].photos=a[i].photos.slice(-15);
+  try{localStorage.setItem("vita.patients",JSON.stringify(a));}
+  catch(e){alert("Sem espaço no navegador para salvar a foto. Remova fotos antigas e tente de novo.");return;}
+  render();
+}
+function removePhoto(idx){pUpdate(p=>{if(p.photos)p.photos.splice(idx,1);});render();}
 // Streak: dias consecutivos (terminando hoje ou ontem) com ≥3 hábitos feitos.
 function streak(h){
   let s=0;const d=new Date();
@@ -1133,6 +1172,23 @@ function render(){
     <div class="wtabs">${cmodes.map(([k,l])=>`<button data-cmode="${k}" class="${k===CALC.mode?"on":""}">${l}</button>`).join("")}</div>
     ${cbody}</div>`;
 
+  // ---- FOTOS DE EVOLUÇÃO (comparação lado a lado) ----
+  const photos=patientPhotos();
+  const POSELBL={frente:"Frente",lado:"Lado",costas:"Costas"};
+  const byPose=p2=>photos.map((ph,i)=>({...ph,i})).filter(x=>x.pose===p2).sort((a,b)=>a.d<b.d?-1:a.d>b.d?1:a.i-b.i);
+  const cmpBlocks=["frente","lado","costas"].map(pz=>{const g=byPose(pz);if(g.length<2)return"";const a=g[0],b=g[g.length-1];
+    return`<div class="cmp"><div class="cmphd">${POSELBL[pz]} · ${g.length} fotos</div><div class="cmprow">
+      <figure><img src="${a.url}" alt="antes"><figcaption>${a.d} · antes</figcaption></figure>
+      <figure><img src="${b.url}" alt="depois"><figcaption>${b.d} · depois</figcaption></figure></div></div>`;}).join("");
+  const cardPhotos=`<div class="card span-7"><h3>Fotos de evolução <span class="pill accent">${photos.length}</span></h3><div class="cap">ficam só neste dispositivo — nunca enviadas · reduzidas p/ caber</div>
+    <div class="logadd">
+      <select id="photopose"><option value="frente">Frente</option><option value="lado">Lado</option><option value="costas">Costas</option></select>
+      <label class="minibtn photobtn">📷 Enviar foto<input type="file" accept="image/*" id="photofile" style="display:none"></label>
+    </div>
+    ${photos.length?`<div class="pgal">${photos.map((ph,i)=>`<figure class="pth"><img src="${ph.url}" alt="${ph.pose}"><figcaption>${POSELBL[ph.pose]} · ${ph.d}</figcaption><button class="rmbtn pthrm" data-rmphoto="${i}" aria-label="Remover">✕</button></figure>`).join("")}</div>`:`<div class="src" style="padding:10px 0">Nenhuma foto ainda. Envie a primeira — quando houver 2+ da mesma pose, aparece a comparação antes/depois.</div>`}</div>`;
+  const cardCompare=`<div class="card span-5"><h3>Antes × depois</h3><div class="cap">primeira vs última foto de cada pose</div>
+    ${cmpBlocks||`<div class="src" style="padding:10px 0">Envie ao menos 2 fotos da mesma pose (ex.: frente) para ver a comparação lado a lado.</div>`}</div>`;
+
   // ---- PRONTUÁRIO PARA EXPORTAÇÃO (impressão → PDF) ----
   const GOALLBL={fat_loss:"Emagrecimento",hypertrophy:"Hipertrofia",maintenance:"Manutenção / saúde"}[p.goal]||p.goal;
   const lowMic=micros.filter(x=>x.st==="low").map(x=>x.l);
@@ -1178,6 +1234,7 @@ function render(){
     calc:{title:"Calculadoras",sub:"1RM, zonas de FC, pace, gasto calórico e VO₂máx — todas determinísticas.",html:cardCalc+cardBody},
     labs:{title:"Exames",sub:"Comparação com faixas de referência armazenadas — educativo, nunca prescreve.",html:cardLabs+cardLabSummary},
     habits:{title:"Hábitos",sub:"Checklist diário e sequência por regras determinísticas sobre o que você registra.",html:cardHabits+cardStreak+cardCoach},
+    fotos:{title:"Fotos de evolução",sub:"Registro visual do progresso, comparação antes/depois. Tudo local — as imagens não saem do dispositivo.",html:cardPhotos+cardCompare},
     safe:{title:"Segurança",sub:"Guardrails determinísticos. Educa, não diagnostica.",html:(guards.length?"":`<div class="card span-12"><h3>Nenhuma bandeira vermelha ativa <span class="pill good">tudo certo</span></h3><div class="cap">o motor libera as recomendações padrão</div><div class="src" style="font-size:12px">Regras monitoradas: dor torácica ao esforço · IMC &lt;17,5 com meta de emagrecer · indícios de transtorno alimentar · gestação/lactação · diabetes tipo 1 · menor de 16 sem responsável · exame em faixa crítica · piso calórico 1,1×TMB · freio de perda &gt;1,5%/semana.</div></div>`)+cardTrend+cardBody},
   };
   const v=VIEWS[VIEW];
@@ -1200,6 +1257,7 @@ $("#views").addEventListener("click",e=>{
   const rm=e.target.closest("[data-rmlog]");if(rm){removeLogItem(+rm.dataset.rmlog);return;}
   if(e.target.closest("#mesoPrev")){setMesoWeek(-1);return;}
   if(e.target.closest("#mesoNext")){setMesoWeek(1);return;}
+  const rmp=e.target.closest("[data-rmphoto]");if(rmp){removePhoto(+rmp.dataset.rmphoto);return;}
   const cm=e.target.closest("[data-cmode]");if(cm){CALC.mode=cm.dataset.cmode;render();return;}
   const sw=e.target.closest("[data-swap]");if(sw){SWAP=SWAP===sw.dataset.swap?null:sw.dataset.swap;render();return;}
 });
@@ -1210,7 +1268,10 @@ $("#exportPdf").addEventListener("click",()=>printMode("print-report"));
 function printMode(cls){document.body.classList.add(cls);window.print();setTimeout(()=>document.body.classList.remove(cls),400);}
 if(window.matchMedia)window.matchMedia("print").addEventListener&&window.matchMedia("print").addEventListener("change",ev=>{if(!ev.matches)document.body.classList.remove("print-shop","print-report");});
 // inputs/selects das calculadoras — 'change' (não 'input') p/ não perder foco no re-render
-$("#views").addEventListener("change",e=>{const c=e.target.closest("[data-calc]");if(c){CALC[c.dataset.calc]=c.value;render();}});
+$("#views").addEventListener("change",e=>{
+  const c=e.target.closest("[data-calc]");if(c){CALC[c.dataset.calc]=c.value;render();return;}
+  const pf=e.target.closest("#photofile");if(pf&&pf.files&&pf.files[0]){handlePhotoFile(pf.files[0],($("#photopose")||{value:"frente"}).value);pf.value="";}
+});
 // chips multi-seleção da anamnese
 $("#anamnese").addEventListener("click",e=>{const b=e.target.closest(".chips[data-multi] button");if(!b)return;b.classList.toggle("on");render();});
 $("#views").addEventListener("keydown",e=>{
