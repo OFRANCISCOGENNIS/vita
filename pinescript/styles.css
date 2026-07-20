@@ -2459,3 +2459,26 @@ body.modo-foco .cmp-bar { display: none; }
     /* o gráfico ampliado no celular respeita a tela (JS já limita a ~60vh) */
     .rail { top: var(--reg-top, 56px); }
 }
+
+/* ---- Piloto: gate de evidência ---- */
+.piloto-prova { margin-top: 10px; border-radius: 10px; padding: 10px 12px; border: 1px solid var(--hairline); font-size: 12px; line-height: 1.45; }
+.prova-barra { height: 5px; border-radius: 3px; background: var(--surface-2); overflow: hidden; margin-bottom: 7px; }
+.prova-barra span { display: block; height: 100%; border-radius: 3px; transition: width 0.4s; }
+.prova-coletando { background: rgba(245,158,11,0.08); border-color: rgba(245,158,11,0.35); }
+.prova-coletando .prova-barra span { background: var(--warning); }
+.prova-sem-edge { background: rgba(239,68,68,0.10); border-color: rgba(239,68,68,0.45); }
+.prova-sem-edge .prova-barra span { background: var(--put); width: 100%; }
+.prova-sem-edge .prova-msg { color: var(--put); font-weight: 600; }
+.prova-validado { background: rgba(34,197,94,0.12); border-color: rgba(34,197,94,0.45); }
+.prova-validado .prova-barra span { background: var(--call); width: 100%; }
+.prova-validado .prova-msg { color: var(--call); font-weight: 600; }
+
+/* ---- Tour guiado ---- */
+#tourOverlay { position: fixed; inset: 0; z-index: 3000; display: none; }
+#tourSpot { position: absolute; border-radius: 12px; box-shadow: 0 0 0 4px rgba(34,211,238,0.7), 0 0 0 9999px rgba(4,8,18,0.78); transition: all 0.3s cubic-bezier(0.16,1,0.3,1); pointer-events: none; }
+#tourBalao { position: absolute; width: 320px; max-width: 92vw; background: var(--surface); border: 1px solid var(--neon-2); border-radius: 14px; padding: 14px 16px; box-shadow: 0 18px 50px rgba(0,0,0,0.55); animation: iosSheet 0.25s var(--spring); }
+#tourBalao h4 { font-size: 14px; color: var(--ink); margin-bottom: 6px; }
+#tourBalao p { font-size: 12.5px; color: var(--ink-2); line-height: 1.5; }
+.tour-nav { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; }
+.tour-nav > span:first-child { font-size: 11px; color: var(--ink-muted); font-weight: 700; }
+@media (prefers-reduced-motion: reduce) { #tourSpot, #tourBalao { transition: none; animation: none; } }

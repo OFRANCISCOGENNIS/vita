@@ -426,6 +426,7 @@
                         <button id="pilotoZerar" class="btn-mini" type="button">Zerar conta demo</button>
                     </div>
                     <div id="pilotoStats" class="qo-kv"></div>
+                    <div id="pilotoProva" class="piloto-prova"></div>
                     <p class="group-note">Registra sozinho as entradas que passam no gatilho como operações simuladas e acompanha saldo/WR/drawdown. Payout usa o campo <strong>Payout (%)</strong>. Não executa nada na corretora — a operação real, se quiser, é manual.</p>
                 </div>
 
@@ -705,7 +706,7 @@
         <div id="ajudaModal" class="ajuda-overlay" style="display:none;">
             <div class="ajuda-card">
                 <button id="ajudaFechar" class="ajuda-x" type="button" aria-label="Fechar">✕</button>
-                <h2>❔ Ajuda — QUANT OPS</h2>
+                <h2>❔ Ajuda — QUANT OPS <button id="btnTour" class="btn-ghost" type="button" style="float:right;font-size:12px;">▶ Rever tour guiado</button></h2>
                 <div class="ajuda-cols">
                     <section>
                         <h3>⌨️ Atalhos de teclado</h3>
@@ -868,6 +869,7 @@
     <script src="src/31-divergencia.js"></script>
     <script src="src/32-semaforo.js"></script>
     <script src="src/33-mobile.js"></script>
+    <script src="src/34-tour.js"></script>
     <!-- APP:END -->
 </body>
 </html>

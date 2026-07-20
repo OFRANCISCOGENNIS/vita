@@ -51,6 +51,20 @@ function calcularContaDemo() {
 
 function _pMoney(v) { return 'R$ ' + (v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
+// ---- Gate de evidência (função pura): há PROVA estatística de edge? ----
+// Não basta estar no lucro por sorte. Exige amostra (≥30 ops), expectativa
+// positiva E o limite inferior de Wilson acima do break-even do payout. Só aí
+// o resultado do paper trading merece confiança — nunca antes.
+const PILOTO_MIN_OPS = 30;
+function provaEdge(conta, payout) {
+    const ops = conta.ops || 0, wins = Math.round((conta.wr || 0) * ops);
+    const beWR = 1 / (1 + Math.max(0.01, payout || 0.87));
+    const lb = ops > 0 && typeof wilsonLB === 'function' ? wilsonLB(wins, ops) : 0;
+    if (ops < PILOTO_MIN_OPS) return { nivel: 'coletando', lb, beWR, faltam: PILOTO_MIN_OPS - ops, msg: `🔬 Coletando evidência: ${ops}/${PILOTO_MIN_OPS} operações. Não confie no saldo ainda — amostra pequena é sorte, não edge.` };
+    if (lb <= beWR || (conta.exp || 0) <= 0) return { nivel: 'sem-edge', lb, beWR, faltam: 0, msg: `❌ SEM edge provado: no limite inferior o acerto (${(lb * 100).toFixed(0)}%) não supera o break-even (${(beWR * 100).toFixed(0)}%). Mesmo no lucro, a estatística não sustenta ir pra real.` };
+    return { nivel: 'validado', lb, beWR, faltam: 0, msg: `✅ Edge validado: ${ops} ops · acerto no limite inferior (${(lb * 100).toFixed(0)}%) acima do break-even (${(beWR * 100).toFixed(0)}%). Evidência real — ainda assim, risco é seu.` };
+}
+
 function renderPiloto() {
     const st = document.getElementById('pilotoStats'), tag = document.getElementById('pilotoSaldo');
     if (!st || !tag) return;
@@ -65,6 +79,14 @@ function renderPiloto() {
         kv('Drawdown máx', _pMoney(c.ddMax) + ' (' + (c.ddPct * 100).toFixed(0) + '%)', c.ddMax > 0 ? 'kv-bad' : '') +
         kv('Expectativa/op', (c.exp >= 0 ? '+' : '') + _pMoney(c.exp), c.exp >= 0 ? 'kv-good' : 'kv-bad') +
         kv('Sequência atual', c.seq ? c.seq + ' ' + (c.seqTipo === 'W' ? 'WIN' : 'LOSS') : '—', c.seqTipo === 'W' ? 'kv-good' : c.seqTipo === 'L' ? 'kv-bad' : '');
+
+    // Gate de evidência: prova (ou desmente) o edge antes de qualquer confiança
+    const pv = document.getElementById('pilotoProva');
+    if (pv) {
+        const pe = provaEdge(c, pilotoPayout());
+        pv.className = 'piloto-prova prova-' + pe.nivel;
+        pv.innerHTML = `<div class="prova-barra"><span style="width:${Math.min(100, (c.ops / PILOTO_MIN_OPS) * 100).toFixed(0)}%"></span></div><div class="prova-msg">${pe.msg}</div>`;
+    }
 }
 
 function configurarPiloto() {

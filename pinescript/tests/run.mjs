@@ -763,6 +763,43 @@ const mob = await p.evaluate(() => {
 });
 check('nav inferior mobile tem 5 atalhos com ações', mob.botoes === 5 && mob.temAcoes);
 check('atalho da nav revela o painel e marca ativo', mob.abriu);
+// Gate de evidência no Piloto (função pura) + tour guiado
+const ge = await p.evaluate(() => {
+  const pay = 0.87;
+  // amostra pequena → coletando
+  const coletando = provaEdge({ ops: 12, wr: 0.7, exp: 5 }, pay);
+  // amostra grande com edge (28/40 = 70% → LB alto) → validado
+  const validado = provaEdge({ ops: 40, wr: 0.7, exp: 8 }, pay);
+  // amostra grande mas acerto baixo (18/40 = 45%) → sem edge
+  const semEdge = provaEdge({ ops: 40, wr: 0.45, exp: -2 }, pay);
+  // render no painel
+  registro = []; renderPiloto();
+  const temProva = !!document.getElementById('pilotoProva');
+  return {
+    coletando: coletando.nivel === 'coletando' && coletando.faltam === 18,
+    validado: validado.nivel === 'validado' && validado.lb > validado.beWR,
+    semEdge: semEdge.nivel === 'sem-edge',
+    temProva
+  };
+});
+check('gate: amostra pequena = coletando (faltam 18)', ge.coletando);
+check('gate: amostra + edge no LB = validado', ge.validado);
+check('gate: acerto baixo = sem edge provado', ge.semEdge);
+check('painel do Piloto mostra a prova de edge', ge.temProva);
+const tour = await p.evaluate(async () => {
+  localStorage.removeItem('tourVisto');
+  tourIniciar();
+  const ov = document.getElementById('tourOverlay');
+  const aberto = ov && ov.style.display === 'block';
+  await new Promise(r => setTimeout(r, 450));   // o balão posiciona/preenche em ~350ms
+  const temBalao = !!document.getElementById('tourBalao') && /Semáforo/.test(document.getElementById('tourTit').textContent);
+  tourFechar();
+  const fechou = ov.style.display === 'none' && localStorage.getItem('tourVisto') === '1';
+  const temBtn = !!document.getElementById('btnTour');
+  return { aberto, temBalao, fechou, temBtn };
+});
+check('tour guiado abre com o 1º passo (Semáforo)', tour.aberto && tour.temBalao);
+check('tour fecha e marca como visto · botão de rever existe', tour.fechou && tour.temBtn);
 check('botões de timeframe no gráfico trocam o TF (M15)', quick.tfMudou);
 check('trocar moeda cripto pelo gráfico muda o símbolo', quick.symMudou);
 check('escolher forex pelo gráfico ajusta o par', quick.forexMudou);
