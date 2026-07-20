@@ -357,6 +357,35 @@ test('auditVolume ordena por séries desc e classifica cada músculo', () => {
   assert.strictEqual(audit[0].muscle, 'back');
   assert.strictEqual(audit.find((a) => a.muscle === 'quadriceps').status, 'below_mev');
 });
+test('periodização: semana 1 acúmulo (base, RIR 3); semana 4 pico (+50%, RIR 1)', () => {
+  const w1 = W.periodize(1), w4 = W.periodize(4);
+  assert.strictEqual(w1.phase, 'accumulation');
+  assert.strictEqual(w1.setMult, 1);
+  assert.strictEqual(w1.targetRir, 3);
+  assert.strictEqual(w4.setMult, 1.5);
+  assert.strictEqual(w4.targetRir, 1);
+});
+test('periodização: última semana é deload (50% volume, 80% carga)', () => {
+  const d = W.periodize(5);
+  assert.strictEqual(d.phase, 'deload');
+  assert.strictEqual(d.setMult, 0.5);
+  assert.strictEqual(d.intensityMult, 0.8);
+});
+test('periodização: semana além do mesociclo satura no deload', () => {
+  assert.strictEqual(W.periodize(9).phase, 'deload');
+});
+test('applyPeriodization escala séries e nunca ultrapassa teto por exercício', () => {
+  const sessions = [{ items: [{ code: 'BB_BENCH_PRESS', sets: 3 }] }];
+  const pool = { BB_BENCH_PRESS: { primary_muscle: 'chest' } };
+  const s1 = W.applyPeriodization(sessions, pool, 1);
+  const s4 = W.applyPeriodization(sessions, pool, 4);
+  assert.ok(s4.sessions[0].items[0].sets >= s1.sessions[0].items[0].sets); // pico ≥ base
+  const deload = W.applyPeriodization(sessions, pool, 5);
+  assert.ok(deload.sessions[0].items[0].sets < s1.sessions[0].items[0].sets); // deload reduz
+});
+test('periodização: determinismo', () => {
+  deterministic(() => W.periodize(3, 5));
+});
 test('gerador de treino: determinismo', () => {
   deterministic(() => W.generateWorkoutPlan({ exercises: EXERCISES, goal: 'hypertrophy', daysPerWeek: 5, equipment: ['barbell', 'dumbbell', 'machine', 'cable', 'bodyweight'], level: 'advanced' }));
 });

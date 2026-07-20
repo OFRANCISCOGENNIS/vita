@@ -157,7 +157,46 @@ function auditVolume(weeklyVolume) {
     .sort((a, b) => b.sets - a.sets || a.muscle.localeCompare(b.muscle));
 }
 
+// ---------------------------------------------------------------------------
+// PERIODIZAÇÃO em mesociclo: semanas de acúmulo rampam o volume (MEV→MRV) e a
+// proximidade da falha (RIR 3→1); a última semana é DELOAD (50% volume, 80%
+// carga, longe da falha). Baseado em periodização por acúmulo + Pelland 2024
+// (MRV sustentável só 1–2 semanas → descarga programada).
+// ---------------------------------------------------------------------------
+function periodize(week, mesoLength = 5) {
+  const w = Math.max(1, Math.min(week, mesoLength));
+  if (w >= mesoLength) {
+    return { week: w, mesoLength, phase: 'deload', setMult: 0.5, intensityMult: 0.8, targetRir: 4,
+      note: 'Deload: 50% do volume, 80% da carga, longe da falha — dissipa fadiga e ressensibiliza.' };
+  }
+  const acc = mesoLength - 1;
+  const t = acc > 1 ? (w - 1) / (acc - 1) : 0; // 0 na 1ª semana → 1 na última de acúmulo
+  const setMult = Math.round((1 + t * 0.5) * 100) / 100; // +0% a +50% de volume
+  const targetRir = Math.max(1, 3 - Math.round(t * 2));   // RIR 3 → 1
+  return { week: w, mesoLength, phase: 'accumulation', setMult, intensityMult: 1, targetRir,
+    progressPct: Math.round(t * 100),
+    note: `Acúmulo: volume em ${Math.round(setMult * 100)}% da base, alvo RIR ${targetRir}.` };
+}
+
+// Aplica a periodização a um plano: escala as séries de cada exercício,
+// respeitando o MRV do músculo (nunca ultrapassa o máximo recuperável).
+function applyPeriodization(sessions, poolByCode, week, mesoLength = 5) {
+  const per = periodize(week, mesoLength);
+  const scaled = sessions.map((s) => ({
+    ...s,
+    items: s.items.map((it) => {
+      const ex = poolByCode[it.code];
+      const lm = (ex && VOLUME_LANDMARKS[ex.primary_muscle]) || DEFAULT_LANDMARK;
+      const perExMrv = Math.max(1, Math.round(lm.mrv / 3)); // teto por exercício (~1/3 do MRV do músculo)
+      const sets = Math.max(1, Math.min(Math.round(it.sets * per.setMult), perExMrv));
+      return { ...it, sets, targetRir: per.targetRir };
+    }),
+  }));
+  return { periodization: per, sessions: scaled };
+}
+
 module.exports = {
   generateWorkoutPlan, eligibleExercises, nextLoad, SPLITS, GOAL_PARAMS,
   classifyVolume, auditVolume, VOLUME_LANDMARKS,
+  periodize, applyPeriodization,
 };
