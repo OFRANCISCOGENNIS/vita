@@ -8164,11 +8164,12 @@ Public Sub GerarChecklistCKCP(Optional ByVal silencioso As Boolean = False)
     ws.Cells(2, 5).Font.Bold = True: ws.Cells(2, 5).Font.Color = corHdr
 
     ' --- Validacao (dropdown) na coluna STATUS --------------------------------
-    Dim sep As String: sep = Application.International(xlListSeparator)
+    ' Formula1 em VBA usa SEMPRE virgula como separador de lista,
+    ' independente do idioma do Excel (usar ";" quebra em pt-BR).
     With ws.Range(ws.Cells(5, 5), ws.Cells(ultLin, 5)).Validation
         .Delete
         .Add Type:=xlValidateList, AlertStyle:=xlValidAlertStop, _
-             Formula1:="CONCLUIDO" & sep & "PENDENTE" & sep & "N/A"
+             Formula1:="CONCLUIDO,PENDENTE,N/A"
         .IgnoreBlank = True: .InCellDropdown = True
     End With
 
