@@ -723,6 +723,15 @@ h1.title{font-size:clamp(26px,3vw,34px);font-weight:800;letter-spacing:-.02em;ma
           <option value="2">Avançado</option>
         </select>
       </div>
+      <div class="field wide"><label>Divisão de treino</label>
+        <select id="split">
+          <option value="auto" selected>Automática (recomendada)</option>
+          <option value="ab">A/B — Superior · Inferior</option>
+          <option value="abc">A/B/C — Empurrar · Puxar · Pernas</option>
+          <option value="abcd">A/B/C/D — Peito+Trí · Costas+Bí · Pernas · Ombros</option>
+          <option value="abcde">A/B/C/D/E — Peito · Costas · Pernas · Ombros · Braços</option>
+        </select>
+      </div>
     </section>
 
     <section class="profile anamnese" aria-label="Anamnese" id="anamnese">
@@ -1304,6 +1313,18 @@ const EX=[
   {c:"SKULL_CRUSHER",n:"Tríceps testa",mu:"Tríceps",mp:"triceps",eq:["barbell","dumbbell"],lv:1,comp:0,ctr:["shoulder"],cue:"Deitado, barra acima do peito. Flexione só os cotovelos descendo a barra à testa; estenda de volta sem abrir os cotovelos."},
   {c:"SINGLE_CALF",n:"Panturrilha unilateral",mu:"Panturrilha",mp:"calf",eq:["bodyweight"],lv:1,comp:0,ctr:[],cue:"Uma perna na borda do degrau. Suba na ponta do pé com pausa no topo; desça alongando bem o calcanhar abaixo do degrau."},
   {c:"CABLE_CRUNCH",n:"Abdominal na polia",mu:"Core",mp:"core",eq:["cable"],lv:1,comp:0,ctr:[],cue:"Ajoelhado, corda atrás da cabeça. Enrole a coluna levando as costelas à bacia expirando; volte controlando sem puxar com os braços."},
+  {c:"BB_BENCH",n:"Supino reto com barra",mu:"Peito",mp:"push_h",eq:["barbell"],lv:1,comp:1,ctr:["shoulder"],cue:"Escápulas retraídas, pés firmes no chão. Desça a barra à linha do mamilo com cotovelos ~45–70°; empurre até quase estender. Use anilhas de segurança ou parceiro."},
+  {c:"CABLE_CROSS",n:"Crossover na polia",mu:"Peito",mp:"push_h",eq:["cable"],lv:1,comp:0,ctr:["shoulder"],cue:"Polias altas, passo à frente. Abra os braços sentindo alongar o peito (posição alongada!) e feche em arco até as mãos se cruzarem; controle a volta."},
+  {c:"PECK_DECK",n:"Voador (peck deck)",mu:"Peito",mp:"push_h",eq:["machine"],lv:0,comp:0,ctr:[],cue:"Costas apoiadas, cotovelos na altura dos ombros. Feche os braços contraindo o peito 1s; abra devagar até alongar bem sem perder o apoio."},
+  {c:"INCLINE_FLY",n:"Crucifixo inclinado",mu:"Peito",mp:"push_h",eq:["dumbbell"],lv:1,comp:0,ctr:["shoulder"],cue:"Banco a 30°, cotovelos levemente flexionados. Abra até o máximo alongamento confortável do peitoral superior; feche em arco."},
+  {c:"DECLINE_PUSHUP",n:"Flexão declinada",mu:"Peito",mp:"push_h",eq:["bodyweight"],lv:1,comp:1,ctr:["wrist","shoulder"],cue:"Pés elevados no banco, mãos no chão. Desça o peito controlando com o core firme; empurre — ênfase no peitoral superior."},
+  {c:"CONC_CURL",n:"Rosca concentrada",mu:"Bíceps",mp:"biceps",eq:["dumbbell"],lv:0,comp:0,ctr:[],cue:"Sentado, cotovelo apoiado na parte interna da coxa. Flexione até contrair o pico do bíceps; desça devagar até estender por completo."},
+  {c:"CABLE_CURL",n:"Rosca na polia baixa",mu:"Bíceps",mp:"biceps",eq:["cable"],lv:0,comp:0,ctr:[],cue:"Cotovelos colados ao tronco, barra na polia baixa. Tensão contínua: flexione até o topo e desça controlando sem descansar embaixo."},
+  {c:"INCLINE_CURL",n:"Rosca inclinada",mu:"Bíceps",mp:"biceps",eq:["dumbbell"],lv:1,comp:0,ctr:["shoulder"],cue:"Banco a 45–60°, braços pendendo atrás do tronco — o bíceps trabalha alongado (posição que mais estimula!). Flexione sem adiantar o cotovelo."},
+  {c:"REVERSE_CURL",n:"Rosca inversa",mu:"Bíceps",mp:"biceps",eq:["barbell","dumbbell"],lv:0,comp:0,ctr:["wrist"],cue:"Pegada pronada (palmas para baixo). Flexione mantendo os punhos neutros — foco em braquiorradial e antebraço."},
+  {c:"BENCH_DIP",n:"Mergulho no banco",mu:"Tríceps",mp:"triceps",eq:["bodyweight"],lv:0,comp:1,ctr:["shoulder"],cue:"Mãos no banco atrás do corpo, pernas à frente. Desça flexionando os cotovelos até ~90°; suba estendendo — não afunde os ombros."},
+  {c:"KICKBACK",n:"Tríceps coice",mu:"Tríceps",mp:"triceps",eq:["dumbbell"],lv:0,comp:0,ctr:[],cue:"Tronco inclinado, cotovelo alto e fixo ao lado do corpo. Estenda o cotovelo até a contração total do tríceps; volte devagar."},
+  {c:"CABLE_OH_EXT",n:"Tríceps francês na polia",mu:"Tríceps",mp:"triceps",eq:["cable"],lv:1,comp:0,ctr:["shoulder"],cue:"De costas para a polia baixa, corda atrás da cabeça. Estenda acima da cabeça — a cabeça longa trabalha alongada; controle a volta."},
 ];
 const EQLBL={barbell:"Barra",dumbbell:"Halteres",machine:"Máquina",cable:"Polia",bodyweight:"Peso corporal",kettlebell:"Kettlebell"};
 const LVLBL=["Iniciante","Intermediário","Avançado"];
@@ -1354,27 +1375,34 @@ const LVLNAMES=[[100,"Lendário"],[50,"Elite"],[25,"Atleta"],[10,"Consistente"],
 function levelName(lvl){for(const[t,n]of LVLNAMES)if(lvl>=t)return n;return"Iniciante";}
 function isoWeek(dstr){const d=new Date(dstr+"T12:00:00");const t=new Date(d);t.setDate(t.getDate()+3-((t.getDay()+6)%7));const w1=new Date(t.getFullYear(),0,4);return t.getFullYear()*100+(1+Math.round(((t-w1)/864e5-3+((w1.getDay()+6)%7))/7));}
 const SPLITS={1:["full"],2:["full","full"],3:["full","full","full"],4:["upper","lower","upper","lower"],5:["push","pull","legs","upper","lower"],6:["push","pull","legs","push","pull","legs"]};
-const DAYPAT={full:["squat","push_h","pull_h","hinge","push_v","core"],upper:["push_h","pull_h","push_v","pull_v","sdelt","triceps","biceps"],lower:["squat","hinge","quad","ham","calf","core"],push:["push_h","push_v","push_h","sdelt","triceps"],pull:["pull_v","pull_h","pull_v","rdelt","biceps"],legs:["squat","hinge","quad","ham","calf","core"]};
+const DAYPAT={full:["squat","push_h","pull_h","hinge","push_v","core"],upper:["push_h","pull_h","push_v","pull_v","sdelt","triceps","biceps"],lower:["squat","hinge","quad","ham","calf","core"],push:["push_h","push_v","push_h","sdelt","triceps"],pull:["pull_v","pull_h","pull_v","rdelt","biceps"],legs:["squat","hinge","quad","ham","calf","core"],
+  chesttri:["push_h","push_h","push_h","triceps","triceps","core"],backbi:["pull_v","pull_h","pull_h","biceps","biceps"],shoulders:["push_v","sdelt","sdelt","rdelt","core"],chest:["push_h","push_h","push_h","push_h","core"],back:["pull_v","pull_h","pull_v","pull_h","shrug"],arms:["biceps","triceps","biceps","triceps","biceps","triceps"]};
+// divisões clássicas escolhíveis (A/B, A/B/C, A/B/C/D, A/B/C/D/E) — ciclam pelos dias da semana
+const SPLITMAP={ab:["upper","lower"],abc:["push","pull","legs"],abcd:["chesttri","backbi","legs","shoulders"],abcde:["chest","backbi","legs","shoulders","arms"]};
 // lo/hi: faixa de reps composto; ilo/ihi: isolado (reps mais altas). rc: descanso composto; ri: isolado.
 const GP={hypertrophy:{lo:6,hi:12,ilo:10,ihi:15,rc:150,ri:75},strength:{lo:3,hi:6,ilo:8,ihi:12,rc:180,ri:90},fat_loss:{lo:8,hi:15,ilo:12,ihi:20,rc:120,ri:60},maintenance:{lo:8,hi:15,ilo:10,ihi:15,rc:120,ri:60}};
-const DAYNAME={full:"Corpo inteiro",upper:"Superior",lower:"Inferior",push:"Empurrar",pull:"Puxar",legs:"Pernas"};
+const DAYNAME={full:"Corpo inteiro",upper:"Superior",lower:"Inferior",push:"Empurrar",pull:"Puxar",legs:"Pernas",chesttri:"Peito + Tríceps",backbi:"Costas + Bíceps",shoulders:"Ombros",chest:"Peito",back:"Costas",arms:"Braços"};
 const LEVEL_SETS=[2,3,4]; // iniciante/intermediário/avançado: volume base por série
 // equipment: equipamentos; conditions: lesões; level: 0/1/2 (iniciante→avançado)
 function workoutPlan(p,equipment,conditions,level=1){
   level=Math.max(0,Math.min(+level||0,2));
-  const split=SPLITS[Math.min(Math.max(p.days,1),6)];const gp=GP[p.goal]||GP.maintenance;const sets=LEVEL_SETS[level];
+  const days=Math.min(Math.max(p.days,1),6);
+  const custom=p.split&&SPLITMAP[p.split];
+  const split=custom?Array.from({length:days},(_,i)=>custom[i%custom.length]):SPLITS[days];
+  const gp=GP[p.goal]||GP.maintenance;const sets=LEVEL_SETS[level];
   const pool=EX.filter(e=>e.eq.some(x=>equipment.includes(x))&&!e.ctr.some(c=>conditions.includes(c)));
   const usage=new Map();
   const plan=split.map((dt,i)=>{
     const pats=DAYPAT[dt];const items=[];
     for(const pat of pats){
       // preferir exercícios ≤ nível do usuário (iniciante evita avançados); recorre a mais difíceis só se o padrão ficaria vazio
-      const cands=pool.filter(e=>e.mp===pat).sort((a,b)=>((a.lv<=level?0:1)-(b.lv<=level?0:1))||b.comp-a.comp||(usage.get(a.c)||0)-(usage.get(b.c)||0)||a.c.localeCompare(b.c));
+      let cands=pool.filter(e=>e.mp===pat&&!items.some(x=>x.n===e.n)).sort((a,b)=>((a.lv<=level?0:1)-(b.lv<=level?0:1))||b.comp-a.comp||(usage.get(a.c)||0)-(usage.get(b.c)||0)||a.c.localeCompare(b.c));
+      if(!cands[0])cands=pool.filter(e=>e.mp===pat); // sem inédito no padrão → aceita repetir
       if(!cands[0])continue;const e=cands[0];usage.set(e.c,(usage.get(e.c)||0)+1);
       const iso=!e.comp;const lo=iso?(gp.ilo||gp.lo):gp.lo,hi=iso?(gp.ihi||gp.hi):gp.hi;
       items.push({n:e.n,mu:e.mu,sets,lo,hi,rest:e.comp?gp.rc:gp.ri});
     }
-    return{day:i+1,type:DAYNAME[dt],items};
+    return{day:i+1,type:(custom?String.fromCharCode(65+i%custom.length)+" · ":"")+DAYNAME[dt],items};
   });
   // exercícios barrados por lesão (para transparência na UI)
   const barred=EX.filter(e=>e.ctr.some(c=>conditions.includes(c))&&e.eq.some(x=>equipment.includes(x)));
@@ -1404,7 +1432,7 @@ function saveProfile(){
     pt.profile={
       sex:document.querySelector("#sexseg .on").dataset.sex,
       weight:$("#weight").value,height:$("#height").value,age:$("#age").value,bf:$("#bf").value,waist:$("#waist").value,
-      goal:$("#goal").value,activity:$("#activity").value,days:$("#days").value,strategy:$("#strategy").value,level:$("#level").value,
+      goal:$("#goal").value,activity:$("#activity").value,days:$("#days").value,strategy:$("#strategy").value,level:$("#level").value,split:($("#split")||{}).value||"auto",
       allergies:chipsOn("allergies"),equipment:chipsOn("equipment"),injuries:chipsOn("injuries"),
     };
     pt.labs=LABVALS;
@@ -1415,10 +1443,10 @@ function loadProfile(){
   $("#pname").value=pt.name||"Paciente";
   const d=pt.profile||{};
   // aplica default quando o campo do paciente está vazio (evita herdar o perfil do paciente anterior)
-  const DEF={weight:"80",height:"180",age:"30",bf:"20",waist:"85",goal:"fat_loss",activity:"moderate",days:"4",strategy:"flexible",level:"1"};
+  const DEF={weight:"80",height:"180",age:"30",bf:"20",waist:"85",goal:"fat_loss",activity:"moderate",days:"4",strategy:"flexible",level:"1",split:"auto"};
   const set=(id,v)=>{if($("#"+id))$("#"+id).value=(v!=null&&v!=="")?v:DEF[id];};
   set("weight",d.weight);set("height",d.height);set("age",d.age);set("bf",d.bf);set("waist",d.waist);
-  set("goal",d.goal);set("activity",d.activity);set("days",d.days);set("strategy",d.strategy);set("level",d.level);
+  set("goal",d.goal);set("activity",d.activity);set("days",d.days);set("strategy",d.strategy);set("level",d.level);set("split",d.split);
   document.querySelectorAll("#sexseg button").forEach(b=>b.classList.toggle("on",b.dataset.sex===(d.sex||"M")));
   const applyChips=(id,vals,def)=>{const v=vals||def||[];document.querySelectorAll("#"+id+" button").forEach(b=>b.classList.toggle("on",v.includes(b.dataset.v)));};
   applyChips("allergies",d.allergies,[]);
@@ -1442,7 +1470,7 @@ function P(){
   return{
     sex:document.querySelector("#sexseg .on").dataset.sex,
     weightKg:+$("#weight").value,heightCm:+$("#height").value,age:+$("#age").value,
-    bf:+$("#bf").value,waist:+$("#waist").value,goal:$("#goal").value,activity:$("#activity").value,days:+$("#days").value,level:+$("#level").value,
+    bf:+$("#bf").value,waist:+$("#waist").value,goal:$("#goal").value,activity:$("#activity").value,days:+$("#days").value,level:+$("#level").value,split:(($("#split")||{}).value)||"auto",
     strategy:$("#strategy").value,
     allergies:chipsOn("allergies"),equipment:chipsOn("equipment"),
     conditions:mergedConditions(),
@@ -1611,6 +1639,29 @@ function shareAchievement(info){
     const a=document.createElement("a");a.href=c.toDataURL("image/png");a.download="vita-conquista.png";a.click();
     histLog("share","imagem de conquista gerada");toast("Imagem gerada — pronta para compartilhar 📤");
   }catch(e){toast("Não foi possível gerar a imagem neste dispositivo.");}
+}
+/* ============ FOTO DA REFEIÇÃO (câmera → identificação assistida → macros+micros) ============ */
+function mealPhotos(){const p=pActive();return(p&&p.mealPhotos)||[];}
+function handleMealPhoto(file){
+  if(!file||!/^image\//.test(file.type))return;
+  const fr=new FileReader();
+  fr.onload=()=>{const img=new Image();img.onload=()=>{
+    const w=360,h=Math.max(1,Math.round(img.height*w/Math.max(img.width,1)));
+    const c=document.createElement("canvas");c.width=w;c.height=h;
+    c.getContext("2d").drawImage(img,0,0,w,h);
+    const data=c.toDataURL("image/jpeg",.6);
+    pUpdate(p=>{p.mealPhotos=p.mealPhotos||[];p.mealPhotos.push({d:todayKey(),ts:Date.now(),img:data,items:[],sent:false});if(p.mealPhotos.length>24)p.mealPhotos=p.mealPhotos.slice(-24);});
+    histLog("nutrição","foto de refeição registrada");render();
+  };img.src=fr.result;};
+  fr.readAsDataURL(file);
+}
+function mealPhotoAdd(i,n,g){if(!n||!(g>0))return;pUpdate(p=>{if(p.mealPhotos&&p.mealPhotos[i])p.mealPhotos[i].items.push({n,g:Math.round(g)});});render();}
+function mealPhotoSend(i){
+  const mp=mealPhotos()[i];if(!mp||mp.sent||!mp.items.length)return;
+  mp.items.forEach(it=>{pUpdate(p=>{p.foodlog=p.foodlog||{};const t=todayKey();p.foodlog[t]=p.foodlog[t]||[];p.foodlog[t].push({n:it.n,g:it.g});});});
+  pUpdate(p=>{if(p.mealPhotos&&p.mealPhotos[i])p.mealPhotos[i].sent=true;});
+  histLog("nutrição","refeição fotografada lançada no diário ("+mp.items.length+" itens)");
+  toast("Refeição lançada no diário ✓");render();
 }
 /* medidas corporais: circunferências + dobras (Jackson-Pollock 3) */
 const SF_SITES={M:["Peitoral","Abdominal","Coxa"],F:["Tríceps","Supra-ilíaca","Coxa"]};
@@ -2070,6 +2121,29 @@ function render(){
     </div>
     ${favs().food.length?`<div class="src" style="margin:8px 0 2px">⭐ Favoritos — toque para adicionar 100 g</div><div class="wsetrow" style="margin-bottom:8px">${favs().food.map(fn=>`<button class="setchip" data-quickfood="${fn}" style="cursor:pointer">${fn} +</button>`).join("")}</div>`:""}
     <div class="list">${tlog.length?tlog.map((e,i)=>{const fd=FOODS.find(f=>f.n===e.n);const kc=fd?Math.round(fd.kcal*e.g/100):0;const pr=fd?Math.round(fd.p*e.g/100):0;const isF=favs().food.includes(e.n);return`<div class="li"><span class="idx tnum">${String(i+1).padStart(2,'0')}</span><div class="nm"><b>${e.n}</b><span>${e.g} g</span></div><div class="rt"><b class="tnum">${kc}</b> kcal · ${pr}g P</div><button class="rmbtn favbtn ${isF?"on":""}" data-favfood="${e.n}" aria-label="favorito">${isF?"★":"☆"}</button><button class="rmbtn" data-rmlog="${i}" aria-label="Remover">✕</button></div>`;}).join(""):`<div class="src" style="padding:8px 0">Nenhum item hoje. Adicione acima — a aba Análise passa a usar o consumo real.</div>`}</div></div>`;
+  // ---- FOTO DA REFEIÇÃO: câmera + identificação assistida + macros/micros por refeição ----
+  const mpsAll=mealPhotos();
+  const foodOptions=(()=>{const CAT={meats:"Carnes e aves",fish:"Peixes",eggs:"Ovos",dairy:"Laticínios",legumes:"Leguminosas",cereals:"Cereais e grãos",tubers:"Tubérculos",vegetables:"Verduras e legumes",fruits:"Frutas",oils:"Óleos e oleaginosas",supplements:"Suplementos"};return Object.keys(CAT).filter(c=>FOODS.some(f=>f.c===c)).map(c=>`<optgroup label="${CAT[c]}">${FOODS.filter(f=>f.c===c).map(f=>`<option value="${f.n}">${f.n}</option>`).join("")}</optgroup>`).join("");})();
+  const mealPhotoPanel=mpsAll.map((mp,i)=>{
+    if(mp.d!==todayKey())return"";
+    const items=mp.items.map(e=>({food:FOODS.find(f=>f.n===e.n),g:e.g})).filter(x=>x.food);
+    const tot=sumIntake(items);
+    const micTop=items.length?analyzeMicros(items,p.sex).filter(x=>x.amount>0&&x.kind!=="ceiling").sort((a,b)=>b.pct-a.pct).slice(0,5):[];
+    const hora=new Date(mp.ts);
+    return `<div class="daytag" style="margin-top:14px">Refeição de ${String(hora.getHours()).padStart(2,"0")}:${String(hora.getMinutes()).padStart(2,"0")} ${mp.sent?'<span class="pill good">no diário ✓</span>':""} <button class="rmbtn" data-mpdel="${i}" style="margin-left:auto" aria-label="Excluir foto">✕</button></div>
+    <div class="demorow"><img src="${mp.img}" alt="foto da refeição" style="width:150px;border-radius:10px;border:1px solid var(--border)">
+      <div style="flex:1;min-width:220px">
+        <div class="logadd" style="margin-bottom:8px"><select data-mpsel="${i}">${foodOptions}</select><input class="wnum" data-mpg="${i}" type="number" value="100" min="5" step="5" aria-label="gramas"><button class="minibtn" data-mpadd="${i}">+ Identificar</button></div>
+        ${mp.items.length?mp.items.map((e2,j)=>{const fd=FOODS.find(f=>f.n===e2.n);return `<div class="subrow"><b>${e2.n}</b><span class="tnum">${e2.g} g</span><span class="tnum" style="color:var(--muted)">${fd?Math.round(fd.kcal*e2.g/100):0} kcal</span><button class="rmbtn" data-mprm="${i}:${j}" aria-label="Remover">✕</button></div>`;}).join(""):`<div class="src">Identifique os alimentos do prato — o motor calcula tudo pela tabela.</div>`}
+        ${mp.items.length?`<div class="src" style="margin-top:8px"><b>Total da refeição:</b> ${tot.kcal} kcal · P ${tot.p} g · C ${tot.c} g · G ${tot.f} g</div>
+        ${micTop.length?`<div class="wsetrow" style="margin-top:6px">${micTop.map(mo=>`<span class="setchip">${mo.l}: ${mo.amount} ${mo.u} (${mo.pct}% do dia)</span>`).join("")}</div>`:""}
+        ${!mp.sent?`<button class="minibtn" data-mpsend="${i}" style="margin-top:8px">→ Lançar no diário de hoje</button>`:""}`:""}
+      </div></div>`;
+  }).join("");
+  const cardMealPhoto=`<div class="card span-12"><h3>📷 Foto da refeição <span class="pill accent">${mpsAll.filter(x=>x.d===todayKey()).length} hoje</span></h3><div class="cap">abra a câmera, fotografe o prato e identifique os alimentos — macros e micros calculados na hora pela tabela (determinístico, sem IA de imagem; a foto nunca sai do dispositivo)</div>
+    <label class="minibtn" style="margin:0;cursor:pointer;display:inline-flex">📷 Fotografar refeição<input type="file" accept="image/*" capture="environment" id="mealphoto" style="display:none"></label>
+    ${mealPhotoPanel||'<div class="src" style="margin-top:10px">Nenhuma foto hoje. No celular, o botão abre direto a câmera traseira.</div>'}</div>`;
+
   const cardIntake=`<div class="card span-5"><h3>Consumido × alvo</h3><div class="cap">${hasLog?"aderência calórica + proteica":"registre no diário para comparar"}</div>
     <div class="ringwrap" style="width:150px;height:150px;margin:0 auto 8px">${ring(hasLog?adh.ad/100:0,150)}<div class="center"><div class="big tnum" style="font-size:34px">${hasLog?adh.ad:"—"}${hasLog?'<small style="font-size:14px">%</small>':""}</div><div class="unit">ADERÊNCIA</div></div></div>
     <div class="mh" style="justify-content:space-between;display:flex;font-size:13px;margin-bottom:7px"><b>Calorias</b><span class="g mono tnum">${consumed.kcal} / ${m.kcal} kcal</span></div>
@@ -2958,7 +3032,7 @@ function render(){
     today:{title:"Hoje",sub:"Tudo abaixo é calculado por fórmula nomeada — mesmo input, mesmo output.",html:cardCoach+cardEnergy+cardMacros+cardBody+cardTrend+cardAdapt+cardReady+cardWater+cardMeals+cardWorkoutMain},
     nutri:{title:"Nutrição",sub:"Meta calórica e macros pelo motor; plano montado por seleção na base de alimentos.",html:cardEnergy+cardMacros+cardMeals+cardEvid+cardBody},
     week:{title:"Semana",sub:"7 dias com rotação determinística de fontes + lista de compras agregada.",html:cardWeek+cardShop},
-    diario:{title:"Diário alimentar",sub:"Registre o consumo real; a Análise passa a usar o que foi comido, não o plano.",html:cardDiary+cardIntake},
+    diario:{title:"Diário alimentar",sub:"Fotografe a refeição ou registre o consumo real; a Análise passa a usar o que foi comido, não o plano.",html:cardMealPhoto+cardDiary+cardIntake},
     analise:{title:"Análise de precisão",sub:"Micronutrientes vs DRI, qualidade proteica (PDCAAS), leucina por refeição, carga glicêmica e lacunas com fontes alimentares.",html:cardMicros+cardProtQual+cardProtDist+cardGL+cardSupp+cardEvid+cardMacros},
     train:{title:"Treino",sub:"Split por frequência com isolamento direto de braços/panturrilha, volume graduado por landmarks, base aeróbica e biblioteca de exercícios.",html:cardWorkoutMain+cardVolume+cardZone2+cardExLib+cardReady+cardTrend},
     calc:{title:"Calculadoras",sub:"1RM, zonas de FC, pace, gasto calórico e VO₂máx — todas determinísticas.",html:cardCalc+cardBody},
@@ -2997,6 +3071,10 @@ $("#views").addEventListener("click",e=>{
   const ff=e.target.closest("[data-favfood]");if(ff){toggleFav("food",ff.dataset.favfood);return;}
   const qf=e.target.closest("[data-quickfood]");if(qf){addLogItem(qf.dataset.quickfood,100);return;}
   const cv=e.target.closest("[data-csv]");if(cv){exportCsv(cv.dataset.csv);return;}
+  const mpa=e.target.closest("[data-mpadd]");if(mpa){const i=mpa.dataset.mpadd;const sel=document.querySelector('[data-mpsel="'+i+'"]'),gr=document.querySelector('[data-mpg="'+i+'"]');if(sel&&gr)mealPhotoAdd(+i,sel.value,+gr.value);return;}
+  const mpr=e.target.closest("[data-mprm]");if(mpr){const[i,j]=mpr.dataset.mprm.split(":");pUpdate(p=>{if(p.mealPhotos&&p.mealPhotos[+i])p.mealPhotos[+i].items.splice(+j,1);});render();return;}
+  const mpd=e.target.closest("[data-mpdel]");if(mpd){let rm=null;const i=+mpd.dataset.mpdel;pUpdate(p=>{if(p.mealPhotos)rm=p.mealPhotos.splice(i,1)[0];});render();if(rm)toast("Foto removida",()=>{pUpdate(p=>{p.mealPhotos=p.mealPhotos||[];p.mealPhotos.splice(i,0,rm);});render();});return;}
+  const mps2=e.target.closest("[data-mpsend]");if(mps2){mealPhotoSend(+mps2.dataset.mpsend);return;}
   if(e.target.closest("#shareAchv")){if(LAST_SHARE)shareAchievement(LAST_SHARE);return;}
   const dk=e.target.closest("[data-dkpi]");if(dk){if(dk.dataset.dkpi){VIEW=dk.dataset.dkpi;$("#nav").querySelectorAll("button").forEach(x=>x.classList.toggle("on",x.dataset.v===VIEW));}render();return;}
   const dcp=e.target.closest("[data-dcmp]");if(dcp){DCMP=+dcp.dataset.dcmp;render();return;}
@@ -3080,7 +3158,8 @@ $("#views").addEventListener("change",e=>{
   const gff=e.target.closest("[data-goalfield]");if(gff){const[id,field]=gff.dataset.goalfield.split(":");patchSmartGoal(id,{[field]:field==="target"?+gff.value:gff.value});return;}
   const bd=e.target.closest("[data-budget]");if(bd){pUpdate(p=>{p.dailyBudget=bd.value===""?undefined:+bd.value;});render();return;}
   const pf=e.target.closest("#photofile");if(pf&&pf.files&&pf.files[0]){handlePhotoFile(pf.files[0],($("#photopose")||{value:"frente"}).value);pf.value="";return;}
-  const wf=e.target.closest("#wearfile");if(wf&&wf.files&&wf.files[0]){const fr=new FileReader();fr.onload=()=>importWearableText(fr.result);fr.readAsText(wf.files[0]);wf.value="";}
+  const wf=e.target.closest("#wearfile");if(wf&&wf.files&&wf.files[0]){const fr=new FileReader();fr.onload=()=>importWearableText(fr.result);fr.readAsText(wf.files[0]);wf.value="";return;}
+  const mpf=e.target.closest("#mealphoto");if(mpf&&mpf.files&&mpf.files[0]){handleMealPhoto(mpf.files[0]);mpf.value="";return;}
 });
 // drag & drop: exercícios do treino (mesmo dia) + cards do dashboard
 $("#views").addEventListener("dragstart",e=>{
@@ -3219,7 +3298,7 @@ const cmdNorm=s=>(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"");
 function cmdFz(q,t){q=cmdNorm(q);t=cmdNorm(t);if(!q)return 1;let last=-1,score=0;for(const ch of q){const pos=t.indexOf(ch,last+1);if(pos<0)return 0;score+=(pos===last+1?2:1);last=pos;}if(t.startsWith(q))score+=6;if(t.indexOf(q)>=0)score+=4;return score;}
 function buildCmdIndex(){const out=[];
   const bs=document.querySelectorAll("#nav button");[].forEach.call(bs,b=>{const v=b.dataset.v;if(v)out.push({grp:"Telas",ic:"🧭",title:(b.getAttribute("aria-label")||v),sub:"abrir tela",run:()=>navigateTo(v)});});
-  const ACT=[["Abrir Dashboard","📊",()=>navigateTo("dash")],["Nova meta / objetivo","🎯",()=>navigateTo("objetivos")],["Iniciar treino","🏋️",()=>navigateTo("train")],["Registrar refeição","🍽️",()=>navigateTo("diario")],["Registrar peso e medidas","⚖️",()=>navigateTo("metas")],["Registrar hábito","🔥",()=>navigateTo("habits")],["Ver evolução","📈",()=>navigateTo("evolucao")],["Gerar prontuário (PDF)","📄",()=>{closeOv();const b=$("#exportPdf");if(b)b.click();}],["Exportar backup (JSON)","⭳",()=>{closeOv();const b=$("#backupBtn");if(b)b.click();}],["Alternar tema claro/escuro","🌓",()=>{AP.mode=AP.mode==="dark"?"light":AP.mode==="light"?"auto":"dark";apDo();}],["Aparência e temas","🎨",()=>{closeOv();renderAppear();openOv("#appearOv");}],["Modo foco","🎯",()=>toggleFocus()],["Abrir Gamificação","🏆",()=>navigateTo("game")],["Exportar treinos (CSV)","📊",()=>{closeOv();exportCsv("treinos");}],["Exportar diário (CSV)","🍽️",()=>{closeOv();exportCsv("diario");}],["Exportar evolução (CSV)","📈",()=>{closeOv();exportCsv("evolucao");}],["Gerar imagem de conquista","📤",()=>{closeOv();if(LAST_SHARE)shareAchievement(LAST_SHARE);}]];
+  const ACT=[["Abrir Dashboard","📊",()=>navigateTo("dash")],["Nova meta / objetivo","🎯",()=>navigateTo("objetivos")],["Iniciar treino","🏋️",()=>navigateTo("train")],["Registrar refeição","🍽️",()=>navigateTo("diario")],["Fotografar refeição","📷",()=>navigateTo("diario")],["Registrar peso e medidas","⚖️",()=>navigateTo("metas")],["Registrar hábito","🔥",()=>navigateTo("habits")],["Ver evolução","📈",()=>navigateTo("evolucao")],["Gerar prontuário (PDF)","📄",()=>{closeOv();const b=$("#exportPdf");if(b)b.click();}],["Exportar backup (JSON)","⭳",()=>{closeOv();const b=$("#backupBtn");if(b)b.click();}],["Alternar tema claro/escuro","🌓",()=>{AP.mode=AP.mode==="dark"?"light":AP.mode==="light"?"auto":"dark";apDo();}],["Aparência e temas","🎨",()=>{closeOv();renderAppear();openOv("#appearOv");}],["Modo foco","🎯",()=>toggleFocus()],["Abrir Gamificação","🏆",()=>navigateTo("game")],["Exportar treinos (CSV)","📊",()=>{closeOv();exportCsv("treinos");}],["Exportar diário (CSV)","🍽️",()=>{closeOv();exportCsv("diario");}],["Exportar evolução (CSV)","📈",()=>{closeOv();exportCsv("evolucao");}],["Gerar imagem de conquista","📤",()=>{closeOv();if(LAST_SHARE)shareAchievement(LAST_SHARE);}]];
   ACT.forEach(a=>out.push({grp:"Ações",ic:a[1],title:a[0],sub:"executar",run:a[2]}));
   try{smartGoals().forEach(g=>out.push({grp:"Metas",ic:"🏁",title:g.title,sub:(g.status||"ativa")+" · objetivo",run:()=>navigateTo("objetivos")}));}catch(e){}
   try{EX.forEach(ex=>out.push({grp:"Exercícios",ic:"💪",title:ex.n,sub:ex.mu+" · "+(ex.eq||[]).map(x=>EQLBL[x]||x).join("/"),run:()=>{EXFILTER=ex.mu;navigateTo("train");}}));}catch(e){}
