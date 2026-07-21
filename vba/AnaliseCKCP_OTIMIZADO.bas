@@ -4717,9 +4717,15 @@ PreCalc:
     row = row + 2
 
     ' === CARDS DE RESUMO (numeros preenchidos no final, com contagens reais) ===
+    ws.Cells(row, 1).Value = "RESUMO"
+    With ws.Cells(row, 1)
+        .Font.Size = 8: .Font.Bold = True: .Font.Color = RGB(134, 142, 150)
+        .IndentLevel = 1
+    End With
+    row = row + 1
     rowCards = row
-    ws.Rows(rowCards).RowHeight = 14
-    ws.Rows(rowCards + 1).RowHeight = 28
+    ws.Rows(rowCards).RowHeight = 16
+    ws.Rows(rowCards + 1).RowHeight = 38
     row = row + 3
 
     gEtapa = "Alertas: secao A"
@@ -4974,28 +4980,42 @@ ProxE:
     ws.Activate
     ActiveWindow.DisplayGridlines = False
     On Error GoTo 0
-    AplicarFreeze ws, "A1", congelar:=False   ' FASE 3.3
+    ' Congela cabecalho + cards de resumo (sticky ao rolar as secoes)
+    AplicarFreeze ws, "A" & (rowCards + 3), congelar:=True
 End Sub
 
-' Helper: card de resumo (fundo na tinta da secao + barra superior + numero grande)
+' Helper: card de resumo (bloco de 3 colunas, borda completa, barra de acento
+' no topo, rotulo em cima e numero grande centralizado).
 Private Sub EscreverCardAlerta(ws As Worksheet, ByVal r As Long, ByVal c As Long, _
         ByVal rotulo As String, ByVal valor As Long, _
         ByVal cor As Long, ByVal corFundo As Long)
-    With ws.Range(ws.Cells(r, c), ws.Cells(r + 1, c + 1))
+    Dim bloco As Range
+    Set bloco = ws.Range(ws.Cells(r, c), ws.Cells(r + 1, c + 2))
+    With bloco
         .Interior.Color = corFundo
+        ' borda completa fina na cor da secao
+        .Borders(xlEdgeLeft).LineStyle = xlContinuous:   .Borders(xlEdgeLeft).Color = cor
+        .Borders(xlEdgeRight).LineStyle = xlContinuous:  .Borders(xlEdgeRight).Color = cor
+        .Borders(xlEdgeBottom).LineStyle = xlContinuous: .Borders(xlEdgeBottom).Color = cor
+        ' barra de acento grossa no topo
         .Borders(xlEdgeTop).LineStyle = xlContinuous
-        .Borders(xlEdgeTop).Weight = xlThick
-        .Borders(xlEdgeTop).Color = cor
+        .Borders(xlEdgeTop).Weight = xlThick: .Borders(xlEdgeTop).Color = cor
     End With
+    ' rotulo (linha de cima, coluna do card)
     With ws.Cells(r, c)
         .Value = rotulo
         .Font.Size = 8: .Font.Bold = True: .Font.Color = cor
         .IndentLevel = 1
     End With
+    ' numero grande centralizado no bloco inferior (mescla c..c+2)
+    With ws.Range(ws.Cells(r + 1, c), ws.Cells(r + 1, c + 2))
+        .Merge
+        .HorizontalAlignment = xlCenter: .VerticalAlignment = xlCenter
+    End With
     With ws.Cells(r + 1, c)
         .Value = valor
-        .Font.Size = 20: .Font.Bold = True: .Font.Color = cor
-        .IndentLevel = 1
+        .Font.Size = 24: .Font.Bold = True
+        .Font.Color = IIf(valor > 0, cor, RGB(134, 142, 150))
     End With
 End Sub
 
@@ -8216,6 +8236,7 @@ Public Sub GerarChecklistCKCP(Optional ByVal silencioso As Boolean = False)
     AddChk ws, linha, "ANALISE DE CUSTO", "CHECK DE ATIVACAO DIRETA", "ANALISE DE CUSTO - ANALISE DE CA > CUSTO APENAS NA ODI - SENDO 25% (+- 5%) - SENDO 8% NO IOP"
     AddChk ws, linha, "ANALISE DE CUSTO", "CHECK DE FRETE", "ANALISE DE CUSTO - Verificar frete"
     AddChk ws, linha, "ANALISE DE CUSTO", "CHECK DO PRECO UNITARIO DE MATERIAL", "ANALISE DE CUSTO - PRECO UNITARIO > PRIORIZAR UC/UAR"
+    AddChk ws, linha, "ANALISE DE CUSTO", "VERIFICAR VALOR UNITARIO E VALOR DE MATERIAIS", "ANALISE DE CUSTO - MATERIAL > IDENTIFICAR VALOR UNITARIO E VALOR DE MATERIAIS ABAIXO OU ACIMA DO ESPERADO"
     AddChk ws, linha, "ANALISE DE CUSTO", "CHECK PEP SEM UC", "ANALISE DE CUSTO - ANALISE DE CA > REVISAR COLUNA MAT.UC"
     AddChk ws, linha, "ANALISE DE CUSTO", "CHECK DE CUSTO DE SUPORTE", "ANALISE DE CUSTO - RAZAO CJ > VERIFICAR CUSTOS DE SUPORTE (VIAGEM, ALIMENTACAO E HOSPEDAGEM) (2026)"
     AddChk ws, linha, "ANALISE DE CUSTO", "ZERAR MOP", "RETIRAR O MOP PARA REDISTRIBUICAO NAS OBRAS"
