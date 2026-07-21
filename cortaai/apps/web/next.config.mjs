@@ -6,7 +6,7 @@ const isPagesExport = process.env.PAGES_EXPORT === "1";
 
 // Em Pages de projeto, o site é servido sob /<repo>. Configurável via env para
 // funcionar em qualquer fork sem editar código.
-const basePath = isPagesExport ? process.env.PAGES_BASE_PATH ?? "/anonymousKS" : "";
+const basePath = isPagesExport ? process.env.PAGES_BASE_PATH ?? "/vita" : "";
 
 const nextConfig = {
   output: isPagesExport ? "export" : "standalone",

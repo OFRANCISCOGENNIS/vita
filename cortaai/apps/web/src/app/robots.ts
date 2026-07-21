@@ -5,6 +5,6 @@ export default function robots(): MetadataRoute.Robots {
     rules: [
       { userAgent: "*", allow: "/", disallow: ["/app/"] },
     ],
-    sitemap: "https://ofranciscogennis.github.io/anonymousKS/sitemap.xml",
+    sitemap: "https://ofranciscogennis.github.io/vita/sitemap.xml",
   };
 }

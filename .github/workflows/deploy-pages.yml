@@ -42,7 +42,7 @@ jobs:
       - name: Build estático (Next.js export)
         env:
           PAGES_EXPORT: "1"
-          PAGES_BASE_PATH: "/anonymousKS"
+          PAGES_BASE_PATH: "/vita"
           # Client ID público do Google OAuth (login pelo navegador via GIS).
           # Client IDs não são segredo — podem ficar no repositório.
           NEXT_PUBLIC_GOOGLE_CLIENT_ID: "37663642014-g9tdm5ctfqn465ta627a5oe3127idk1l.apps.googleusercontent.com"
