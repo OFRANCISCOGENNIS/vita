@@ -324,6 +324,35 @@ h1.title{font-size:clamp(26px,3vw,34px);font-weight:800;letter-spacing:-.02em;ma
 .dtabs button{font-family:var(--mono);font-size:11px;padding:5px 11px;border-radius:999px;border:1px solid var(--border);background:var(--surface-2);color:var(--muted);cursor:pointer}
 .dtabs button.on{background:var(--accent);color:#fff;border-color:var(--accent)}
 
+/* metas SMART */
+.goalcard{background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-sm);padding:14px 15px;border-left:3px solid var(--accent)}
+.goalcard.pri-high{border-left-color:var(--crit,#e5484d)}.goalcard.pri-med{border-left-color:var(--warn)}.goalcard.pri-low{border-left-color:var(--good)}
+.goalcard.st-done{opacity:.72}.goalcard.st-canceled{opacity:.5}
+.goalhd{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap}
+.goalhd b{font-size:15px;letter-spacing:-.01em}
+.smartb{display:flex;gap:4px;flex-wrap:wrap;margin:7px 0}
+.smartb span{font-family:var(--mono);font-size:9px;letter-spacing:.03em;padding:2px 6px;border-radius:4px;background:var(--surface);border:1px solid var(--border);color:var(--muted)}
+.smartb span b{color:var(--fg);font-weight:700}
+.subt{display:flex;align-items:center;gap:9px;padding:6px 0;border-top:1px solid var(--border)}
+.subt .sck{width:18px;height:18px;border-radius:5px;border:1.5px solid var(--border);flex:0 0 auto;display:flex;align-items:center;justify-content:center;font-size:11px;color:transparent}
+.subt.done .sck{background:var(--good);border-color:var(--good);color:#fff}
+.subt .stx{flex:1;min-width:0;font-size:12.5px}
+.subt .stx small{display:block;color:var(--muted);font-family:var(--mono);font-size:10px}
+.subt .spct{font-family:var(--mono);font-size:11px;color:var(--muted);flex:0 0 auto}
+.gmeta{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:7px;margin:10px 0}
+.gmeta .gm{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:6px 8px}
+.gmeta .gm .k{font-family:var(--mono);font-size:8.5px;text-transform:uppercase;letter-spacing:.03em;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gmeta .gm .v{font-family:var(--mono);font-size:14px;font-weight:800}
+.girec{display:flex;gap:8px;align-items:flex-start;margin-top:9px;padding:9px 11px;background:var(--surface);border-radius:6px;border:1px dashed color-mix(in srgb,var(--accent) 40%,var(--border));font-size:12px;line-height:1.5}
+.heat{display:flex;gap:3px;flex-wrap:wrap;margin-top:6px}
+.heat i{width:12px;height:12px;border-radius:3px;background:var(--border)}
+.heat i.h1{background:color-mix(in srgb,var(--good) 35%,var(--border))}.heat i.h2{background:color-mix(in srgb,var(--good) 65%,var(--border))}.heat i.h3{background:var(--good)}
+.gtmpl{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
+.gtmpl .tpl{text-align:left;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-sm);padding:11px 12px;cursor:pointer;transition:.15s}
+.gtmpl .tpl:hover{border-color:color-mix(in srgb,var(--accent) 45%,var(--border));transform:translateY(-2px)}
+.gtmpl .tpl b{font-size:13px;display:block}
+.gtmpl .tpl span{font-size:11px;color:var(--muted);display:block;margin-top:3px}
+
 /* medidas corporais */
 .mgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px}
 .mfield{display:flex;flex-direction:column;gap:5px}
@@ -482,6 +511,7 @@ h1.title{font-size:clamp(26px,3vw,34px);font-weight:800;letter-spacing:-.02em;ma
       <button data-v="pacientes" aria-label="Pacientes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.3 2.7-5 6-5s6 1.7 6 5"/><path d="M16 6a3 3 0 0 1 0 6M18 20c0-2.5-1-4-3-4.5"/></svg><span class="railtip">Pacientes</span></button>
       <button class="on" data-v="dash" aria-label="Dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="5" rx="1"/><rect x="13" y="10" width="8" height="11" rx="1"/><rect x="3" y="13" width="8" height="8" rx="1"/></svg><span class="railtip">Dashboard</span></button>
       <button data-v="today" aria-label="Hoje"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg><span class="railtip">Hoje</span></button>
+      <button data-v="objetivos" aria-label="Metas inteligentes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/></svg><span class="railtip">Metas SMART</span></button>
       <button data-v="nutri" aria-label="Nutrição"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg><span class="railtip">Nutrição</span></button>
       <button data-v="agenda" aria-label="Agenda"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span class="railtip">Agenda</span></button>
       <button data-v="diario" aria-label="Diário"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 4h16v16H4z"/><path d="M8 4v16M4 9h4M4 14h4M12 9h5M12 13h5"/></svg><span class="railtip">Diário</span></button>
@@ -1303,6 +1333,29 @@ function addDaysStr(n){const d=new Date();d.setDate(d.getDate()+n);return String
 function patientGoals(){const p=pActive();return(p&&p.goals)||{};}
 function setGoal(kind,patch){pUpdate(p=>{p.goals=p.goals||{};p.goals[kind]={...(p.goals[kind]||{}),...patch};});render();}
 function clearGoal(kind){pUpdate(p=>{if(p.goals)delete p.goals[kind];});render();}
+/* ============ SISTEMA INTELIGENTE DE METAS (SMART, determinístico) ============ */
+function smartGoals(){const p=pActive();return(p&&p.smartGoals)||[];}
+function addSmartGoal(g){pUpdate(p=>{p.smartGoals=p.smartGoals||[];p.smartGoals.push(g);});render();}
+function patchSmartGoal(id,patch){pUpdate(p=>{(p.smartGoals||[]).forEach(g=>{if(g.id===id)Object.assign(g,patch);});});render();}
+function removeSmartGoal(id){pUpdate(p=>{p.smartGoals=(p.smartGoals||[]).filter(x=>x.id!==id);});render();}
+// Achievable: avalia se o alvo é realista no prazo, com ritmo seguro por evidência.
+// muscle: Lyle McDonald (novato→avançado kg/mês). weight: 0,25–1%/sem (Garthe 2011).
+// strength: %/sem por nível. bodyfat ~0,5pp/sem. waist ~0,7cm/sem. Hábitos: sem teto fisiológico.
+function goalAchievability(type,start,target,weeks,ctx){
+  ctx=ctx||{};const lvl=Math.max(0,Math.min(ctx.level||1,2));const delta=Math.abs(target-start);const months=weeks/4.345;
+  let safe=null,dirNote=null;
+  if(type==="muscle")safe=[0.9,0.5,0.25][lvl]*months;
+  else if(type==="weight"){safe=0.01*(ctx.weight||start)*weeks;if(target>start&&ctx.goal!=="hypertrophy")dirNote="Ganhar peso não combina com objetivo de emagrecimento.";}
+  else if(type==="bodyfat")safe=0.5*weeks;
+  else if(type==="strength")safe=start*[0.015,0.0075,0.004][lvl]*weeks;
+  else if(type==="waist")safe=0.7*weeks;
+  else return{prob:"—",ok:true,safe:null,msg:"Meta de hábito: viável — depende de consistência, não de limite fisiológico."};
+  const ratio=delta/(safe||1e-9);let prob,ok=true,suggest=null;
+  if(ratio<=0.75)prob="alta";else if(ratio<=1.15)prob="média";else{prob="baixa";ok=false;suggest=R(start+Math.sign(target-start)*safe,1);}
+  return{prob,ok,ratio:R(ratio,2),safe:R(safe,1),suggest,dirNote,
+    msg:prob==="baixa"?`Baixa probabilidade no prazo. Um alvo de ~${suggest} ${ctx.unit||""} seria mais realista.`:prob==="média"?"Ambiciosa, mas possível com boa consistência.":"Alvo realista para o prazo."};
+}
+function weeksBetween(d0,d1){return Math.max(0.1,(new Date(d1)-new Date(d0))/6048e5);}
 /* medidas corporais: circunferências + dobras (Jackson-Pollock 3) */
 const SF_SITES={M:["Peitoral","Abdominal","Coxa"],F:["Tríceps","Supra-ilíaca","Coxa"]};
 function bodyFatJP3(sex,age,sum){if(!(sum>0))return null;const bd=sex==="M"?1.10938-0.0008267*sum+0.0000016*sum*sum-0.0002574*age:1.0994921-0.0009929*sum+0.0000023*sum*sum-0.0001392*age;return R(495/bd-450,1);}
@@ -2287,8 +2340,191 @@ function render(){
   const cardDInsights=`<div class="card span-12"><h3>Insights inteligentes <span class="pill accent">${insights.length}</span></h3><div class="cap">interpretações e recomendações por regras nomeadas sobre os seus dados — determinístico, sem IA externa</div>
     <div class="coachlist" style="margin-top:10px">${insights.map(i=>`<div class="insight ${i.sev}"><span class="iic">${i.ic}</span><span class="ib">${i.ib}</span></div>`).join("")}</div></div>`;
 
+  // ================= SISTEMA INTELIGENTE DE METAS (SMART, determinístico) =================
+  const SG=smartGoals();
+  const sgLevel=Math.max(0,Math.min(p.level||1,2));
+  const GLBL2={fat_loss:"Emagrecimento",hypertrophy:"Hipertrofia",maintenance:"Manutenção",performance:"Performance"};
+  const measG=patientMeasures();
+  const lastWaist=(()=>{for(let i=measG.length-1;i>=0;i--)if(measG[i].waist!=null)return measG[i].waist;return null;})();
+  const bestE1rm=name=>{let b=0;(DWL[name]||[]).forEach(se=>se.sets.forEach(s=>{const e=e1rm(s.l,s.r)||0;if(e>b)b=e;}));return b||null;};
+  const e1rmSeries=name=>reindex((DWL[name]||[]).map(se=>{let b=0;se.sets.forEach(s=>{const e=e1rm(s.l,s.r)||0;if(e>b)b=e;});return{d:se.d,y:R(b,1),lab:se.d.slice(5)};}).filter(o=>o.y>0));
+  const goalLive=g=>{
+    if(g.type==="weight")return{cur:kgNow,series:wSer};
+    if(g.type==="muscle")return{cur:leanNow,series:leanSer};
+    if(g.type==="bodyfat")return{cur:bfNow,series:bfSer};
+    if(g.type==="waist")return{cur:lastWaist,series:reindex(measG.filter(mm=>mm.waist!=null).map(mm=>({d:mm.d,y:mm.waist,lab:mm.d.slice(5)})))};
+    if(g.type==="strength")return{cur:bestE1rm(g.exercise),series:e1rmSeries(g.exercise)};
+    if(g.type==="protein")return{cur:prot14!=null?Math.round(prot14):null,series:protSer};
+    if(g.type==="freq")return{cur:wkThis.days,series:[]};
+    if(g.type==="sleep")return{cur:sleep14!=null?R(sleep14,1):sleepLatest,series:sleepSer};
+    if(g.type==="water")return{cur:Math.round(waterMlToday),series:[]};
+    return{cur:null,series:[]};
+  };
+  const goalStats=g=>{
+    const {cur,series}=goalLive(g);const start=g.start,target=g.target;
+    const reached=cur!=null&&(g.dir==="up"?cur>=target:cur<=target);
+    let pct=0;if(cur!=null)pct=start===target?100:Math.round(Math.min(1,Math.max(0,Math.abs(cur-start)/(Math.abs(target-start)||1)))*100);
+    const remain=cur!=null?R(Math.abs(target-cur),1):null;
+    const daysLeft=g.deadlineD?Math.round((new Date(g.deadlineD)-new Date(todayKey()))/864e5):null;
+    let rate=null,eta=null;
+    if(series&&series.length>=2){const tr=trend(series);rate=tr.slope;if(cur!=null&&Math.abs(rate)>1e-6){const need=(target-cur)/rate;if(need>0&&Math.sign(rate)===Math.sign(target-cur))eta=Math.round(need);}}
+    let needAvg=null;if(daysLeft&&daysLeft>0&&remain!=null&&!reached)needAvg=R(Math.abs(target-cur)/(daysLeft/7),2);
+    return{cur,series,start,target,reached,pct,remain,daysLeft,rate,eta,needAvg};
+  };
+  const goalSubtasks=g=>{
+    const S=[];const add=(label,freq,diff,done,pct,detail)=>S.push({label,freq,diff,done,pct:pct==null?(done?100:0):Math.round(pct*100),detail});
+    const proteinOk=prot14!=null&&prot14>=m.protein*.9;
+    const freqOk=wkThis.days>=p.days;
+    const sleepOk=(sleep14!=null?sleep14:(sleepLatest||0))>=7.5;
+    const measRecent=measG.length>0&&measG[measG.length-1].d>=dateStrAgo(35);
+    const surplus=hasLog?consumed.kcal>=td.value:null;
+    const deficit=hasLog?consumed.kcal<=kc:null;
+    const stepsOk=stepsToday!=null&&stepsToday>=8000;
+    const pPct=prot14!=null?Math.min(1,prot14/m.protein):0;
+    const fPct=Math.min(1,wkThis.days/Math.max(p.days,1));
+    if(g.type==="muscle"){
+      add(`Treinar ${p.days}×/semana`,"semanal","média",freqOk,fPct,`${wkThis.days}/${p.days} nesta semana`);
+      add(`Consumir ${m.protein} g de proteína/dia`,"diária","média",proteinOk,pPct,prot14!=null?`média ${Math.round(prot14)} g (14d)`:"sem diário");
+      add("Manter superávit calórico","diária","média",surplus,null,hasLog?`hoje ${consumed.kcal} vs ${Math.round(td.value)} kcal`:"registre o diário");
+      add("Dormir ≥ 8 horas","diária","fácil",sleepOk,null,sleep14!=null?`média ${R(sleep14,1)} h`:"sem dados de sono");
+      add("Aumentar cargas progressivamente","semanal","difícil",volUp&&volAll.vol>0,null,volUp?"volume subindo":"volume estável/caindo");
+      add("Avaliação física mensal","mensal","fácil",measRecent,null,measRecent?"em dia":"registre medidas");
+    }else if(g.type==="weight"||g.type==="bodyfat"||g.type==="waist"){
+      add("Manter déficit calórico","diária","média",deficit,null,hasLog?`hoje ${consumed.kcal} vs ${kc} kcal`:"registre o diário");
+      add(`Proteína ${m.protein} g/dia (preserva massa)`,"diária","média",proteinOk,pPct,prot14!=null?`média ${Math.round(prot14)} g`:"sem diário");
+      add("Cardio / 8.000 passos","diária","média",stepsOk,stepsToday!=null?Math.min(1,stepsToday/8000):0,stepsToday!=null?`${stepsToday.toLocaleString('pt-BR')} passos hoje`:"conecte wearable");
+      add(`Treinar ${p.days}×/semana`,"semanal","média",freqOk,fPct,`${wkThis.days}/${p.days}`);
+      add("Registrar peso semanalmente","semanal","fácil",DWI.length>0&&DWI[DWI.length-1].d>=dateStrAgo(7),null,DWI.length?`última ${DWI[DWI.length-1].d.slice(5)}`:"nenhuma pesagem");
+    }else if(g.type==="strength"){
+      add(`Registrar ${g.exercise}`,"por sessão","fácil",(DWL[g.exercise]||[]).length>0,null,`${(DWL[g.exercise]||[]).length} sessões`);
+      add("Progressão dupla (topo da faixa + RIR≤1)","semanal","difícil",null,null,"veja a aba Treino");
+      add(`Treinar ${p.days}×/semana`,"semanal","média",freqOk,fPct,`${wkThis.days}/${p.days}`);
+      add("Proteína + sono para recuperar","diária","média",proteinOk&&sleepOk,null,"suporte à síntese proteica");
+    }else{
+      add("Cumprir a meta hoje","diária","fácil",null,null,"marque no diário/hábitos");
+      add("Manter a sequência","diária","média",st2>=3,null,`sequência atual ${st2} dias`);
+    }
+    return S;
+  };
+  const goalPriority=g=>{
+    const base=g.priority||"med";const sub=goalSubtasks(g);
+    const failing=sub.filter(s=>s.done===false&&s.freq!=="mensal").length;
+    const critFail=(g.type==="muscle"||g.type==="weight")&&prot14!=null&&prot14<m.protein*.8;
+    if(critFail||failing>=Math.ceil(sub.length*.6))return{level:"high",escalated:base!=="high"};
+    return{level:base,escalated:false};
+  };
+  const goalRecommendation=(g,gs)=>{
+    const recs=[];const wkTot=g.createdD&&g.deadlineD?weeksBetween(g.createdD,g.deadlineD):null;
+    const ach=wkTot?goalAchievability(g.type,g.start,g.target,wkTot,{level:sgLevel,weight:p.weightKg,goal:p.goal,unit:g.unit}):null;
+    if(gs.reached)recs.push("🎉 Meta atingida! Marque como concluída para registrar a conquista.");
+    else{
+      if(ach&&ach.prob==="baixa"&&ach.suggest!=null)recs.push(`Alvo ambicioso: ${ach.msg}`);
+      if(gs.daysLeft!=null&&gs.daysLeft<0)recs.push(gs.eta!=null?`Prazo vencido — no ritmo atual, ~${gs.eta} dias a mais bastam. Recalcule a data.`:"Prazo vencido — reveja o alvo ou o plano.");
+      else if(gs.rate!=null&&gs.cur!=null&&Math.sign(gs.rate)!==Math.sign(g.target-gs.cur)&&Math.abs(g.target-gs.cur)>.1)recs.push("A tendência atual afasta da meta — ajuste o balanço calórico e o treino.");
+      else if(gs.eta!=null&&gs.daysLeft!=null&&gs.eta>gs.daysLeft)recs.push(`No ritmo atual (~${gs.eta} dias) você passa do prazo (${gs.daysLeft} dias). Aumente a intensidade ou estenda a data.`);
+      const failD=goalSubtasks(g).filter(s=>s.done===false&&s.freq==="diária");
+      if(failD.length)recs.push(`Hábito travando o progresso: <b>${failD[0].label}</b>.`);
+      if(recS!=null&&recS<50&&(g.type==="muscle"||g.type==="strength"))recs.push("Sinais de fadiga (recuperação baixa) — considere 1–2 dias de descanso.");
+    }
+    if(!recs.length)recs.push("No caminho certo — mantenha a consistência.");
+    return recs;
+  };
+  const PRIL={high:"🔴 alta",med:"🟡 média",low:"🟢 baixa"};
+  const heatCells=(()=>{const h=[];for(let i=13;i>=0;i--){const d=dateStrAgo(i);let lv=0;if(Object.values(DWL).some(a=>a.some(s=>s.d===d)))lv+=2;if(DFL[d])lv+=1;h.push(Math.min(3,lv));}return h;})();
+  const renderGoalCard=g=>{
+    const gs=goalStats(g),pr=goalPriority(g),sub=goalSubtasks(g);
+    const done=g.status==="done",canceled=g.status==="canceled";
+    const wkTot=g.createdD&&g.deadlineD?weeksBetween(g.createdD,g.deadlineD):null;
+    const ach=wkTot?goalAchievability(g.type,g.start,g.target,wkTot,{level:sgLevel,weight:p.weightKg,goal:p.goal,unit:g.unit}):null;
+    const recs=(done||canceled)?[]:goalRecommendation(g,gs);
+    const brDl=g.deadlineD?g.deadlineD.split("-").reverse().join("/"):"sem prazo";
+    return `<div class="goalcard pri-${pr.level} st-${g.status}">
+      <div class="goalhd"><div><b>${g.title}</b> ${pr.escalated?'<span class="pill crit" title="prioridade elevada automaticamente pela IA de regras">↑ prioridade</span>':""}
+        <div class="smartb"><span>S · específica</span><span>M · <b>${g.target} ${g.unit}</b></span><span>A · atingib. <b>${ach?ach.prob:"—"}</b></span><span>R · <b>${GLBL2[p.goal]||p.goal}</b></span><span>T · <b>${brDl}</b></span></div></div>
+        <span class="pill ${done?"good":canceled?"":pr.level==="high"?"crit":pr.level==="med"?"warn":"good"}">${done?"✓ concluída":canceled?"cancelada":PRIL[pr.level]}</span></div>
+      ${!canceled?`<div class="track" style="margin:4px 0 2px"><div class="fill" style="width:${gs.pct}%;background:${gs.reached||done?'var(--good)':'var(--accent)'}"></div></div>
+      <div class="gmeta">
+        <div class="gm"><div class="k">Concluído</div><div class="v">${gs.pct}%</div></div>
+        <div class="gm"><div class="k">Atual</div><div class="v">${gs.cur!=null?R(gs.cur,1):"—"}</div></div>
+        <div class="gm"><div class="k">Restante</div><div class="v">${gs.remain!=null?gs.remain:"—"}<small> ${g.unit}</small></div></div>
+        <div class="gm"><div class="k">Prazo</div><div class="v">${gs.daysLeft!=null?gs.daysLeft+"d":"—"}</div></div>
+        <div class="gm"><div class="k">Previsão</div><div class="v">${gs.eta!=null?"~"+gs.eta+"d":"—"}</div></div>
+        <div class="gm"><div class="k">Média nec.</div><div class="v">${gs.needAvg!=null?gs.needAvg:"—"}<small> /sem</small></div></div>
+        <div class="gm"><div class="k">Ritmo</div><div class="v">${gs.rate!=null?(gs.rate>0?"+":"")+R(gs.rate,2):"—"}</div></div>
+      </div>
+      ${gs.series&&gs.series.length>=2?dchart(gs.series,{id:"gl"+g.id,unit:" "+g.unit,target:g.target,aria:"evolução da meta"}):`<div class="src">Registre mais pontos (peso, medidas ou séries) para ver a curva e a previsão.</div>`}
+      <div class="src" style="margin:10px 0 4px">Plano de ação — subtarefas automáticas</div>
+      ${sub.map(s=>`<div class="subt ${s.done?"done":""}"><span class="sck">✓</span><span class="stx">${s.label}<small>${s.freq} · dificuldade ${s.diff}${s.detail?" · "+s.detail:""}</small></span><span class="spct">${s.done===true?"✓":s.done===false?s.pct+"%":"—"}</span></div>`).join("")}
+      ${recs.length?`<div class="girec"><span>🤖</span><div>${recs.map(r=>`<div>${r}</div>`).join("")}</div></div>`:""}
+      <div class="src" style="margin:9px 0 4px">Consistência (14 dias)</div><div class="heat">${heatCells.map(h=>`<i class="${h?"h"+h:""}"></i>`).join("")}</div>`:""}
+      <div class="logadd" style="margin-top:12px">
+        ${!done&&!canceled?`<input class="wnum" style="width:96px" type="number" step="0.5" data-goalfield="${g.id}:target" value="${g.target}" title="ajustar alvo"><input class="wnum" style="width:148px" type="date" data-goalfield="${g.id}:deadlineD" value="${g.deadlineD||""}">
+        <button class="minibtn" data-goaldone="${g.id}">✓ Concluir</button><button class="minibtn" data-goalcancel="${g.id}">Cancelar</button>`:`<button class="minibtn" data-goalreopen="${g.id}">Reabrir</button>`}
+        <button class="rmbtn" data-goalrm="${g.id}" title="Remover">✕</button>
+      </div></div>`;
+  };
+  // templates relevantes ao objetivo do usuário (Relevant)
+  const curLeanG=leanNow,curBfG=bfNow,curWG=kgNow,curWaistG=lastWaist;
+  const tpl=(type,ic,title,unit,dir,start,target,weeks,pri,ex)=>({type,ic,title,unit,dir,start:R(start,1),target:R(target,1),weeks,pri,ex:ex||""});
+  const templates=[];const WK=12;
+  if(p.goal==="hypertrophy"||p.goal==="maintenance"){
+    const gain=R([0.9,0.5,0.25][sgLevel]*(WK/4.345),1);
+    templates.push(tpl("muscle","💪",`Ganhar ${gain} kg de massa muscular`,"kg","up",curLeanG,curLeanG+gain,WK,"high"));
+    const exN=mostDone?mostDone[0]:(Object.keys(DWL)[0]||null),cE=exN?bestE1rm(exN):null;
+    if(exN&&cE)templates.push(tpl("strength","🏋️",`Aumentar 1RM de ${exN} em 10%`,"kg","up",cE,R(cE*1.1,1),WK,"med",exN));
+    templates.push(tpl("protein","🥩",`Bater ${m.protein} g de proteína/dia`,"g","up",prot14!=null?Math.round(prot14):0,m.protein,8,"high"));
+  }
+  if(p.goal==="fat_loss"){
+    const loss=R(0.008*curWG*WK,1);
+    templates.push(tpl("weight","⚖️",`Perder ${loss} kg`,"kg","down",curWG,curWG-loss,WK,"high"));
+    templates.push(tpl("bodyfat","🔥","Reduzir 4 pontos de %gordura","%","down",curBfG,curBfG-4,WK,"high"));
+    if(curWaistG)templates.push(tpl("waist","📏","Reduzir 6 cm de cintura","cm","down",curWaistG,curWaistG-6,WK,"med"));
+    templates.push(tpl("protein","🥩",`Proteína ${m.protein} g/dia (preservar massa)`,"g","up",prot14!=null?Math.round(prot14):0,m.protein,8,"med"));
+  }
+  templates.push(tpl("freq","📅",`Treinar ${p.days}×/semana`,"×","up",wkThis.days,p.days,8,"high"));
+  templates.push(tpl("sleep","😴","Dormir 8 h por noite","h","up",sleep14!=null?R(sleep14,1):0,8,8,"high"));
+  const tplHtml=templates.map(t=>{const dl=dateStrAgo(-Math.round(t.weeks*7));const a=goalAchievability(t.type,t.start,t.target,t.weeks,{level:sgLevel,weight:p.weightKg,goal:p.goal,unit:t.unit});const col=a.prob==="alta"?"good":a.prob==="média"?"warn":a.prob==="baixa"?"crit":"muted";
+    return `<button class="tpl" data-addgoal="${t.type}" data-gtitle="${t.title}" data-gunit="${t.unit}" data-gdir="${t.dir}" data-gstart="${t.start}" data-gtarget="${t.target}" data-gpri="${t.pri}" data-gex="${t.ex}" data-gdeadline="${dl}"><b>${t.ic} ${t.title}</b><span>alvo ${t.target} ${t.unit} · ${t.weeks} sem · atingibilidade <b style="color:var(--${col})">${a.prob}</b></span></button>`;}).join("");
+  const cardGoalNew=`<div class="card span-12"><h3>Criar objetivo SMART <span class="pill accent">${GLBL2[p.goal]||p.goal}</span></h3><div class="cap">modelos alinhados ao seu objetivo · a IA de regras já valida a atingibilidade e monta o plano · toque para criar</div>
+    <div class="gtmpl" style="margin-top:10px">${tplHtml}</div>
+    <div class="src" style="margin-top:10px">Cada meta segue a metodologia <b>SMART</b> (Específica · Mensurável · Atingível · Relevante · com Prazo), gera subtarefas automáticas e acompanha seu progresso em tempo real sobre os dados reais.</div></div>`;
+
+  const activeG=SG.filter(g=>g.status==="active"),otherG=SG.filter(g=>g.status!=="active");
+  const cardGoalActive=`<div class="card span-12"><h3>Metas ativas <span class="pill ${activeG.length?"accent":""}">${activeG.length}</span></h3><div class="cap">progresso, previsão, subtarefas e recomendações — atualizados automaticamente</div>
+    ${activeG.length?`<div style="display:grid;gap:12px;margin-top:10px">${activeG.map(renderGoalCard).join("")}</div>`:`<div class="src" style="margin-top:8px">Nenhuma meta ativa. Crie uma acima — em segundos você tem plano, prazo e acompanhamento.</div>`}</div>`;
+  const cardGoalOther=otherG.length?`<div class="card span-12"><h3>Concluídas & canceladas <span class="pill good">${otherG.filter(g=>g.status==="done").length} concluídas</span></h3><div class="cap">histórico de objetivos</div>
+    <div style="display:grid;gap:12px;margin-top:10px">${otherG.map(renderGoalCard).join("")}</div></div>`:"";
+
+  // estatísticas das metas
+  const totalG=SG.length,doneG=SG.filter(g=>g.status==="done").length,cancG=SG.filter(g=>g.status==="canceled").length;
+  const succRate=(doneG+cancG)?Math.round(doneG/(doneG+cancG)*100):null;
+  const times=SG.filter(g=>g.status==="done"&&g.doneAt&&g.createdAt).map(g=>(g.doneAt-g.createdAt)/864e5);
+  const avgTime=times.length?Math.round(times.reduce((a,b)=>a+b,0)/times.length):null;
+  const activeStats=activeG.map(g=>({t:g.title,pct:goalStats(g).pct,type:g.type}));
+  const bestG=activeStats.slice().sort((a,b)=>b.pct-a.pct)[0],worstG=activeStats.slice().sort((a,b)=>a.pct-b.pct)[0];
+  const allSub=activeG.flatMap(goalSubtasks);const subDone=allSub.filter(s=>s.done===true).length;
+  const wkPctG=allSub.length?Math.round(subDone/allSub.length*100):null;
+  const byCat={};activeStats.forEach(s=>{(byCat[s.type]=byCat[s.type]||[]).push(s.pct);});
+  const catAvg=Object.entries(byCat).map(([k,a])=>`${k} ${Math.round(a.reduce((x,y)=>x+y,0)/a.length)}%`).join(" · ")||"—";
+  const cardGoalStats=`<div class="card span-12"><h3>Estatísticas das metas ${succRate!=null?`<span class="pill ${succRate>=70?"good":succRate>=40?"warn":"crit"}">${succRate}% sucesso</span>`:""}</h3><div class="cap">desempenho determinístico sobre seus objetivos</div>
+    <div class="statg" style="margin-top:10px">
+      ${dstat("Total de metas",totalG||null)}${dstat("Concluídas",doneG||null)}${dstat("Em andamento",activeG.length||null)}${dstat("Canceladas",cancG||null)}
+      ${dstat("Taxa de sucesso",succRate,"%")}${dstat("Tempo médio",avgTime,"dias")}${dstat("Sequência de hábitos",st2||null,"dias")}${dstat("Cumprimento de subtarefas",wkPctG,"%")}
+      ${dstat("Maior desempenho",bestG?bestG.t.slice(0,18):null,bestG?bestG.pct+"%":"")}${dstat("Menor desempenho",worstG&&activeStats.length>1?worstG.t.slice(0,18):null,worstG&&activeStats.length>1?worstG.pct+"%":"")}
+      ${dstat("Progresso por categoria",activeStats.length?catAvg:null)}${dstat("Metas concluídas (XP)",doneG?doneG*100+st2*5:null,"XP")}
+    </div></div>`;
+
+  // conquistas de metas
+  const gxp=doneG*100+st2*5,glv=xpLevel(gxp);
+  const gach=[{n:"Primeira meta",ic:"🥉",d:"Conclua 1 objetivo",got:doneG>=1},{n:"5 metas",ic:"🥈",d:"Conclua 5 objetivos",got:doneG>=5},{n:"10 metas",ic:"🥇",d:"Conclua 10 objetivos",got:doneG>=10},{n:"Sequência 7 dias",ic:"🔥",d:"7 dias de hábitos",got:st2>=7},{n:"Foco total",ic:"🏆",d:"3 concluídas, 0 canceladas",got:doneG>=3&&cancG===0}];
+  const cardGoalAch=`<div class="card span-12"><h3>Conquistas de metas <span class="pill accent">Nível ${glv.lvl} · ${gxp} XP</span></h3><div class="cap">recompensas por objetivos concluídos e consistência</div>
+    <div class="mh" style="display:flex;justify-content:space-between;font-size:12px;margin:6px 0"><b class="mono">Nível ${glv.lvl}</b><span class="g mono tnum">${glv.cur}/${glv.need} XP p/ nível ${glv.lvl+1}</span></div>
+    <div class="track" style="margin-bottom:14px"><div class="fill" style="width:${glv.pct}%;background:linear-gradient(90deg,var(--accent),var(--accent-2))"></div></div>
+    <div class="achgrid">${gach.map(a=>`<div class="ach ${a.got?"done":""}" title="${a.d}"><span class="aic">${a.ic}</span><div class="anm"><b>${a.n}</b><span>${a.got?"desbloqueada":a.d}</span></div>${a.got?'<span class="chk" style="color:var(--good)">✓</span>':""}</div>`).join("")}</div></div>`;
+
   const VIEWS={
     dash:{title:"Dashboard",sub:"Central de evolução: indicadores, gráficos interativos, comparações, metas, estatísticas e insights — tudo determinístico.",html:cardDHero+cardKpis+cardDWeight+cardDComp+cardDVol+cardDNut+cardDSleep+cardDCompare+cardDGoals+cardDStats+cardDInsights},
+    objetivos:{title:"Metas inteligentes",sub:"Objetivos SMART com subtarefas automáticas, prioridade, prazos, barra de progresso, previsão de conclusão, conquistas e recomendações — determinístico.",html:cardGoalNew+cardGoalActive+cardGoalOther+cardGoalStats+cardGoalAch},
     today:{title:"Hoje",sub:"Tudo abaixo é calculado por fórmula nomeada — mesmo input, mesmo output.",html:cardCoach+cardEnergy+cardMacros+cardBody+cardTrend+cardAdapt+cardReady+cardWater+cardMeals+cardWorkoutMain},
     nutri:{title:"Nutrição",sub:"Meta calórica e macros pelo motor; plano montado por seleção na base de alimentos.",html:cardEnergy+cardMacros+cardMeals+cardBody},
     week:{title:"Semana",sub:"7 dias com rotação determinística de fontes + lista de compras agregada.",html:cardWeek+cardShop},
@@ -2369,6 +2605,11 @@ $("#views").addEventListener("click",e=>{
   const am=e.target.closest("[data-anammulti]");if(am){toggleAnamMulti(am.dataset.anammulti,am.dataset.v);return;}
   const ac=e.target.closest("[data-anamchoice]");if(ac){setAnam(ac.dataset.anamchoice,anamnese()[ac.dataset.anamchoice]===ac.dataset.v?null:ac.dataset.v);return;}
   const cg=e.target.closest("[data-cleargoal]");if(cg){clearGoal(cg.dataset.cleargoal);return;}
+  const ag=e.target.closest("[data-addgoal]");if(ag){const d=ag.dataset;addSmartGoal({id:"g"+Date.now(),type:d.addgoal,title:d.gtitle,unit:d.gunit,dir:d.gdir,start:+d.gstart,target:+d.gtarget,priority:d.gpri,exercise:d.gex||null,createdD:todayKey(),deadlineD:d.gdeadline,createdAt:Date.now(),status:"active"});return;}
+  const gd=e.target.closest("[data-goaldone]");if(gd){patchSmartGoal(gd.dataset.goaldone,{status:"done",doneAt:Date.now()});return;}
+  const gc=e.target.closest("[data-goalcancel]");if(gc){patchSmartGoal(gc.dataset.goalcancel,{status:"canceled"});return;}
+  const gro=e.target.closest("[data-goalreopen]");if(gro){patchSmartGoal(gro.dataset.goalreopen,{status:"active",doneAt:null});return;}
+  const grm=e.target.closest("[data-goalrm]");if(grm){removeSmartGoal(grm.dataset.goalrm);return;}
   if(e.target.closest("#addMeas")){
     const g=k=>{const el=document.querySelector('[data-meas="'+k+'"]');const v=el&&el.value!==""?+el.value:null;return v;};
     const entry={d:todayKey()};["waist","arm","thigh","hip"].forEach(k=>{const v=g(k);if(v!=null)entry[k]=v;});
@@ -2399,6 +2640,7 @@ $("#views").addEventListener("change",e=>{
   const c=e.target.closest("[data-calc]");if(c){CALC[c.dataset.calc]=c.value;render();return;}
   const anum=e.target.closest("[data-anamnum]");if(anum){setAnam(anum.dataset.anamnum,anum.value===""?null:+anum.value);return;}
   const gl=e.target.closest("[data-goal]");if(gl){const[kind,field]=gl.dataset.goal.split(".");const isNum=(field==="target");setGoal(kind,{[field]:gl.value===""?undefined:(isNum?+gl.value:gl.value)});return;}
+  const gff=e.target.closest("[data-goalfield]");if(gff){const[id,field]=gff.dataset.goalfield.split(":");patchSmartGoal(id,{[field]:field==="target"?+gff.value:gff.value});return;}
   const bd=e.target.closest("[data-budget]");if(bd){pUpdate(p=>{p.dailyBudget=bd.value===""?undefined:+bd.value;});render();return;}
   const pf=e.target.closest("#photofile");if(pf&&pf.files&&pf.files[0]){handlePhotoFile(pf.files[0],($("#photopose")||{value:"frente"}).value);pf.value="";return;}
   const wf=e.target.closest("#wearfile");if(wf&&wf.files&&wf.files[0]){const fr=new FileReader();fr.onload=()=>importWearableText(fr.result);fr.readAsText(wf.files[0]);wf.value="";}
