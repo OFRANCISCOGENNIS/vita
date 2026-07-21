@@ -4768,12 +4768,20 @@ ProxBcalc:
         If qG = 0 And vG = 0 Then GoTo ProxB
         If InStr(UCase$(CStr(dados(fiG, cClassif))), "FALTA") > 0 _
            And qG = 0 And vG <> 0 Then GoTo ProxB
-        ' Regra ADERENCIA por tipo de PEP (igual aba MATERIAL)
+        ' Regras de ADERENCIA (mesma ordem/precedencia da aba MATERIAL):
+        '   1) QTD=0 com VALOR<>0; 2) sinais opostos; 3) VALOR=0 com QTD<>0;
+        '   4) sinal por tipo de PEP (ODD positivo / ODI-ODM-ODS negativo)
         tipoG = TipoPEPCodigo(pep)
         tpAneel = TipoPEPANEEL(pep)
         If tipoG = "S" Then tpAneel = "ODS"
         motG = ""
-        If tipoG = "D" Then
+        If qG = 0 And vG <> 0 Then
+            motG = "QTD=0 COM VALOR"
+        ElseIf (qG > 0 And vG < 0) Or (qG < 0 And vG > 0) Then
+            motG = "SINAIS OPOSTOS QTD x VALOR"
+        ElseIf vG = 0 And qG <> 0 Then
+            motG = "VALOR=0 COM QTD"
+        ElseIf tipoG = "D" Then
             If qG > 0 Then motG = "QTD+"
             If vG > 0 Then motG = Trim$(motG & " VALOR+")
         Else
@@ -8101,14 +8109,32 @@ Public Sub GerarChecklistCKCP(Optional ByVal silencioso As Boolean = False)
         .Font.Color = vbWhite: .Font.Bold = True: .Font.Size = 16
         .Font.Name = "Segoe UI": .VerticalAlignment = xlCenter
     End With
-    ws.Cells(1, 1).Value = "CHECKLIST CKCP": ws.Cells(1, 1).IndentLevel = 1
-    ws.Rows(1).RowHeight = 34
+    ws.Cells(1, 1).Value = "CHECKLIST CKCP  -  CONFIRMACAO DO PROCESSO"
+    ws.Cells(1, 1).IndentLevel = 1
+    ws.Rows(1).RowHeight = 38
 
+    ' Linha de apoio (CORTE ID + % concluido) sobre fundo cinza-claro
+    With ws.Range("A2:H2")
+        .Interior.Color = RGB(240, 244, 242)
+    End With
     ws.Cells(2, 1).Value = "CORTE ID:": ws.Cells(2, 1).Font.Bold = True
-    ws.Cells(2, 2).Interior.Color = RGB(255, 249, 196)
-    ws.Range("A2:B2").Borders.LineStyle = xlContinuous
+    ws.Cells(2, 1).Font.Name = "Segoe UI": ws.Cells(2, 1).Font.Size = 10
+    With ws.Cells(2, 2)
+        .Interior.Color = RGB(255, 249, 196)
+        .Font.Bold = True: .HorizontalAlignment = xlCenter
+        .Borders.LineStyle = xlContinuous
+        .Borders.Color = RGB(191, 175, 90)
+    End With
     ws.Cells(2, 4).Value = "% CONCLUIDO:": ws.Cells(2, 4).Font.Bold = True
-    ws.Rows(2).RowHeight = 20
+    ws.Cells(2, 4).Font.Name = "Segoe UI": ws.Cells(2, 4).Font.Size = 10
+    ws.Cells(2, 4).HorizontalAlignment = xlRight
+    ws.Rows(2).RowHeight = 24
+
+    ' Faixa de acento verde-claro sob a banda
+    With ws.Range("A3:H3")
+        .Interior.Color = RGB(0, 176, 102)
+    End With
+    ws.Rows(3).RowHeight = 4
 
     ' --- Cabecalho da tabela --------------------------------------------------
     Dim hdr As Variant, c As Long
@@ -8158,10 +8184,22 @@ Public Sub GerarChecklistCKCP(Optional ByVal silencioso As Boolean = False)
     Dim ultLin As Long: ultLin = linha
     Dim nItens As Long: nItens = ultLin - 4
 
-    ' % concluido
-    ws.Cells(2, 5).Formula = "=COUNTIF(E5:E" & ultLin & ",""CONCLUIDO"")/" & nItens
-    ws.Cells(2, 5).NumberFormat = "0%"
-    ws.Cells(2, 5).Font.Bold = True: ws.Cells(2, 5).Font.Color = corHdr
+    ' % concluido com barra de progresso (data bar) na propria celula
+    With ws.Cells(2, 5)
+        .Formula = "=COUNTIF(E5:E" & ultLin & ",""CONCLUIDO"")/" & nItens
+        .NumberFormat = "0%"
+        .Font.Bold = True: .Font.Size = 11: .Font.Color = corHdr
+        .HorizontalAlignment = xlCenter
+    End With
+    On Error Resume Next
+    With ws.Cells(2, 5).FormatConditions.AddDatabar
+        .BarColor.Color = RGB(0, 176, 102)
+        .BarFillType = xlDataBarFillGradient
+        .MinPoint.Modify newtype:=xlConditionValueNumber, newvalue:=0
+        .MaxPoint.Modify newtype:=xlConditionValueNumber, newvalue:=1
+        .ShowValue = True
+    End With
+    On Error GoTo 0
 
     ' --- Validacao (dropdown) na coluna STATUS --------------------------------
     ' Formula1 em VBA usa SEMPRE virgula como separador de lista,
@@ -8189,19 +8227,36 @@ Public Sub GerarChecklistCKCP(Optional ByVal silencioso As Boolean = False)
     ' --- Corpo: fonte, bordas, alinhamento ------------------------------------
     With ws.Range(ws.Cells(5, 1), ws.Cells(ultLin, 8))
         .Font.Name = "Segoe UI": .Font.Size = 9
-        .VerticalAlignment = xlCenter: .WrapText = True
+        .VerticalAlignment = xlCenter: .WrapText = False
         .Borders.LineStyle = xlContinuous
         .Borders.Weight = xlHairline: .Borders.Color = RGB(223, 227, 230)
     End With
-    ws.Range(ws.Cells(5, 1), ws.Cells(ultLin, 1)).HorizontalAlignment = xlCenter
+    ' Wrap apenas onde o texto e longo (ORIENTACAO e OBS), com altura fixa
+    ws.Range(ws.Cells(5, 4), ws.Cells(ultLin, 4)).WrapText = True
+    ws.Range(ws.Cells(5, 8), ws.Cells(ultLin, 8)).WrapText = True
+    Dim rAlt As Long
+    For rAlt = 5 To ultLin
+        ws.Rows(rAlt).RowHeight = 26
+    Next rAlt
+    ' ORIENTACAO em cinza discreto (informacao de apoio)
+    With ws.Range(ws.Cells(5, 4), ws.Cells(ultLin, 4)).Font
+        .Color = RGB(105, 117, 126): .Size = 8
+    End With
+    ' N em cinza pequeno, centralizado
+    With ws.Range(ws.Cells(5, 1), ws.Cells(ultLin, 1))
+        .HorizontalAlignment = xlCenter
+        .Font.Color = RGB(150, 158, 165): .Font.Size = 8
+    End With
+    ' DATA centralizada
+    ws.Range(ws.Cells(5, 7), ws.Cells(ultLin, 7)).HorizontalAlignment = xlCenter
     ws.Range(ws.Cells(1, 1), ws.Cells(ultLin, 8)).BorderAround _
         LineStyle:=xlContinuous, Weight:=xlThin, Color:=corBanda
 
     ' --- Larguras -------------------------------------------------------------
-    ws.Columns(1).ColumnWidth = 4:  ws.Columns(2).ColumnWidth = 16
-    ws.Columns(3).ColumnWidth = 34: ws.Columns(4).ColumnWidth = 60
-    ws.Columns(5).ColumnWidth = 13: ws.Columns(6).ColumnWidth = 16
-    ws.Columns(7).ColumnWidth = 12: ws.Columns(8).ColumnWidth = 24
+    ws.Columns(1).ColumnWidth = 4:  ws.Columns(2).ColumnWidth = 18
+    ws.Columns(3).ColumnWidth = 40: ws.Columns(4).ColumnWidth = 58
+    ws.Columns(5).ColumnWidth = 14: ws.Columns(6).ColumnWidth = 16
+    ws.Columns(7).ColumnWidth = 12: ws.Columns(8).ColumnWidth = 26
 
     ws.Tab.Color = corHdr
     ws.Rows(4).AutoFilter
@@ -8219,12 +8274,41 @@ Private Sub AddChk(ws As Worksheet, ByRef lin As Long, _
                    ByVal categoria As String, ByVal etapa As String, ByVal orientacao As String)
     lin = lin + 1
     Dim n As Long: n = lin - 4
+    ' Zebra primeiro (a cor da categoria e aplicada por cima)
+    If (n Mod 2) = 0 Then _
+        ws.Range(ws.Cells(lin, 1), ws.Cells(lin, 8)).Interior.Color = RGB(246, 249, 247)
     ws.Cells(lin, 1).Value = n
     ws.Cells(lin, 2).Value = categoria
     ws.Cells(lin, 3).Value = etapa
     ws.Cells(lin, 4).Value = orientacao
     ws.Cells(lin, 3).Font.Bold = True
     ws.Cells(lin, 7).NumberFormat = "dd/mm/yyyy"
-    If (n Mod 2) = 0 Then _
-        ws.Range(ws.Cells(lin, 1), ws.Cells(lin, 8)).Interior.Color = RGB(246, 249, 247)
+    ' Badge de categoria: fundo claro + fonte escura por area do processo
+    Dim bg As Long, fg As Long
+    CorCategoriaChk categoria, bg, fg
+    With ws.Cells(lin, 2)
+        .Interior.Color = bg
+        .Font.Color = fg: .Font.Bold = True: .Font.Size = 8
+        .HorizontalAlignment = xlCenter
+    End With
+End Sub
+
+' Paleta por categoria do checklist (fundo claro / fonte escura).
+Private Sub CorCategoriaChk(ByVal categoria As String, ByRef bg As Long, ByRef fg As Long)
+    Select Case UCase$(Trim$(categoria))
+        Case "ANALISE CKCP"
+            bg = RGB(214, 238, 223): fg = RGB(0, 97, 50)        ' verde
+        Case "SAP"
+            bg = RGB(217, 231, 247): fg = RGB(21, 79, 146)      ' azul
+        Case "ANALISE DE CUSTO"
+            bg = RGB(214, 236, 238): fg = RGB(11, 107, 115)     ' teal
+        Case "CUSTO DE OBRAS"
+            bg = RGB(253, 233, 217): fg = RGB(180, 95, 6)       ' laranja
+        Case "CAPITALIZACAO"
+            bg = RGB(234, 224, 244): fg = RGB(96, 50, 150)      ' roxo
+        Case "SIS.CONFORMIDADE"
+            bg = RGB(230, 232, 235): fg = RGB(70, 80, 90)       ' cinza
+        Case Else
+            bg = RGB(240, 244, 242): fg = RGB(60, 72, 66)
+    End Select
 End Sub
