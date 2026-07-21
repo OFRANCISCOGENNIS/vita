@@ -1689,6 +1689,32 @@ function camShot(){
   pUpdate(p=>{p.mealPhotos=p.mealPhotos||[];p.mealPhotos.push({d:todayKey(),ts:Date.now(),img:data,items:[],sent:false});if(p.mealPhotos.length>24)p.mealPhotos=p.mealPhotos.slice(-24);});
   closeCam();histLog("nutrição","foto de refeição (câmera ao vivo)");toast("Foto capturada — identifique os alimentos 👇");render();
 }
+/* Reconhecimento de alimentos NO APARELHO (TF.js/MobileNet): baixa 1× (~10 MB),
+   o service worker guarda em cache e depois roda 100% offline. A foto nunca sai
+   do dispositivo; o modelo apenas SUGERE — o usuário sempre confirma. */
+const ML_MAP={"banana":"Banana prata","orange":"Laranja pera","strawberry":"Morango","granny smith":"Maçã com casca","broccoli":"Brócolis cozido","zucchini":"Abobrinha refogada","guacamole":"Abacate","french loaf":"Pão francês","bagel":"Pão francês","mashed potato":"Mandioca cozida","meat loaf":"Patinho grelhado","carbonara":"Macarrão integral","corn":"Arroz integral"};
+let ML={net:null};
+function loadScript(src){return new Promise((res,rej)=>{const s=document.createElement("script");s.src=src;s.onload=res;s.onerror=rej;document.head.appendChild(s);});}
+async function mlRecognize(i){
+  const box=document.querySelector('[data-mlout="'+i+'"]');
+  const mp=mealPhotos()[i];if(!mp)return;
+  try{
+    if(box)box.innerHTML='<span class="src">⏳ Carregando o modelo no aparelho… (1º uso baixa ~10 MB; depois funciona offline)</span>';
+    if(!window.tf)await loadScript("https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js");
+    if(!window.mobilenet)await loadScript("https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet@2.1.1/dist/mobilenet.min.js");
+    if(!ML.net)ML.net=await window.mobilenet.load({version:2,alpha:1});
+    const img=new Image();img.src=mp.img;await new Promise(r=>{img.onload=r;img.onerror=r;});
+    const preds=await ML.net.classify(img,5);
+    const chips=preds.filter(pr=>pr.probability>=.05).map(pr=>{
+      const label=pr.className.split(",")[0];
+      const mapped=ML_MAP[label.toLowerCase()];
+      const conf=Math.round(pr.probability*100);
+      return mapped?`<button class="setchip" data-mlpick="${i}:${mapped}" style="cursor:pointer;border-color:var(--good)">✓ ${mapped} · ${conf}%</button>`:`<span class="setchip" style="opacity:.65" title="sem correspondência na tabela — identifique manualmente">${label} · ${conf}%</span>`;
+    }).join("");
+    if(box)box.innerHTML=chips?`<div class="src" style="margin:6px 0 2px">Sugestões do modelo local — toque em ✓ para usar (você confirma, o motor calcula):</div><div class="wsetrow">${chips}</div>`:'<span class="src">O modelo não reconheceu este prato com confiança — identifique manualmente (pratos brasileiros compostos, como arroz+feijão, confundem modelos genéricos).</span>';
+    histLog("nutrição","reconhecimento local executado na foto");
+  }catch(e){if(box)box.innerHTML='<span class="src">Reconhecimento indisponível: no 1º uso é preciso internet para baixar o modelo (depois funciona offline). Identifique manualmente.</span>';}
+}
 function mealPhotoAdd(i,n,g){if(!n||!(g>0))return;pUpdate(p=>{if(p.mealPhotos&&p.mealPhotos[i])p.mealPhotos[i].items.push({n,g:Math.round(g)});});render();}
 function mealPhotoSend(i){
   const mp=mealPhotos()[i];if(!mp||mp.sent||!mp.items.length)return;
@@ -2185,7 +2211,9 @@ function render(){
     <div class="demorow"><img src="${mp.img}" alt="foto da refeição" style="width:150px;border-radius:10px;border:1px solid var(--border)">
       <div style="flex:1;min-width:220px">
         <div class="logadd" style="margin-bottom:6px"><select data-mpsel="${i}">${foodOptions}</select><input class="wnum" data-mpg="${i}" type="number" value="100" min="5" step="5" aria-label="gramas"><button class="minibtn" data-mpadd="${i}">+ Identificar</button></div>
-        <div class="wsetrow" data-mpmeas="${i}" style="margin-bottom:8px">${measChipsPhoto(i,"meats")}</div>
+        <div class="wsetrow" data-mpmeas="${i}" style="margin-bottom:6px">${measChipsPhoto(i,"meats")}</div>
+        <button class="minibtn" data-mlrec="${i}" style="margin:0 0 6px">🔎 Reconhecer alimentos no aparelho (beta · offline após 1º uso)</button>
+        <div data-mlout="${i}"></div>
         ${mp.items.length?mp.items.map((e2,j)=>{const fd=FOODS.find(f=>f.n===e2.n);return `<div class="subrow"><b>${e2.n}</b><span class="tnum">${e2.g} g</span><span class="tnum" style="color:var(--muted)">${fd?Math.round(fd.kcal*e2.g/100):0} kcal</span><button class="rmbtn" data-mprm="${i}:${j}" aria-label="Remover">✕</button></div>`;}).join(""):`<div class="src">Identifique os alimentos do prato — o motor calcula tudo pela tabela.</div>`}
         ${mp.items.length?`<div class="src" style="margin-top:8px"><b>Total da refeição:</b> ${tot.kcal} kcal · P ${tot.p} g · C ${tot.c} g · G ${tot.f} g</div>
         ${micTop.length?`<div class="wsetrow" style="margin-top:6px">${micTop.map(mo=>`<span class="setchip">${mo.l}: ${mo.amount} ${mo.u} (${mo.pct}% do dia)</span>`).join("")}</div>`:""}
@@ -3128,6 +3156,8 @@ $("#views").addEventListener("click",e=>{
   const mpd=e.target.closest("[data-mpdel]");if(mpd){let rm=null;const i=+mpd.dataset.mpdel;pUpdate(p=>{if(p.mealPhotos)rm=p.mealPhotos.splice(i,1)[0];});render();if(rm)toast("Foto removida",()=>{pUpdate(p=>{p.mealPhotos=p.mealPhotos||[];p.mealPhotos.splice(i,0,rm);});render();});return;}
   const mps2=e.target.closest("[data-mpsend]");if(mps2){mealPhotoSend(+mps2.dataset.mpsend);return;}
   if(e.target.closest("#camOpen")){openCam();return;}
+  const mlr=e.target.closest("[data-mlrec]");if(mlr){mlRecognize(+mlr.dataset.mlrec);return;}
+  const mlp=e.target.closest("[data-mlpick]");if(mlp){const ix=mlp.dataset.mlpick.indexOf(":");const i=mlp.dataset.mlpick.slice(0,ix),n=mlp.dataset.mlpick.slice(ix+1);const sel=document.querySelector('[data-mpsel="'+i+'"]');if(sel){sel.value=n;const f=FOODS.find(x=>x.n===n);const box=document.querySelector('[data-mpmeas="'+i+'"]');if(box&&f)box.innerHTML=measChipsPhoto(i,f.c);}toast(n+" selecionado — ajuste a porção e toque em + Identificar");return;}
   const mpm=e.target.closest("[data-mpm]");if(mpm){const[i,g]=mpm.dataset.mpm.split(":");const inp=document.querySelector('[data-mpg="'+i+'"]');if(inp)inp.value=g;return;}
   const qm=e.target.closest("[data-qmeas]");if(qm){const inp=document.querySelector("#loggrams");if(inp)inp.value=qm.dataset.qmeas;return;}
   if(e.target.closest("#shareAchv")){if(LAST_SHARE)shareAchievement(LAST_SHARE);return;}
