@@ -254,6 +254,10 @@ h1.title{font-size:clamp(26px,3vw,34px);font-weight:800;letter-spacing:-.02em;ma
   padding:16px 18px;margin-bottom:20px;box-shadow:var(--shadow);
   display:flex;gap:22px;align-items:flex-end;flex-wrap:wrap;
 }
+.pbreak{flex-basis:100%;width:100%;display:flex;align-items:center;gap:12px;margin-top:2px;
+  font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint)}
+.pbreak::after{content:"";flex:1;height:1px;background:var(--border)}
+.profile .field.bm input{width:86px}
 .field{display:flex;flex-direction:column;gap:6px}
 .field label{font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint)}
 .field input,.field select{
@@ -750,6 +754,17 @@ h1.title{font-size:clamp(26px,3vw,34px);font-weight:800;letter-spacing:-.02em;ma
           <option value="abcde">A/B/C/D/E — Peito · Costas · Pernas · Ombros · Braços</option>
         </select>
       </div>
+      <div class="pbreak">📏 Medidas corporais · cm (o valor cinza é a última medição)</div>
+      <div class="field bm"><label>Peitoral</label><input data-bodym="chest" type="number" step="0.5" min="40" max="200" placeholder="cm"></div>
+      <div class="field bm"><label>Braço D</label><input data-bodym="arm" type="number" step="0.5" min="15" max="70" placeholder="cm"></div>
+      <div class="field bm"><label>Braço E</label><input data-bodym="armL" type="number" step="0.5" min="15" max="70" placeholder="cm"></div>
+      <div class="field bm"><label>Antebraço</label><input data-bodym="forearm" type="number" step="0.5" min="15" max="55" placeholder="cm"></div>
+      <div class="field bm"><label>Abdômen</label><input data-bodym="abdomen" type="number" step="0.5" min="50" max="200" placeholder="cm"></div>
+      <div class="field bm"><label>Quadril</label><input data-bodym="hip" type="number" step="0.5" min="50" max="200" placeholder="cm"></div>
+      <div class="field bm"><label>Coxa D</label><input data-bodym="thigh" type="number" step="0.5" min="30" max="110" placeholder="cm"></div>
+      <div class="field bm"><label>Coxa E</label><input data-bodym="thighL" type="number" step="0.5" min="30" max="110" placeholder="cm"></div>
+      <div class="field bm"><label>Panturrilha</label><input data-bodym="calf" type="number" step="0.5" min="20" max="70" placeholder="cm"></div>
+      <div class="field"><label>&nbsp;</label><button class="minibtn" id="saveBodyM" style="margin:0;height:38px">📏 Registrar medidas de hoje</button></div>
     </section>
 
     <section class="profile anamnese" aria-label="Anamnese" id="anamnese">
@@ -1490,6 +1505,9 @@ function loadProfile(){
   applyChips("equipment",d.equipment,["bodyweight","dumbbell","barbell","machine","cable"]);
   applyChips("injuries",d.injuries,[]);
   LABVALS=pt.labs||{};
+  // medidas corporais no perfil: última medição vira placeholder (valor cinza)
+  const lastBM=(pt.measures||[]).slice(-1)[0]||{};
+  document.querySelectorAll("[data-bodym]").forEach(inp=>{inp.value="";const v=lastBM[inp.dataset.bodym];inp.placeholder=v!=null?String(v):"cm";});
   // popula o seletor de pacientes no header
   const sel=$("#patientsel");if(sel){sel.innerHTML=pAll().map(x=>`<option value="${x.id}" ${x.id===pActiveId()?"selected":""}>${x.name}</option>`).join("");}
 }
@@ -2482,7 +2500,7 @@ function render(){
   // ---- MEDIDAS CORPORAIS (circunferências + dobras JP3) ----
   const meas=patientMeasures();
   const sfLabels=SF_SITES[p.sex]||SF_SITES.M;
-  const CIRC=[["waist","Cintura"],["arm","Braço"],["thigh","Coxa"],["hip","Quadril"]];
+  const CIRC=[["chest","Peitoral"],["arm","Braço D"],["armL","Braço E"],["forearm","Antebraço"],["waist","Cintura"],["abdomen","Abdômen"],["hip","Quadril"],["thigh","Coxa D"],["thighL","Coxa E"],["calf","Panturrilha"]];
   const lastM=meas.length?meas[meas.length-1]:null;
   const firstM=meas.length?meas[0]:null;
   const delta=(k)=>{if(!firstM||!lastM||firstM[k]==null||lastM[k]==null||meas.length<2)return null;return R(lastM[k]-firstM[k],1);};
@@ -2994,7 +3012,7 @@ function render(){
   templates.push(tpl("freq","📅",`Treinar ${p.days}×/semana`,"×","up",wkThis.days,p.days,8,"high"));
   templates.push(tpl("sleep","😴","Dormir 8 h por noite","h","up",sleep14!=null?R(sleep14,1):0,8,8,"high"));
   const tplHtml=templates.map(t=>{const dl=dateStrAgo(-Math.round(t.weeks*7));const a=goalAchievability(t.type,t.start,t.target,t.weeks,{level:sgLevel,weight:p.weightKg,goal:p.goal,unit:t.unit});const col=a.prob==="alta"?"good":a.prob==="média"?"warn":a.prob==="baixa"?"crit":"muted";
-    return `<button class="tpl" data-addgoal="${t.type}" data-gtitle="${t.title}" data-gunit="${t.unit}" data-gdir="${t.dir}" data-gstart="${t.start}" data-gtarget="${t.target}" data-gpri="${t.pri}" data-gex="${t.ex}" data-gdeadline="${dl}"><b>${t.ic} ${t.title}</b><span>alvo ${t.target} ${t.unit} · ${t.weeks} sem · atingibilidade <b style="color:var(--${col})">${a.prob}</b></span></button>`;}).join("");
+    return `<button class="tpl" data-addgoal="${t.type}" data-gtitle="${t.title}" data-gunit="${t.unit}" data-gdir="${t.dir}" data-gstart="${t.start}" data-gtarget="${t.target}" data-gpri="${t.pri}" data-gex="${t.ex}" data-gdeadline="${dl}"><b>${t.ic} ${t.title}</b><span>alvo ${t.target} ${t.unit} · ${t.weeks} sem · atingibilidade <b style="color:var(--${col})">${a.prob}</b></span><span class="pill accent" style="margin-top:8px">+ Criar esta meta</span></button>`;}).join("");
   const cardGoalNew=`<div class="card span-12"><h3>Criar objetivo SMART <span class="pill accent">${GLBL2[p.goal]||p.goal}</span></h3><div class="cap">modelos alinhados ao seu objetivo · a IA de regras já valida a atingibilidade e monta o plano · toque para criar</div>
     <div class="gtmpl" style="margin-top:10px">${tplHtml}</div>
     <div class="src" style="margin-top:10px">Cada meta segue a metodologia <b>SMART</b> (Específica · Mensurável · Atingível · Relevante · com Prazo), gera subtarefas automáticas e acompanha seu progresso em tempo real sobre os dados reais.</div></div>`;
@@ -3562,6 +3580,18 @@ if(document.addEventListener)document.addEventListener("keydown",e=>{
 try{if(typeof navigator!=="undefined"&&navigator.serviceWorker&&navigator.serviceWorker.register){navigator.serviceWorker.register("sw.js").catch(()=>{});}}catch(e){}
 
 $("#focusExit")&&$("#focusExit").addEventListener("click",()=>toggleFocus());
+/* medidas corporais do perfil: registra/mescla a medição de hoje */
+(function(){const b=document.getElementById?document.getElementById("saveBodyM"):null;if(!b)return;
+  b.addEventListener("click",()=>{
+    const entry={};let n=0;
+    document.querySelectorAll("[data-bodym]").forEach(inp=>{const v=parseFloat(String(inp.value).replace(",","."));if(v>0){entry[inp.dataset.bodym]=v;n++;}});
+    const wst=parseFloat(String(($("#waist")||{}).value||"").replace(",","."));if(wst>0){entry.waist=wst;n++;}
+    if(!n){toast("Preencha ao menos uma medida (o valor cinza é só a última medição).");return;}
+    pUpdate(p=>{p.measures=p.measures||[];const t=todayKey();let m0=p.measures.find(x=>x.d===t);if(m0)Object.assign(m0,entry);else p.measures.push({d:t,...entry});p.measures.sort((a,b2)=>a.d<b2.d?-1:a.d>b2.d?1:0);});
+    histLog("medidas",Object.keys(entry).length+" medida(s) registradas no perfil");
+    toast("Medidas de hoje registradas 📏");loadProfile();render();
+  });
+})();
 (function(){const s=document.getElementById?document.getElementById("camShotBtn"):null;if(s)s.addEventListener("click",camShot);const c=document.getElementById?document.getElementById("camClose"):null;if(c)c.addEventListener("click",closeCam);})();
 /* bloqueio: listeners + boot + auto-lock por inatividade */
 (function(){
