@@ -144,14 +144,17 @@ body.focusmode .focusexit{display:inline-flex}
 
 /* ====== demonstração animada de movimento (pictograma 2 frames, tipo GIF) ====== */
 .exdemo{width:132px;height:104px;background:var(--surface);border:1px solid var(--border);border-radius:10px;flex:0 0 auto}
-.exdemo .fig{stroke:var(--text);stroke-width:4.6;stroke-linecap:round;stroke-linejoin:round;fill:none}
-.exdemo .hd{fill:var(--text);stroke:none}
-.exdemo .ld{stroke:var(--accent)}
-.exdemo .gnd{stroke:var(--border);stroke-width:2}
-.exdemo .f1{animation:exf1 1.5s steps(1) infinite}
-.exdemo .f2{animation:exf2 1.5s steps(1) infinite}
-@keyframes exf1{0%,49%{opacity:1}50%,100%{opacity:0}}
-@keyframes exf2{0%,49%{opacity:0}50%,100%{opacity:1}}
+.exdemo{filter:drop-shadow(0 3px 4px rgba(0,0,0,.18))}
+.exdemo .fig{stroke:var(--text);stroke-width:6;stroke-linecap:round;stroke-linejoin:round;fill:none}
+.exdemo .hd{fill:var(--text);stroke:var(--text);stroke-width:2}
+.exdemo .ld{stroke:var(--accent);stroke-width:6.5}
+.exdemo .gnd{stroke:var(--border);stroke-width:2.5}
+.exdemo .f1{animation:exfA 1.35s ease-in-out infinite}
+.exdemo .f2{animation:exfB 1.35s ease-in-out infinite}
+/* crossfade suave entre as duas poses = movimento contínuo (não pisca como flip-book) */
+@keyframes exfA{0%,12%{opacity:1}44%,56%{opacity:0}88%,100%{opacity:1}}
+@keyframes exfB{0%,12%{opacity:0}44%,56%{opacity:1}88%,100%{opacity:0}}
+@media (prefers-reduced-motion:reduce){.exdemo .f2{opacity:1}}
 .demorow{display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap;margin-top:8px}
 .demorow .cue{flex:1;min-width:200px;font-size:12.5px;line-height:1.55;color:var(--muted)}
 
@@ -204,6 +207,10 @@ body.privmode .kv:hover,body.privmode .big:hover,body.privmode .now:hover,body.p
 .camguide{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
 .camhint{font-size:12px;color:var(--muted);max-width:420px;text-align:center;line-height:1.5}
 .camrow{display:flex;gap:10px}
+/* animação ao clicar no ícone Vitα */
+@keyframes brandPop{0%{transform:scale(1) rotate(0)}30%{transform:scale(1.28) rotate(-12deg)}55%{transform:scale(.9) rotate(8deg)}100%{transform:scale(1) rotate(0)}}
+@keyframes brandGlow{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--accent) 60%,transparent)}100%{box-shadow:0 0 0 22px transparent}}
+.brand.pop{animation:brandPop .55s cubic-bezier(.34,1.56,.64,1),brandGlow .6s ease-out}
 .favbtn{color:var(--faint);font-size:15px}
 .favbtn.on{color:#F1C40F}
 [draggable="true"]{cursor:grab}
@@ -431,6 +438,18 @@ h1.title{font-size:clamp(26px,3vw,34px);font-weight:800;letter-spacing:-.02em;ma
 /* agenda do dia */
 .tl{display:flex;flex-direction:column}
 .tlrow{display:flex;align-items:flex-start;gap:12px;padding:10px 0;border-left:2px solid var(--border);margin-left:44px;padding-left:16px;position:relative}
+.trcalhead{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin-bottom:5px}
+.trcalhead span{text-align:center;font-family:var(--mono);font-size:10px;color:var(--faint)}
+.trcal{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
+.trday{aspect-ratio:1;border:1px solid var(--border);background:var(--surface-2);color:var(--muted);border-radius:8px;font-family:var(--mono);font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.15s;padding:0}
+.trday:hover:not(:disabled){border-color:var(--accent);transform:translateY(-1px)}
+.trday.tr{background:var(--good);color:#062b20;border-color:var(--good)}
+.trday.td{outline:2px solid var(--accent);outline-offset:1px}
+.trday.fut{opacity:.32;cursor:default}
+.tlrow .ck{color:transparent;font-weight:800;transition:.15s}
+.tlrow.agdone{border-left-color:var(--good)}
+.tlrow.agdone .ck{color:var(--good)}
+.tlrow.agdone .tlc b{text-decoration:line-through;color:var(--muted)}
 .tlrow .tlt{position:absolute;left:-44px;top:10px;font-family:var(--mono);font-size:11px;color:var(--muted);width:38px;text-align:right}
 .tlrow .tlic{font-size:16px;margin-left:-25px;background:var(--surface);border-radius:50%;z-index:1}
 .tlrow .tlc b{font-size:13.5px;display:block}
@@ -663,7 +682,7 @@ h1.title{font-size:clamp(26px,3vw,34px);font-weight:800;letter-spacing:-.02em;ma
 
 <div class="app">
   <aside class="rail">
-    <div class="brand" title="Vitα">Vα</div>
+    <div class="brand" id="brand" title="Vitα — toque para o Dashboard" role="button" tabindex="0" style="cursor:pointer">Vα</div>
     <nav class="nav" id="nav">
       <button data-v="pacientes" aria-label="Pacientes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.3 2.7-5 6-5s6 1.7 6 5"/><path d="M16 6a3 3 0 0 1 0 6M18 20c0-2.5-1-4-3-4.5"/></svg><span class="railtip">Pacientes</span></button>
       <button class="on" data-v="dash" aria-label="Dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="5" rx="1"/><rect x="13" y="10" width="8" height="11" rx="1"/><rect x="3" y="13" width="8" height="8" rx="1"/></svg><span class="railtip">Dashboard</span></button>
@@ -1154,9 +1173,11 @@ function saveLabSnapshot(){
 const HABITS=[
   {k:"water",n:"Água na meta",ic:"💧"},
   {k:"train",n:"Treino do dia",ic:"🏋️"},
+  {k:"cardio",n:"Cardio / Zona 2",ic:"🏃"},
   {k:"sleep",n:"Dormi 7 h+",ic:"😴"},
   {k:"steps",n:"8 000 passos",ic:"👟"},
   {k:"protein",n:"Proteína na meta",ic:"🍳"},
+  {k:"stretch",n:"Alongamento",ic:"🧘"},
 ];
 function todayKey(){const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");}
 function loadHab(){const p=pActive();return(p&&p.habits)||{};}
@@ -2076,12 +2097,15 @@ function render(){
   // meals & workout compact — hoje usa o dia real da semana (rotação determinística)
   const todayIdx=(new Date().getDay()+6)%7; // 0=segunda
   const plan=dietBlocked?[]:dayPlan(m,pool,todayIdx),totKcal=plan.reduce((s,x)=>s+x.kcal,0),totP=plan.reduce((s,x)=>s+x.p,0);
-  const mealItem=(it,i)=>{
-    const food=FOODS.find(f=>f.n===it.n);
-    const open=SWAP===it.n;
+  const mealSwaps=(_pt&&_pt.mealSwaps)||{};
+  const applySwap=(it)=>{const to=mealSwaps[it.n];if(!to)return it;const F=FOODS.find(f=>f.n===to);if(!F||!F.kcal)return it;const g=Math.max(5,Math.round(it.kcal/F.kcal*100));return{...it,n:to,g,kcal:Math.round(F.kcal*g/100),p:Math.round(F.p*g/100),swapped:it.n};};
+  const mealItem=(it0,i)=>{
+    const orig=it0.n;const it=applySwap(it0);
+    const food=FOODS.find(f=>f.n===orig);
+    const open=SWAP===orig;
     const subs=open&&food?findSubs(food,pool):[];
-    return `<div class="li swap ${open?'op':''}" data-swap="${it.n}" role="button" tabindex="0" aria-expanded="${open}"><span class="idx tnum">${String(i+1).padStart(2,'0')}</span><div class="nm"><b>${it.n} <span class="swapic">⇄</span></b><span>${porcaoTxt(it.n,it.g)}</span></div><div class="rt"><b class="tnum">${it.kcal}</b> kcal · ${it.p}g P</div></div>`+
-      (open?`<div class="subs">${subs.length?`<div class="subttl">Não tem ${it.n}? Troque por (mesma caloria):</div>${subs.map(s=>`<div class="subrow"><b>${s.n}</b><span class="tnum">${porcaoTxt(s.n,s.g)}</span><span class="pill ${s.sim>.9?'good':s.sim>.8?'accent':'warn'}">${Math.round(s.sim*100)}% equivalente</span></div>`).join("")}`:`<div class="src">Sem substituto próximo na base filtrada.</div>`}</div>`:"");
+    return `<div class="li swap ${open?'op':''}" data-swap="${orig}" role="button" tabindex="0" aria-expanded="${open}"><span class="idx tnum">${String(i+1).padStart(2,'0')}</span><div class="nm"><b>${it.n} ${it.swapped?'<span class="pill accent" style="font-size:9px;padding:1px 5px">trocado</span>':''}<span class="swapic">⇄</span></b><span>${porcaoTxt(it.n,it.g)}</span></div><div class="rt"><b class="tnum">${it.kcal}</b> kcal · ${it.p}g P</div></div>`+
+      (open?`<div class="subs">${subs.length?`<div class="subttl">Escolha o equivalente (mesma caloria) — ex.: outro frango ou peixe:</div>${it.swapped?`<button class="setchip" data-undoswap="${orig}" style="cursor:pointer;border-color:var(--accent)">↩ voltar para ${orig}</button>`:""}${subs.map(s=>`<button class="subrow" data-doswap="${orig}|${s.n}" style="cursor:pointer;width:100%;text-align:left;background:none;border:0;border-top:1px solid var(--border);color:var(--text)"><b>${s.n}</b><span class="tnum">${porcaoTxt(s.n,s.g)}</span><span class="pill ${s.sim>.9?'good':s.sim>.8?'accent':'warn'}">${Math.round(s.sim*100)}% equivalente</span></button>`).join("")}`:`<div class="src">Sem substituto próximo na base filtrada.</div>`}</div>`:"");
   };
   const cardMeals=`<div class="card span-6"><h3>Plano alimentar · ${WEEK_DAYS[todayIdx]} ${blockedBadge}</h3><div class="cap">${dietBlocked?`dieta ${stratName} contraindicada para a condição selecionada`:`${stratName} · ${totKcal} kcal · ${totP} g proteína · toque num item para trocar`}</div>
     ${dietBlocked?`<div class="src" style="font-size:13px;color:var(--crit)">O motor recusa gerar um plano com estratégia contraindicada. Escolha outra dieta ou remova a condição.</div>`:`<div class="list">${plan.map(ms=>`<div class="daytag">${ms.s} · ${ms.t} · alvo ${ms.tk} kcal</div>${ms.items.map(mealItem).join("")}`).join("")}</div>`}</div>`;
@@ -2558,8 +2582,10 @@ function render(){
     evs.push({t:"19:00",ic:"🥤",tt:"Pós-treino",dt:`Proteína aqui apoia a síntese — ~${Math.round(.4*p.weightKg)} g (0,4 g/kg, Schoenfeld & Aragon)`});}
   evs.sort((a,b)=>a.t<b.t?-1:a.t>b.t?1:0);
   const nowH=new Date().getHours();
-  const cardAgenda=`<div class="card span-8"><h3>Agenda de hoje · ${WEEK_DAYS[todayIdx]}</h3><div class="cap">cronograma de refeições, hidratação e treino · horários do plano</div>
-    <div class="tl">${evs.map(ev=>{const eh=+ev.t.slice(0,2);const past=eh<nowH;return`<div class="tlrow ${past?'past':''}"><span class="tlt tnum">${ev.t}</span><span class="tlic">${ev.ic}</span><div class="tlc"><b>${ev.tt}</b><span>${ev.dt}</span></div></div>`;}).join("")}</div>
+  const agDone=((_pt&&_pt.agendaDone)||{})[todayKey()]||[];
+  const agN=evs.filter(ev=>agDone.includes(ev.t+"|"+ev.tt)).length;
+  const cardAgenda=`<div class="card span-8"><h3>Agenda de hoje · ${WEEK_DAYS[todayIdx]} <span class="pill ${agN>=evs.length&&evs.length?"good":"accent"}">${agN}/${evs.length} feito</span></h3><div class="cap">toque em cada item para marcar como concluído · salvo neste dispositivo</div>
+    <div class="tl">${evs.map(ev=>{const eh=+ev.t.slice(0,2);const past=eh<nowH;const key=ev.t+"|"+ev.tt;const done=agDone.includes(key);return`<div class="tlrow ${past?'past':''} ${done?'agdone':''}" data-agdone="${key}" role="button" tabindex="0" style="cursor:pointer"><span class="ck" style="margin-right:2px">✓</span><span class="tlt tnum">${ev.t}</span><span class="tlic">${ev.ic}</span><div class="tlc"><b>${ev.tt}</b><span>${ev.dt}</span></div></div>`;}).join("")}</div>
     <div class="src" style="margin-top:12px">Ajuste os horários à sua rotina — o que importa é a distribuição (proteína a cada 3–4 h, água ao longo do dia).</div></div>`;
   const cardAgendaSum=`<div class="card span-4"><h3>Resumo do dia</h3><div class="cap">metas de hoje</div>
     <div class="tiles">
@@ -2569,6 +2595,16 @@ function render(){
       <div class="tile"><div class="k">Refeições</div><div class="v tnum">${plan.length}</div><div class="meta">a cada 3–4 h</div></div>
     </div>
     <div class="src" style="margin-top:12px">Marque os hábitos do dia na aba Hábitos — a sequência conta com 3+ concluídos.</div></div>`;
+
+  // ---- FERRAMENTA DE METAS DIÁRIAS (o próprio usuário cria e marca; reinicia a cada dia) ----
+  const dGoals=(_pt&&_pt.dailyGoals)||[];
+  const dDone=((_pt&&_pt.dailyDone)||{})[todayKey()]||[];
+  const dgN=dGoals.filter(g=>dDone.includes(g.id)).length;
+  const dgPct=dGoals.length?Math.round(dgN/dGoals.length*100):0;
+  const cardDailyGoals=`<div class="card span-4"><h3>🎯 Metas diárias <span class="pill ${dGoals.length&&dgN>=dGoals.length?"good":"accent"}">${dgN}/${dGoals.length}</span></h3><div class="cap">crie suas próprias metas do dia e marque ao concluir · o check zera todo dia</div>
+    <div class="logadd" style="margin-bottom:10px"><input class="wnum" id="dgnew" type="text" maxlength="60" placeholder="ex.: 10 min de meditação" style="flex:1"><button class="minibtn" id="dgAdd">+ Adicionar</button></div>
+    ${dGoals.length?`<div class="track" style="margin-bottom:10px"><div class="fill" style="width:${dgPct}%;background:${dgPct>=100?'var(--good)':'linear-gradient(90deg,var(--accent),var(--accent-2))'}"></div></div>`:""}
+    ${dGoals.length?dGoals.map(g=>{const done=dDone.includes(g.id);return`<div class="chk-ex ${done?"done":""}" data-dgtoggle="${g.id}" role="button" tabindex="0" style="cursor:pointer"><span class="ck">✓</span><span class="cx">${g.t}</span><button class="rmbtn" data-dgrm="${g.id}" aria-label="Remover">✕</button></div>`;}).join(""):`<div class="src">Nenhuma meta diária ainda. Adicione acima — ótimo para hábitos que não estão na lista fixa (estudar, meditar, tomar sol…).</div>`}</div>`;
 
   // ---- CHECK-IN SEMANAL AUTOMÁTICO ----
   const today0=todayKey(),d7=dateStrAgo(6),d8=dateStrAgo(7),d14=dateStrAgo(13);
@@ -3187,7 +3223,8 @@ function render(){
 
   // ================= CHECK-UP DE EXAMES RECOMENDADO (por perfil) =================
   const intenseTr=p.days>=5||["high","athlete"].includes(p.activity);
-  const chkPer=intenseTr?"semestral":"anual";
+  const compTr=p.activity==="athlete"||p.days>=6;
+  const chkPer=compTr?"trimestral":intenseTr?"semestral":"anual";
   const CHECKUP=[
     {n:"Hemograma completo",why:"triagem geral — anemia, imunidade, plaquetas",code:null},
     {n:"Glicemia de jejum + HbA1c",why:"metabolismo da glicose e risco de diabetes",code:"GLUCOSE"},
@@ -3274,6 +3311,19 @@ function render(){
     </div>
     <div class="src" style="margin-top:12px">Creatina monoidratada e cafeína são os suplementos com evidência mais consistente (ISSN). O total proteico do dia importa mais que o horário exato (Schoenfeld & Aragon). Em cutting, proteína alta preserva massa magra (Helms 2014). <b>Nada aqui é prescrição — é o consenso científico, para discutir com seu nutricionista.</b></div></div>`;
 
+  // ================= CALENDÁRIO DE TREINOS (dias treinados + marcação manual) =================
+  const trainedSet=new Set();Object.values(DWL).forEach(a=>a.forEach(s=>trainedSet.add(s.d)));
+  const trMarks=(_pt&&_pt.trainMarks)||[];trMarks.forEach(d=>trainedSet.add(d));
+  const calBase=new Date(dT0+"T12:00:00");
+  const calDow=(calBase.getDay()+6)%7;
+  const calStart=new Date(calBase);calStart.setDate(calBase.getDate()-calDow-28);
+  const calDays=[];for(let i=0;i<35;i++){const d=new Date(calStart);d.setDate(calStart.getDate()+i);const ds=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");calDays.push({ds,n:d.getDate(),future:ds>dT0,today:ds===dT0,tr:trainedSet.has(ds)});}
+  const calTr=calDays.filter(d=>d.tr).length;
+  const cardTrainCal=`<div class="card span-6"><h3>Calendário de treinos <span class="pill accent">${calTr} nas 5 semanas</span></h3><div class="cap">verde = treino feito (registrado ou marcado) · toque num dia para marcar/desmarcar</div>
+    <div class="trcalhead">${["S","T","Q","Q","S","S","D"].map(x=>`<span>${x}</span>`).join("")}</div>
+    <div class="trcal">${calDays.map(d=>`<button class="trday ${d.tr?"tr":""} ${d.today?"td":""} ${d.future?"fut":""}" ${d.future?"disabled":`data-trainmark="${d.ds}"`} title="${d.ds.split("-").reverse().join("/")}">${d.n}</button>`).join("")}</div>
+    <div class="src" style="margin-top:10px">Dias com séries registradas já aparecem em verde automaticamente. Marque manualmente treinos feitos fora do app (ex.: corrida, quadra).</div></div>`;
+
   // ---- SUPLEMENTAÇÃO OPCIONAL: sugestão determinística por lacunas do paciente ----
   const supActive=(_pt&&_pt.supps)||[];
   const proteinHard=m.protein>=p.weightKg*1.8;
@@ -3313,12 +3363,12 @@ function render(){
     week:{title:"Semana",sub:"7 dias com rotação determinística de fontes + lista de compras agregada.",html:cardWeek+cardShop},
     diario:{title:"Diário alimentar",sub:"Fotografe a refeição ou registre o consumo real; a Análise passa a usar o que foi comido, não o plano.",html:cardMealPhoto+cardDiary+cardIntake},
     analise:{title:"Análise de precisão",sub:"Micronutrientes vs DRI, qualidade proteica (PDCAAS), leucina por refeição, carga glicêmica e lacunas com fontes alimentares.",html:cardMicros+cardProtQual+cardProtDist+cardGL+cardSupp+cardSupps+cardEvid+cardMacros},
-    train:{title:"Treino",sub:"Split por frequência com isolamento direto de braços/panturrilha, volume graduado por landmarks, base aeróbica e biblioteca de exercícios.",html:cardWorkoutMain+cardVolume+cardZone2+cardExLib+cardReady+cardTrend},
+    train:{title:"Treino",sub:"Split por frequência com isolamento direto de braços/panturrilha, calendário de treinos, volume graduado por landmarks, base aeróbica e biblioteca de exercícios.",html:cardWorkoutMain+cardTrainCal+cardVolume+cardZone2+cardExLib+cardReady+cardTrend},
     calc:{title:"Calculadoras",sub:"1RM, zonas de FC, pace, gasto calórico e VO₂máx — todas determinísticas.",html:cardCalc+cardBody},
     labs:{title:"Exames",sub:"Comparação com faixas de referência + tendência entre exames — educativo, nunca prescreve.",html:cardCheckup+cardLabs+cardLabSummary+cardLabTrend},
     habits:{title:"Hábitos",sub:"Checklist diário, sequência, conquistas e nível — tudo por regras determinísticas.",html:cardHabits+cardWater+cardStreak+cardGami+cardCoach},
     pacientes:{title:"Pacientes",sub:"Visão do profissional: todos os pacientes, quem precisa de atenção primeiro.",html:cardRoster+cardNotes},
-    agenda:{title:"Agenda do dia",sub:"Checklist das metas do dia + cronograma de refeições, hidratação e treino por horário.",html:cardDayCheck+cardAgenda+cardAgendaSum},
+    agenda:{title:"Agenda do dia",sub:"Metas diárias que você cria, checklist automático e cronograma de refeições, hidratação e treino por horário.",html:cardDailyGoals+cardDayCheck+cardAgenda+cardAgendaSum},
     evolucao:{title:"Evolução",sub:"Check-in semanal, linha do tempo de todas as métricas, histórico de ações e exportação CSV.",html:cardCheckin+cardEvolution+cardHistory+cardExport},
     metas:{title:"Metas & medidas",sub:"Alvos com previsão de data + circunferências e dobras com %gordura por Jackson-Pollock.",html:cardGoals+cardGoalsHelp+cardMeasures+cardMeasEvo},
     fotos:{title:"Fotos de evolução",sub:"Registro visual do progresso, comparação antes/depois. Tudo local — as imagens não saem do dispositivo.",html:cardPhotos+cardCompare},
@@ -3435,6 +3485,13 @@ $("#views").addEventListener("click",e=>{
   const opt=e.target.closest("[data-openpt]");if(opt){pSetActive(opt.dataset.openpt);loadProfile();VIEW="today";$("#nav").querySelectorAll("button").forEach(x=>x.classList.toggle("on",x.dataset.v==="today"));render();return;}
   if(e.target.closest("#copyCheckin")){const txt=CHECKIN_TEXT;const done=()=>alert("Resumo copiado — cole no WhatsApp/e-mail do paciente.");if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(txt).then(done).catch(()=>alert(txt));}else alert(txt);return;}
   const cm=e.target.closest("[data-cmode]");if(cm){CALC.mode=cm.dataset.cmode;render();return;}
+  const dsw=e.target.closest("[data-doswap]");if(dsw){const ix=dsw.dataset.doswap.indexOf("|");const o=dsw.dataset.doswap.slice(0,ix),n=dsw.dataset.doswap.slice(ix+1);pUpdate(p=>{p.mealSwaps=p.mealSwaps||{};p.mealSwaps[o]=n;});SWAP=null;histLog("nutrição","troca no plano: "+o+" → "+n);toast(o+" trocado por "+n);render();return;}
+  const usw=e.target.closest("[data-undoswap]");if(usw){pUpdate(p=>{if(p.mealSwaps)delete p.mealSwaps[usw.dataset.undoswap];});render();return;}
+  const agd=e.target.closest("[data-agdone]");if(agd){const k=agd.dataset.agdone;pUpdate(p=>{p.agendaDone=p.agendaDone||{};const t=todayKey();const a=new Set(p.agendaDone[t]||[]);a.has(k)?a.delete(k):a.add(k);p.agendaDone[t]=[...a];});render();return;}
+  const dg=e.target.closest("[data-dgtoggle]");if(dg){const id=dg.dataset.dgtoggle;pUpdate(p=>{p.dailyDone=p.dailyDone||{};const t=todayKey();const a=new Set(p.dailyDone[t]||[]);a.has(id)?a.delete(id):a.add(id);p.dailyDone[t]=[...a];});render();return;}
+  const dgr=e.target.closest("[data-dgrm]");if(dgr){pUpdate(p=>{p.dailyGoals=(p.dailyGoals||[]).filter(g=>g.id!==dgr.dataset.dgrm);});render();return;}
+  if(e.target.closest("#dgAdd")){const inp=document.querySelector("#dgnew");const v=inp&&inp.value.trim();if(v){pUpdate(p=>{p.dailyGoals=p.dailyGoals||[];p.dailyGoals.push({id:"dg"+Date.now(),t:v});});histLog("meta","meta diária criada: "+v);render();}return;}
+  const tcm=e.target.closest("[data-trainmark]");if(tcm){const d=tcm.dataset.trainmark;pUpdate(p=>{p.trainMarks=p.trainMarks||[];const i=p.trainMarks.indexOf(d);i>=0?p.trainMarks.splice(i,1):p.trainMarks.push(d);});histLog("treino","dia "+d.slice(5)+(pActive().trainMarks.includes(d)?" marcado como treinado":" desmarcado"));render();return;}
   const sw=e.target.closest("[data-swap]");if(sw){SWAP=SWAP===sw.dataset.swap?null:sw.dataset.swap;render();return;}
 });
 // troca de paciente + novo paciente + exportar prontuário
@@ -3634,6 +3691,9 @@ if(document.addEventListener)document.addEventListener("keydown",e=>{
 try{if(typeof navigator!=="undefined"&&navigator.serviceWorker&&navigator.serviceWorker.register){navigator.serviceWorker.register("sw.js").catch(()=>{});}}catch(e){}
 
 $("#focusExit")&&$("#focusExit").addEventListener("click",()=>toggleFocus());
+/* ícone Vitα: animação de toque + volta ao Dashboard */
+(function(){const b=document.getElementById?document.getElementById("brand"):null;if(!b)return;
+  b.addEventListener("click",()=>{b.classList.remove("pop");void b.offsetWidth;b.classList.add("pop");navigateTo("dash");});})();
 /* medidas corporais do perfil: registra/mescla a medição de hoje */
 (function(){const b=document.getElementById?document.getElementById("saveBodyM"):null;if(!b)return;
   b.addEventListener("click",()=>{
