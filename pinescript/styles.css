@@ -1,0 +1,2484 @@
+/* ============================================================================
+   SIMULADOR CONFLUÊNCIA — TEMA ESCURO DE TRADING
+   Tokens de cor validados (dataviz): superfície #1a1a19, página #0d0d0d,
+   séries #3987e5/#c98500/#9085e9, status #0ca30c/#fab219/#d03b3b.
+   ============================================================================ */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+:root {
+    /* Superfícies e tinta — QUANT OPS PREMIUM (dark theme institucional) */
+    --page: #080B12;
+    --surface: #101722;
+    --surface-2: #182230;
+    --ink: #FFFFFF;
+    --ink-2: #AAB5C5;
+    --ink-muted: #6E7A8C;
+    --hairline: rgba(170, 181, 197, 0.10);
+    --grid: #1a2230;
+
+    /* Acento e séries */
+    --accent: #3B82F6;
+    --accent-2: #60A5FA;
+    --serie-ema-r: #3B82F6;
+    --serie-ema-l: #F59E0B;
+    --serie-ema-200: #8B7FF0;
+
+    /* Status */
+    --good: #22C55E;
+    --warning: #F59E0B;
+    --critical: #EF4444;
+
+    /* Direções de trade */
+    --call: #22C55E;
+    --put: #EF4444;
+
+    /* Vidro + elevação (glassmorphism leve) */
+    --glass: rgba(16, 23, 34, 0.72);
+    --glass-brd: rgba(170, 181, 197, 0.10);
+    --elev-1: 0 1px 2px rgba(0, 0, 0, 0.35);
+    --elev-2: 0 6px 20px rgba(0, 0, 0, 0.35);
+    --elev-3: 0 16px 44px rgba(0, 0, 0, 0.45);
+
+    --radius: 14px;
+    --radius-sm: 10px;
+    --spacing: 16px;
+    --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+body {
+    /* Inter / Manrope / SF Pro quando disponíveis; senão system-ui (offline-safe) */
+    font-family: 'Inter', 'Manrope', -apple-system, 'SF Pro Display', system-ui, 'Segoe UI', sans-serif;
+    color: var(--ink-2);
+    line-height: 1.55;
+    letter-spacing: -0.01em;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    /* Fundo em degradê escuro premium (halo azulado sutil no topo) */
+    background:
+        radial-gradient(1200px 620px at 78% -8%, rgba(59, 130, 246, 0.10), transparent 60%),
+        radial-gradient(900px 520px at 0% 100%, rgba(139, 127, 240, 0.06), transparent 55%),
+        var(--page);
+    background-attachment: fixed;
+    min-height: 100vh;
+    /* Números tabulares em todo o app: dígitos com largura fixa não "pulam" ao
+       atualizar ao vivo e alinham em colunas — leitura de terminal de trading. */
+    font-variant-numeric: tabular-nums;
+    -webkit-font-feature-settings: "tnum" 1;
+    font-feature-settings: "tnum" 1;
+}
+
+.container {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+/* ============================================================================
+   HEADER (compacto — a decisão é o herói, não o título)
+   ============================================================================ */
+
+.header {
+    background: var(--surface);
+    color: var(--ink);
+    padding: 16px var(--spacing);
+    text-align: center;
+    border-bottom: 1px solid var(--hairline);
+}
+
+.header h1 {
+    font-size: 19px;
+    font-weight: 700;
+    margin-bottom: 2px;
+}
+
+.header .subtitle {
+    font-size: 12px;
+    color: var(--ink-muted);
+}
+
+/* ============================================================================
+   LAYOUT
+   ============================================================================ */
+
+.main-content {
+    display: flex;
+    flex: 1;
+    gap: var(--spacing);
+    padding: var(--spacing);
+    max-width: 1600px;
+    margin: 0 auto;
+    width: 100%;
+}
+
+.sidebar {
+    width: 280px;
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    border-radius: var(--radius);
+    padding: var(--spacing);
+    height: fit-content;
+    position: sticky;
+    top: var(--spacing);
+    overflow-y: auto;
+    max-height: calc(100vh - 40px);
+    flex-shrink: 0;
+}
+
+.sidebar h2 {
+    font-size: 15px;
+    margin-bottom: 16px;
+    color: var(--ink);
+    border-bottom: 2px solid var(--accent);
+    padding-bottom: 8px;
+}
+
+.control-group {
+    margin-bottom: 18px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--hairline);
+}
+
+.control-group h3 {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--ink-muted);
+    margin-bottom: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+}
+
+.control-group label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    font-size: 12.5px;
+    color: var(--ink-2);
+    cursor: pointer;
+    flex-wrap: wrap;
+}
+
+.control-group input[type="checkbox"] {
+    width: 15px;
+    height: 15px;
+    cursor: pointer;
+    accent-color: var(--accent);
+}
+
+.control-group input[type="number"] {
+    padding: 6px 8px;
+    background: var(--surface-2);
+    border: 1px solid var(--hairline);
+    border-radius: 5px;
+    font-size: 12px;
+    width: 62px;
+    color: var(--ink);
+    transition: var(--transition);
+}
+
+.control-group input[type="number"]:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+.control-group select {
+    padding: 7px 8px;
+    background: var(--surface-2);
+    border: 1px solid var(--hairline);
+    border-radius: 5px;
+    font-size: 12px;
+    width: 100%;
+    cursor: pointer;
+    color: var(--ink);
+}
+
+.control-group select:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+#symbol {
+    width: 100%;
+    padding: 7px 8px;
+    background: var(--surface-2);
+    border: 1px solid var(--hairline);
+    border-radius: 5px;
+    font-size: 13px;
+    text-transform: uppercase;
+    font-weight: 700;
+    color: var(--ink);
+}
+
+#symbol:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+/* ============================================================================
+   BOTÕES
+   ============================================================================ */
+
+.btn-primary {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    padding: 10px 16px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: var(--transition);
+    width: 100%;
+}
+
+.btn-primary:hover {
+    background: #2a78d6;
+}
+
+.btn-mini {
+    background: var(--surface-2);
+    color: var(--ink);
+    border: 1px solid var(--hairline);
+    padding: 5px 12px;
+    border-radius: 5px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.btn-mini:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+/* ============================================================================
+   CARDS / GRÁFICOS
+   ============================================================================ */
+
+.charts-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing);
+    min-width: 0;
+}
+
+.chart-container {
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    border-radius: var(--radius);
+    padding: var(--spacing);
+}
+
+.chart-container h2 {
+    font-size: 14px;
+    margin-bottom: 12px;
+    color: var(--ink);
+    font-weight: 700;
+}
+
+.sub-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--spacing);
+}
+
+.tv-chart {
+    width: 100%;
+    position: relative;
+}
+
+.tv-chart-main { height: var(--chart-h, 1200px); }
+.tv-chart-sub { height: 190px; }
+
+.chart-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    margin-top: 10px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ink-2);
+}
+
+/* Identidade das séries: marcador colorido ao lado, texto em tinta normal */
+.chart-legend .lg::before {
+    content: '';
+    display: inline-block;
+    width: 10px;
+    height: 3px;
+    border-radius: 2px;
+    margin-right: 6px;
+    vertical-align: middle;
+    background: var(--ink-muted);
+}
+.chart-legend .lg-close::before { background: var(--ink); }
+.chart-legend .lg-ema9::before { background: var(--serie-ema-r); }
+.chart-legend .lg-ema21::before { background: var(--serie-ema-l); }
+.chart-legend .lg-ema200::before { background: var(--serie-ema-200); }
+
+/* ============================================================================
+   PAINEL DE DECISÃO (o herói da assertividade)
+   ============================================================================ */
+
+.decision-panel {
+    display: grid;
+    /* 1ª coluna (veredito+motivo) limitada; 2ª (chips+contexto) pode encolher e
+       quebrar em vez de colapsar numa fatia — nada de legenda escondida. */
+    grid-template-columns: minmax(220px, 20rem) minmax(0, 1fr);
+    gap: 24px;
+    align-items: center;
+    border-left: 4px solid var(--ink-muted);
+}
+/* Com o dock do Registro ocupando espaço, empilha mais cedo para caber tudo. */
+body.tem-registro .decision-panel { grid-template-columns: 1fr; }
+
+.decision-main {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 240px;
+}
+
+.decision-label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--ink-muted);
+}
+
+.decision-verdict {
+    font-size: 40px;
+    font-weight: 800;
+    line-height: 1.1;
+    letter-spacing: -0.5px;
+    color: var(--ink);
+    transition: color 0.2s ease;
+}
+
+.decision-verdict.verdict-call { color: var(--call); text-shadow: 0 0 22px rgba(38, 166, 154, 0.35); }
+.decision-verdict.verdict-put { color: var(--put); text-shadow: 0 0 22px rgba(239, 83, 80, 0.35); }
+.decision-verdict.verdict-wait { color: var(--ink-muted); }
+.decision-verdict.verdict-news { color: var(--warning); text-shadow: 0 0 22px rgba(250, 178, 25, 0.3); }
+
+/* Pulse na VIRADA do veredito (classe adicionada por JS só na transição) */
+@keyframes verdictPulse {
+    0% { transform: scale(1); }
+    35% { transform: scale(1.06); }
+    100% { transform: scale(1); }
+}
+.decision-verdict.v-flash { animation: verdictPulse 0.55s cubic-bezier(0.34, 1.56, 0.64, 1); }
+@media (prefers-reduced-motion: reduce) { .decision-verdict.v-flash { animation: none; } }
+
+.decision-reason {
+    font-size: 12.5px;
+    color: var(--ink-2);
+}
+
+.decision-side {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 0;
+}
+
+.decision-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.decision-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 10px;
+    background: var(--surface-2);
+    border: 1px solid var(--hairline);
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ink-2);
+}
+
+.decision-chip .chip-dir-up { color: var(--call); font-weight: 800; }
+.decision-chip .chip-dir-down { color: var(--put); font-weight: 800; }
+.decision-chip .chip-dir-none { color: var(--ink-muted); }
+.decision-chip.chip-off { opacity: 0.45; }
+.scan-item { cursor: pointer; font-size: 13px; }
+.scan-item:hover { border-color: var(--accent); }
+.reg-list { margin-top: 10px; max-height: 220px; overflow-y: auto; }
+.reg-row { display: flex; align-items: center; gap: 12px; padding: 6px 8px; border-bottom: 1px solid var(--grid); font-size: 13px; }
+.reg-hora { color: var(--ink-muted); font-variant-numeric: tabular-nums; min-width: 42px; }
+.reg-par { flex: 1; font-weight: 600; }
+.btn-ghost { background: transparent; border: 1px solid var(--grid); color: var(--ink-2); font-size: 12px; padding: 2px 10px; border-radius: 6px; cursor: pointer; }
+.btn-ghost:hover { border-color: var(--accent); }
+.ia-row { cursor: pointer; }
+.ia-row:hover { background: var(--surface-2); }
+.ia-sel { background: rgba(38,166,154,0.12); }
+.ia-params { color: var(--ink-muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.scan-tuned { color: #fab219; font-weight: 700; }
+.decision-grade { display: inline-flex; align-items: center; gap: 4px; font-weight: 800; font-size: 14px; padding: 3px 12px; border-radius: 8px; letter-spacing: 0.5px; margin: 4px 0; }
+.grade-A { background: rgba(12,163,12,0.18); color: #26c281; border: 1px solid #0ca30c; }
+.grade-B { background: rgba(250,178,25,0.15); color: #fab219; border: 1px solid #fab219; }
+.grade-C { background: rgba(208,59,59,0.15); color: #ef5350; border: 1px solid #d03b3b; }
+.reg-tag { font-size: 10px; font-weight: 700; color: #3987e5; border: 1px solid #3987e5; border-radius: 4px; padding: 0 5px; margin-left: 6px; letter-spacing: 0.4px; white-space: nowrap; }
+.reg-grade { font-weight: 800; font-size: 12px; padding: 1px 8px; border-radius: 6px; }
+
+/* ============================================================================
+   QUANT OPS — barra executiva, painéis de inteligência e heatmap
+   ============================================================================ */
+.qo-topbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; background: var(--surface); border-bottom: 1px solid var(--hairline); padding: 10px var(--spacing); }
+.qo-brand { display: flex; align-items: center; gap: 10px; margin-right: 12px; color: var(--ink); }
+.qo-logo { font-size: 26px; color: var(--accent); }
+.qo-brand strong { display: block; font-size: 16px; letter-spacing: 1px; }
+.qo-brand small { display: block; font-size: 8.5px; color: var(--ink-muted); letter-spacing: 1.6px; }
+.qo-stat { background: var(--surface-2); border: 1px solid var(--hairline); border-radius: 8px; padding: 6px 14px; min-width: 110px; }
+.qo-stat small { display: block; font-size: 10px; color: var(--ink-muted); letter-spacing: 0.4px; }
+.qo-stat span { font-size: 15px; font-weight: 800; color: var(--ink); }
+.qo-big { font-size: 18px !important; }
+.qo-good { color: var(--call) !important; }
+.qo-bad { color: var(--put) !important; }
+.qo-ring-wrap { display: flex; align-items: center; gap: 10px; }
+.qo-ring { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 50%; background: conic-gradient(var(--call) 0deg, var(--grid) 0deg); }
+.qo-ring > span { display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 50%; background: var(--surface-2); font-size: 11px; font-weight: 800; color: var(--ink); }
+.qo-intel { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: var(--spacing); }
+.qo-panel h2 { font-size: 11px; letter-spacing: 1.2px; color: var(--ink-muted); border-bottom: 1px solid var(--hairline); padding-bottom: 6px; }
+.qo-kv { font-size: 12.5px; }
+.qo-kv .kv { display: flex; justify-content: space-between; gap: 10px; padding: 4px 0; border-bottom: 1px dashed var(--hairline); }
+.qo-kv .kv:last-child { border-bottom: none; }
+.qo-kv .kv b { color: var(--ink); font-weight: 700; }
+.kv-good b { color: var(--call) !important; }
+.kv-bad b { color: var(--put) !important; }
+.kv-warn b { color: var(--warning) !important; }
+.qo-banner { margin-top: 10px; text-align: center; font-weight: 800; font-size: 14px; letter-spacing: 0.6px; padding: 10px; border-radius: 8px; }
+.qo-banner.ok { background: rgba(38,166,154,0.15); color: var(--call); border: 1px solid var(--call); }
+.qo-banner.no { background: rgba(239,83,80,0.12); color: var(--put); border: 1px solid var(--put); }
+.qo-heat { display: flex; flex-direction: column; gap: 4px; }
+.qo-heat .hrow { display: grid; grid-template-columns: 130px 1fr 44px 24px; align-items: center; gap: 10px; padding: 4px 8px; border-radius: 6px; cursor: pointer; font-size: 12.5px; }
+.qo-heat .hrow:hover { background: var(--surface-2); }
+.qo-heat .hbar { height: 10px; border-radius: 5px; background: var(--grid); overflow: hidden; }
+.qo-heat .hfill { display: block; height: 100%; border-radius: 5px; }
+.qo-heat .hnum { text-align: right; font-weight: 800; color: var(--ink); font-variant-numeric: tabular-nums; }
+.estudo-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 18px; margin-top: 12px; }
+.estudo-grid h4 { margin: 0 0 8px; font-size: 13px; color: var(--ink-2); }
+.estudo-row { display: flex; align-items: center; gap: 8px; padding: 3px 0; font-size: 12px; }
+.estudo-lbl { min-width: 70px; color: var(--ink-2); }
+.estudo-bar { flex: 1; height: 10px; background: var(--grid); border-radius: 5px; overflow: hidden; }
+.estudo-fill { display: block; height: 100%; border-radius: 5px; }
+.bar-good { background: #0ca30c; }
+.bar-mid { background: #fab219; }
+.bar-bad { background: #d03b3b; }
+.estudo-num { min-width: 74px; text-align: right; color: var(--ink-muted); font-variant-numeric: tabular-nums; }
+@media (max-width: 760px) { .estudo-grid { grid-template-columns: 1fr; } }
+
+.decision-context {
+    font-size: 12px;
+    color: var(--ink-muted);
+}
+
+.decision-context strong { color: var(--ink-2); }
+
+/* ============================================================================
+   FLUXO DE VOLUME (compra × venda)
+   ============================================================================ */
+
+.fluxo-cols {
+    display: grid;
+    grid-template-columns: 1.3fr 1fr;
+    gap: 18px;
+}
+
+.fluxo-sub {
+    font-size: 11px;
+    color: var(--ink-muted);
+    margin-bottom: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+}
+
+.pressao-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.pressao-item {
+    display: grid;
+    grid-template-columns: minmax(90px, auto) 1fr auto auto;
+    gap: 10px;
+    align-items: center;
+    padding: 9px 12px;
+    background: var(--surface-2);
+    border: 1px solid var(--hairline);
+    border-radius: 8px;
+    font-size: 12px;
+}
+
+.pressao-sym { font-weight: 700; color: var(--ink); }
+
+/* Barra: parte esquerda (verde) = compra; fundo (vermelho) = venda */
+.pressao-bar {
+    height: 10px;
+    background: rgba(239, 83, 80, 0.55);
+    border-radius: 5px;
+    overflow: hidden;
+    min-width: 80px;
+}
+
+.pressao-buy {
+    height: 100%;
+    background: rgba(38, 166, 154, 0.9);
+    border-radius: 5px 0 0 5px;
+    transition: width 0.4s ease;
+}
+
+.pressao-pct {
+    color: var(--ink-2);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.pressao-dir { font-weight: 700; white-space: nowrap; }
+.pressao-dir .chip-dir-up { color: var(--call); }
+.pressao-dir .chip-dir-down { color: var(--put); }
+.pressao-dir .chip-dir-none { color: var(--ink-muted); }
+
+@media (max-width: 900px) {
+    .fluxo-cols { grid-template-columns: 1fr; }
+}
+
+/* ============================================================================
+   TREINO DE LEITURA (replay)
+   ============================================================================ */
+
+.train-panel { border-left: 4px solid var(--accent); }
+
+.train-pos {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--ink-muted);
+    margin-left: 8px;
+}
+
+.train-reading {
+    font-size: 13px;
+    color: var(--ink-2);
+    background: var(--surface-2);
+    border-radius: 8px;
+    padding: 10px 14px;
+    margin-bottom: 12px;
+    line-height: 1.7;
+}
+
+.train-reading strong { color: var(--ink); }
+
+.train-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.btn-train {
+    border: none;
+    padding: 12px 22px;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 800;
+    cursor: pointer;
+    transition: var(--transition);
+    color: #fff;
+}
+
+.btn-train:hover { filter: brightness(1.15); }
+.btn-train:active { transform: scale(0.97); }
+
+.btn-train-call { background: var(--call); }
+.btn-train-put { background: var(--put); }
+.btn-train-skip {
+    background: var(--surface-2);
+    color: var(--ink-2);
+    border: 1px solid var(--hairline);
+    font-weight: 600;
+}
+
+.train-feedback {
+    font-size: 13px;
+    color: var(--ink-2);
+    padding: 10px 14px;
+    border-left: 3px solid var(--accent);
+    background: rgba(57, 135, 229, 0.08);
+    border-radius: 6px;
+    margin-bottom: 12px;
+    min-height: 20px;
+}
+
+.train-feedback strong { color: var(--ink); }
+
+.train-stats {
+    display: flex;
+    gap: 18px;
+    flex-wrap: wrap;
+    font-size: 13px;
+    color: var(--ink-2);
+}
+
+.train-stat strong { color: var(--ink); font-size: 15px; }
+
+.group-note {
+    font-size: 11px;
+    color: var(--ink-muted);
+    margin-top: 6px;
+    line-height: 1.5;
+}
+
+/* ============================================================================
+   MEDIDOR DE CONFLUÊNCIA
+   ============================================================================ */
+
+.conf-meter {
+    margin: 14px 0 6px;
+    padding: 12px;
+    background: var(--surface-2);
+    border-radius: 8px;
+}
+
+.conf-meter-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+
+.conf-meter-row:last-child { margin-bottom: 0; }
+
+.conf-lbl {
+    font-size: 12px;
+    font-weight: 700;
+    width: 120px;
+    flex-shrink: 0;
+}
+.conf-lbl-call { color: var(--call); }
+.conf-lbl-put { color: var(--put); }
+
+.conf-bar {
+    flex: 1;
+    height: 14px;
+    background: var(--grid);
+    border-radius: 7px;
+    overflow: hidden;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+
+.conf-bar-fill {
+    height: 100%;
+    width: 0%;
+    border-radius: 7px;
+    transition: width 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.conf-fill-call { background: linear-gradient(90deg, rgba(38, 166, 154, 0.55), var(--call)); box-shadow: 0 0 10px rgba(38, 166, 154, 0.4); }
+.conf-fill-put { background: linear-gradient(90deg, rgba(239, 83, 80, 0.55), var(--put)); box-shadow: 0 0 10px rgba(239, 83, 80, 0.4); }
+
+.conf-score {
+    font-size: 12px;
+    font-weight: 700;
+    width: 34px;
+    text-align: right;
+    flex-shrink: 0;
+    color: var(--ink-2);
+    font-variant-numeric: tabular-nums;
+}
+
+/* ============================================================================
+   TABELA DE ENTRADAS
+   ============================================================================ */
+
+.entry-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-bottom: 14px;
+    font-size: 13px;
+    color: var(--ink-2);
+}
+
+.entry-summary .sum-item strong { font-size: 15px; color: var(--ink); }
+.entry-summary .sum-win strong { color: var(--good); }
+.entry-summary .sum-loss strong { color: var(--critical); }
+.entry-summary .sum-pend strong { color: var(--ink-muted); }
+.entry-summary .sum-block strong { color: var(--warning); }
+.entry-summary .sum-rate strong { color: var(--accent); }
+
+.entry-table-wrap {
+    max-height: 340px;
+    overflow-y: auto;
+    border: 1px solid var(--hairline);
+    border-radius: 8px;
+}
+
+.entry-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+}
+
+.entry-table thead th {
+    position: sticky;
+    top: 0;
+    background: var(--surface-2);
+    color: var(--ink);
+    padding: 8px 10px;
+    text-align: left;
+    font-weight: 700;
+    z-index: 1;
+    border-bottom: 1px solid var(--hairline);
+}
+
+.entry-table tbody td {
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--grid);
+    color: var(--ink-2);
+    font-variant-numeric: tabular-nums;
+}
+
+.entry-table tbody tr:hover { background: var(--surface-2); }
+
+.entry-table .dir-call { color: var(--call); font-weight: 700; }
+.entry-table .dir-put { color: var(--put); font-weight: 700; }
+.entry-table .res-win { color: var(--good); font-weight: 700; }
+.entry-table .res-loss { color: var(--critical); font-weight: 700; }
+.entry-table .res-pend { color: var(--ink-muted); }
+.entry-table .res-block { color: var(--warning); font-weight: 700; }
+.entry-table tr.row-blocked { opacity: 0.55; }
+
+.entry-table .cell-fatores {
+    font-size: 11px;
+    color: var(--ink-muted);
+    font-family: ui-monospace, 'Cascadia Mono', 'Consolas', monospace;
+}
+.entry-table .cell-fatores b { color: var(--ink-2); }
+
+/* ============================================================================
+   MÉTRICAS DE ANÁLISE
+   ============================================================================ */
+
+.metrics-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+}
+.metrics-toolbar label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink-2);
+}
+.metrics-toolbar input {
+    width: 70px;
+    padding: 6px 8px;
+    background: var(--surface-2);
+    border: 1px solid var(--hairline);
+    border-radius: 5px;
+    font-size: 13px;
+    color: var(--ink);
+}
+.metrics-hint { font-size: 12px; color: var(--ink-muted); }
+
+.metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 10px;
+    margin-bottom: 18px;
+}
+
+.metric-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 12px 8px;
+    background: var(--surface-2);
+    border: 1px solid var(--hairline);
+    border-radius: 8px;
+    text-align: center;
+}
+
+.metric-val {
+    font-size: 20px;
+    font-weight: 800;
+    color: var(--ink);
+    line-height: 1.2;
+}
+.metric-val.good { color: var(--good); }
+.metric-val.bad { color: var(--critical); }
+.metric-lbl { font-size: 11px; color: var(--ink-muted); margin-top: 4px; }
+.metric-empty { padding: 16px; color: var(--ink-muted); font-size: 13px; text-align: center; grid-column: 1 / -1; }
+
+.metrics-cols {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: 18px;
+}
+.metrics-cols h3 {
+    font-size: 11px;
+    color: var(--ink-muted);
+    margin-bottom: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+}
+
+.score-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.score-table thead th {
+    background: var(--surface-2);
+    color: var(--ink);
+    padding: 7px 10px;
+    text-align: left;
+    font-weight: 700;
+    border-bottom: 1px solid var(--hairline);
+}
+.score-table tbody td {
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--grid);
+    color: var(--ink-2);
+    font-variant-numeric: tabular-nums;
+}
+.score-table .res-win { color: var(--good); font-weight: 700; }
+.score-table .res-loss { color: var(--critical); font-weight: 700; }
+
+/* ============================================================================
+   BANNER DE NOTÍCIA / AVISOS
+   ============================================================================ */
+
+.news-risk-banner {
+    display: none;
+    padding: 10px 14px;
+    margin-bottom: 12px;
+    background: rgba(250, 178, 25, 0.10);
+    border-left: 4px solid var(--warning);
+    border-radius: 6px;
+    font-size: 13px;
+    color: var(--warning);
+}
+
+.signal-hint {
+    margin: 12px 0 0;
+    padding: 10px 12px;
+    background: rgba(250, 178, 25, 0.08);
+    border-left: 3px solid var(--warning);
+    border-radius: 5px;
+    font-size: 12px;
+    color: var(--ink-2);
+    display: none;
+}
+
+/* ============================================================================
+   NOTÍCIAS
+   ============================================================================ */
+
+.news-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+}
+
+.news-filter {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--ink-2);
+    cursor: pointer;
+}
+.news-filter input { accent-color: var(--accent); }
+
+.news-status { font-size: 12px; color: var(--ink-muted); margin-left: auto; }
+
+.news-list {
+    max-height: 320px;
+    overflow-y: auto;
+    border: 1px solid var(--hairline);
+    border-radius: 8px;
+}
+
+.news-item {
+    display: grid;
+    grid-template-columns: 70px 1fr auto;
+    gap: 10px;
+    align-items: center;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--grid);
+    text-decoration: none;
+    color: var(--ink-2);
+    transition: background 0.15s ease;
+}
+.news-item:last-child { border-bottom: none; }
+.news-item:hover { background: var(--surface-2); }
+
+.news-time { font-size: 11px; color: var(--ink-muted); white-space: nowrap; }
+.news-title { font-size: 13px; line-height: 1.4; color: var(--ink-2); }
+.news-src {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--accent);
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+.news-empty { padding: 20px; text-align: center; color: var(--ink-muted); font-size: 13px; }
+
+/* ============================================================================
+   STATUS / CONEXÃO
+   ============================================================================ */
+
+.status-container { background: var(--surface); }
+
+.status-panel { font-size: 14px; }
+
+.stat-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--grid);
+    color: var(--ink-2);
+}
+.stat-row:last-child { border-bottom: none; }
+.stat-row strong { color: var(--ink); font-weight: 700; font-size: 15px; }
+
+.filters-status { margin-top: 16px; padding-top: 12px; }
+.filters-status h3 {
+    font-size: 11px;
+    color: var(--ink-muted);
+    margin-bottom: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+}
+
+.filter-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 7px 0;
+    font-size: 12px;
+    border-bottom: 1px solid var(--grid);
+    color: var(--ink-2);
+}
+.filter-item:last-child { border-bottom: none; }
+
+.filter-status-icon { font-size: 15px; font-weight: 700; }
+.filter-status-ok { color: var(--good); }
+.filter-status-fail { color: var(--critical); }
+.filter-status-disabled { color: var(--ink-muted); }
+
+.conn-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+    font-size: 12px;
+}
+
+.conn-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    display: inline-block;
+    flex-shrink: 0;
+}
+.conn-dot.conn-on { background: var(--good); box-shadow: 0 0 6px var(--good); animation: pulse 1.4s infinite; }
+.conn-dot.conn-connecting { background: var(--warning); animation: pulse 1s infinite; }
+.conn-dot.conn-off { background: var(--ink-muted); }
+.conn-dot.conn-err { background: var(--critical); }
+
+.conn-text { color: var(--ink-2); font-weight: 600; }
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.35; }
+    100% { opacity: 1; }
+}
+
+.live-badge {
+    display: none;
+    font-size: 11px;
+    font-weight: 800;
+    color: #fff;
+    background: var(--critical);
+    padding: 2px 8px;
+    border-radius: 10px;
+    vertical-align: middle;
+    animation: pulse 1.4s infinite;
+}
+
+/* ============================================================================
+   WIDGET TRADINGVIEW
+   ============================================================================ */
+
+.tv-widget-wrap {
+    position: relative;
+    height: 480px;
+    width: 100%;
+}
+
+#tvWidget { height: 100%; width: 100%; }
+
+.tv-widget-msg {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 20px;
+    color: var(--ink-muted);
+    font-size: 14px;
+    background: var(--surface-2);
+    border: 1px dashed var(--hairline);
+    border-radius: 8px;
+}
+
+.tv-sync-tag {
+    font-size: 11px;
+    font-weight: 700;
+    color: #fff;
+    background: var(--accent);
+    padding: 2px 8px;
+    border-radius: 10px;
+    vertical-align: middle;
+}
+
+/* ============================================================================
+   FOOTER
+   ============================================================================ */
+
+.footer {
+    background: var(--surface);
+    color: var(--ink-muted);
+    text-align: center;
+    padding: 16px var(--spacing);
+    margin-top: auto;
+    font-size: 12px;
+    border-top: 1px solid var(--hairline);
+}
+
+.footer p { margin: 6px 0; }
+
+.footer code {
+    background: var(--surface-2);
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 11px;
+    color: var(--ink-2);
+}
+
+/* ============================================================================
+   SCROLLBARS
+   ============================================================================ */
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: var(--surface); }
+::-webkit-scrollbar-thumb { background: var(--grid); border-radius: 8px; }
+::-webkit-scrollbar-thumb:hover { background: var(--ink-muted); }
+
+/* ============================================================================
+   RESPONSIVO
+   ============================================================================ */
+
+@media (max-width: 1200px) {
+    .main-content { flex-direction: column; }
+    .sidebar { width: 100%; position: static; max-height: none; }
+}
+
+@media (max-width: 900px) {
+    .sub-row { grid-template-columns: 1fr; }
+    .metrics-cols { grid-template-columns: 1fr; }
+    .decision-panel { grid-template-columns: 1fr; }
+}
+
+/* ---- Filtro de moedas do Scanner (checklist "🎯 Moedas p/ análise") ---- */
+.scan-fil-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px 10px;
+    margin: 6px 0 8px;
+    max-height: 190px;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+.scan-fil {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12.5px;
+    color: var(--ink-2);
+    cursor: pointer;
+    padding: 2px 0;
+    line-height: 1.2;
+    user-select: none;
+}
+.scan-fil input { accent-color: var(--accent); flex: 0 0 auto; }
+.scan-fil span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.scan-fil-actions { display: flex; gap: 8px; }
+.scan-fil-actions .btn-mini { flex: 1; }
+
+/* ---- Botão "⚙️ Controles": recolhe/expande a barra de configurações ---- */
+.qo-toggle {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--surface-2);
+    color: var(--ink);
+    border: 1px solid var(--hairline);
+    border-radius: 8px;
+    padding: 7px 12px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: var(--transition);
+}
+.qo-toggle:hover { border-color: var(--accent); color: var(--accent); }
+.qo-toggle.is-off { background: transparent; color: var(--ink-muted); }
+.sidebar.oculta { display: none; }
+
+/* ---- Registro de entradas: painel "congelado" (fica fixo ao rolar a página) ---- */
+#registroPanel {
+    position: sticky;
+    top: 10px;
+    z-index: 6;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.38);
+}
+
+/* ---- Registro compacto: card menor, alinhado à direita, para dar destaque ao gráfico ---- */
+#registroPanel {
+    max-width: 440px;
+    margin-left: auto;      /* empurra pra direita: vira um card, não ocupa a tela toda */
+    padding: 10px 12px;
+}
+#registroPanel h2 { font-size: 13px; margin-bottom: 8px; }
+#registroPanel #chartRegistro { height: 84px; }
+#registroPanel .reg-list { max-height: 120px; margin-top: 6px; }
+#registroPanel .reg-row { padding: 3px 6px; font-size: 12px; gap: 8px; }
+#registroPanel .reg-hora { min-width: 38px; }
+
+/* ---- Registro de entradas: DOCK VERTICAL FIXO no canto direito ---- */
+/* Fica sempre encostado na borda direita, na vertical, ocupando a altura toda
+   abaixo da barra superior. É position:fixed, então NÃO empurra o gráfico —
+   o espaço é reservado com padding-right no .main-content (body.tem-registro). */
+:root { --reg-w: 328px; --reg-top: 64px; }
+#registroPanel.registro-col {
+    position: fixed;
+    top: var(--reg-top);
+    right: 0;
+    bottom: 0;
+    width: var(--reg-w);
+    max-width: var(--reg-w);
+    margin: 0;
+    z-index: 20;
+    flex-direction: column;         /* quando visível o JS aplica display:flex */
+    padding: 14px;
+    border-radius: 12px 0 0 0;
+    box-shadow: -12px 0 30px rgba(0, 0, 0, 0.35);
+}
+#registroPanel.registro-col #chartRegistro { height: 70px; flex: 0 0 auto; }
+#registroPanel.registro-col .reg-list {
+    flex: 1 1 auto;
+    max-height: none;               /* ocupa toda a altura restante do dock */
+    margin-top: 8px;
+}
+#registroPanel.registro-col .reg-row { padding: 5px 4px; font-size: 12px; gap: 7px; flex-wrap: nowrap; }
+/* Nenhuma célula da linha quebra em duas linhas — nomes/legendas sempre inteiros. */
+#registroPanel.registro-col .reg-row > span { white-space: nowrap; }
+#registroPanel.registro-col .reg-par { flex: 1 1 auto; min-width: 0; }
+
+/* Reserva o espaço do dock para o conteúdo não ficar escondido atrás dele. */
+body.tem-registro .main-content { padding-right: calc(var(--reg-w) + var(--spacing)); }
+
+/* Telas estreitas: o dock vira faixa mais fina; bem pequenas, empilha embaixo. */
+@media (max-width: 1100px) { :root { --reg-w: 300px; } }
+@media (max-width: 760px) {
+    #registroPanel.registro-col {
+        position: static; width: 100%; max-width: none; border-radius: 12px;
+        box-shadow: none; z-index: auto;
+    }
+    #registroPanel.registro-col .reg-list { max-height: 260px; }
+    body.tem-registro .main-content { padding-right: var(--spacing); }
+}
+
+/* ---- Toasts (avisos elegantes que substituem os alert()) ---- */
+.toast-wrap { position: fixed; right: 16px; bottom: 16px; z-index: 999; display: flex; flex-direction: column; gap: 8px; max-width: 340px; }
+.toast {
+    background: var(--surface-2); color: var(--ink);
+    border: 1px solid var(--hairline); border-left: 3px solid var(--accent);
+    border-radius: 8px; padding: 10px 14px; font-size: 13px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+    animation: toastIn 0.25s ease;
+}
+.toast-ok { border-left-color: var(--good); }
+.toast-err { border-left-color: var(--critical); }
+.toast-out { opacity: 0; transform: translateY(6px); transition: all 0.4s ease; }
+@keyframes toastIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
+/* ---- Skeleton loader: shimmer no gráfico enquanto os dados chegam ---- */
+body.carregando #chartPreco { position: relative; min-height: 120px; }
+body.carregando #chartPreco::after {
+    content: ''; position: absolute; inset: 0; z-index: 5; border-radius: 6px;
+    background: linear-gradient(100deg, transparent 30%, rgba(140, 170, 255, 0.10) 50%, transparent 70%) var(--surface-2);
+    background-size: 220% 100%;
+    animation: shimmer 1.1s linear infinite;
+}
+@keyframes shimmer { from { background-position: 130% 0; } to { background-position: -90% 0; } }
+
+/* ---- Calibração da IA (painel do Registro) ---- */
+.ia-calib {
+    margin-top: 8px; padding: 8px 10px;
+    border: 1px solid var(--hairline); border-radius: 8px;
+    font-size: 12px; color: var(--ink-2); background: var(--surface-2);
+}
+
+/* ---- Botão de tema (ícone só) ---- */
+.qo-toggle-icon { margin-left: 0; padding: 7px 10px; }
+
+/* ---- Tema claro ---- */
+:root[data-theme="light"] {
+    --page: #eef1f8;
+    --surface: #ffffff;
+    --surface-2: #f2f5fb;
+    --ink: #17203a;
+    --ink-2: #3a4761;
+    --ink-muted: #68738f;
+    --hairline: rgba(40, 70, 140, 0.16);
+    --grid: #e7ecf7;
+    /* Vidro claro coerente com o tema claro */
+    --glass: rgba(255, 255, 255, 0.78);
+    --glass-brd: rgba(40, 70, 140, 0.14);
+}
+:root[data-theme="light"] body {
+    background:
+        radial-gradient(1200px 620px at 78% -8%, rgba(59, 130, 246, 0.10), transparent 60%),
+        var(--page);
+}
+:root[data-theme="light"] .qo-topbar { background: rgba(255, 255, 255, 0.75); }
+:root[data-theme="light"] .toast { box-shadow: 0 8px 24px rgba(80, 100, 160, 0.25); }
+:root[data-theme="light"] .qo-ring { filter: saturate(1.1); }
+
+/* ---- Selos WIN/LOSS/aguardando no Registro ---- */
+.reg-res { margin-left: 4px; font-weight: 700; font-size: 12px; flex: 0 0 auto; }
+.reg-win { color: var(--good); }
+.reg-loss { color: var(--critical); }
+.reg-open { color: var(--ink-muted); }
+
+/* ---- Modal de ajuda (atalho ?) ---- */
+.ajuda-overlay {
+    position: fixed; inset: 0; z-index: 1000;
+    background: rgba(4, 8, 18, 0.72);
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px; backdrop-filter: blur(3px);
+}
+.ajuda-card {
+    position: relative; width: 100%; max-width: 860px; max-height: 88vh; overflow-y: auto;
+    background: var(--surface); border: 1px solid var(--hairline); border-radius: 14px;
+    padding: 22px 24px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+.ajuda-card h2 { font-size: 18px; margin-bottom: 16px; color: var(--ink); }
+.ajuda-x {
+    position: absolute; top: 14px; right: 14px;
+    background: var(--surface-2); color: var(--ink-2); border: 1px solid var(--hairline);
+    border-radius: 8px; width: 30px; height: 30px; cursor: pointer; font-size: 14px;
+}
+.ajuda-x:hover { color: var(--critical); border-color: var(--critical); }
+.ajuda-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 18px 26px; }
+.ajuda-cols h3 { font-size: 13px; color: var(--accent); margin-bottom: 8px; letter-spacing: 0.02em; }
+.ajuda-list { list-style: none; display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; color: var(--ink-2); }
+.ajuda-list li { line-height: 1.35; }
+.ajuda-list kbd {
+    display: inline-block; min-width: 18px; text-align: center;
+    background: var(--surface-2); border: 1px solid var(--hairline); border-bottom-width: 2px;
+    border-radius: 5px; padding: 1px 6px; font-family: inherit; font-weight: 700; color: var(--ink); margin-right: 6px;
+}
+.ajuda-nota { margin-top: 18px; padding-top: 12px; border-top: 1px solid var(--hairline); font-size: 12px; color: var(--ink-muted); }
+@media (max-width: 640px) { .ajuda-cols { grid-template-columns: 1fr; } }
+
+/* ---- Régua de setas na vertical (topo do dock do Registro) ---- */
+.reg-arrows {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+    max-height: 200px;
+    overflow: hidden;
+    padding: 4px 0 6px;
+    border-bottom: 1px solid var(--hairline);
+}
+.reg-seta { font-size: 15px; line-height: 1; }
+.seta-up { color: var(--call); }
+.seta-down { color: var(--put); }
+.seta-win { text-shadow: 0 0 7px rgba(12, 163, 12, 0.85); }
+.seta-loss { opacity: 0.4; }
+
+/* Filtro "só nível A" no topo do dock de Registro */
+.reg-filtro {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 12px; color: var(--ink-muted);
+    margin: 2px 0 8px; cursor: pointer; user-select: none;
+}
+.reg-filtro input { margin: 0; cursor: pointer; }
+.reg-filtro strong { color: var(--call); }
+.reg-filtro strong.grau-b { color: #e0a52e; }
+
+/* ============================================================================
+   MICRO-INTERAÇÕES (pacote de design 3): flash de valor, hover, foco acessível
+   ============================================================================ */
+
+/* Flash sutil quando um valor muda ao vivo (adicionado por JS por ~0.5s) */
+@keyframes flashUp   { 0% { color: var(--call); text-shadow: 0 0 12px rgba(38,166,154,.6); } 100% {} }
+@keyframes flashDown { 0% { color: var(--put);  text-shadow: 0 0 12px rgba(239,83,80,.6); } 100% {} }
+.val-up   { animation: flashUp   0.55s ease-out; }
+.val-down { animation: flashDown 0.55s ease-out; }
+@media (prefers-reduced-motion: reduce) { .val-up, .val-down { animation: none; } }
+
+/* Hover consistente nas linhas/itens clicáveis (scanner, IA, registro, notícias) */
+.scan-item, .ia-row, .news-item { transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease; }
+.scan-item:hover { background: var(--surface-2); transform: translateY(-1px); }
+.ia-row:hover, .news-item:hover { background: var(--surface-2); }
+.ia-row:hover { box-shadow: inset 3px 0 0 var(--accent); }
+
+/* Foco acessível: anel visível só para navegação por teclado (não no clique) */
+:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 6px;
+}
+button:focus-visible, .scan-item:focus-visible, .ia-row:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+/* Presets de estratégia por regime */
+.preset-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 8px; }
+.btn-preset {
+    background: var(--surface-2); color: var(--ink);
+    border: 1px solid var(--hairline); padding: 8px 6px;
+    border-radius: 6px; font-size: 12px; font-weight: 700;
+    cursor: pointer; transition: var(--transition);
+}
+.btn-preset:hover { border-color: var(--accent); transform: translateY(-1px); }
+.btn-preset.is-active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn-preset-auto { grid-column: 1 / -1; }
+
+/* ============================================================================
+   REDESIGN PREMIUM — glassmorphism, elevação e refino (camada por cima)
+   ============================================================================ */
+
+/* Superfícies de vidro: gráfico, sidebar e dock com blur + borda suave */
+.chart-container,
+.sidebar,
+#registroPanel.registro-col {
+    background: var(--glass);
+    -webkit-backdrop-filter: blur(16px) saturate(1.2);
+    backdrop-filter: blur(16px) saturate(1.2);
+    border: 1px solid var(--glass-brd);
+    border-radius: var(--radius);
+    box-shadow: var(--elev-2);
+}
+
+/* Topbar: barra fina, fixa, translúcida */
+.qo-topbar {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    background: rgba(8, 11, 18, 0.72);
+    -webkit-backdrop-filter: blur(14px) saturate(1.2);
+    backdrop-filter: blur(14px) saturate(1.2);
+    border-bottom: 1px solid var(--glass-brd);
+    box-shadow: var(--elev-1);
+}
+
+/* Botões primários: gradiente sutil + glow no hover */
+.btn-primary {
+    background: linear-gradient(180deg, var(--accent-2), var(--accent));
+    box-shadow: 0 2px 10px rgba(59, 130, 246, 0.28);
+    letter-spacing: 0.2px;
+}
+.btn-primary:hover {
+    background: linear-gradient(180deg, #7cb0ff, var(--accent-2));
+    box-shadow: 0 4px 18px rgba(59, 130, 246, 0.45);
+    transform: translateY(-1px);
+}
+.btn-primary:active { transform: translateY(0); }
+
+/* Inputs / selects: cantos suaves + foco com glow do acento */
+.control-group input[type="number"],
+.control-group select,
+#symbol,
+#tdKey {
+    border-radius: var(--radius-sm);
+    transition: var(--transition);
+}
+.control-group input[type="number"]:focus,
+.control-group select:focus,
+#symbol:focus,
+#tdKey:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.18);
+}
+
+/* Cards de métrica / heat: leve elevação + hover que "levanta" */
+.metric-card,
+.qo-heat-row,
+.decision-chip,
+.scan-item {
+    border-radius: var(--radius-sm);
+    transition: var(--transition);
+}
+.metric-card:hover { border-color: var(--glass-brd); transform: translateY(-2px); box-shadow: var(--elev-1); }
+
+/* Títulos de seção com respiro (grid de 8px) */
+.chart-container h2 { letter-spacing: -0.2px; }
+.sidebar h2 { border-bottom-color: rgba(59, 130, 246, 0.5); }
+
+/* Scrollbars finas e discretas (WebKit) */
+.sidebar::-webkit-scrollbar,
+.reg-list::-webkit-scrollbar,
+#registroBody::-webkit-scrollbar { width: 8px; height: 8px; }
+.sidebar::-webkit-scrollbar-thumb,
+.reg-list::-webkit-scrollbar-thumb,
+#registroBody::-webkit-scrollbar-thumb { background: rgba(170, 181, 197, 0.18); border-radius: 8px; }
+.sidebar::-webkit-scrollbar-thumb:hover { background: rgba(170, 181, 197, 0.3); }
+.sidebar::-webkit-scrollbar-track { background: transparent; }
+* { scrollbar-width: thin; scrollbar-color: rgba(170, 181, 197, 0.18) transparent; }
+
+/* Chips de decisão: pílulas de vidro */
+.decision-chip { background: var(--surface-2); border: 1px solid var(--glass-brd); }
+.decision-chip:hover { background: var(--surface-2); border-color: rgba(59, 130, 246, 0.4); }
+
+/* Menos moldura pesada nos gráficos internos (integra ao card) */
+.tv-chart { border-radius: var(--radius-sm); overflow: hidden; }
+
+@media (prefers-reduced-motion: reduce) {
+    .btn-primary:hover, .metric-card:hover, .scan-item:hover { transform: none; }
+}
+
+/* Funil de qualidade (painel de decisão): 6 elos ✓/✕ da assertividade */
+.quality-funnel {
+    grid-column: 1 / -1;
+    display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+    padding-top: 10px; margin-top: 6px;
+    border-top: 1px solid var(--hairline);
+}
+.funil-titulo { font-size: 11px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; color: var(--ink-muted); margin-right: 4px; }
+.funil-titulo strong { color: var(--ink); }
+.funil-elo {
+    font-size: 12px; font-weight: 600; padding: 3px 10px;
+    border-radius: 999px; border: 1px solid var(--glass-brd);
+    background: var(--surface-2); cursor: help; white-space: nowrap;
+    transition: var(--transition);
+}
+.funil-elo:hover { transform: translateY(-1px); box-shadow: var(--elev-1); }
+.funil-ok { color: var(--call); border-color: rgba(34, 197, 94, 0.35); }
+.funil-no { color: var(--put); border-color: rgba(239, 68, 68, 0.35); }
+.funil-nd { color: var(--ink-muted); }
+
+/* ============================================================================
+   OTIMIZAÇÃO DE TELA: cards recolhíveis + layout mais denso
+   ============================================================================ */
+
+/* Títulos viram alternadores: chevron indica o estado */
+.chart-container.recolhivel > h2 { cursor: pointer; user-select: none; display: flex; align-items: center; gap: 8px; }
+.chart-container.recolhivel > h2::after {
+    content: '⌃';
+    margin-left: auto;
+    font-size: 12px;
+    color: var(--ink-muted);
+    transform: rotate(180deg);
+    transition: transform 0.2s ease;
+}
+.chart-container.recolhido > h2::after { transform: rotate(90deg); }
+.chart-container.recolhido > *:not(h2) { display: none !important; }
+.chart-container.recolhido { padding-top: 10px; padding-bottom: 10px; }
+.chart-container.recolhido > h2 { margin-bottom: 0; opacity: 0.75; }
+
+/* Layout mais denso: tela inteira aproveitada, cartões mais enxutos */
+.main-content { max-width: none; }
+.chart-container { padding: 12px 14px; }
+.chart-container h2 { margin-bottom: 10px; }
+.sidebar { width: 260px; }
+.tv-chart-sub { height: 170px; }
+.qo-intel { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; align-items: start; }
+.charts-area { gap: 12px; }
+.main-content { gap: 12px; padding: 12px; }
+
+/* ============================================================================
+   CAMADA DE ANIMAÇÕES (rica, em todo o app) — tudo com fallback reduced-motion
+   ============================================================================ */
+
+/* ---- Entrada dos cards ao carregar a página: fade + subida escalonada ---- */
+@keyframes cardIn { from { opacity: 0; transform: translateY(10px) scale(0.99); } to { opacity: 1; transform: none; } }
+.sidebar, .charts-area > * { animation: cardIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.charts-area > *:nth-child(1) { animation-delay: 0.02s; }
+.charts-area > *:nth-child(2) { animation-delay: 0.06s; }
+.charts-area > *:nth-child(3) { animation-delay: 0.10s; }
+.charts-area > *:nth-child(4) { animation-delay: 0.14s; }
+.charts-area > *:nth-child(n+5) { animation-delay: 0.16s; }
+.qo-intel > * { animation: cardIn 0.45s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.qo-intel > *:nth-child(1) { animation-delay: 0.05s; }
+.qo-intel > *:nth-child(2) { animation-delay: 0.09s; }
+.qo-intel > *:nth-child(3) { animation-delay: 0.13s; }
+.qo-intel > *:nth-child(4) { animation-delay: 0.17s; }
+.qo-intel > *:nth-child(5) { animation-delay: 0.21s; }
+
+/* ---- Recolher/expandir cards: transição suave de altura+opacidade ---- */
+.chart-container:not(.recolhido) > *:not(h2) {
+    animation: expandeConteudo 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes expandeConteudo { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+.chart-container.recolhivel { transition: padding 0.25s ease; }
+.chart-container.recolhivel > h2::after { transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1); }
+
+/* ---- Botões: ripple discreto + realce ---- */
+.btn-primary, .btn-mini, .btn-preset, .qo-toggle {
+    position: relative;
+    overflow: hidden;
+}
+.qo-ripple {
+    position: absolute; border-radius: 50%; pointer-events: none;
+    background: rgba(255, 255, 255, 0.35);
+    transform: scale(0); opacity: 0.6;
+    animation: qoRipple 0.55s ease-out forwards;
+}
+@keyframes qoRipple { to { transform: scale(2.6); opacity: 0; } }
+
+/* ---- Painéis que aparecem sob demanda (heat/scan/ia/estudo/train) ---- */
+#heatPanel, #scanPanel, #iaPanel, #estudoPanel, #trainPanel { animation: cardIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+/* ---- Chips de decisão e funil: entrada escalonada + glow no estado ok ---- */
+.decision-chip { animation: chipIn 0.3s ease both; }
+@keyframes chipIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: none; } }
+.funil-elo { animation: chipIn 0.32s ease both; }
+.quality-funnel .funil-elo:nth-child(2) { animation-delay: 0.03s; }
+.quality-funnel .funil-elo:nth-child(3) { animation-delay: 0.06s; }
+.quality-funnel .funil-elo:nth-child(4) { animation-delay: 0.09s; }
+.quality-funnel .funil-elo:nth-child(5) { animation-delay: 0.12s; }
+.quality-funnel .funil-elo:nth-child(6) { animation-delay: 0.15s; }
+.quality-funnel .funil-elo:nth-child(7) { animation-delay: 0.18s; }
+@keyframes funilGlow { 0%, 100% { box-shadow: 0 0 0 rgba(34, 197, 94, 0); } 50% { box-shadow: 0 0 10px rgba(34, 197, 94, 0.45); } }
+.funil-ok { animation: chipIn 0.32s ease both, funilGlow 2.4s ease-in-out 0.4s 2; }
+
+/* ---- Selo A/B/C: entra com leve "pop" quando muda de grade ---- */
+@keyframes gradePop { 0% { transform: scale(0.85); opacity: 0; } 60% { transform: scale(1.05); } 100% { transform: scale(1); opacity: 1; } }
+.decision-grade { animation: gradePop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); }
+
+/* ---- Botão de IA rodando: brilho "varredura" enquanto otimiza ---- */
+@keyframes iaVarredura { 0% { background-position: -120% 0; } 100% { background-position: 220% 0; } }
+#btnIA:disabled {
+    background: linear-gradient(100deg, var(--accent) 40%, var(--accent-2) 50%, var(--accent) 60%);
+    background-size: 250% 100%;
+    animation: iaVarredura 1.6s linear infinite;
+    cursor: progress;
+}
+
+/* ---- Setas do Registro: entram deslizando + toque de destaque na mais nova ---- */
+@keyframes setaIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+.reg-seta { animation: setaIn 0.3s ease both; }
+.reg-row { animation: cardIn 0.28s ease both; }
+
+/* ---- Toggle de tema: rotação suave do ícone ---- */
+#btnTema { transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); }
+#btnTema:active { transform: rotate(160deg); }
+
+/* ---- Modal de ajuda: fade + leve escala ---- */
+@keyframes ajudaIn { from { opacity: 0; transform: scale(0.97); } to { opacity: 1; transform: none; } }
+.ajuda-card { animation: ajudaIn 0.25s cubic-bezier(0.16, 1, 0.3, 1); }
+
+/* ---- Barra de progresso do drawdown/confiança: transição contínua ---- */
+.qo-ring circle { transition: stroke-dashoffset 0.5s cubic-bezier(0.4, 0, 0.2, 1); }
+
+/* Todas as animações desta camada desligam com prefers-reduced-motion */
+@media (prefers-reduced-motion: reduce) {
+    .sidebar, .charts-area > *, .qo-intel > *, .chart-container:not(.recolhido) > *:not(h2),
+    #heatPanel, #scanPanel, #iaPanel, #estudoPanel, #trainPanel,
+    .decision-chip, .funil-elo, .funil-ok, .decision-grade, .reg-seta, .reg-row, .ajuda-card {
+        animation: none !important;
+    }
+    #btnIA:disabled { animation: none; }
+    #btnTema:active { transform: none; }
+}
+
+/* Agentes de Estudo: log de atividades */
+.ag-nome { font-size: 12px; font-weight: 700; color: var(--accent-2); white-space: nowrap; }
+.ag-msg { font-size: 12.5px; color: var(--ink-2); flex: 1; min-width: 0; }
+#agentesLog .reg-row { align-items: flex-start; }
+
+/* Badge do funil por entrada no Registro + linha de prova empírica */
+.reg-funil {
+    font-size: 10.5px; font-weight: 700; color: var(--accent-2);
+    border: 1px solid rgba(96, 165, 250, 0.4); border-radius: 4px;
+    padding: 0 5px; white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Aviso OTC / fim de semana (forex fechado) + forex esmaecido no checklist */
+.otc-aviso {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 10px 14px; border-radius: var(--radius-sm);
+    background: rgba(245, 158, 11, 0.10);
+    border: 1px solid rgba(245, 158, 11, 0.35);
+    color: var(--warning); font-size: 13px;
+}
+.otc-aviso .btn-mini { flex-shrink: 0; }
+.scan-fil-fechado { opacity: 0.45; }
+
+/* Realce de input corrigido/inválido (clamp de faixa ou NaN) */
+.input-invalido {
+    border-color: var(--warning) !important;
+    box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.25) !important;
+}
+
+/* Piloto Automático (paper trading): grade de config + marcador de operação */
+.piloto-cfg { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px 12px; align-items: end; margin-bottom: 10px; }
+.piloto-cfg label { display: flex; flex-direction: column; gap: 3px; font-size: 11.5px; color: var(--ink-muted); }
+.piloto-cfg input, .piloto-cfg select { width: 100%; }
+.piloto-cfg .btn-mini { align-self: end; height: fit-content; }
+.reg-paper { font-size: 11px; }
+
+/* Volume Profile (estilo Profit): barras horizontais, POC e área de valor */
+.vp-body { display: flex; flex-direction: column; gap: 1px; max-height: 340px; overflow-y: auto; }
+.vp-row { display: flex; align-items: center; gap: 8px; padding: 1px 4px; border-radius: 4px; }
+.vp-preco { font-size: 11px; color: var(--ink-muted); min-width: 76px; text-align: right; font-variant-numeric: tabular-nums; }
+.vp-bar { flex: 1; height: 9px; background: var(--grid); border-radius: 3px; overflow: hidden; }
+.vp-bar > span { display: block; height: 100%; background: rgba(96, 165, 250, 0.45); border-radius: 3px; }
+.vp-va .vp-bar > span { background: rgba(96, 165, 250, 0.75); }
+.vp-poc { background: rgba(245, 158, 11, 0.08); }
+.vp-poc .vp-bar > span { background: var(--warning); }
+.vp-atual { outline: 1px solid rgba(34, 197, 94, 0.5); }
+.vp-tag { font-size: 9.5px; font-weight: 800; color: var(--warning); letter-spacing: 0.5px; }
+
+/* Book de Ofertas (DOM) + Times & Trades */
+.book-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 760px) { .book-grid { grid-template-columns: 1fr; } }
+.dom-row { display: flex; align-items: center; gap: 8px; padding: 1px 4px; font-size: 12px; font-variant-numeric: tabular-nums; }
+.dom-preco { min-width: 76px; text-align: right; }
+.dom-ask .dom-preco { color: var(--put); }
+.dom-bid .dom-preco { color: var(--call); }
+.dom-bar { flex: 1; height: 9px; background: var(--grid); border-radius: 3px; overflow: hidden; }
+.dom-bar > span { display: block; height: 100%; border-radius: 3px; }
+.dom-ask .dom-bar > span { background: rgba(239, 68, 68, 0.55); }
+.dom-bid .dom-bar > span { background: rgba(34, 197, 94, 0.55); }
+.dom-qtd { min-width: 64px; text-align: right; color: var(--ink-2); font-size: 11px; }
+.dom-spread { text-align: center; font-size: 11.5px; color: var(--ink-muted); padding: 4px 0; border-top: 1px dashed var(--hairline); border-bottom: 1px dashed var(--hairline); margin: 3px 0; }
+#bookFita { max-height: 330px; overflow: hidden; }
+.tt-row { display: grid; grid-template-columns: 48px 1fr 1fr 20px; gap: 6px; font-size: 11.5px; padding: 1px 4px; font-variant-numeric: tabular-nums; animation: cardIn 0.25s ease both; }
+.tt-buy { color: var(--call); }
+.tt-sell { color: var(--put); }
+.tt-big { font-weight: 800; background: rgba(245, 158, 11, 0.10); border-radius: 4px; }
+
+/* ============================================================================
+   MODO MINIMALISTA: rail de painéis (ícones) + painéis ocultos
+   ============================================================================ */
+.painel-oculto { display: none !important; }
+.rail {
+    position: fixed; left: 0; top: var(--reg-top, 64px); bottom: 0;
+    width: 48px; z-index: 35;
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    padding: 10px 5px;
+    background: var(--glass);
+    -webkit-backdrop-filter: blur(14px) saturate(1.2);
+    backdrop-filter: blur(14px) saturate(1.2);
+    border-right: 1px solid var(--glass-brd);
+    overflow-y: auto; scrollbar-width: none;
+}
+.rail::-webkit-scrollbar { display: none; }
+.rail-btn {
+    width: 38px; height: 38px; flex-shrink: 0;
+    border-radius: 10px; border: 1px solid transparent;
+    background: transparent; font-size: 17px; line-height: 1;
+    cursor: pointer; opacity: 0.45; transition: var(--transition);
+}
+.rail-btn:hover { opacity: 0.95; background: var(--surface-2); transform: translateY(-1px); }
+.rail-btn.is-on {
+    opacity: 1; background: var(--surface-2);
+    border-color: rgba(59, 130, 246, 0.45);
+    box-shadow: 0 0 8px rgba(59, 130, 246, 0.25);
+}
+.rail-all { margin-top: auto; opacity: 0.6; }
+.main-content { padding-left: 58px; }
+@media (max-width: 760px) {
+    .rail { width: 42px; padding: 8px 3px; }
+    .rail-btn { width: 34px; height: 34px; font-size: 15px; }
+    .main-content { padding-left: 48px; }
+}
+
+/* ---- Detalhe da entrada (modal: motivos + gráfico + horários) ---- */
+.reg-row { cursor: pointer; }
+.reg-row:hover { background: rgba(255,255,255,0.05); }
+.det-card { max-width: 920px; width: 94vw; }
+.det-titulo { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 18px; font-weight: 700; margin-bottom: 12px; }
+.det-titulo .det-par { font-size: 20px; }
+.det-verd { padding: 2px 10px; border-radius: 6px; font-size: 14px; }
+.det-verd.det-call { background: rgba(34,197,94,0.18); color: #22c55e; }
+.det-verd.det-put { background: rgba(239,68,68,0.18); color: #ef4444; }
+.det-badge { font-size: 12px; opacity: 0.85; }
+.det-horarios { display: flex; align-items: center; gap: 14px; justify-content: center; margin-bottom: 14px; }
+.det-hbox { text-align: center; padding: 8px 16px; border-radius: 10px; min-width: 110px; border: 1px solid rgba(255,255,255,0.12); }
+.det-hbox.det-in { background: rgba(34,197,94,0.10); border-color: rgba(34,197,94,0.35); }
+.det-hbox.det-out { background: rgba(234,179,8,0.10); border-color: rgba(234,179,8,0.35); }
+.det-hlbl { font-size: 11px; letter-spacing: 0.5px; opacity: 0.8; }
+.det-hval { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.det-harrow { font-size: 13px; opacity: 0.7; white-space: nowrap; }
+.det-grid { display: grid; grid-template-columns: 1.3fr 1fr; gap: 16px; }
+.det-grafico { width: 100%; height: 240px; border-radius: 8px; overflow: hidden; background: rgba(0,0,0,0.15); }
+.det-semgrafico { display: flex; align-items: center; justify-content: center; height: 100%; padding: 16px; text-align: center; font-size: 13px; opacity: 0.7; }
+.det-numeros { margin-top: 10px; display: flex; flex-direction: column; gap: 2px; }
+.det-h { font-size: 13px; margin: 4px 0 8px; opacity: 0.9; }
+.det-fatores, .det-funil { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+.det-chip { padding: 3px 9px; border-radius: 14px; font-size: 12px; border: 1px solid rgba(255,255,255,0.14); }
+.det-chip-ok { background: rgba(34,197,94,0.15); border-color: rgba(34,197,94,0.4); }
+.det-chip-nt { opacity: 0.75; }
+.det-vazio { font-size: 12px; opacity: 0.6; }
+.det-ressalvas { font-size: 12.5px; color: var(--warning, #eab308); background: rgba(234,179,8,0.08); border-radius: 8px; padding: 8px 10px; }
+@media (max-width: 720px) {
+    .det-grid { grid-template-columns: 1fr; }
+    .det-horarios { gap: 8px; }
+    .det-hbox { min-width: 88px; padding: 6px 10px; }
+    .det-hval { font-size: 18px; }
+}
+
+/* ---- Detalhe encostado no Registro: painel lateral, não modal central ---- */
+/* Abre deslizando da direita, ao lado do dock do Registro (quando visível),
+   para o olho ir direto da linha clicada ao retrato da entrada. */
+#detalheModal { justify-content: flex-end; align-items: stretch; padding: 0; background: rgba(4, 8, 18, 0.35); }
+#detalheModal .det-card {
+    position: fixed; top: var(--reg-top, 64px); bottom: 0; right: 0;
+    width: min(560px, 94vw); max-width: none; max-height: none;
+    margin: 0; border-radius: 12px 0 0 12px;
+    box-shadow: -16px 0 40px rgba(0, 0, 0, 0.45);
+    animation: detSlideIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+/* com o dock do Registro aberto, encosta NELE (fica imediatamente à esquerda) */
+body.tem-registro #detalheModal .det-card { right: var(--reg-w); border-radius: 12px 0 0 12px; }
+/* painel mais estreito: gráfico em cima, motivos embaixo */
+#detalheModal .det-grid { grid-template-columns: 1fr; }
+@keyframes detSlideIn { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (max-width: 760px) {
+    #detalheModal .det-card, body.tem-registro #detalheModal .det-card {
+        right: 0; left: 0; width: auto; border-radius: 12px 12px 0 0;
+    }
+}
+@media (prefers-reduced-motion: reduce) { #detalheModal .det-card { animation: none !important; } }
+
+/* ---- Meus filtros (presets salvos pelo usuário) ---- */
+.filtros-row { display: flex; gap: 6px; margin-bottom: 8px; }
+.filtros-row input[type="text"], .filtros-row select {
+    flex: 1; min-width: 0;
+    background: var(--surface-2); color: var(--ink);
+    border: 1px solid var(--hairline); border-radius: 8px;
+    padding: 7px 10px; font-size: 12.5px;
+}
+.filtros-row .btn-mini { flex: 0 0 auto; }
+
+/* ============================================================================
+   CAMADA IMPACTO — visual vívido de alto impacto (neon ciano/violeta/magenta)
+   Gradientes animados, aurora de fundo, brilhos e micro-interações. Toda
+   animação nova respeita prefers-reduced-motion (desligada no fim do bloco).
+   ============================================================================ */
+:root {
+    --neon-1: #22D3EE;   /* ciano elétrico */
+    --neon-2: #8B5CF6;   /* violeta */
+    --neon-3: #EC4899;   /* magenta */
+    --grad-brand: linear-gradient(100deg, #22D3EE, #8B5CF6 48%, #EC4899 100%);
+    --grad-call: linear-gradient(100deg, #34D399, #22D3EE);
+    --grad-put: linear-gradient(100deg, #F87171, #EC4899);
+}
+
+/* ---- Aurora viva no fundo (blobs de cor em órbita lenta) ---- */
+@keyframes qoAurora {
+    0% { transform: translate3d(-4%, -2%, 0) rotate(0deg) scale(1); }
+    50% { transform: translate3d(4%, 3%, 0) rotate(180deg) scale(1.12); }
+    100% { transform: translate3d(-4%, -2%, 0) rotate(360deg) scale(1); }
+}
+body::before {
+    content: ''; position: fixed; inset: -22%; z-index: -1; pointer-events: none;
+    background:
+        radial-gradient(38% 30% at 22% 28%, rgba(34, 211, 238, 0.11), transparent 70%),
+        radial-gradient(32% 28% at 78% 18%, rgba(139, 92, 246, 0.12), transparent 70%),
+        radial-gradient(30% 26% at 62% 82%, rgba(236, 72, 153, 0.08), transparent 70%);
+    filter: blur(30px);
+    animation: qoAurora 46s linear infinite;
+}
+:root[data-theme="light"] body::before { opacity: 0.5; }
+
+/* ---- Topbar: linha de energia + marca em gradiente vivo ---- */
+.qo-topbar { position: relative; }
+@keyframes qoFlow { to { background-position: 220% 0; } }
+.qo-topbar::after {
+    content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px;
+    background: linear-gradient(90deg, transparent, var(--neon-1), var(--neon-2), var(--neon-3), transparent);
+    background-size: 220% 100%;
+    animation: qoFlow 7s linear infinite;
+    opacity: 0.9; pointer-events: none;
+}
+@keyframes qoGradShift { to { background-position: 200% center; } }
+@keyframes qoLogoPulse {
+    50% { filter: drop-shadow(0 0 18px rgba(34, 211, 238, 0.85)); transform: scale(1.07); }
+}
+.qo-logo {
+    font-size: 24px;
+    background: var(--grad-brand);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 10px rgba(139, 92, 246, 0.55));
+    animation: qoLogoPulse 3.2s ease-in-out infinite;
+}
+.qo-brand strong {
+    background: var(--grad-brand); background-size: 200% auto;
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    animation: qoGradShift 8s linear infinite;
+}
+:root[data-theme="light"] .qo-brand strong,
+:root[data-theme="light"] .qo-logo { --grad-brand: linear-gradient(100deg, #0891B2, #7C3AED 48%, #DB2777 100%); }
+
+/* ---- Tiles da topbar: vida no hover (linha de energia + flutuação) ---- */
+.qo-stat { position: relative; overflow: hidden; transition: var(--transition); }
+.qo-stat::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    background: var(--grad-brand); opacity: 0; transition: opacity 0.25s;
+}
+.qo-stat:hover { transform: translateY(-2px); border-color: rgba(34, 211, 238, 0.45); box-shadow: 0 8px 22px rgba(34, 211, 238, 0.12); }
+.qo-stat:hover::before { opacity: 1; }
+
+/* ---- Botão primário: gradiente vivo + varredura de brilho ---- */
+.btn-primary {
+    position: relative; overflow: hidden;
+    background: linear-gradient(100deg, #2563EB, #7C3AED 55%, #DB2777);
+    background-size: 180% 100%;
+    box-shadow: 0 6px 20px rgba(124, 58, 237, 0.35);
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.btn-primary:hover { background-position: 90% 0; transform: translateY(-1px); box-shadow: 0 10px 30px rgba(34, 211, 238, 0.35); }
+.btn-primary::after {
+    content: ''; position: absolute; top: 0; bottom: 0; left: -70%; width: 45%;
+    background: linear-gradient(105deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+    transform: skewX(-18deg); transition: left 0.5s ease; pointer-events: none;
+}
+.btn-primary:hover::after { left: 130%; }
+
+/* ---- Botões secundários e presets: levitação + halo neon ---- */
+.btn-mini:hover, .btn-ghost:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(34, 211, 238, 0.18); border-color: var(--neon-1); color: var(--neon-1); }
+.btn-preset:hover { transform: translateY(-1px); border-color: var(--neon-2); box-shadow: 0 6px 16px rgba(139, 92, 246, 0.22); }
+.btn-preset.is-active {
+    background: linear-gradient(100deg, rgba(34, 211, 238, 0.16), rgba(139, 92, 246, 0.16));
+    border-color: var(--neon-2);
+    box-shadow: inset 0 0 0 1px rgba(139, 92, 246, 0.35), 0 6px 18px rgba(139, 92, 246, 0.18);
+}
+
+/* ---- Cards: levitação com aura ao passar o mouse ---- */
+.chart-container { transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.25s, border-color 0.25s; }
+.chart-container:hover {
+    transform: translateY(-2px);
+    border-color: rgba(34, 211, 238, 0.28);
+    box-shadow: var(--elev-2), 0 0 0 1px rgba(34, 211, 238, 0.10), 0 12px 34px rgba(34, 211, 238, 0.08);
+}
+
+/* ---- Painel de decisão: pulso neon vivo quando vira CALL/PUT ---- */
+@keyframes qoPulseCall { 50% { box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.45), 0 14px 54px rgba(34, 197, 94, 0.30); } }
+@keyframes qoPulsePut { 50% { box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.45), 0 14px 54px rgba(239, 68, 68, 0.30); } }
+.decision-panel { transition: box-shadow 0.3s, border-color 0.3s; }
+.decision-panel:has(.verdict-call) { box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.25), 0 10px 40px rgba(34, 197, 94, 0.16); animation: qoPulseCall 2.2s ease-in-out infinite; }
+.decision-panel:has(.verdict-put) { box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.25), 0 10px 40px rgba(239, 68, 68, 0.16); animation: qoPulsePut 2.2s ease-in-out infinite; }
+.decision-verdict.verdict-call {
+    background: var(--grad-call); -webkit-background-clip: text; background-clip: text; color: transparent;
+    text-shadow: none; filter: drop-shadow(0 0 14px rgba(52, 211, 153, 0.45));
+}
+.decision-verdict.verdict-put {
+    background: var(--grad-put); -webkit-background-clip: text; background-clip: text; color: transparent;
+    text-shadow: none; filter: drop-shadow(0 0 14px rgba(248, 113, 113, 0.45));
+}
+
+/* ---- Rail: ícones maiores, salto elástico e estado ativo em gradiente ---- */
+.rail::after {
+    content: ''; position: absolute; top: 0; bottom: 0; right: 0; width: 1px;
+    background: linear-gradient(180deg, rgba(34, 211, 238, 0.5), rgba(139, 92, 246, 0.35), transparent);
+    pointer-events: none;
+}
+.rail-btn { font-size: 18px; transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.18s, background 0.18s; }
+.rail-btn:hover {
+    transform: scale(1.16) rotate(-4deg);
+    background: rgba(34, 211, 238, 0.10);
+    box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.45), 0 6px 16px rgba(34, 211, 238, 0.25);
+}
+.rail-btn[aria-pressed="true"] {
+    background: linear-gradient(140deg, rgba(34, 211, 238, 0.18), rgba(139, 92, 246, 0.18));
+    box-shadow: inset 0 0 0 1px rgba(139, 92, 246, 0.4);
+}
+
+/* ---- Funil: elo fechado ganha brilho de conquista ---- */
+.funil-elo.funil-ok { box-shadow: 0 0 10px rgba(34, 197, 94, 0.22), inset 0 0 0 1px rgba(34, 197, 94, 0.30); }
+.funil-elo.funil-no { box-shadow: inset 0 0 0 1px rgba(239, 68, 68, 0.28); }
+
+/* ---- Selo A: varredura de brilho contínua (é o troféu do app) ---- */
+@keyframes qoShine { 0%, 55% { left: -80%; } 100% { left: 160%; } }
+.reg-grade.grade-A, .decision-grade.grade-A { position: relative; overflow: hidden; }
+.reg-grade.grade-A::after, .decision-grade.grade-A::after {
+    content: ''; position: absolute; top: 0; bottom: 0; left: -80%; width: 50%;
+    background: linear-gradient(105deg, transparent, rgba(255, 255, 255, 0.5), transparent);
+    transform: skewX(-20deg); animation: qoShine 3.4s ease-in-out infinite; pointer-events: none;
+}
+
+/* ---- Horários do detalhe: pulso suave (ENTRAR verde · SAIR âmbar) ---- */
+@keyframes qoInGlow { 50% { box-shadow: 0 0 18px rgba(34, 197, 94, 0.30); } }
+@keyframes qoOutGlow { 50% { box-shadow: 0 0 18px rgba(234, 179, 8, 0.28); } }
+.det-hbox.det-in { animation: qoInGlow 2.6s ease-in-out infinite; }
+.det-hbox.det-out { animation: qoOutGlow 2.6s ease-in-out infinite; }
+
+/* ---- Títulos de seção: marcador em gradiente ---- */
+.control-group h3 { position: relative; padding-left: 12px; }
+.control-group h3::before {
+    content: ''; position: absolute; left: 0; top: 50%; transform: translateY(-50%);
+    width: 4px; height: 14px; border-radius: 3px;
+    background: var(--grad-brand); box-shadow: 0 0 8px rgba(139, 92, 246, 0.5);
+}
+
+/* ---- Toasts com aura, scrollbar neon, seleção e foco vivos ---- */
+.toast { -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); box-shadow: 0 12px 34px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(34, 211, 238, 0.14); }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, rgba(34, 211, 238, 0.45), rgba(139, 92, 246, 0.45));
+    border-radius: 8px; border: 2px solid var(--page);
+}
+::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg, rgba(34, 211, 238, 0.7), rgba(139, 92, 246, 0.7)); }
+::selection { background: rgba(139, 92, 246, 0.45); color: #fff; }
+:focus-visible { outline: 2px solid var(--neon-1); outline-offset: 2px; }
+
+/* ---- Reduced motion: toda a camada de impacto fica estática ---- */
+@media (prefers-reduced-motion: reduce) {
+    body::before, .qo-logo, .qo-brand strong, .qo-topbar::after,
+    .decision-panel, .reg-grade.grade-A::after, .decision-grade.grade-A::after,
+    .det-hbox.det-in, .det-hbox.det-out { animation: none !important; }
+    .btn-primary::after { display: none; }
+    .rail-btn:hover, .qo-stat:hover, .chart-container:hover, .btn-primary:hover, .btn-mini:hover, .btn-preset:hover { transform: none; }
+}
+
+/* ---- Calibração avançada (curva + fatores) e histórico ---- */
+.calib-tit { font-size: 12px; font-weight: 700; color: var(--ink); margin: 10px 0 4px; }
+.calib-fatores { display: flex; flex-wrap: wrap; gap: 6px; }
+#calibExtra .kv { display: flex; justify-content: space-between; gap: 10px; padding: 3px 0; font-size: 12px; border-bottom: 1px dashed var(--hairline); }
+#calibExtra .kv b { color: var(--ink); }
+#calibExtra .kv-good b { color: var(--call); } #calibExtra .kv-bad b { color: var(--put); } #calibExtra .kv-warn b { color: var(--warning); }
+
+/* ---- Botões de conserto em 1 clique no log dos agentes ---- */
+.ag-fix { font-size: 11px; padding: 1px 8px; margin-left: 4px; border-color: rgba(34, 211, 238, 0.45); color: var(--neon-1, var(--accent)); white-space: nowrap; }
+.ag-fix:hover { background: rgba(34, 211, 238, 0.12); }
+
+/* ---- Popover de informação (clique nos ícones) ---- */
+#infoPop {
+    position: fixed; z-index: 1200; max-width: 320px;
+    background: var(--surface); border: 1px solid rgba(139, 92, 246, 0.45);
+    border-radius: 12px; padding: 12px 14px;
+    box-shadow: 0 16px 44px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(34, 211, 238, 0.12);
+    animation: infoPopIn 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes infoPopIn { from { transform: translateY(6px) scale(0.97); opacity: 0; } to { transform: none; opacity: 1; } }
+#infoPop .ip-tit { font-size: 13px; font-weight: 800; color: var(--ink); margin-bottom: 6px; }
+#infoPop .ip-corpo { font-size: 12.5px; color: var(--ink-2); line-height: 1.5; }
+#infoPop .ip-corpo em { color: var(--neon-1); font-style: normal; }
+#infoPop .ip-acao { margin-top: 10px; width: 100%; }
+.ico-info { cursor: pointer; transition: transform 0.15s, filter 0.15s; display: inline-block; }
+.ico-info:hover { transform: scale(1.25); filter: drop-shadow(0 0 8px rgba(34, 211, 238, 0.6)); }
+.qo-stat, #decisionChips .decision-chip, .funil-elo { cursor: pointer; }
+@media (prefers-reduced-motion: reduce) { #infoPop { animation: none; } .ico-info:hover { transform: none; } }
+
+/* ---- Zonas S/R no gráfico (overlay de faixas) ---- */
+#chartPreco { position: relative; }
+#zonasOverlay { position: absolute; inset: 0; pointer-events: none; z-index: 5; overflow: hidden; }
+.zona-faixa { position: absolute; left: 0; right: 0; display: flex; align-items: center; justify-content: center; }
+.zona-faixa { justify-content: flex-start; }
+.zona-rot {
+    font-size: 9.5px; font-weight: 700; letter-spacing: 0.3px; white-space: nowrap;
+    margin: 0 0 0 6px; padding: 1px 6px; border-radius: 6px;
+    background: rgba(8, 11, 18, 0.72); text-transform: uppercase; opacity: 0.9;
+}
+
+/* ---- Análise Mestre ---- */
+.am-card { max-width: 760px; }
+.am-sec { margin-bottom: 16px; }
+.am-sec h3 { font-size: 13.5px; color: var(--ink); margin-bottom: 6px; border-left: 4px solid var(--neon-2); padding-left: 8px; }
+.am-sec p { font-size: 12.5px; color: var(--ink-2); line-height: 1.55; margin: 4px 0; }
+.am-sec .kv { display: flex; justify-content: space-between; gap: 12px; padding: 3px 0; font-size: 12.5px; border-bottom: 1px dashed var(--hairline); }
+.am-sec .kv b { color: var(--ink); text-align: right; }
+.am-sec .kv-good b { color: var(--call); } .am-sec .kv-bad b { color: var(--put); }
+.am-nota { font-size: 11.5px !important; color: var(--ink-muted) !important; }
+.am-tabela { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.am-tabela td { padding: 4px 6px; border-bottom: 1px solid var(--hairline); }
+.am-tabela b { color: var(--ink); }
+.am-barra { display: inline-block; width: 110px; height: 7px; background: var(--surface-2); border-radius: 4px; overflow: hidden; vertical-align: middle; }
+.am-barra span { display: block; height: 100%; background: var(--grad-brand); border-radius: 4px; }
+
+/* ---- Botões-toggle no cabeçalho do gráfico (🟩 zonas · 📐 LTA/LTB) ---- */
+.btn-ghost.is-active {
+    background: linear-gradient(100deg, rgba(34, 211, 238, 0.16), rgba(139, 92, 246, 0.16));
+    border-color: var(--neon-2); color: var(--ink);
+    box-shadow: inset 0 0 0 1px rgba(139, 92, 246, 0.35);
+}
+
+/* ---- Grupo de ações da topbar: 🎓 Análise + Controles + tema + ajuda quebram JUNTOS ---- */
+.qo-acoes { display: flex; gap: 8px; margin-left: auto; align-items: center; }
+.qo-acoes .qo-toggle { margin-left: 0; }
+
+/* ============================================================================
+   CAMADA FLUIDEZ — mesmas animações, custo de GPU/CPU muito menor
+   ============================================================================ */
+/* Aurora: sem filter:blur (o blur de 30px numa camada gigante repintava a tela
+   toda a cada frame). Os gradientes já são suaves; só transform = composited. */
+body::before { filter: none; opacity: 0.85; will-change: transform; animation-duration: 90s; }
+
+/* Logo: pulso só de transform (animar drop-shadow força repaint contínuo) */
+@keyframes qoLogoPulseLeve { 50% { transform: scale(1.07); } }
+.qo-logo { animation: qoLogoPulseLeve 3.2s ease-in-out infinite; }
+
+/* Linha de energia e marca: mais lentas = menos frames repintados */
+.qo-topbar::after { animation-duration: 14s; }
+.qo-brand strong { animation-duration: 14s; }
+
+/* Painel de decisão: o pulso de box-shadow repintava o painel inteiro a cada
+   frame. Agora o brilho vive num ::after fixo e só a OPACIDADE anima (GPU). */
+.decision-panel { position: relative; }
+.decision-panel:has(.verdict-call), .decision-panel:has(.verdict-put) { animation: none !important; }
+.decision-panel::after {
+    content: ''; position: absolute; inset: -1px; border-radius: inherit;
+    pointer-events: none; opacity: 0;
+}
+@keyframes qoGlowOp { 0%, 100% { opacity: 0.35; } 50% { opacity: 1; } }
+.decision-panel:has(.verdict-call)::after {
+    box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.45), 0 14px 54px rgba(34, 197, 94, 0.30);
+    animation: qoGlowOp 2.2s ease-in-out infinite;
+}
+.decision-panel:has(.verdict-put)::after {
+    box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.45), 0 14px 54px rgba(239, 68, 68, 0.30);
+    animation: qoGlowOp 2.2s ease-in-out infinite;
+}
+
+/* Aba oculta: TODA animação pausa (JS alterna a classe em visibilitychange) */
+body.anim-pausa *, body.anim-pausa::before, body.anim-pausa::after,
+body.anim-pausa *::before, body.anim-pausa *::after {
+    animation-play-state: paused !important;
+}
+
+/* ============================================================================
+   CAMADA FLUIDEZ 2 + POLIMENTO DE INTERFACE
+   ============================================================================ */
+/* Flash sutil quando um valor da topbar MUDA (transform/filter = composited) */
+@keyframes qoValFlash { 0% { transform: scale(1.14); filter: brightness(1.6); } 100% { transform: none; filter: none; } }
+.qo-flash { display: inline-block; animation: qoValFlash 0.45s ease; }
+
+/* Listas roláveis isoladas do resto do layout (repaint local, não global) */
+.reg-list, #agentesLog, #iaList, #scanList { contain: content; }
+
+/* Legenda do gráfico em chips (antes texto solto) */
+.chart-legend .lg {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: var(--surface-2); border: 1px solid var(--hairline);
+    border-radius: 6px; padding: 2px 8px; margin: 2px 4px 0 0; font-size: 11.5px;
+}
+
+/* Títulos dos cards: sublinhado em gradiente que cresce no hover (transform) */
+.chart-container > h2 { position: relative; }
+.chart-container > h2::after {
+    content: ''; position: absolute; left: 0; right: 40%; bottom: -3px; height: 2px;
+    background: var(--grad-brand); border-radius: 2px;
+    transform: scaleX(0); transform-origin: left; transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    pointer-events: none;
+}
+.chart-container:hover > h2::after { transform: scaleX(1); }
+
+/* Botões do cabeçalho do gráfico: respiro entre eles quando quebram de linha */
+.chart-container > h2 .btn-ghost { margin-top: 2px; margin-bottom: 2px; }
+
+/* Selects e inputs: foco com halo suave (consistência com o resto) */
+.sidebar select:focus, .sidebar input:focus { border-color: var(--neon-1); box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.12); outline: none; }
+
+@media (prefers-reduced-motion: reduce) {
+    .qo-flash { animation: none; }
+    .chart-container > h2::after { transition: none; }
+}
+
+/* ============================================================================
+   CAMADA iOS/macOS — molas, lupa do Dock, switches e sheets
+   ============================================================================ */
+:root {
+    --spring: cubic-bezier(0.34, 1.56, 0.64, 1);     /* mola com overshoot (iOS) */
+    --ease-ios: cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+
+/* TODA ferramenta destaca com mola no hover e afunda no toque (como iOS) */
+button:not(.rail-btn), .qo-stat, .det-tag, .ico-info, .scan-fil, .reg-seta {
+    transition: transform 0.22s var(--spring), box-shadow 0.22s ease,
+        background 0.2s ease, border-color 0.2s ease, color 0.2s ease, filter 0.2s ease;
+}
+button:not(.rail-btn):not(:disabled):hover { transform: translateY(-1px) scale(1.045); }
+button:not(.rail-btn):not(:disabled):active { transform: scale(0.95); transition-duration: 0.09s; }
+.decision-chip:hover, .funil-elo:hover { transform: translateY(-1px) scale(1.06); }
+.decision-chip, .funil-elo { transition: transform 0.22s var(--spring), box-shadow 0.22s ease, background 0.2s ease; }
+
+/* Rail: transform vem do JS (lupa do Dock) — origem à esquerda p/ crescer p/ fora */
+.rail-btn { transform-origin: left center; transition: transform 0.12s var(--ease-ios), box-shadow 0.18s, background 0.18s; }
+.rail-btn:hover { box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.45), 0 6px 16px rgba(34, 211, 238, 0.25); background: rgba(34, 211, 238, 0.10); }
+
+/* Switches estilo iOS nos toggles dos controles (checkbox continua checkbox) */
+.control-group > label > input[type="checkbox"], .reg-filtro > input[type="checkbox"] {
+    appearance: none; -webkit-appearance: none;
+    width: 36px; height: 21px; min-width: 36px; border-radius: 11px;
+    background: var(--surface-2); border: 1px solid var(--hairline);
+    position: relative; cursor: pointer; vertical-align: middle; margin-right: 4px;
+    transition: background 0.25s var(--ease-ios), border-color 0.25s;
+}
+.control-group > label > input[type="checkbox"]::after, .reg-filtro > input[type="checkbox"]::after {
+    content: ''; position: absolute; top: 2px; left: 2px; width: 15px; height: 15px;
+    border-radius: 50%; background: #fff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+    transition: transform 0.25s var(--spring), width 0.15s ease;
+}
+.control-group > label > input[type="checkbox"]:checked, .reg-filtro > input[type="checkbox"]:checked {
+    background: #34C759; border-color: #34C759;   /* verde iOS */
+}
+.control-group > label > input[type="checkbox"]:checked::after, .reg-filtro > input[type="checkbox"]:checked::after {
+    transform: translateX(15px);
+}
+.control-group > label > input[type="checkbox"]:active::after, .reg-filtro > input[type="checkbox"]:active::after {
+    width: 19px;   /* o "knob" estica no toque, como no iOS */
+}
+.control-group > label > input[type="checkbox"]:checked:active::after, .reg-filtro > input[type="checkbox"]:checked:active::after {
+    transform: translateX(11px);
+}
+
+/* Modais entram como SHEET do iOS: sobem com mola */
+@keyframes iosSheet { from { transform: translateY(18px) scale(0.965); opacity: 0; } to { transform: none; opacity: 1; } }
+.ajuda-card { animation: iosSheet 0.32s var(--spring); }
+#detalheModal .det-card { animation: iosSheet 0.32s var(--spring); }
+#infoPop { animation: iosSheet 0.26s var(--spring); }
+
+/* Toasts entram como banner do iOS */
+@keyframes iosBanner { from { transform: translateY(14px) scale(0.97); opacity: 0; } to { transform: none; opacity: 1; } }
+.toast { animation: iosBanner 0.3s var(--spring); }
+
+@media (prefers-reduced-motion: reduce) {
+    button:not(.rail-btn):not(:disabled):hover, .decision-chip:hover, .funil-elo:hover { transform: none; }
+    .ajuda-card, #detalheModal .det-card, #infoPop, .toast { animation: none; }
+}
+
+/* ============================================================================
+   CAMADA ÍCONES — rail com "app icons" glossy, halo colorido por ferramenta
+   ============================================================================ */
+.rail { width: 60px; padding: 12px 6px; gap: 8px; }
+.main-content { padding-left: 72px; }
+
+.rail-btn {
+    width: 46px; height: 46px; border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+    opacity: 1;                                   /* tira o esmaecido antigo */
+    position: relative; overflow: visible;
+    /* tile de vidro com um toque da cor do ícone */
+    background:
+        linear-gradient(160deg, rgba(255,255,255,0.08), rgba(255,255,255,0) 55%),
+        color-mix(in srgb, var(--ico, #8B5CF6) 12%, rgba(20,26,38,0.85));
+    border: 1px solid color-mix(in srgb, var(--ico, #8B5CF6) 30%, transparent);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.10), 0 3px 8px rgba(0,0,0,0.35);
+    transition: transform 0.14s var(--ease-ios), box-shadow 0.22s ease, border-color 0.22s ease, filter 0.22s ease;
+}
+/* halo de cor pulsando por trás do ícone (opacity = composited) */
+.rail-btn::before {
+    content: ''; position: absolute; inset: -3px; border-radius: 16px; z-index: -1;
+    background: radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--ico) 55%, transparent), transparent 70%);
+    opacity: 0.35; transition: opacity 0.25s ease; pointer-events: none;
+}
+.rail-ico {
+    font-size: 23px; line-height: 1;
+    filter: saturate(1.25) drop-shadow(0 0 5px color-mix(in srgb, var(--ico) 60%, transparent));
+    transition: filter 0.22s ease;
+}
+.rail-btn:hover {
+    background:
+        linear-gradient(160deg, rgba(255,255,255,0.14), rgba(255,255,255,0) 55%),
+        color-mix(in srgb, var(--ico, #8B5CF6) 22%, rgba(20,26,38,0.85));
+    border-color: color-mix(in srgb, var(--ico) 65%, transparent);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.18),
+        0 0 0 1px color-mix(in srgb, var(--ico) 40%, transparent),
+        0 8px 22px color-mix(in srgb, var(--ico) 40%, transparent);
+}
+.rail-btn:hover::before { opacity: 0.85; }
+.rail-btn:hover .rail-ico { filter: saturate(1.4) drop-shadow(0 0 10px var(--ico)); }
+.rail-btn:active { transform: scale(0.92); }
+/* painel ABERTO: anel de cor forte + halo aceso (o "app icon" ativo) */
+.rail-btn.is-on {
+    border-color: var(--ico);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.18),
+        0 0 0 1.5px color-mix(in srgb, var(--ico) 70%, transparent),
+        0 6px 18px color-mix(in srgb, var(--ico) 45%, transparent);
+}
+.rail-btn.is-on::before { opacity: 0.7; }
+.rail-btn.is-on .rail-ico { filter: saturate(1.35) drop-shadow(0 0 8px var(--ico)); }
+/* borda do rail em gradiente sutil (já existia a linha; reforça o acabamento) */
+.rail { border-right: 1px solid rgba(255,255,255,0.06); }
+
+@media (max-width: 760px) {
+    .rail { width: 52px; padding: 10px 5px; gap: 6px; }
+    .rail-btn { width: 42px; height: 42px; border-radius: 12px; }
+    .rail-ico { font-size: 20px; }
+    .main-content { padding-left: 62px; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .rail-btn::before { transition: none; }
+}
+
+/* ---- Título do gráfico: par em destaque + TF/fonte ---- */
+.ct-par { font-size: 16px; font-weight: 800; color: var(--ink); letter-spacing: 0.3px; }
+.ct-meta {
+    margin-left: 8px; font-size: 11.5px; font-weight: 600; color: var(--ink-muted);
+    padding: 2px 8px; border-radius: 6px; background: var(--surface-2);
+    border: 1px solid var(--hairline); vertical-align: middle;
+}
+
+/* ---- Barra de troca rápida do gráfico (moeda + timeframe) ---- */
+.chart-wrap { position: relative; }
+/* Barra flutuante SOBRE o gráfico (canto superior esquerdo, estilo TradingView) */
+.chart-quickbar {
+    position: absolute; top: 8px; left: 8px; z-index: 6;
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    padding: 5px 6px; border-radius: 12px;
+    /* SEM backdrop-blur: o canvas repinta a cada tick e o blur re-amostraria
+       tudo de novo por frame (custo alto). Fundo quase-sólido dá o mesmo look. */
+    background: color-mix(in srgb, var(--surface) 92%, transparent);
+    border: 1px solid var(--glass-brd); box-shadow: 0 6px 18px rgba(0,0,0,0.3);
+}
+#chartSym {
+    background: var(--surface-2); color: var(--ink); font-weight: 700; font-size: 13px;
+    border: 1px solid var(--hairline); border-radius: 10px; padding: 7px 12px;
+    cursor: pointer; min-width: 150px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+#chartSym:hover { border-color: var(--neon-1); }
+#chartSym:focus { border-color: var(--neon-1); box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.12); outline: none; }
+.tf-seg { display: inline-flex; background: var(--surface-2); border: 1px solid var(--hairline); border-radius: 10px; padding: 3px; gap: 2px; }
+.tf-seg button {
+    background: transparent; color: var(--ink-2); border: none; cursor: pointer;
+    font-size: 12.5px; font-weight: 700; padding: 5px 12px; border-radius: 7px;
+    transition: transform 0.14s var(--spring), background 0.2s, color 0.2s;
+}
+.tf-seg button:hover { color: var(--ink); }
+.tf-seg button.is-active {
+    background: linear-gradient(100deg, var(--neon-1), var(--neon-2));
+    color: #fff; box-shadow: 0 2px 8px rgba(34, 211, 238, 0.35);
+}
+@media (max-width: 620px) {
+    #chartSym { min-width: 120px; flex: 1; }
+    .tf-seg button { padding: 5px 9px; }
+}
+
+/* ---- FLUIDEZ 3: isola o repaint do canvas do resto da página ---- */
+#chartPreco { contain: layout paint; }
+#chartRsi, #chartAtr, #chartFluxo, #chartEquity { contain: layout paint; }
+
+/* ---- Ferramentas de execução na barra do gráfico ---- */
+.tick-preco { font-size: 15px; font-weight: 800; color: var(--ink); margin-left: 4px; }
+.tick-var { font-size: 12px; font-weight: 700; padding: 2px 7px; border-radius: 6px; }
+.tick-var.tick-up { color: var(--call); background: rgba(34, 197, 94, 0.12); }
+.tick-var.tick-down { color: var(--put); background: rgba(239, 68, 68, 0.12); }
+.vela-timer {
+    font-size: 12.5px; font-weight: 700; color: var(--ink-2);
+    padding: 3px 9px; border-radius: 8px; background: var(--surface-2);
+    border: 1px solid var(--hairline); font-variant-numeric: tabular-nums;
+}
+.vela-timer.vela-urgente { color: #fff; background: var(--warning); border-color: var(--warning); animation: velaPisca 1s steps(2) infinite; }
+@keyframes velaPisca { 50% { opacity: 0.55; } }
+.alerta-chips { display: inline-flex; gap: 5px; flex-wrap: wrap; }
+.alerta-chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 11.5px; font-weight: 700; color: var(--warning);
+    background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.4);
+    border-radius: 12px; padding: 2px 4px 2px 9px;
+}
+.alerta-chip button { background: transparent; border: none; color: var(--warning); cursor: pointer; font-size: 11px; padding: 1px 5px; border-radius: 8px; }
+.alerta-chip button:hover { background: rgba(245, 158, 11, 0.25); }
+#btnAlerta.is-active { background: rgba(245, 158, 11, 0.18); border-color: var(--warning); color: var(--warning); }
+@media (prefers-reduced-motion: reduce) { .vela-timer.vela-urgente { animation: none; } }
+
+/* ---- Sessões pintadas no gráfico ---- */
+#sessoesOverlay { position: absolute; inset: 0; pointer-events: none; z-index: 1; overflow: hidden; }
+.sess-faixa { position: absolute; top: 0; bottom: 0; }
+
+/* ---- Modo foco: só decisão + gráfico ---- */
+body.modo-foco .sidebar,
+body.modo-foco .rail,
+body.modo-foco #registroPanel,
+body.modo-foco .qo-intel,
+body.modo-foco #painelSub, body.modo-foco #painelFluxo, body.modo-foco #painelIntel,
+body.modo-foco #heatPanel, body.modo-foco #scanPanel, body.modo-foco #iaPanel,
+body.modo-foco #agentesPanel, body.modo-foco #pilotoPanel, body.modo-foco #proPanel,
+body.modo-foco #bookPanel, body.modo-foco #painelPA, body.modo-foco #painelEntradas,
+body.modo-foco #painelMetricas, body.modo-foco #estudoPanel, body.modo-foco #painelTV,
+body.modo-foco #painelNews, body.modo-foco #painelStatus, body.modo-foco #trainPanel,
+body.modo-foco .footer { display: none !important; }
+body.modo-foco .main-content { padding-left: var(--spacing); padding-right: var(--spacing); }
+#btnFoco.is-active, #btnSessoes.is-active {
+    background: rgba(34, 211, 238, 0.14); border-color: var(--neon-1); color: var(--neon-1);
+}
+
+/* ---- Barra de comparação de ativos ---- */
+.cmp-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 8px; padding: 6px 2px; }
+.cmp-lbl { font-size: 12px; font-weight: 700; color: var(--ink-2); }
+#cmpSym {
+    background: var(--surface-2); color: var(--ink); border: 1px solid var(--hairline);
+    border-radius: 8px; padding: 6px 10px; font-size: 12.5px; width: 150px; text-transform: uppercase;
+}
+#cmpSym:focus { border-color: var(--neon-1); box-shadow: 0 0 0 3px rgba(34,211,238,0.12); outline: none; }
+.cmp-res { font-size: 12.5px; font-weight: 600; color: var(--ink-2); }
+body.modo-foco .cmp-bar { display: none; }
+
+/* ---- Menu ⋯ Ferramentas do gráfico ---- */
+.chart-tools { position: relative; display: inline-block; }
+#btnFerramentas.is-open { background: rgba(34, 211, 238, 0.14); border-color: var(--neon-1); color: var(--neon-1); }
+#btnFerramentas.tem-ativo::after {
+    content: ''; position: absolute; top: 3px; right: 3px; width: 7px; height: 7px;
+    border-radius: 50%; background: var(--neon-1); box-shadow: 0 0 6px var(--neon-1);
+}
+.tools-menu {
+    position: absolute; top: calc(100% + 6px); left: 0; z-index: 20;
+    display: flex; flex-direction: column; gap: 2px; min-width: 210px; padding: 6px;
+    background: var(--surface); border: 1px solid var(--glass-brd); border-radius: 12px;
+    box-shadow: 0 14px 40px rgba(0, 0, 0, 0.5);
+    animation: iosSheet 0.2s var(--spring);
+}
+.tools-grp { font-size: 10px; font-weight: 800; letter-spacing: 0.6px; text-transform: uppercase; color: var(--ink-muted); padding: 6px 8px 2px; }
+.tools-item {
+    text-align: left; justify-content: flex-start; width: 100%;
+    padding: 8px 10px; border-radius: 8px; font-size: 12.5px; border-color: transparent;
+}
+.tools-item:hover { background: var(--surface-2); }
+.tools-item.is-active { background: rgba(34, 211, 238, 0.12); border-color: var(--neon-1); color: var(--neon-1); }
+@media (prefers-reduced-motion: reduce) { .tools-menu { animation: none; } }
+
+/* ---- Gestão de risco: guardião ---- */
+.risco-guardiao { margin-top: 10px; border-radius: 10px; padding: 10px 12px; border: 1px solid var(--hairline); }
+.risco-guardiao .guard-pl { font-size: 13px; margin-bottom: 3px; }
+.risco-guardiao .guard-msg { font-size: 12px; line-height: 1.45; }
+.guard-ok { background: rgba(34, 197, 94, 0.06); border-color: rgba(34, 197, 94, 0.25); }
+.guard-meta { background: rgba(34, 197, 94, 0.14); border-color: rgba(34, 197, 94, 0.5); }
+.guard-meta .guard-msg { color: var(--call); font-weight: 700; }
+.guard-stop { background: rgba(239, 68, 68, 0.14); border-color: rgba(239, 68, 68, 0.55); animation: guardPisca 1.4s ease-in-out infinite; }
+.guard-stop .guard-msg { color: var(--put); font-weight: 700; }
+@keyframes guardPisca { 50% { box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.5), 0 0 22px rgba(239, 68, 68, 0.25); } }
+@media (prefers-reduced-motion: reduce) { .guard-stop { animation: none; } }
+
+/* ---- Watchlist ---- */
+.watch-add { display: flex; gap: 6px; margin-bottom: 8px; }
+#watchAddSym { flex: 1; min-width: 0; background: var(--surface-2); color: var(--ink); border: 1px solid var(--hairline); border-radius: 8px; padding: 7px 10px; font-size: 12.5px; text-transform: uppercase; }
+#watchAddSym:focus { border-color: var(--neon-1); box-shadow: 0 0 0 3px rgba(34,211,238,0.12); outline: none; }
+.watch-list { display: flex; flex-direction: column; gap: 2px; }
+.watch-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 8px; cursor: pointer; transition: background 0.15s; }
+.watch-row:hover { background: var(--surface-2); }
+.watch-atual { box-shadow: inset 0 0 0 1px rgba(34,211,238,0.4); }
+.watch-par { flex: 1; min-width: 0; font-weight: 700; font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.watch-preco { font-variant-numeric: tabular-nums; font-size: 12.5px; color: var(--ink); }
+.watch-var { font-size: 12px; font-weight: 700; min-width: 58px; text-align: right; }
+.watch-load { font-size: 12px; color: var(--ink-muted); }
+.watch-x { background: transparent; border: none; color: var(--ink-muted); cursor: pointer; font-size: 11px; padding: 2px 5px; border-radius: 6px; opacity: 0; transition: opacity 0.15s; }
+.watch-row:hover .watch-x { opacity: 1; }
+.watch-x:hover { background: rgba(239,68,68,0.18); color: var(--put); }
+
+/* ---- Semáforo de decisão único ---- */
+.semaforo {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    padding: 12px 16px; border-radius: 12px; margin-bottom: 12px;
+    border: 1px solid var(--hairline); transition: background 0.3s, border-color 0.3s;
+}
+.sem-luz { font-size: 26px; line-height: 1; }
+.sem-txt { display: flex; flex-direction: column; }
+.sem-txt strong { font-size: 20px; font-weight: 800; letter-spacing: 0.3px; }
+.sem-txt small { font-size: 12px; color: var(--ink-2); }
+.semaforo-entrar { background: rgba(34, 197, 94, 0.14); border-color: rgba(34, 197, 94, 0.5); }
+.semaforo-entrar .sem-txt strong { color: var(--call); }
+.semaforo-entrar { animation: semPulse 2s ease-in-out infinite; }
+@keyframes semPulse { 50% { box-shadow: 0 0 0 1px rgba(34,197,94,0.5), 0 0 24px rgba(34,197,94,0.22); } }
+.semaforo-esperar { background: rgba(245, 158, 11, 0.10); border-color: rgba(245, 158, 11, 0.4); }
+.semaforo-esperar .sem-txt strong { color: var(--warning); }
+.semaforo-evitar { background: rgba(239, 68, 68, 0.12); border-color: rgba(239, 68, 68, 0.5); }
+.semaforo-evitar .sem-txt strong { color: var(--put); }
+/* linha MTF */
+.mtf-row { display: inline-flex; align-items: center; gap: 5px; flex-wrap: wrap; margin-left: auto; }
+.mtf-chip { font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 6px; background: var(--surface-2); border: 1px solid var(--hairline); }
+.mtf-up { color: var(--call); } .mtf-down { color: var(--put); } .mtf-nt { color: var(--ink-muted); }
+.mtf-ok { font-size: 11px; font-weight: 700; color: var(--call); }
+.mtf-no { font-size: 11px; font-weight: 700; color: var(--ink-muted); }
+@media (prefers-reduced-motion: reduce) { .semaforo-entrar { animation: none; } }
+@media (max-width: 620px) { .mtf-row { margin-left: 0; width: 100%; } }
+
+/* ============================================================================
+   PACOTE MOBILE — nav inferior + alvos de toque maiores (≤760px)
+   ============================================================================ */
+.mnav { display: none; }
+@media (max-width: 760px) {
+    .mnav {
+        display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 60;
+        background: var(--glass); -webkit-backdrop-filter: blur(16px) saturate(1.2); backdrop-filter: blur(16px) saturate(1.2);
+        border-top: 1px solid var(--glass-brd); padding: 4px 4px calc(4px + env(safe-area-inset-bottom));
+    }
+    .mnav button {
+        flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px;
+        background: transparent; border: none; color: var(--ink-2);
+        font-size: 10px; font-weight: 700; padding: 7px 2px; border-radius: 10px; cursor: pointer;
+        min-height: 48px;
+    }
+    .mnav button span { font-size: 20px; line-height: 1; }
+    .mnav button.is-active { color: var(--neon-1); background: rgba(34, 211, 238, 0.12); }
+    .mnav button:active { transform: scale(0.94); }
+
+    /* espaço para a nav não cobrir o rodapé/conteúdo */
+    .main-content { padding-bottom: 72px; }
+    body.tem-registro .main-content { padding-bottom: 72px; }
+    .footer { margin-bottom: 60px; }
+
+    /* alvos de toque maiores: botões e selects respiram no dedo */
+    .btn-ghost, .btn-mini, .qo-toggle, .tf-seg button { min-height: 40px; }
+    .tf-seg button { padding: 8px 12px; font-size: 13px; }
+    #chartSym, #cmpSym, #watchAddSym, .sidebar select, .sidebar input[type="number"], .sidebar input[type="text"] { min-height: 42px; font-size: 14px; }
+    .watch-row, .reg-row { min-height: 40px; }
+    /* o gráfico ampliado no celular respeita a tela (JS já limita a ~60vh) */
+    .rail { top: var(--reg-top, 56px); }
+}
+
+/* ---- Piloto: gate de evidência ---- */
+.piloto-prova { margin-top: 10px; border-radius: 10px; padding: 10px 12px; border: 1px solid var(--hairline); font-size: 12px; line-height: 1.45; }
+.prova-barra { height: 5px; border-radius: 3px; background: var(--surface-2); overflow: hidden; margin-bottom: 7px; }
+.prova-barra span { display: block; height: 100%; border-radius: 3px; transition: width 0.4s; }
+.prova-coletando { background: rgba(245,158,11,0.08); border-color: rgba(245,158,11,0.35); }
+.prova-coletando .prova-barra span { background: var(--warning); }
+.prova-sem-edge { background: rgba(239,68,68,0.10); border-color: rgba(239,68,68,0.45); }
+.prova-sem-edge .prova-barra span { background: var(--put); width: 100%; }
+.prova-sem-edge .prova-msg { color: var(--put); font-weight: 600; }
+.prova-validado { background: rgba(34,197,94,0.12); border-color: rgba(34,197,94,0.45); }
+.prova-validado .prova-barra span { background: var(--call); width: 100%; }
+.prova-validado .prova-msg { color: var(--call); font-weight: 600; }
+
+/* ---- Tour guiado ---- */
+#tourOverlay { position: fixed; inset: 0; z-index: 3000; display: none; }
+#tourSpot { position: absolute; border-radius: 12px; box-shadow: 0 0 0 4px rgba(34,211,238,0.7), 0 0 0 9999px rgba(4,8,18,0.78); transition: all 0.3s cubic-bezier(0.16,1,0.3,1); pointer-events: none; }
+#tourBalao { position: absolute; width: 320px; max-width: 92vw; background: var(--surface); border: 1px solid var(--neon-2); border-radius: 14px; padding: 14px 16px; box-shadow: 0 18px 50px rgba(0,0,0,0.55); animation: iosSheet 0.25s var(--spring); }
+#tourBalao h4 { font-size: 14px; color: var(--ink); margin-bottom: 6px; }
+#tourBalao p { font-size: 12.5px; color: var(--ink-2); line-height: 1.5; }
+.tour-nav { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; }
+.tour-nav > span:first-child { font-size: 11px; color: var(--ink-muted); font-weight: 700; }
+@media (prefers-reduced-motion: reduce) { #tourSpot, #tourBalao { transition: none; animation: none; } }

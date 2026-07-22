@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QUANT OPS — Institutional Trading Intelligence</title>
+    <meta http-equiv="refresh" content="0; url=pinescript/Simulador_Standalone.html">
+    <link rel="canonical" href="pinescript/Simulador_Standalone.html">
+    <style>
+        html, body {
+            margin: 0;
+            height: 100%;
+            background: #0a0e17;
+            color: #e6edf3;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+        .wrap {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 1.25rem;
+            text-align: center;
+            padding: 1.5rem;
+            box-sizing: border-box;
+        }
+        .brand {
+            font-size: clamp(1.5rem, 4vw, 2.5rem);
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            background: linear-gradient(90deg, #38bdf8, #22d3ee);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+        .sub { opacity: 0.6; font-size: 0.95rem; letter-spacing: 0.04em; }
+        .spinner {
+            width: 38px; height: 38px;
+            border: 3px solid rgba(56, 189, 248, 0.2);
+            border-top-color: #38bdf8;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        a { color: #38bdf8; }
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <div class="brand">QUANT OPS</div>
+        <div class="spinner"></div>
+        <div class="sub">Carregando o simulador…</div>
+        <noscript>
+            <p><a href="pinescript/Simulador_Standalone.html">Clique aqui para abrir o simulador</a></p>
+        </noscript>
+    </div>
+</body>
+</html>

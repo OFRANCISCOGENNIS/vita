@@ -1,0 +1,297 @@
+//@version=5
+// FERRAMENTA DE ESTUDO. Não é recomendação. Sinais exigem backtest e validação antes de qualquer uso real.
+//
+// ============================================================================
+// INDICADOR DE CONFLUÊNCIA MULTI-FATOR — FOREX & CRIPTO (M1 / M5 / M15 / M30)
+// ============================================================================
+// O sinal só dispara quando MÚLTIPLOS fatores estão alinhados na mesma direção:
+//   1) Tendência  -> EMA rápida x EMA lenta + viés macro (EMA 200)
+//   2) Momentum   -> RSI saindo de sobrevenda/sobrecompra
+//   3) Volatilidade -> ATR acima da própria média (evita lateralização)
+//   4) Estrutura  -> rompimento de máxima/mínima recente
+//   5) Volume     -> (opcional) volume acima da média
+// Cada fator pode ser ligado/desligado individualmente para testar combinações.
+//
+// AVISO IMPORTANTE SOBRE RUÍDO (M1/M5): timeframes muito baixos têm relação
+// sinal/ruído muito pior, poucas velas para confirmar estrutura e o
+// spread/corretagem/taxas corroem fortemente qualquer edge estatístico.
+// Use os filtros de confirmação de fechamento e cooldown, e SEMPRE valide
+// em backtest/forward test antes de considerar uso com capital real.
+// ============================================================================
+
+indicator("Confluência Multi-Fator [Forex/Cripto] - Estudo", overlay = true, max_labels_count = 500, max_lines_count = 500)
+
+// ---------------------------------------------------------------------------
+// BLOCO 1 — INPUTS: TENDÊNCIA (EMAs)
+// ---------------------------------------------------------------------------
+grpTend = "1) Tendência (EMAs)"
+useTendencia     = input.bool(true, "Ativar filtro de Tendência (EMA rápida x lenta)", group = grpTend, tooltip = "Exige alinhamento entre EMA rápida e EMA lenta na direção do sinal.")
+emaRapidaLen     = input.int(9, "EMA Rápida", minval = 1, group = grpTend, tooltip = "Período da média móvel exponencial rápida.")
+emaLentaLen      = input.int(21, "EMA Lenta", minval = 1, group = grpTend, tooltip = "Período da média móvel exponencial lenta.")
+useFiltroEma200  = input.bool(true, "Ativar filtro de viés macro (EMA 200)", group = grpTend, tooltip = "Só permite LONG com preço acima da EMA200 e SHORT com preço abaixo dela.")
+ema200Len        = input.int(200, "EMA 200 (viés macro)", minval = 1, group = grpTend, tooltip = "Período da EMA usada como filtro de tendência de longo prazo.")
+
+// ---------------------------------------------------------------------------
+// BLOCO 2 — INPUTS: MOMENTUM (RSI)
+// ---------------------------------------------------------------------------
+grpMom = "2) Momentum (RSI)"
+useMomentum      = input.bool(true, "Ativar filtro de Momentum (RSI)", group = grpMom, tooltip = "Exige que o RSI cruze saindo da zona de sobrevenda (LONG) ou de sobrecompra (SHORT).")
+rsiLen           = input.int(14, "Período do RSI", minval = 1, group = grpMom)
+rsiSobrevenda    = input.int(30, "Zona de Sobrevenda", minval = 1, maxval = 50, group = grpMom, tooltip = "Nível abaixo do qual o RSI é considerado sobrevendido.")
+rsiSobrecompra   = input.int(70, "Zona de Sobrecompra", minval = 50, maxval = 99, group = grpMom, tooltip = "Nível acima do qual o RSI é considerado sobrecomprado.")
+
+// ---------------------------------------------------------------------------
+// BLOCO 3 — INPUTS: VOLATILIDADE / CONTEXTO (ATR)
+// ---------------------------------------------------------------------------
+grpVol = "3) Volatilidade (ATR)"
+useVolatilidade  = input.bool(true, "Ativar filtro de Volatilidade (ATR)", group = grpVol, tooltip = "Bloqueia sinais quando o ATR atual está abaixo da própria média (mercado lateral, sem força).")
+atrLen           = input.int(14, "Período do ATR", minval = 1, group = grpVol)
+atrMediaLen      = input.int(50, "Período da Média do ATR", minval = 1, group = grpVol, tooltip = "Período da média do ATR usada como referência de 'volatilidade normal'.")
+
+// ---------------------------------------------------------------------------
+// BLOCO 4 — INPUTS: ESTRUTURA (ROMPIMENTO)
+// ---------------------------------------------------------------------------
+grpEstr = "4) Estrutura (Rompimento)"
+useEstrutura        = input.bool(true, "Ativar filtro de Estrutura (rompimento de máx/mín)", group = grpEstr, tooltip = "Exige rompimento da máxima/mínima recente, calculada excluindo a vela atual.")
+estruturaLookback   = input.int(20, "Lookback (nº de velas)", minval = 2, group = grpEstr, tooltip = "Quantidade de velas anteriores usada para calcular a máxima/mínima de referência.")
+
+// ---------------------------------------------------------------------------
+// BLOCO 5 — INPUTS: VOLUME (opcional)
+// ---------------------------------------------------------------------------
+grpVolu = "5) Volume (opcional)"
+useVolume        = input.bool(false, "Ativar filtro de Volume", group = grpVolu, tooltip = "Exige volume acima da média. Sugestão: manter desligado em Forex, pois o volume não é confiável (dado de tick, não de mercado centralizado).")
+volumeMediaLen   = input.int(20, "Período da Média de Volume", minval = 1, group = grpVolu)
+
+// ---------------------------------------------------------------------------
+// BLOCO 6 — INPUTS: ANTI-RUÍDO / REPAINT
+// ---------------------------------------------------------------------------
+grpRuido = "6) Anti-Ruído / Repaint"
+confirmarFechamento = input.bool(true, "Exigir fechamento da vela (evita repaint)", group = grpRuido, tooltip = "Se ativado, o sinal só é validado com barstate.isconfirmed (vela fechada). Recomendado, especialmente em M1/M5.")
+cooldownVelas       = input.int(5, "Cooldown entre sinais (nº de velas)", minval = 0, group = grpRuido, tooltip = "Número mínimo de velas que devem se passar entre dois sinais consecutivos, para reduzir sinais em sequência (ruído).")
+
+// ---------------------------------------------------------------------------
+// BLOCO 7 — INPUTS: GESTÃO DE RISCO (apenas visual)
+// ---------------------------------------------------------------------------
+grpRisco = "7) Gestão de Risco (visual)"
+mostrarRisco     = input.bool(true, "Mostrar linhas de Stop e Alvo", group = grpRisco, tooltip = "Apenas ilustrativo. O indicador NÃO envia nem executa ordens.")
+atrMultStop      = input.float(1.5, "Multiplicador de ATR para o Stop", minval = 0.1, step = 0.1, group = grpRisco, tooltip = "Distância do stop = ATR atual x este multiplicador.")
+riscoRetorno     = input.float(1.5, "Relação Risco:Retorno (R:R)", minval = 0.1, step = 0.1, group = grpRisco, tooltip = "Alvo = distância do stop x este fator, a partir do preço de entrada.")
+
+// ---------------------------------------------------------------------------
+// BLOCO 8 — INPUTS: VISUAL
+// ---------------------------------------------------------------------------
+grpVisual = "8) Visual"
+mostrarBackground = input.bool(true, "Colorir fundo conforme viés de tendência", group = grpVisual)
+mostrarTabela     = input.bool(true, "Mostrar tabela de status", group = grpVisual)
+
+// ---------------------------------------------------------------------------
+// BLOCO 9 — CÁLCULOS BASE
+// ---------------------------------------------------------------------------
+emaRapida = ta.ema(close, emaRapidaLen)
+emaLenta  = ta.ema(close, emaLentaLen)
+ema200    = ta.ema(close, ema200Len)
+
+rsiValor  = ta.rsi(close, rsiLen)
+
+atrValor  = ta.atr(atrLen)
+atrMedia  = ta.sma(atrValor, atrMediaLen)
+
+volumeMedia = ta.sma(volume, volumeMediaLen)
+
+// Máxima/mínima de referência, excluindo a vela atual (evita olhar o próprio rompimento)
+maximaRecente = ta.highest(high, estruturaLookback)[1]
+minimaRecente = ta.lowest(low, estruturaLookback)[1]
+
+// ---------------------------------------------------------------------------
+// BLOCO 10 — CONDIÇÕES BRUTAS DE CADA FATOR (antes de aplicar os toggles)
+// ---------------------------------------------------------------------------
+rawTendenciaLong  = emaRapida > emaLenta
+rawTendenciaShort = emaRapida < emaLenta
+
+rawMacroLong  = close > ema200
+rawMacroShort = close < ema200
+
+rawMomentumLong  = ta.crossover(rsiValor, rsiSobrevenda)
+rawMomentumShort = ta.crossunder(rsiValor, rsiSobrecompra)
+
+rawVolatilidade = atrValor > atrMedia
+
+rawEstruturaLong  = close > maximaRecente
+rawEstruturaShort = close < minimaRecente
+
+rawVolume = volume > volumeMedia
+
+// ---------------------------------------------------------------------------
+// BLOCO 11 — CONDIÇÕES EFETIVAS (aplica o toggle: fator desligado = não bloqueia)
+// ---------------------------------------------------------------------------
+condTendenciaLong  = not useTendencia or rawTendenciaLong
+condTendenciaShort = not useTendencia or rawTendenciaShort
+
+condMacroLong  = not useFiltroEma200 or rawMacroLong
+condMacroShort = not useFiltroEma200 or rawMacroShort
+
+condMomentumLong  = not useMomentum or rawMomentumLong
+condMomentumShort = not useMomentum or rawMomentumShort
+
+condVolatilidade = not useVolatilidade or rawVolatilidade
+
+condEstruturaLong  = not useEstrutura or rawEstruturaLong
+condEstruturaShort = not useEstrutura or rawEstruturaShort
+
+condVolume = not useVolume or rawVolume
+
+// ---------------------------------------------------------------------------
+// BLOCO 12 — CONFLUÊNCIA BRUTA (todos os fatores ativos alinhados)
+// ---------------------------------------------------------------------------
+sinalLongBruto  = condTendenciaLong and condMacroLong and condMomentumLong and condVolatilidade and condEstruturaLong and condVolume
+sinalShortBruto = condTendenciaShort and condMacroShort and condMomentumShort and condVolatilidade and condEstruturaShort and condVolume
+
+// ---------------------------------------------------------------------------
+// BLOCO 13 — ANTI-RUÍDO: CONFIRMAÇÃO DE FECHAMENTO + COOLDOWN
+// ---------------------------------------------------------------------------
+var int barrasDesdeUltimoSinal = 999999
+barrasDesdeUltimoSinal := barrasDesdeUltimoSinal + 1
+
+condFechamento = not confirmarFechamento or barstate.isconfirmed
+condCooldown   = barrasDesdeUltimoSinal >= cooldownVelas
+
+sinalLong  = sinalLongBruto and condFechamento and condCooldown
+sinalShort = sinalShortBruto and condFechamento and condCooldown and not sinalLong
+
+if sinalLong or sinalShort
+    barrasDesdeUltimoSinal := 0
+
+// ---------------------------------------------------------------------------
+// BLOCO 14 — VIÉS ATUAL (para background e tabela, baseado na tendência pura)
+// ---------------------------------------------------------------------------
+vieseAtual = rawTendenciaLong and rawMacroLong ? 1 : rawTendenciaShort and rawMacroShort ? -1 : 0
+
+// ---------------------------------------------------------------------------
+// BLOCO 15 — PLOTS: EMAs, EMA 200 e Background
+// ---------------------------------------------------------------------------
+plot(emaRapida, "EMA Rápida", color = color.new(color.aqua, 0), linewidth = 1)
+plot(emaLenta, "EMA Lenta", color = color.new(color.orange, 0), linewidth = 1)
+plot(useFiltroEma200 ? ema200 : na, "EMA 200 (viés macro)", color = color.new(color.purple, 0), linewidth = 2)
+
+bgcolor(mostrarBackground ? (vieseAtual == 1 ? color.new(color.green, 90) : vieseAtual == -1 ? color.new(color.red, 90) : na) : na, title = "Background de Viés")
+
+// ---------------------------------------------------------------------------
+// BLOCO 16 — SETAS DE COMPRA/VENDA
+// ---------------------------------------------------------------------------
+plotshape(sinalLong, title = "Sinal de Compra", style = shape.triangleup, location = location.belowbar, color = color.new(color.lime, 0), size = size.small, text = "LONG")
+plotshape(sinalShort, title = "Sinal de Venda", style = shape.triangledown, location = location.abovebar, color = color.new(color.red, 0), size = size.small, text = "SHORT")
+
+// ---------------------------------------------------------------------------
+// BLOCO 17 — GESTÃO DE RISCO VISUAL (Stop e Alvo via ATR / R:R)
+// ---------------------------------------------------------------------------
+var line linhaStopLong  = na
+var line linhaAlvoLong  = na
+var line linhaStopShort = na
+var line linhaAlvoShort = na
+
+if mostrarRisco and sinalLong
+    stopLong = close - atrValor * atrMultStop
+    alvoLong = close + (close - stopLong) * riscoRetorno
+    line.delete(linhaStopLong)
+    line.delete(linhaAlvoLong)
+    linhaStopLong := line.new(bar_index, stopLong, bar_index + estruturaLookback, stopLong, color = color.red, style = line.style_dashed, width = 1)
+    linhaAlvoLong := line.new(bar_index, alvoLong, bar_index + estruturaLookback, alvoLong, color = color.green, style = line.style_dashed, width = 1)
+
+if mostrarRisco and sinalShort
+    stopShort = close + atrValor * atrMultStop
+    alvoShort = close - (stopShort - close) * riscoRetorno
+    line.delete(linhaStopShort)
+    line.delete(linhaAlvoShort)
+    linhaStopShort := line.new(bar_index, stopShort, bar_index + estruturaLookback, stopShort, color = color.red, style = line.style_dashed, width = 1)
+    linhaAlvoShort := line.new(bar_index, alvoShort, bar_index + estruturaLookback, alvoShort, color = color.green, style = line.style_dashed, width = 1)
+
+// ---------------------------------------------------------------------------
+// BLOCO 18 — TABELA DE STATUS (canto superior direito)
+// ---------------------------------------------------------------------------
+statusFiltro(ativado, condLongOk, condShortOk, vies) => ativado ? (vies == 1 ? (condLongOk ? "✓" : "✗") : vies == -1 ? (condShortOk ? "✓" : "✗") : "–") : "–"
+
+var table painel = table.new(position.top_right, 2, 9, bgcolor = color.new(color.black, 70), border_color = color.gray, border_width = 1)
+
+if mostrarTabela and barstate.islast
+    vieseTexto = vieseAtual == 1 ? "ALTA" : vieseAtual == -1 ? "BAIXA" : "NEUTRO"
+    vieseCor   = vieseAtual == 1 ? color.new(color.green, 20) : vieseAtual == -1 ? color.new(color.red, 20) : color.new(color.gray, 20)
+
+    table.cell(painel, 0, 0, "Timeframe", text_color = color.white, bgcolor = color.new(color.gray, 40))
+    table.cell(painel, 1, 0, timeframe.period, text_color = color.white, bgcolor = color.new(color.gray, 60))
+
+    table.cell(painel, 0, 1, "Viés", text_color = color.white, bgcolor = color.new(color.gray, 40))
+    table.cell(painel, 1, 1, vieseTexto, text_color = color.white, bgcolor = vieseCor)
+
+    table.cell(painel, 0, 2, "RSI", text_color = color.white, bgcolor = color.new(color.gray, 40))
+    table.cell(painel, 1, 2, str.tostring(rsiValor, "#.##"), text_color = color.white, bgcolor = color.new(color.gray, 60))
+
+    table.cell(painel, 0, 3, "Tendência (EMA)", text_color = color.white, bgcolor = color.new(color.gray, 40))
+    table.cell(painel, 1, 3, statusFiltro(useTendencia, rawTendenciaLong, rawTendenciaShort, vieseAtual), text_color = color.white, bgcolor = color.new(color.gray, 60))
+
+    table.cell(painel, 0, 4, "Momentum (RSI)", text_color = color.white, bgcolor = color.new(color.gray, 40))
+    table.cell(painel, 1, 4, statusFiltro(useMomentum, rawMomentumLong, rawMomentumShort, vieseAtual), text_color = color.white, bgcolor = color.new(color.gray, 60))
+
+    table.cell(painel, 0, 5, "Volatilidade (ATR)", text_color = color.white, bgcolor = color.new(color.gray, 40))
+    table.cell(painel, 1, 5, statusFiltro(useVolatilidade, rawVolatilidade, rawVolatilidade, vieseAtual), text_color = color.white, bgcolor = color.new(color.gray, 60))
+
+    table.cell(painel, 0, 6, "Estrutura (Romp.)", text_color = color.white, bgcolor = color.new(color.gray, 40))
+    table.cell(painel, 1, 6, statusFiltro(useEstrutura, rawEstruturaLong, rawEstruturaShort, vieseAtual), text_color = color.white, bgcolor = color.new(color.gray, 60))
+
+    table.cell(painel, 0, 7, "Volume", text_color = color.white, bgcolor = color.new(color.gray, 40))
+    table.cell(painel, 1, 7, statusFiltro(useVolume, rawVolume, rawVolume, vieseAtual), text_color = color.white, bgcolor = color.new(color.gray, 60))
+
+    table.cell(painel, 0, 8, "Cooldown", text_color = color.white, bgcolor = color.new(color.gray, 40))
+    table.cell(painel, 1, 8, condCooldown ? "Pronto" : "Aguardando", text_color = color.white, bgcolor = color.new(color.gray, 60))
+
+// ---------------------------------------------------------------------------
+// BLOCO 19 — ALERTAS
+// ---------------------------------------------------------------------------
+alertcondition(sinalLong, title = "Sinal de Compra (LONG)", message = "Confluência de COMPRA detectada.")
+alertcondition(sinalShort, title = "Sinal de Venda (SHORT)", message = "Confluência de VENDA detectada.")
+
+if sinalLong
+    msgLong = "LONG | " + syminfo.ticker + " | TF: " + timeframe.period + " | Preço: " + str.tostring(close) +
+      " | Filtros ativos -> Tendência:" + (useTendencia ? "sim" : "não") +
+      " Macro(EMA200):" + (useFiltroEma200 ? "sim" : "não") +
+      " RSI:" + (useMomentum ? "sim" : "não") +
+      " ATR:" + (useVolatilidade ? "sim" : "não") +
+      " Estrutura:" + (useEstrutura ? "sim" : "não") +
+      " Volume:" + (useVolume ? "sim" : "não")
+    alert(msgLong, alert.freq_once_per_bar_close)
+
+if sinalShort
+    msgShort = "SHORT | " + syminfo.ticker + " | TF: " + timeframe.period + " | Preço: " + str.tostring(close) +
+      " | Filtros ativos -> Tendência:" + (useTendencia ? "sim" : "não") +
+      " Macro(EMA200):" + (useFiltroEma200 ? "sim" : "não") +
+      " RSI:" + (useMomentum ? "sim" : "não") +
+      " ATR:" + (useVolatilidade ? "sim" : "não") +
+      " Estrutura:" + (useEstrutura ? "sim" : "não") +
+      " Volume:" + (useVolume ? "sim" : "não")
+    alert(msgShort, alert.freq_once_per_bar_close)
+
+// ============================================================================
+// COMO USAR
+// ============================================================================
+// 1. No TradingView, abra o gráfico do ativo (Forex ou Cripto) desejado.
+// 2. Clique em "Pine Editor" (parte inferior da tela) -> "Novo" -> "Indicador em branco".
+// 3. Apague o conteúdo padrão e cole todo o código deste arquivo.
+// 4. Clique em "Adicionar ao Gráfico". Ajuste os inputs em "Configurações"
+//    (ícone de engrenagem) conforme o ativo/timeframe testado.
+//
+// COMO CRIAR O ALERTA (webhook/notificação):
+// 1. Com o indicador aplicado ao gráfico, clique no sino "Alertas" (Alt+A).
+// 2. Em "Condição", selecione este indicador e escolha
+//    "Sinal de Compra (LONG)" ou "Sinal de Venda (SHORT)".
+// 3. Em "Frequência do disparo", use "Uma vez por barra fechada" (evita repaint).
+// 4. Na aba "Notificações":
+//    - Marque "Webhook URL" e informe o endpoint do seu bot/serviço
+//      (ex.: integração com Telegram, Discord, corretora via API, etc.);
+//    - E/ou marque "Notificação via app" / "E-mail" para receber no celular.
+// 5. A mensagem do alerta já é montada dinamicamente pela função alert()
+//    dentro do código (par, timeframe, preço e quais filtros estavam ativos).
+// 6. Clique em "Criar" para salvar o alerta.
+//
+// LEMBRETE: este script é uma ferramenta de ESTUDO. Sempre valide em
+// backtest e forward test antes de qualquer uso com capital real, e tenha
+// atenção redobrada em M1/M5 (ruído, spread e taxas corroem o edge).
+// ============================================================================
