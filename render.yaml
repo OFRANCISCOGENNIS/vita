@@ -1,0 +1,38 @@
+# Blueprint do Render — backend real do CortaAí em 1 clique (plano grátis).
+#
+# Como usar: https://render.com → New → Blueprint → aponte para este
+# repositório → Deploy. Ao terminar, copie a URL do serviço (ex.:
+# https://cortaai-api.onrender.com) e cole em Configurações → "Backend real"
+# no site do CortaAí.
+#
+# O serviço roda em contêiner único com degradação graciosa: SQLite no lugar
+# do Postgres, tarefas em background inline no lugar do Celery/Redis e
+# armazenamento em disco local no lugar do MinIO. ffmpeg e yt-dlp já vêm na
+# imagem — renderização final, transcrição no servidor, Radar ao vivo e o
+# gerador do Estúdio IA funcionam de verdade.
+#
+# Observação honesta do plano grátis: o serviço hiberna após ~15 min sem uso
+# (a primeira chamada demora ~1 min para acordar) e o disco é efêmero (dados
+# de conta/projetos do servidor podem zerar em novos deploys). Para persistir,
+# suba para um plano com disco ou aponte DATABASE_URL para um Postgres.
+
+services:
+  - type: web
+    name: cortaai-api
+    runtime: docker
+    plan: free
+    rootDir: cortaai/apps/api
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: CORS_ORIGINS
+        value: https://ofranciscogennis.github.io,http://localhost:3000
+      - key: JWT_SECRET
+        generateValue: true
+      - key: SEED_ON_STARTUP
+        value: "0"
+      - key: ENVIRONMENT
+        value: production
+      - key: CORTAAI_LOCAL_STORAGE
+        value: /srv/api/storage

@@ -1,0 +1,478 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ---------------------------------------------------------------------------
+   Design tokens (theme-aware). Dark is the default (:root); light theme is
+   activated by ThemeProvider/anti-FOUC script setting data-theme="light" on
+   <html>. Surface + line colors are driven by these vars via tailwind.config.
+   --------------------------------------------------------------------------- */
+:root {
+  color-scheme: dark;
+  --bg: 10 10 15; /* #0a0a0f */
+  --surface-1: 16 16 24; /* #101018 */
+  --surface-2: 22 22 31; /* #16161f */
+  --surface-3: 30 30 42; /* #1e1e2a */
+  --line: rgba(255, 255, 255, 0.08);
+  --line-50: rgba(255, 255, 255, 0.04);
+  --scrollbar-thumb: rgba(255, 255, 255, 0.12);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.22);
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: 247 247 250; /* #f7f7fa */
+  --surface-1: 255 255 255; /* #ffffff */
+  --surface-2: 248 248 251; /* #f8f8fb */
+  --surface-3: 238 238 243; /* #eeeef3 */
+  --line: rgba(9, 9, 20, 0.1);
+  --line-50: rgba(9, 9, 20, 0.05);
+  --scrollbar-thumb: rgba(9, 9, 20, 0.18);
+  --scrollbar-thumb-hover: rgba(9, 9, 20, 0.3);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  @apply bg-surface text-zinc-200 antialiased;
+  background-image:
+    radial-gradient(ellipse 60% 40% at 70% -10%, rgba(139, 92, 246, 0.12), transparent),
+    radial-gradient(ellipse 50% 35% at 20% 0%, rgba(217, 70, 239, 0.07), transparent);
+  background-attachment: fixed;
+}
+
+/* Light theme: darker default ink + softer, tinted gradient wash. */
+:root[data-theme="light"] body {
+  color: #27272a;
+  background-image:
+    radial-gradient(ellipse 60% 40% at 70% -10%, rgba(139, 92, 246, 0.1), transparent),
+    radial-gradient(ellipse 50% 35% at 20% 0%, rgba(217, 70, 239, 0.06), transparent);
+}
+
+/* Custom scrollbar (theme-aware) */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+  background-clip: content-box;
+  border: 2px solid transparent;
+}
+
+/* Range input thumb (sliders) */
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  height: 16px;
+  width: 16px;
+  border-radius: 9999px;
+  background: white;
+  border: 3px solid #8b5cf6;
+  cursor: pointer;
+  margin-top: 0;
+}
+input[type="range"]::-moz-range-thumb {
+  height: 16px;
+  width: 16px;
+  border-radius: 9999px;
+  background: white;
+  border: 3px solid #8b5cf6;
+  cursor: pointer;
+}
+
+/* ---------------------------------------------------------------------------
+   Editor (CapCut-style) — thin scrollbars for internal panel/timeline scroll
+   areas and a subtle fade when switching side-panel tabs. The fade respects
+   prefers-reduced-motion (only defined inside the no-preference query).
+   --------------------------------------------------------------------------- */
+.editor-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+.editor-scroll::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.editor-scroll::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 8px;
+  border: 0;
+  background-clip: padding-box;
+}
+.editor-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+  border: 0;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes panel-fade {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: none; }
+  }
+  .panel-fade {
+    animation: panel-fade 0.18s ease-out both;
+  }
+}
+
+
+/* ---------------------------------------------------------------------------
+   Kit de animação do app (Fatia P): entradas suaves, pop de cards, brilho
+   pulsante e gradiente vivo em botões. Tudo dentro de prefers-reduced-motion:
+   no-preference — quem prefere menos movimento vê o conteúdo estático.
+   --------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes anim-rise {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: none; }
+  }
+  .anim-rise {
+    animation: anim-rise 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  @keyframes anim-pop {
+    0% { opacity: 0; transform: scale(0.85); }
+    70% { transform: scale(1.03); }
+    100% { opacity: 1; transform: scale(1); }
+  }
+  .anim-pop {
+    animation: anim-pop 0.26s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  }
+
+  @keyframes anim-glow-pulse {
+    0%, 100% { box-shadow: 0 0 24px -6px rgba(139, 92, 246, 0.45); }
+    50% { box-shadow: 0 0 44px -4px rgba(217, 70, 239, 0.75); }
+  }
+  .anim-glow-pulse {
+    animation: anim-glow-pulse 2.4s ease-in-out infinite;
+  }
+
+  .btn-gradient-live {
+    background-size: 200% 200%;
+    animation: gradient-move 4s ease infinite;
+  }
+
+  /* hover com leve elevação para cards clicáveis */
+  .hover-lift {
+    transition: transform 0.18s ease, box-shadow 0.18s ease;
+  }
+  .hover-lift:hover {
+    transform: translateY(-2px);
+  }
+
+  /* entrada em cascata: filhos diretos sobem com atraso incremental */
+  .stagger-in > * {
+    animation: anim-rise 0.34s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  .stagger-in > *:nth-child(1) { animation-delay: 0.02s; }
+  .stagger-in > *:nth-child(2) { animation-delay: 0.05s; }
+  .stagger-in > *:nth-child(3) { animation-delay: 0.08s; }
+  .stagger-in > *:nth-child(4) { animation-delay: 0.11s; }
+  .stagger-in > *:nth-child(5) { animation-delay: 0.14s; }
+  .stagger-in > *:nth-child(6) { animation-delay: 0.17s; }
+  .stagger-in > *:nth-child(7) { animation-delay: 0.20s; }
+  .stagger-in > *:nth-child(8) { animation-delay: 0.23s; }
+  .stagger-in > *:nth-child(9) { animation-delay: 0.26s; }
+  .stagger-in > *:nth-child(10) { animation-delay: 0.29s; }
+  .stagger-in > *:nth-child(n + 11) { animation-delay: 0.32s; }
+}
+
+@keyframes caret-blink {
+  0%, 50% { border-color: transparent; }
+  51%, 100% { border-color: #34d399; }
+}
+.caption-typewriter {
+  animation: caret-blink 1s step-end infinite;
+}
+
+@keyframes gradient-move {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+.caption-gradient-animated {
+  background-size: 200% 200%;
+  animation: gradient-move 3s ease infinite;
+}
+
+/* ---------------------------------------------------------------------------
+   Transition demo animations (editor: "Transições" panel). Each plays once on
+   the incoming scene so the user previews the cut transition.
+   --------------------------------------------------------------------------- */
+@keyframes transi-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes transi-slide {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+@keyframes transi-zoom {
+  from { transform: scale(1.6); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+@keyframes transi-whip {
+  0% { transform: translateX(60%) skewX(-18deg); filter: blur(6px); opacity: 0; }
+  100% { transform: translateX(0) skewX(0); filter: blur(0); opacity: 1; }
+}
+@keyframes transi-glitch {
+  0% { transform: translate(0); opacity: 0.2; filter: hue-rotate(0deg); }
+  20% { transform: translate(-6px, 3px); filter: hue-rotate(90deg); }
+  40% { transform: translate(6px, -3px); filter: hue-rotate(-90deg); }
+  60% { transform: translate(-4px, -2px); filter: hue-rotate(45deg); }
+  80% { transform: translate(4px, 2px); filter: hue-rotate(-45deg); }
+  100% { transform: translate(0); opacity: 1; filter: hue-rotate(0deg); }
+}
+.transi-fade { animation: transi-fade 0.7s ease both; }
+.transi-slide { animation: transi-slide 0.6s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.transi-zoom { animation: transi-zoom 0.7s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.transi-whip { animation: transi-whip 0.45s ease-out both; }
+.transi-glitch { animation: transi-glitch 0.6s steps(2, end) both; }
+
+/* ---------------------------------------------------------------------------
+   CapCut Pro pack — biblioteca de efeitos (FX). Motion effects animate a
+   wrapper transform (magnitude driven by inline --fx-* vars); overlay effects
+   are painted as blended layers in the preview component.
+   --------------------------------------------------------------------------- */
+@keyframes fx-shake {
+  0%, 100% { transform: translate(0, 0); }
+  25% { transform: translate(calc(var(--fx-amt, 4px) * -1), var(--fx-amt, 4px)); }
+  50% { transform: translate(var(--fx-amt, 4px), calc(var(--fx-amt, 4px) * -1)); }
+  75% { transform: translate(calc(var(--fx-amt, 4px) * -1), calc(var(--fx-amt, 4px) * -1)); }
+}
+.fx-shake { animation: fx-shake 0.4s steps(3, end) infinite; will-change: transform; }
+
+@keyframes fx-zoom-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(var(--fx-zoom, 1.06)); }
+}
+.fx-zoom-pulse { animation: fx-zoom-pulse 1.4s ease-in-out infinite; will-change: transform; }
+
+@keyframes fx-glitch {
+  0%, 100% { transform: translate(0); filter: hue-rotate(0deg); }
+  20% { transform: translate(calc(var(--fx-amt, 3px) * -1), 1px); filter: hue-rotate(50deg); }
+  40% { transform: translate(var(--fx-amt, 3px), -1px); filter: hue-rotate(-40deg); }
+  60% { transform: translate(calc(var(--fx-amt, 3px) * -0.6), -1px); filter: hue-rotate(30deg); }
+  80% { transform: translate(var(--fx-amt, 3px), 1px); filter: hue-rotate(-20deg); }
+}
+.fx-glitch { animation: fx-glitch 1.3s steps(2, end) infinite; will-change: transform; }
+
+@keyframes fx-leak {
+  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.5; }
+  50% { transform: translate(8%, -6%) scale(1.15); opacity: 0.85; }
+}
+.fx-leak { animation: fx-leak 6s ease-in-out infinite; }
+
+@keyframes fx-grain {
+  0% { transform: translate(0, 0); }
+  25% { transform: translate(-4%, 3%); }
+  50% { transform: translate(3%, -3%); }
+  75% { transform: translate(-2%, -4%); }
+  100% { transform: translate(0, 0); }
+}
+.fx-grain { animation: fx-grain 0.6s steps(3, end) infinite; }
+
+@keyframes fx-vhs-roll {
+  0% { background-position-y: 0; }
+  100% { background-position-y: 100%; }
+}
+.fx-vhs-roll { animation: fx-vhs-roll 5s linear infinite; }
+
+@keyframes fx-prism {
+  0%, 100% { filter: hue-rotate(0deg); opacity: 0.55; }
+  50% { filter: hue-rotate(60deg); opacity: 0.8; }
+}
+.fx-prism { animation: fx-prism 5s ease-in-out infinite; }
+
+/* ---------------------------------------------------------------------------
+   CapCut Pro pack — texto animado (templates in/out). Applied to the preview
+   text element; keyed on preset+text so it replays when changed.
+   --------------------------------------------------------------------------- */
+@keyframes at-pop {
+  0% { transform: scale(0.4); opacity: 0; }
+  60% { transform: scale(1.12); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.at-pop { animation: at-pop 0.7s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+@keyframes at-slide {
+  0% { transform: translateY(40%); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+.at-slide { animation: at-slide 0.6s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+@keyframes at-bounce {
+  0% { transform: translateY(-60%) scale(0.9); opacity: 0; }
+  55% { transform: translateY(10%) scale(1.05); opacity: 1; }
+  75% { transform: translateY(-4%) scale(0.98); }
+  100% { transform: translateY(0) scale(1); }
+}
+.at-bounce { animation: at-bounce 0.9s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+
+@keyframes at-glow {
+  0%, 100% { text-shadow: 0 0 6px currentColor, 0 0 14px currentColor; }
+  50% { text-shadow: 0 0 12px currentColor, 0 0 30px currentColor, 0 0 44px currentColor; }
+}
+.at-glow { animation: at-glow 1.6s ease-in-out infinite; }
+
+@keyframes at-wave {
+  0%, 100% { transform: translateY(0) rotate(-1deg); }
+  50% { transform: translateY(-8%) rotate(1deg); }
+}
+.at-wave { animation: at-wave 2s ease-in-out infinite; }
+
+/* Typewriter: reveal width with a blinking caret (steps count = ~char count). */
+@keyframes at-typewriter {
+  from { width: 0; }
+  to { width: 100%; }
+}
+.at-typewriter {
+  display: inline-block;
+  overflow: hidden;
+  white-space: nowrap;
+  border-right: 2px solid currentColor;
+  animation: at-typewriter 2s steps(24, end) both, caret-blink 0.8s step-end infinite;
+}
+
+/* Loop toggle for the animated-text presets that play once by default. Declared
+   after the .at-* rules so the longhand iteration-count wins over the shorthand. */
+.at-loop { animation-iteration-count: infinite; }
+
+/* ---------------------------------------------------------------------------
+   Caption entrance animations (editor: legenda → "Animação de entrada").
+   Applied to the caption element/words; keyed on the text so each new caption
+   replays. Karaokê staggers a pop per word via inline animation-delay.
+   --------------------------------------------------------------------------- */
+@keyframes cap-anim-pop {
+  0% { transform: scale(0.6); opacity: 0; }
+  60% { transform: scale(1.08); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.cap-anim-pop { animation: cap-anim-pop 0.45s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+@keyframes cap-anim-slide {
+  0% { transform: translateY(45%); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+.cap-anim-slide { animation: cap-anim-slide 0.4s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+@keyframes cap-kara {
+  0% { transform: translateY(20%) scale(0.9); opacity: 0.25; }
+  100% { transform: translateY(0) scale(1); opacity: 1; }
+}
+.cap-kara { display: inline-block; animation: cap-kara 0.3s ease both; }
+
+/* ---------------------------------------------------------------------------
+   LIGHT THEME REMAP — components use flat dark-only utilities (text-white,
+   text-zinc-*, bg-white/*, ...) with no dark: variants. Under data-theme=light
+   we remap the ink scale + white-alpha decorations so everything stays legible.
+   The [data-theme="light"] prefix wins on specificity; accents (violet/fuchsia/
+   emerald/rose) are intentionally left untouched.
+   --------------------------------------------------------------------------- */
+
+/* Line color modifier (bake per-theme alpha; the /50 utility can't be derived
+   from a raw var() color, so it's overridden explicitly for both themes). */
+.border-line\/50 { border-color: var(--line-50); }
+
+/* Text ink scale */
+:root[data-theme="light"] .text-white { color: #0b0b12; }
+:root[data-theme="light"] .hover\:text-white:hover { color: #0b0b12; }
+:root[data-theme="light"] .group:hover .group-hover\:text-white { color: #0b0b12; }
+:root[data-theme="light"] .text-zinc-100 { color: #18181b; }
+:root[data-theme="light"] .text-zinc-200 { color: #27272a; }
+:root[data-theme="light"] .text-zinc-300 { color: #3f3f46; }
+:root[data-theme="light"] .text-zinc-400 { color: #52525b; }
+:root[data-theme="light"] .text-zinc-500 { color: #71717a; }
+:root[data-theme="light"] .text-zinc-600 { color: #a1a1aa; }
+:root[data-theme="light"] .text-zinc-700 { color: #c4c4cc; }
+
+/* Placeholders */
+:root[data-theme="light"] .placeholder\:text-zinc-500::placeholder { color: #71717a; }
+:root[data-theme="light"] .placeholder\:text-zinc-600::placeholder { color: #a1a1aa; }
+
+/* White-alpha decorative backgrounds → dark-ink equivalents */
+:root[data-theme="light"] .bg-white\/5 { background-color: rgba(9, 9, 20, 0.05); }
+:root[data-theme="light"] .bg-white\/10 { background-color: rgba(9, 9, 20, 0.08); }
+:root[data-theme="light"] .bg-white\/15 { background-color: rgba(9, 9, 20, 0.1); }
+:root[data-theme="light"] .hover\:bg-white\/5:hover { background-color: rgba(9, 9, 20, 0.05); }
+:root[data-theme="light"] .hover\:bg-white\/10:hover { background-color: rgba(9, 9, 20, 0.08); }
+
+/* White-alpha rings / borders */
+:root[data-theme="light"] .ring-white\/20 { --tw-ring-color: rgba(9, 9, 20, 0.18); }
+:root[data-theme="light"] .ring-white\/10 { --tw-ring-color: rgba(9, 9, 20, 0.1); }
+:root[data-theme="light"] .border-white\/10 { border-color: rgba(9, 9, 20, 0.1); }
+
+/* Skeleton shimmer (white→white gradient is invisible on light) — repaint it.
+   Targets exactly the Skeleton element (all three classes present). */
+:root[data-theme="light"] .from-white\/5.via-white\/10.to-white\/5 {
+  background-image: linear-gradient(
+    to right,
+    rgba(9, 9, 20, 0.04),
+    rgba(9, 9, 20, 0.09),
+    rgba(9, 9, 20, 0.04)
+  );
+}
+
+/* ---------------------------------------------------------------------------
+   PRINT — "Exportar Raio-X em PDF" (window.print). Hides app chrome (.no-print),
+   forces paper-friendly colors and lays the report out full-width. Recharts SVG
+   keeps its inline fill/stroke colors, so the retention chart still prints.
+   --------------------------------------------------------------------------- */
+@media print {
+  .no-print { display: none !important; }
+
+  html, body {
+    background: #fff !important;
+  }
+  body {
+    background-image: none !important;
+    color: #18181b !important;
+  }
+  main {
+    padding: 0 !important;
+  }
+
+  .print-report {
+    max-width: 100% !important;
+    margin: 0 !important;
+  }
+  .print-report [class*="bg-surface"],
+  .print-report .bg-surface-1,
+  .print-report .bg-surface-2 {
+    background: #fff !important;
+  }
+  .print-report [class*="border-line"],
+  .print-report .border-line {
+    border-color: #d4d4d8 !important;
+  }
+  .print-report .text-white,
+  .print-report .text-zinc-100,
+  .print-report .text-zinc-200,
+  .print-report .text-zinc-300 {
+    color: #18181b !important;
+  }
+  .print-report .text-zinc-400,
+  .print-report .text-zinc-500,
+  .print-report .text-zinc-600 {
+    color: #52525b !important;
+  }
+  .print-report .rounded-2xl,
+  .print-report .rounded-xl,
+  .print-report .avoid-break {
+    break-inside: avoid;
+  }
+
+  @page {
+    margin: 1.4cm;
+  }
+}

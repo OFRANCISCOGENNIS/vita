@@ -1,0 +1,30 @@
+# deps
+node_modules/
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# builds
+.next/
+out/
+dist/
+*.egg-info/
+
+# env & local
+.env
+.env.local
+*.local
+
+# media / artefatos
+*.mp4
+*.mov
+*.mkv
+*.webm
+uploads/
+renders/
+
+# IDE / SO
+.DS_Store
+.idea/
+.vscode/

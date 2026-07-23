@@ -1,0 +1,22 @@
+{
+  "name": "Vitα — Saúde, Performance e Nutrição",
+  "short_name": "Vitα",
+  "description": "Plataforma determinística de saúde, treino, nutrição e evolução. Funciona offline.",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "background_color": "#0B0E14",
+  "theme_color": "#0B0E14",
+  "orientation": "any",
+  "lang": "pt-BR",
+  "categories": ["health", "fitness", "lifestyle"],
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Dashboard", "url": "./?v=dash" },
+    { "name": "Treino", "url": "./?v=train" },
+    { "name": "Metas SMART", "url": "./?v=objetivos" },
+    { "name": "Diário alimentar", "url": "./?v=diario" }
+  ]
+}
