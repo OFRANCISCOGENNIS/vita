@@ -4444,12 +4444,13 @@ Prox:
 PulaConta:
     Next r
 
-    Dim outp() As Variant: ReDim outp(0 To nKeep, 1 To 13)
+    Dim outp() As Variant: ReDim outp(0 To nKeep, 1 To 14)
     outp(0, 1) = "PEP4NIVEL": outp(0, 2) = "PEP3": outp(0, 3) = "TIPO_PEP"
     outp(0, 4) = "CLASSE_CUSTO": outp(0, 5) = "MATERIAL": outp(0, 6) = "TEXTO_MATERIAL"
     outp(0, 7) = "UML": outp(0, 8) = "QTD_ENTRADA": outp(0, 9) = "VALOR_MOEDA"
     outp(0, 10) = "CLASSIFICACAO": outp(0, 11) = "CLS2"
     outp(0, 12) = "PRECO_UNITARIO": outp(0, 13) = "ADERENCIA"
+    outp(0, 14) = "SITUACAO"
 
     Dim rr As Long: rr = 0
     For r = 0 To dFirst.Count - 1
@@ -4487,10 +4488,43 @@ PulaConta:
         Else
             outp(rr, 13) = IIf(q < 0 Or val < 0, "NAO ADERENTE", "ADERENTE")
         End If
+        ' SITUACAO de correcao (1..9) por QTD/VALOR e tipo de PEP
+        outp(rr, 14) = SituacaoCorrecao(q, val, TipoPEPCodigo(pep))
 PulaLin:
     Next r
     EscreverAba "MATERIAL", outp
 End Sub
+
+' Classifica a linha de material em uma das 9 SITUACOES de correcao, conforme
+' o sinal de QTD e VALOR e o tipo de PEP. tp = codigo do PEP (I/D/M/S):
+'   D = ODD ; I/M/S = ODI/ODM/ODS. Combos nao previstos retornam "".
+'   Situacoes 4 e 5 exigem PU > 0 ; situacao 8 exige PU < 0.
+Private Function SituacaoCorrecao(ByVal q As Double, ByVal v As Double, ByVal tp As String) As String
+    q = Round(q, 2): v = Round(v, 2)
+    Dim odd As Boolean: odd = (tp = "D")
+    Dim outros As Boolean: outros = Not odd          ' ODI / ODM / ODS
+    SituacaoCorrecao = ""
+    If q = 0 And v = 0 Then Exit Function            ' NULO (nem entra na aba)
+
+    If q < 0 And v < 0 Then
+        If outros Then SituacaoCorrecao = "1 - QTD NEGATIVA/VLR NEGATIVO"
+    ElseIf q = 0 And v < 0 Then
+        SituacaoCorrecao = "2 - QTD ZERO/VLR NEGATIVO"
+    ElseIf q < 0 And v > 0 Then
+        SituacaoCorrecao = IIf(odd, "8 - QTD NEGATIVA/VLR POSITIVA - ODD (PU < 0)", _
+                                    "3 - QTD NEGATIVA/VLR POSITIVA")
+    ElseIf q > 0 And v = 0 Then
+        SituacaoCorrecao = IIf(odd, "9 - QTD POSITIVA/VLR ZERO - ODD", _
+                                    "4 - QTD POSITIVA/VLR ZERO (PU > 0)")
+    ElseIf q > 0 And v < 0 Then
+        If outros Then SituacaoCorrecao = "5 - QTD POSITIVA/VLR NEGATIVO (PU > 0)"
+    ElseIf q = 0 And v > 0 Then
+        SituacaoCorrecao = "6 - QTD ZERO/VLR POSITIVA"
+    ElseIf q < 0 And v = 0 Then
+        SituacaoCorrecao = "7 - QTD NEGATIVA/VLR ZERO"
+    End If
+    ' q > 0 e v > 0 -> lancamento normal, sem situacao de correcao
+End Function
 
 
 
@@ -5132,6 +5166,7 @@ Private Sub Gerar_Regras()
     s = s & "OBSERVACOES|Motivo do REPROVADO (OBS1)|A coluna OBS1 da aba MATERIAL vs SERVICO traz o motivo da linha: familia UC fora da margem (com MAT/SRV) e, na propagacao, qual ODI reprovou e quais familias (ou ODI sem UC)." & vbLf
     s = s & "OBSERVACOES|Veredito do PEP3 (OBS2)|A coluna OBS2 repete em TODAS as linhas do PEP3 o motivo do veredito: APROVADO (nenhuma familia UC fora da margem) ou REPROVADO (com o motivo agregado)." & vbLf
     s = s & "FILTRAGEM|Linhas NULO ignoradas|Linhas com MAT = 0 e SRV = 0 (NULO) nao sao trazidas para a aba MATERIAL vs SERVICO." & vbLf
+    s = s & "ABA MATERIAL|SITUACAO (1..9)|Classifica a linha em uma das 9 situacoes de correcao por QTD/VALOR e tipo de PEP. 1:QTD<0/VLR<0 (ODI/ODM/ODS); 2:QTD=0/VLR<0 (todos); 3:QTD<0/VLR>0 (ODI/ODM/ODS); 4:QTD>0/VLR=0 (ODI/ODM/ODS, PU>0); 5:QTD>0/VLR<0 (ODI/ODM/ODS, PU>0); 6:QTD=0/VLR>0 (todos); 7:QTD<0/VLR=0 (todos); 8:QTD<0/VLR>0 (ODD, PU<0); 9:QTD>0/VLR=0 (ODD). QTD>0/VLR>0 = lancamento normal (sem situacao)." & vbLf
     s = s & "ABA SERVICO|Unidade de medida (UND)|Preferencia: UML do proprio lancamento SAP; se vazio, usa a unidade (UN) do catalogo SERVICOS_ATUAIS pelo COD_SERVICO." & vbLf
     s = s & "ABA SERVICO|ALERTA_VALOR|Check automatico de valor do servico: VALOR e/ou QTD negativos sao sinalizados; caso contrario OK." & vbLf
     s = s & "ABA SERVICO|APROPRIACAO|Check automatico de apropriacao: TIPO_APLICACAO ODI* lancado em PEP .D (ou ODD* em .I) -> VERIFICAR; fallback por palavra-chave (INST em ODD, RET/DESATIV em ODI)." & vbLf
