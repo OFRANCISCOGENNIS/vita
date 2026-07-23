@@ -771,6 +771,7 @@ h1.title{font-size:clamp(26px,3vw,34px);font-weight:800;letter-spacing:-.02em;ma
           <option value="abc">A/B/C — Empurrar · Puxar · Pernas</option>
           <option value="abcd">A/B/C/D — Peito+Trí · Costas+Bí · Pernas · Ombros</option>
           <option value="abcde">A/B/C/D/E — Peito · Costas · Pernas · Ombros · Braços</option>
+          <option value="gluteo">🍑 Glúteo & posterior — foco feminino (2 dias de glúteo/sem)</option>
         </select>
       </div>
       <div class="pbreak">📏 Medidas corporais · cm (o valor cinza é a última medição)</div>
@@ -1401,7 +1402,14 @@ const EX=[
   {c:"BENCH_DIP",n:"Mergulho no banco",mu:"Tríceps",mp:"triceps",eq:["bodyweight"],lv:0,comp:1,ctr:["shoulder"],cue:"Mãos no banco atrás do corpo, pernas à frente. Desça flexionando os cotovelos até ~90°; suba estendendo — não afunde os ombros."},
   {c:"KICKBACK",n:"Tríceps coice",mu:"Tríceps",mp:"triceps",eq:["dumbbell"],lv:0,comp:0,ctr:[],cue:"Tronco inclinado, cotovelo alto e fixo ao lado do corpo. Estenda o cotovelo até a contração total do tríceps; volte devagar."},
   {c:"CABLE_OH_EXT",n:"Tríceps francês na polia",mu:"Tríceps",mp:"triceps",eq:["cable"],lv:1,comp:0,ctr:["shoulder"],cue:"De costas para a polia baixa, corda atrás da cabeça. Estenda acima da cabeça — a cabeça longa trabalha alongada; controle a volta."},
+  {c:"GLUTE_KICK",n:"Coice de glúteo na polia",mu:"Glúteos",mp:"glute",eq:["cable"],lv:0,comp:0,ctr:[],cue:"Tornozeleira na polia baixa, tronco levemente à frente. Estenda o quadril para trás e cima contraindo o glúteo no topo; controle a volta sem arquear a lombar."},
+  {c:"HIP_ABD",n:"Cadeira abdutora",mu:"Glúteos",mp:"glute",eq:["machine"],lv:0,comp:0,ctr:[],cue:"Sentada, joelhos contra os apoios. Abra as pernas contraindo o glúteo médio; volte devagar sem deixar bater. Incline o tronco à frente para enfatizar o glúteo."},
+  {c:"FROG_PUMP",n:"Frog pump (glúteo)",mu:"Glúteos",mp:"glute",eq:["bodyweight","dumbbell"],lv:0,comp:0,ctr:[],cue:"Deitada, plantas dos pés juntas e joelhos abertos. Eleve o quadril contraindo o glúteo no topo 1s; desça controlando — excelente ativador do glúteo."},
+  {c:"GOOD_MORNING",n:"Good morning",mu:"Posteriores",mp:"hinge",eq:["barbell"],lv:2,comp:1,ctr:["lumbar"],cue:"Barra no trapézio, joelhos levemente flexionados. Empurre o quadril para trás com a coluna neutra até alongar o posterior; suba contraindo glúteo e posterior."},
+  {c:"CABLE_PULLTHRU",n:"Pull-through na polia",mu:"Glúteos",mp:"hinge",eq:["cable"],lv:0,comp:1,ctr:[],cue:"De costas para a polia baixa, corda entre as pernas. Empurre o quadril para trás e estenda projetando o quadril à frente, apertando o glúteo no fim — sem hiperestender a lombar."},
 ];
+// exercícios priorizados no split de foco feminino (rank maior = escolhido primeiro; hip thrust no topo)
+const GPRIO={HIP_THRUST:5,DB_RDL:4,CONV_DEADLIFT:4,SUMO_SQUAT:4,BULGARIAN:3,CABLE_PULLTHRU:3,GOOD_MORNING:3,GLUTE_KICK:2,HIP_ABD:2,FROG_PUMP:2};
 const EQLBL={barbell:"Barra",dumbbell:"Halteres",machine:"Máquina",cable:"Polia",bodyweight:"Peso corporal",kettlebell:"Kettlebell"};
 const LVLBL=["Iniciante","Intermediário","Avançado"];
 /* ---- demonstração animada do movimento (pictograma 2 quadros, tipo GIF, 100% offline) ---- */
@@ -1435,6 +1443,8 @@ const EXDEMOS={
   quad:[`<line class="fig" x1="52" y1="92" x2="52" y2="60" style="stroke:var(--border);stroke-width:6"/><circle class="hd" cx="58" cy="26" r="6"/><line class="fig" x1="58" y1="33" x2="58" y2="58"/><polyline class="fig" points="58,58 76,60"/><polyline class="fig" points="76,60 76,86"/><line class="fig ld" x1="70" y1="84" x2="82" y2="84"/>`,
    `<line class="fig" x1="52" y1="92" x2="52" y2="60" style="stroke:var(--border);stroke-width:6"/><circle class="hd" cx="58" cy="26" r="6"/><line class="fig" x1="58" y1="33" x2="58" y2="58"/><polyline class="fig" points="58,58 76,60"/><polyline class="fig" points="76,60 100,58"/><line class="fig ld" x1="98" y1="52" x2="102" y2="64"/>`],
 };
+EXDEMOS.glute=[`<circle class="hd" cx="26" cy="70" r="6"/><polyline class="fig" points="32,70 58,72"/><polyline class="fig ld" points="58,72 78,72"/><polyline class="fig" points="78,72 92,88"/><polyline class="fig" points="78,72 100,84"/>`,
+ `<circle class="hd" cx="26" cy="66" r="6"/><polyline class="fig" points="32,66 58,56"/><polyline class="fig ld" points="58,56 80,54"/><polyline class="fig" points="80,54 92,84"/><polyline class="fig" points="80,54 100,80"/>`];
 EXDEMOS.shrug=[`<circle class="hd" cx="66" cy="20" r="6"/><line class="fig" x1="66" y1="27" x2="66" y2="58"/><polyline class="fig" points="66,32 54,56"/><polyline class="fig" points="66,32 78,56"/><line class="fig ld" x1="48" y1="58" x2="58" y2="58"/><line class="fig ld" x1="74" y1="58" x2="84" y2="58"/><polyline class="fig" points="66,58 60,77 60,94"/><polyline class="fig" points="66,58 72,77 72,94"/>`,
  `<circle class="hd" cx="66" cy="15" r="6"/><line class="fig" x1="66" y1="22" x2="66" y2="58"/><polyline class="fig" points="66,26 54,50"/><polyline class="fig" points="66,26 78,50"/><line class="fig ld" x1="48" y1="52" x2="58" y2="52"/><line class="fig ld" x1="74" y1="52" x2="84" y2="52"/><polyline class="fig" points="66,58 60,77 60,94"/><polyline class="fig" points="66,58 72,77 72,94"/>`];
 function EXDEMO(mp){const D=EXDEMOS[mp]||EXDEMOS.squat;return `<svg class="exdemo" viewBox="0 0 132 104" role="img" aria-label="demonstração animada do movimento"><line class="gnd" x1="8" y1="96" x2="124" y2="96"/><g class="f1">${D[0]}</g><g class="f2">${D[1]}</g></svg>`;}
@@ -1452,18 +1462,20 @@ function levelName(lvl){for(const[t,n]of LVLNAMES)if(lvl>=t)return n;return"Inic
 function isoWeek(dstr){const d=new Date(dstr+"T12:00:00");const t=new Date(d);t.setDate(t.getDate()+3-((t.getDay()+6)%7));const w1=new Date(t.getFullYear(),0,4);return t.getFullYear()*100+(1+Math.round(((t-w1)/864e5-3+((w1.getDay()+6)%7))/7));}
 const SPLITS={1:["full"],2:["full","full"],3:["full","full","full"],4:["upper","lower","upper","lower"],5:["push","pull","legs","upper","lower"],6:["push","pull","legs","push","pull","legs"]};
 const DAYPAT={full:["squat","push_h","pull_h","hinge","push_v","core"],upper:["push_h","pull_h","push_v","pull_v","sdelt","triceps","biceps"],lower:["squat","hinge","quad","ham","calf","core"],push:["push_h","push_v","push_h","sdelt","triceps"],pull:["pull_v","pull_h","pull_v","rdelt","biceps"],legs:["squat","hinge","quad","ham","calf","core"],
-  chesttri:["push_h","push_h","push_h","triceps","triceps","core"],backbi:["pull_v","pull_h","pull_h","biceps","biceps"],shoulders:["push_v","sdelt","sdelt","rdelt","core"],chest:["push_h","push_h","push_h","push_h","core"],back:["pull_v","pull_h","pull_v","pull_h","shrug"],arms:["biceps","triceps","biceps","triceps","biceps","triceps"]};
+  chesttri:["push_h","push_h","push_h","triceps","triceps","core"],backbi:["pull_v","pull_h","pull_h","biceps","biceps"],shoulders:["push_v","sdelt","sdelt","rdelt","core"],chest:["push_h","push_h","push_h","push_h","core"],back:["pull_v","pull_h","pull_v","pull_h","shrug"],arms:["biceps","triceps","biceps","triceps","biceps","triceps"],
+  glutes:["hinge","glute","squat","glute","hinge","core"],lowerf:["squat","hinge","glute","quad","ham","calf"]};
 // divisões clássicas escolhíveis (A/B, A/B/C, A/B/C/D, A/B/C/D/E) — ciclam pelos dias da semana
-const SPLITMAP={ab:["upper","lower"],abc:["push","pull","legs"],abcd:["chesttri","backbi","legs","shoulders"],abcde:["chest","backbi","legs","shoulders","arms"]};
+const SPLITMAP={ab:["upper","lower"],abc:["push","pull","legs"],abcd:["chesttri","backbi","legs","shoulders"],abcde:["chest","backbi","legs","shoulders","arms"],gluteo:["glutes","upper","lowerf","glutes","upper"]};
 // lo/hi: faixa de reps composto; ilo/ihi: isolado (reps mais altas). rc: descanso composto; ri: isolado.
 const GP={hypertrophy:{lo:6,hi:12,ilo:10,ihi:15,rc:150,ri:75},strength:{lo:3,hi:6,ilo:8,ihi:12,rc:180,ri:90},fat_loss:{lo:8,hi:15,ilo:12,ihi:20,rc:120,ri:60},maintenance:{lo:8,hi:15,ilo:10,ihi:15,rc:120,ri:60}};
-const DAYNAME={full:"Corpo inteiro",upper:"Superior",lower:"Inferior",push:"Empurrar",pull:"Puxar",legs:"Pernas",chesttri:"Peito + Tríceps",backbi:"Costas + Bíceps",shoulders:"Ombros",chest:"Peito",back:"Costas",arms:"Braços"};
+const DAYNAME={full:"Corpo inteiro",upper:"Superior",lower:"Inferior",push:"Empurrar",pull:"Puxar",legs:"Pernas",chesttri:"Peito + Tríceps",backbi:"Costas + Bíceps",shoulders:"Ombros",chest:"Peito",back:"Costas",arms:"Braços",glutes:"Glúteos + Posterior",lowerf:"Inferior completo"};
 const LEVEL_SETS=[2,3,4]; // iniciante/intermediário/avançado: volume base por série
 // equipment: equipamentos; conditions: lesões; level: 0/1/2 (iniciante→avançado)
 function workoutPlan(p,equipment,conditions,level=1){
   level=Math.max(0,Math.min(+level||0,2));
   const days=Math.min(Math.max(p.days,1),6);
   const custom=p.split&&SPLITMAP[p.split];
+  const gfocus=p.split==="gluteo";
   const split=custom?Array.from({length:days},(_,i)=>custom[i%custom.length]):SPLITS[days];
   const gp=GP[p.goal]||GP.maintenance;const sets=LEVEL_SETS[level];
   const pool=EX.filter(e=>e.eq.some(x=>equipment.includes(x))&&!e.ctr.some(c=>conditions.includes(c)));
@@ -1472,7 +1484,7 @@ function workoutPlan(p,equipment,conditions,level=1){
     const pats=DAYPAT[dt];const items=[];
     for(const pat of pats){
       // preferir exercícios ≤ nível do usuário (iniciante evita avançados); recorre a mais difíceis só se o padrão ficaria vazio
-      let cands=pool.filter(e=>e.mp===pat&&!items.some(x=>x.n===e.n)).sort((a,b)=>((a.lv<=level?0:1)-(b.lv<=level?0:1))||b.comp-a.comp||(usage.get(a.c)||0)-(usage.get(b.c)||0)||a.c.localeCompare(b.c));
+      let cands=pool.filter(e=>e.mp===pat&&!items.some(x=>x.n===e.n)).sort((a,b)=>((a.lv<=level?0:1)-(b.lv<=level?0:1))||(gfocus?((GPRIO[b.c]||0)-(GPRIO[a.c]||0)):0)||b.comp-a.comp||(usage.get(a.c)||0)-(usage.get(b.c)||0)||a.c.localeCompare(b.c));
       if(!cands[0])cands=pool.filter(e=>e.mp===pat); // sem inédito no padrão → aceita repetir
       if(!cands[0])continue;const e=cands[0];usage.set(e.c,(usage.get(e.c)||0)+1);
       const iso=!e.comp;const lo=iso?(gp.ilo||gp.lo):gp.lo,hi=iso?(gp.ihi||gp.hi):gp.hi;
@@ -3324,6 +3336,29 @@ function render(){
     <div class="trcal">${calDays.map(d=>`<button class="trday ${d.tr?"tr":""} ${d.today?"td":""} ${d.future?"fut":""}" ${d.future?"disabled":`data-trainmark="${d.ds}"`} title="${d.ds.split("-").reverse().join("/")}">${d.n}</button>`).join("")}</div>
     <div class="src" style="margin-top:10px">Dias com séries registradas já aparecem em verde automaticamente. Marque manualmente treinos feitos fora do app (ex.: corrida, quadra).</div></div>`;
 
+  // ================= TREINO COM FOCO FEMININO (evidência) + CICLO (opcional, honesto) =================
+  const cardFem=`<div class="card span-6"><h3>🍑 Treino com foco feminino <span class="pill accent">glúteos & posterior</span></h3><div class="cap">baseado em evidência — hipertrofia de glúteo e prevenção de lesão de LCA (Frontiers 2025 · Plotkin 2024)</div>
+    <div class="src" style="font-size:12.5px;line-height:1.75;color:var(--text)">
+    • <b>Hip thrust (elevação pélvica)</b> é o exercício mais glúteo-específico e o que mais aumenta a espessura do glúteo — priorize-o (+9,3% vs +6% sem ele).<br>
+    • Combine com <b>terra romeno (RDL)</b>, <b>búlgaro</b>, <b>abdutora</b>, <b>coice</b> e <b>pull-through</b> — o glúteo tolera volume alto (MEV 4 / MRV 16 séries/sem).<br>
+    • Mulheres têm <b>até 8× mais risco de lesão de LCA</b> — fortalecer posterior e glúteo protege o joelho.<br>
+    • Ganho de músculo e perda de gordura ocorrem <b>em qualquer idade e fase hormonal</b> — consistência acima de tudo.<br>
+    • Atenção a <b>ferro/ferritina</b> (meta feminina de ferro: 18 mg/dia vs 8 no homem) para energia e recuperação.
+    </div>
+    <div class="src" style="margin-top:8px">👉 Selecione a divisão <b>🍑 Glúteo & posterior</b> no seu perfil para <b>2 dias de glúteo por semana</b> com o hip thrust automaticamente priorizado.</div></div>`;
+  const cyStart=_pt&&_pt.cycleStart,cyLen=(_pt&&_pt.cycleLen)||28;
+  let cyDay=null,cyPhase="",cyTip="";
+  if(cyStart){const dd=Math.floor((new Date(dT0+"T12:00:00")-new Date(cyStart+"T12:00:00"))/864e5);if(dd>=0){cyDay=(dd%cyLen)+1;
+    if(cyDay<=5){cyPhase="Menstruação";cyTip="Com cólica/fadiga: reduza volume sem culpa e priorize técnica. Sem sintomas, treine normalmente — não há proibição.";}
+    else if(cyDay<=13){cyPhase="Folicular";cyTip="A força tende a render bem (estrogênio em alta) — bom momento para cargas pesadas e tentar recordes. Guia de percepção, não regra.";}
+    else if(cyDay<=16){cyPhase="Ovulação";cyTip="Energia costuma alta; redobre a técnica em agachamento e terra (maior frouxidão ligamentar → cuidado extra com o joelho/LCA).";}
+    else{cyPhase="Lútea / pré-TPM";cyTip="Percepção de esforço e retenção podem subir perto da TPM — manter o treino melhora humor e sintomas; ajuste o volume conforme como você se sente.";}
+  }}
+  const cardCycle=`<div class="card span-6"><h3>Treino & ciclo menstrual <span class="pill">opcional</span></h3><div class="cap">honesto: periodizar pelo ciclo ainda tem evidência limitada — use como guia de percepção, não regra rígida</div>
+    <div class="logadd" style="margin-bottom:8px;flex-wrap:wrap"><input class="wnum" type="date" data-cyclestart value="${cyStart||""}" aria-label="1º dia da última menstruação"><select class="wnum" data-cyclelen style="width:auto">${[26,28,30,32].map(n=>`<option value="${n}" ${cyLen===n?"selected":""}>ciclo ${n} d</option>`).join("")}</select></div>
+    ${cyDay?`<div class="calcout"><div class="cores"><div class="k">Dia do ciclo</div><div class="v tnum">${cyDay}</div><div class="meta">${cyPhase}</div></div></div><div class="src" style="margin-top:10px">${cyTip}</div>`:`<div class="src">Informe o 1º dia da última menstruação para ver a fase estimada e uma orientação de percepção. Nada sai do aparelho.</div>`}
+    <div class="src" style="margin-top:8px">Consenso atual (Frontiers 2023; NSCA 2025): os ganhos de força e músculo ocorrem <b>independentemente da fase</b> — treine bem sempre e regule o volume pela sua sensação.</div></div>`;
+
   // ---- SUPLEMENTAÇÃO OPCIONAL: sugestão determinística por lacunas do paciente ----
   const supActive=(_pt&&_pt.supps)||[];
   const proteinHard=m.protein>=p.weightKg*1.8;
@@ -3363,7 +3398,7 @@ function render(){
     week:{title:"Semana",sub:"7 dias com rotação determinística de fontes + lista de compras agregada.",html:cardWeek+cardShop},
     diario:{title:"Diário alimentar",sub:"Fotografe a refeição ou registre o consumo real; a Análise passa a usar o que foi comido, não o plano.",html:cardMealPhoto+cardDiary+cardIntake},
     analise:{title:"Análise de precisão",sub:"Micronutrientes vs DRI, qualidade proteica (PDCAAS), leucina por refeição, carga glicêmica e lacunas com fontes alimentares.",html:cardMicros+cardProtQual+cardProtDist+cardGL+cardSupp+cardSupps+cardEvid+cardMacros},
-    train:{title:"Treino",sub:"Split por frequência com isolamento direto de braços/panturrilha, calendário de treinos, volume graduado por landmarks, base aeróbica e biblioteca de exercícios.",html:cardWorkoutMain+cardTrainCal+cardVolume+cardZone2+cardExLib+cardReady+cardTrend},
+    train:{title:"Treino",sub:"Split por frequência com isolamento direto de braços/panturrilha, calendário de treinos, volume graduado por landmarks, base aeróbica e biblioteca de exercícios.",html:cardWorkoutMain+cardTrainCal+cardFem+(p.sex==="F"?cardCycle:"")+cardVolume+cardZone2+cardExLib+cardReady+cardTrend},
     calc:{title:"Calculadoras",sub:"1RM, zonas de FC, pace, gasto calórico e VO₂máx — todas determinísticas.",html:cardCalc+cardBody},
     labs:{title:"Exames",sub:"Comparação com faixas de referência + tendência entre exames — educativo, nunca prescreve.",html:cardCheckup+cardLabs+cardLabSummary+cardLabTrend},
     habits:{title:"Hábitos",sub:"Checklist diário, sequência, conquistas e nível — tudo por regras determinísticas.",html:cardHabits+cardWater+cardStreak+cardGami+cardCoach},
@@ -3512,6 +3547,8 @@ $("#views").addEventListener("change",e=>{
   const pf=e.target.closest("#photofile");if(pf&&pf.files&&pf.files[0]){handlePhotoFile(pf.files[0],($("#photopose")||{value:"frente"}).value);pf.value="";return;}
   const wf=e.target.closest("#wearfile");if(wf&&wf.files&&wf.files[0]){const fr=new FileReader();fr.onload=()=>importWearableText(fr.result);fr.readAsText(wf.files[0]);wf.value="";return;}
   const mpf=e.target.closest("#mealphoto");if(mpf&&mpf.files&&mpf.files[0]){handleMealPhoto(mpf.files[0]);mpf.value="";return;}
+  const cys=e.target.closest("[data-cyclestart]");if(cys){pUpdate(p=>{p.cycleStart=cys.value||undefined;});render();return;}
+  const cyl=e.target.closest("[data-cyclelen]");if(cyl){pUpdate(p=>{p.cycleLen=+cyl.value;});render();return;}
   const lms=e.target.closest("#lockminSel");if(lms){secSet({lockMin:+lms.value});secLog("bloqueio automático: "+(+lms.value?lms.value+" min":"desligado"));return;}
   const ef=e.target.closest("#encfile");if(ef&&ef.files&&ef.files[0]){const pw=(document.querySelector("#encpass2")||{}).value||"";encRestore(ef.files[0],pw);ef.value="";return;}
   const msl=e.target.closest("[data-mpsel]");if(msl){const f=FOODS.find(x=>x.n===msl.value);const box=document.querySelector('[data-mpmeas="'+msl.dataset.mpsel+'"]');if(box&&f)box.innerHTML=measChipsPhoto(msl.dataset.mpsel,f.c);return;}
