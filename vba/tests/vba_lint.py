@@ -126,6 +126,87 @@ for ln, full_text in logical:
 for t, oln in stack:
     errors.append((oln, f"Bloco '{t}' aberto e nunca fechado"))
 
+# --- 4) Escopo por procedimento: declaracao duplicada e uso antes do Dim ---
+# Reproduz dois erros de compilacao do VBA que a analise de blocos nao pega:
+#   "Declaracao duplicada no escopo atual" e "Variavel nao definida".
+PARAM_SPLIT = re.compile(r'^\s*(?:Optional\s+)?(?:ByVal\s+|ByRef\s+|ParamArray\s+)?([A-Za-z_]\w*)', re.I)
+DIM_RE = re.compile(r'(?:^|[^A-Za-z_.])(?:Dim|Const|Static)\s+([A-Za-z_]\w*)', re.I)
+USE_RE = re.compile(r'(?<![A-Za-z0-9_.])([A-Za-z_]\w*)(?![A-Za-z0-9_])')
+
+def parse_params(sig):
+    k = sig.find("(")
+    if k < 0:
+        return []
+    depth, end = 0, -1
+    for j in range(k, len(sig)):
+        if sig[j] == "(":
+            depth += 1
+        elif sig[j] == ")":
+            depth -= 1
+            if depth == 0:
+                end = j; break
+    if end < 0:
+        return []
+    inner, parts, cur, d = sig[k+1:end], [], [], 0
+    for ch in inner:
+        if ch in "([":
+            d += 1; cur.append(ch)
+        elif ch in ")]":
+            d -= 1; cur.append(ch)
+        elif ch == "," and d == 0:
+            parts.append("".join(cur)); cur = []
+        else:
+            cur.append(ch)
+    parts.append("".join(cur))
+    names = []
+    for p in parts:
+        mp = PARAM_SPLIT.match(p)
+        if mp:
+            names.append(mp.group(1))
+    return names
+
+scope_errors = []
+cur_proc = None      # (nome, linha, {var_lower: linha}, [linhas do corpo])
+for ln, full_text in logical:
+    code = strip_code(full_text).strip()
+    if not code:
+        continue
+    m = DECL_RE.match(code)
+    if m and cur_proc is None:
+        declared = {}
+        for pname in parse_params(code):
+            declared[pname.lower()] = (ln, "parametro")
+        cur_proc = [m.group(2), ln, declared, []]
+        continue
+    if re.match(r'^\s*End\s+(Sub|Function|Property)\b', code, re.I) and cur_proc:
+        name, pln, declared, body = cur_proc
+        # uso antes do Dim (VBA: "Variavel nao definida" sob Option Explicit)
+        for bln, bcode in body:
+            if re.match(r'^\s*(Dim|Const|Static)\b', bcode, re.I):
+                continue
+            for mu in USE_RE.finditer(bcode):
+                lv = mu.group(1).lower()
+                if lv in declared:
+                    dln, kind = declared[lv]
+                    if kind == "dim" and bln < dln:
+                        scope_errors.append((bln, f"[{name}] '{mu.group(1)}' usado antes do Dim (linha {dln})"))
+        cur_proc = None
+        continue
+    if cur_proc:
+        name, pln, declared, body = cur_proc
+        for md in DIM_RE.finditer(code):
+            v = md.group(1)
+            lv = v.lower()
+            if lv in declared:
+                dln, kind = declared[lv]
+                origem = "parametro" if kind == "parametro" else f"Dim na linha {dln}"
+                scope_errors.append((ln, f"[{name}] declaracao duplicada de '{v}' (ja existe como {origem})"))
+            else:
+                declared[lv] = (ln, "dim")
+        body.append((ln, code))
+
+errors.extend(scope_errors)
+
 print(f"== Analise estatica: {PATH} ==")
 print(f"Linhas fisicas: {len(raw_lines)} | logicas: {len(logical)} | Procedimentos: {len(defined_procs)}")
 print()
@@ -135,7 +216,8 @@ if errors:
         print(f"  L{ln}: {msg}")
 else:
     print(">> ERROS ESTRUTURAIS: NENHUM. Blocos (Sub/Function/If/For/With/Do/Select/Type)")
-    print("   e aspas todos balanceados nas 2860 linhas.")
+    print(f"   e aspas balanceados nas {len(logical)} linhas logicas.")
+    print("   Sem declaracao duplicada e sem uso de variavel antes do Dim.")
 
 # procedimentos chamados via Call que nao existem
 unresolved = [(nm,ln) for nm,ln in called_names if nm not in defined_procs]

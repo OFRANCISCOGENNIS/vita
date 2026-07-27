@@ -1705,10 +1705,14 @@ Private Sub ProcessarAlertaCritico(wsBase As Worksheet, ws As Worksheet)
     Next c
     ws.Rows(1).RowHeight = 30
 
+    ' outRow e declarado ANTES do early-exit abaixo: o GoTo Finaliza2 pula a
+    ' secao de declaracoes seguinte, e Finaliza2 usa outRow para saber quantos
+    ' alertas foram gerados (totAl = outRow - 2).
+    Dim outRow As Long : outRow = 2
     Dim refCol As Long : refCol = idxPep4 : If refCol = 0 Then refCol = 1
     Dim lastRow As Long
     lastRow = wsBase.Cells(wsBase.Rows.Count, refCol).End(xlUp).Row
-    If lastRow < 2 Then outRow = 2 : GoTo Finaliza2
+    If lastRow < 2 Then GoTo Finaliza2
 
     Dim d As Variant
     d = wsBase.Range(wsBase.Cells(2, 1), wsBase.Cells(lastRow, lastC)).Value
@@ -1755,7 +1759,6 @@ Private Sub ProcessarAlertaCritico(wsBase As Worksheet, ws As Worksheet)
         End If
     Next i
 
-    Dim outRow As Long : outRow = 2
     Dim codMat As String, descMat As String, familia As String, famN As String
     Dim valor As Double, qtd As Double, unit As Double, refP As Double
 
