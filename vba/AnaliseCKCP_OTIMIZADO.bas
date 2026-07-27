@@ -4724,6 +4724,8 @@ Private Sub Gerar_AlertasCriticos()
         If UCase$(TipoDaClassif(cls2u, TextoCampo(i, cTexto))) = "UAR" Then dPepUAR(pep) = 1
 ProxUAR:
     Next i
+    ' dPepTemSrv: PEP4 que possuem pelo menos um servico lancado (com COD_SERVICO)
+    Dim dPepTemSrv As Object: Set dPepTemSrv = CreateObject("Scripting.Dictionary")
     For i = 1 To UBound(dados, 1)
         pep = Trim$(CStr(dados(i, cPEP))): If pep = "" Or dPepUAR.Exists(pep) Then GoTo PreCalc
         ' ODD (.D) nao exige material UC -> nao entra na secao A
@@ -4735,6 +4737,10 @@ ProxUAR:
             ' Fallback: familia sem TIPO -> usa CLS3 do catalogo (MAT. UC)
             If tUC = "" And InStr(UCase$(MatInfoLinha(i, 3)), "UC") > 0 Then tUC = "UC"
             If tUC = "UC" Then dPepTemUC(pep) = 1
+        Else
+            ' servico com COD_SERVICO valido
+            Dim codSv As String: codSv = NormCod(dados(i, cMaterial))
+            If codSv <> "" And codSv <> "0" Then dPepTemSrv(pep) = 1
         End If
 PreCalc:
     Next i
@@ -4759,15 +4765,17 @@ PreCalc:
     Dim corInk As Long, corMut As Long
     Dim corA As Long, corAcl As Long, corAzb As Long
     Dim corB As Long, corBcl As Long, corBzb As Long
+    Dim corC As Long, corCcl As Long, corCzb As Long
     Dim corE As Long, corEcl As Long, corEzb As Long
     corInk = RGB(33, 37, 41)        ' texto principal
     corMut = RGB(134, 142, 150)     ' texto secundario
     corA = RGB(13, 110, 253): corAcl = RGB(217, 232, 254): corAzb = RGB(240, 246, 255)
     corB = RGB(200, 35, 51): corBcl = RGB(249, 217, 221): corBzb = RGB(253, 240, 242)
+    corC = RGB(96, 50, 150): corCcl = RGB(234, 224, 244): corCzb = RGB(247, 243, 251)
     corE = RGB(212, 105, 4): corEcl = RGB(252, 229, 205): corEzb = RGB(254, 245, 233)
 
     Dim row As Long: row = 1
-    Dim contA As Long, contB As Long, contE As Long
+    Dim contA As Long, contB As Long, contC As Long, contE As Long
     Dim rowCards As Long
 
     gEtapa = "Alertas: cabecalho"
@@ -4855,6 +4863,44 @@ SomaPep:
     Next pk
     If contA = 0 Then
         ws.Cells(row, 1).Value = "(nenhum PEP sem UC encontrado)"
+        ws.Cells(row, 1).Font.Italic = True: ws.Cells(row, 1).Font.Color = corMut
+        row = row + 1
+    End If
+    row = row + 1
+
+    gEtapa = "Alertas: secao C"
+    ' -----------------------------------------------------------------------
+    ' SECAO C - PEP4NIVEL com material UC e SEM servico lancado
+    ' -----------------------------------------------------------------------
+    row = EscreverCabecalhoAlerta(ws, row, _
+        "C  |  PEP4 COM MATERIAL UC E SEM SERVICO  (material de investimento sem mao de obra correspondente)", _
+        Array("PEP4NIVEL", "PEP3", "TIPO_PEP", "TOTAL_LANCAMENTOS", "VALOR_TOTAL", "OBSERVACAO"), _
+        corC, corCcl)
+
+    Dim pkC As Variant
+    For Each pkC In dPepTemUC.Keys
+        pep = CStr(pkC)
+        If Not dPepTemSrv.Exists(pep) Then          ' tem UC mas nao tem servico
+            contC = contC + 1
+            ws.Cells(row, 1).Value = pep
+            ws.Cells(row, 2).Value = PEP3(pep)
+            ws.Cells(row, 3).Value = TipoPEPANEEL(pep)
+            ws.Cells(row, 4).Value = IIf(dPepCnt.Exists(pep), dPepCnt(pep), 0)
+            ws.Cells(row, 5).Value = Round(IIf(dPepValor.Exists(pep), dPepValor(pep), 0), 2)
+            ws.Cells(row, 6).Value = "Material UC lancado sem servico - verificar mao de obra faltante"
+            With ws.Range(ws.Cells(row, 1), ws.Cells(row, 6))
+                .Font.Color = corInk
+                If (contC Mod 2) = 0 Then .Interior.Color = corCzb
+            End With
+            ws.Cells(row, 5).NumberFormat = "#,##0.00"
+            With ws.Cells(row, 3)
+                .Font.Color = corC: .Font.Bold = True
+            End With
+            row = row + 1
+        End If
+    Next pkC
+    If contC = 0 Then
+        ws.Cells(row, 1).Value = "(nenhum PEP com UC sem servico)"
         ws.Cells(row, 1).Font.Italic = True: ws.Cells(row, 1).Font.Color = corMut
         row = row + 1
     End If
@@ -5037,8 +5083,9 @@ ProxE:
     ' Cards de resumo (contagens reais de cada secao)
     ' -----------------------------------------------------------------------
     EscreverCardAlerta ws, rowCards, 1, "PEPS SEM UC", contA, corA, corAcl
-    EscreverCardAlerta ws, rowCards, 4, "MATERIAL NAO ADERENTE", contB, corB, corBcl
-    EscreverCardAlerta ws, rowCards, 7, "CLASSES VIAGEM COM VALOR", contE, corE, corEcl
+    EscreverCardAlerta ws, rowCards, 3, "MATERIAL NAO ADERENTE", contB, corB, corBcl
+    EscreverCardAlerta ws, rowCards, 5, "UC SEM SERVICO", contC, corC, corCcl
+    EscreverCardAlerta ws, rowCards, 7, "CLASSES VIAGEM", contE, corE, corEcl
 
     gEtapa = "Alertas: formatacao final"
     ' -----------------------------------------------------------------------
@@ -5070,7 +5117,7 @@ Private Sub EscreverCardAlerta(ws As Worksheet, ByVal r As Long, ByVal c As Long
         ByVal rotulo As String, ByVal valor As Long, _
         ByVal cor As Long, ByVal corFundo As Long)
     Dim bloco As Range
-    Set bloco = ws.Range(ws.Cells(r, c), ws.Cells(r + 1, c + 2))
+    Set bloco = ws.Range(ws.Cells(r, c), ws.Cells(r + 1, c + 1))
     With bloco
         .Interior.Color = corFundo
         ' borda completa fina na cor da secao
@@ -5081,20 +5128,24 @@ Private Sub EscreverCardAlerta(ws As Worksheet, ByVal r As Long, ByVal c As Long
         .Borders(xlEdgeTop).LineStyle = xlContinuous
         .Borders(xlEdgeTop).Weight = xlThick: .Borders(xlEdgeTop).Color = cor
     End With
-    ' rotulo (linha de cima, coluna do card)
+    ' rotulo (linha de cima, mesclado nas 2 colunas do card)
+    With ws.Range(ws.Cells(r, c), ws.Cells(r, c + 1))
+        .Merge
+        .HorizontalAlignment = xlLeft: .VerticalAlignment = xlCenter
+    End With
     With ws.Cells(r, c)
         .Value = rotulo
         .Font.Size = 8: .Font.Bold = True: .Font.Color = cor
         .IndentLevel = 1
     End With
-    ' numero grande centralizado no bloco inferior (mescla c..c+2)
-    With ws.Range(ws.Cells(r + 1, c), ws.Cells(r + 1, c + 2))
+    ' numero grande centralizado no bloco inferior (mescla c..c+1)
+    With ws.Range(ws.Cells(r + 1, c), ws.Cells(r + 1, c + 1))
         .Merge
         .HorizontalAlignment = xlCenter: .VerticalAlignment = xlCenter
     End With
     With ws.Cells(r + 1, c)
         .Value = valor
-        .Font.Size = 24: .Font.Bold = True
+        .Font.Size = 22: .Font.Bold = True
         .Font.Color = IIf(valor > 0, cor, RGB(134, 142, 150))
     End With
 End Sub
