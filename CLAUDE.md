@@ -29,7 +29,7 @@ GarantirConfig / CarregarConfig
   → CarregarConversoesCabo      (KG → metros para cabos)
   → CarregarComboServico        (fator multiplicador por serviço combo)
   → CarregarTipoClassif         (CLS2 normalizada → TIPO: COM/UC/UAR)
-  → CarregarDescServico         (catálogo embutido: COD_SERVICO → descrição)
+  → CarregarDescServico         (fallback embutido: COD_SERVICO → descrição; a base atual vem do catálogo SERVICOS_ATUAIS via coluna TEXTO BREVE)
   → Gerar_RazaoCJ
   → Gerar_AlertasCriticos
   → Gerar_MaterialVsServico     (+ popula dMvSVerd/dMvSFamNC/dMvSDif em memória)
@@ -85,7 +85,7 @@ Private nLin As Long              ' qtd de linhas com PEP preenchido
 | `dCabo` | COD_MATERIAL | fator KG→metros (Double) |
 | `dCombo` | COD_SERVICO | fator multiplicador (Double) |
 | `dTipoCls` | CLS2 normalizada | `"COM"` / `"UC"` / `"UAR"` |
-| `dDescSrv` | COD_SERVICO | descrição textual (catálogo embutido) |
+| `dDescSrv` | COD_SERVICO | descrição textual (catálogo `SERVICOS_ATUAIS` coluna TEXTO BREVE; embutido só como fallback) |
 | `dCfg` | CHAVE | valor (da aba CONFIG) |
 | `dClsViagem` | CLASSE_CUSTO | 1 (flag: é classe de viagem) |
 

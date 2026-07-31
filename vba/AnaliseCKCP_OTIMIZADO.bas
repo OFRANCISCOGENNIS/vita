@@ -686,8 +686,15 @@ End Sub
 
 ' Normaliza cdigo de material para casar base x catlogo
 Private Sub CarregarDescServico()
-    ' De-para COD_SERVICO -> Denominacao (catalogo embutido).
-    Set dDescSrv = CreateObject("Scripting.Dictionary")
+    ' De-para COD_SERVICO -> Denominacao (catalogo embutido, usado como FALLBACK).
+    ' A base atual e completa de descricoes vem do catalogo externo
+    ' SERVICOS_ATUAIS (coluna TEXTO BREVE), carregada em CarregarCatalogoServicos.
+    ' So aplicamos o de-para embutido quando aquele catalogo NAO foi carregado.
+    If Not dDescSrv Is Nothing Then
+        If dDescSrv.Count > 0 Then Exit Sub   ' descricoes ja vieram do catalogo externo
+    Else
+        Set dDescSrv = CreateObject("Scripting.Dictionary")
+    End If
     dDescSrv("5013300045") = "ATEND EMERG INST TRAFO 1F ATE 15KVA"
     dDescSrv("5013300046") = "ATEND EMERG RET TRAFO 1F ATE 15KVA"
     dDescSrv("5015000019") = "RET COND NU ALUMINIO <=1/0 SRD"
@@ -1236,19 +1243,26 @@ Private Sub CarregarCatalogoServicos()
     Set ws = wb.Worksheets(1)
 
     Dim cCod As Long, c1 As Long, c2 As Long, c3 As Long, cTA As Long, cSeg As Long
+    Dim cDesc As Long
     cCod = ColLike(ws, Array("COD SERVICO", "COD_SERVICO", "SERVICO"))
     c1 = ColLike(ws, Array("CLS1"))
     c2 = ColLike(ws, Array("CLS2"))
     c3 = ColLike(ws, Array("CLS3"))
     cTA = ColLike(ws, Array("TIPO APLICACAO", "TIPO_APLICACAO", "TIPO APLIC"))
     cSeg = ColLike(ws, Array("SEGMENTO"))
+    ' Descricao (denominacao) do servico: coluna TEXTO BREVE do catalogo
+    ' SERVICOS_ATUAIS. Alimenta dDescSrv com a base completa (antes so vinha
+    ' do catalogo embutido/parcial em CarregarDescServico).
+    cDesc = ColLike(ws, Array("TEXTO BREVE", "TEXTO_BREVE", "DENOMINACAO", "DENOMINACAO_OBJETO", "DESCRICAO"))
     If cCod = 0 Then wb.Close SaveChanges:=False: Exit Sub
+
+    If dDescSrv Is Nothing Then Set dDescSrv = CreateObject("Scripting.Dictionary")
 
     Dim ult As Long
     ult = ws.Cells(ws.Rows.Count, cCod).End(xlUp).Row
     arr = ws.Range(ws.Cells(2, 1), ws.Cells(ult, ws.UsedRange.Columns.Count)).Value
 
-    Dim i As Long, cod As String
+    Dim i As Long, cod As String, den As String
     For i = 1 To UBound(arr, 1)
         cod = NormCod(arr(i, cCod))
         If cod <> "" And Not dCatSrv.Exists(cod) Then
@@ -1258,6 +1272,11 @@ Private Sub CarregarCatalogoServicos()
                 TextoMatriz(arr, i, c3) & "|" & _
                 TextoMatriz(arr, i, cTA) & "|" & _
                 TextoMatriz(arr, i, cSeg)
+        End If
+        ' Descricao vinda do catalogo tem prioridade sobre o embutido
+        If cod <> "" And cDesc > 0 Then
+            den = TextoMatriz(arr, i, cDesc)
+            If den <> "" Then dDescSrv(cod) = den
         End If
     Next i
     wb.Close SaveChanges:=False
