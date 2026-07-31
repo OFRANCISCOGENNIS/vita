@@ -17,6 +17,13 @@
 '                      Obra sem Lastro Físico, Terrenos/Servidões.
 '                      Normas: PRORET 2.3, MCPSE 674/2015, MCSE 396/2010,
 '                      REN 1000/2021, REN 1.058/2023, CPC 20.
+'    ► FORENSE DADOS — 7 Testes de auditoria forense sobre os lançamentos:
+'                      Valores Redondos, Fim de Semana/Feriados, Cutoff de
+'                      Exercício, Fracionamento, Benford 2º dígito,
+'                      Concentração por Usuário, Estorno + Relançamento.
+'                      Referências: ISA 240, Nigrini 2012, praxe TCU/CGU.
+'
+'  TOTAL: 27 testes + Dashboard + Resumo Executivo + Score de Compliance.
 '
 '  ENTRY POINTS:
 '    • Alt+F8 → GerarRelatorio()       — Análise completa CKCP/CA/Classes
@@ -2131,8 +2138,23 @@ Sub AUDITOR_ANEEL_Main()
     AnalisarIntegridadeCad
     Application.StatusBar = "AUDITOR ANEEL | [19/20] Obra sem lastro físico..."
     AnalisarObraSemLastro
-    Application.StatusBar = "AUDITOR ANEEL | [20/20] Terrenos e servidões..."
+    Application.StatusBar = "AUDITOR ANEEL | [20/27] Terrenos e servidões..."
     AnalisarTerrenosServidoes
+
+    Application.StatusBar = "AUDITOR ANEEL | [21/27] Valores redondos..."
+    AnalisarValoresRedondos
+    Application.StatusBar = "AUDITOR ANEEL | [22/27] Fim de semana / feriados..."
+    AnalisarFimDeSemana
+    Application.StatusBar = "AUDITOR ANEEL | [23/27] Cutoff de exercício..."
+    AnalisarCutoffExercicio
+    Application.StatusBar = "AUDITOR ANEEL | [24/27] Fracionamento..."
+    AnalisarFracionamento
+    Application.StatusBar = "AUDITOR ANEEL | [25/27] Benford 2º dígito..."
+    AnalisarBenfordD2
+    Application.StatusBar = "AUDITOR ANEEL | [26/27] Concentração por usuário..."
+    AnalisarUsuarios
+    Application.StatusBar = "AUDITOR ANEEL | [27/27] Estorno e relançamento..."
+    AnalisarEstornoRelanc
 
     Application.StatusBar = "AUDITOR ANEEL | Dashboard + Score..."
     GerarDashboard
@@ -2209,6 +2231,8 @@ Sub CriarAbas()
                   "OBRIG ESPECIAIS", "AIC UNITIZACAO", "JOA", _
                   "CUSTOS ADICIONAIS", "ATIVOS ADMIN", "DUPLIC ENTRE OBRAS", _
                   "INTEGRIDADE CAD", "OBRA SEM LASTRO", "TERRENOS SERVID", _
+                  "VALORES REDONDOS", "FDS FERIADOS", "CUTOFF EXERCICIO", _
+                  "FRACIONAMENTO", "BENFORD D2", "USUARIOS", "ESTORNO RELANC", _
                   "DASHBOARD", "RESUMO")
     Dim n As Variant
     For Each n In nomes
@@ -2899,9 +2923,15 @@ Function CalcularScore() As Double
     ' Benford (–até 5)
     If AbaExiste("BENFORD") Then
         Dim cb As String: cb = Sheets("BENFORD").Cells(12, 3).Value
-        If InStr(cb, "NÃO-CONFORMIDADE") > 0 Then sc = sc - 5
-        If InStr(cb, "LEVE") > 0 Then sc = sc - 3
-        If InStr(cb, "ACEITÁVEL") > 0 Then sc = sc - 1
+        ' "LEVE NÃO-CONFORMIDADE" casa com dois padrões: testar do mais específico
+        ' para o mais genérico evita somar as duas penalidades.
+        If InStr(cb, "LEVE") > 0 Then
+            sc = sc - 3
+        ElseIf InStr(cb, "NÃO-CONFORMIDADE") > 0 Then
+            sc = sc - 5
+        ElseIf InStr(cb, "ACEITÁVEL") > 0 Then
+            sc = sc - 1
+        End If
     End If
 
     ' Sobrepreço (–até 15)
@@ -2931,6 +2961,29 @@ Function CalcularScore() As Double
         pen = nc * 2 + na * 0.5
         sc = sc - WorksheetFunction.Min(CDbl(tetoEx(e)), pen)
     Next e
+
+    ' --- Forense de dados: indícios (peso menor — não geram glosa direta) ---
+    Dim abFo As Variant, tetoFo As Variant, g As Integer
+    abFo = Array("VALORES REDONDOS", "FDS FERIADOS", "CUTOFF EXERCICIO", _
+                 "FRACIONAMENTO", "USUARIOS", "ESTORNO RELANC")
+    tetoFo = Array(4, 4, 5, 6, 4, 6)
+    For g = 0 To UBound(abFo)
+        AudContaSev CStr(abFo(g)), nc, na
+        pen = nc * 1 + na * 0.25
+        sc = sc - WorksheetFunction.Min(CDbl(tetoFo(g)), pen)
+    Next g
+
+    ' Benford 2º dígito (–até 4): severidade vive numa célula única, não por linha
+    If AbaExiste("BENFORD D2") Then
+        Dim cb2 As String: cb2 = CStr(Sheets("BENFORD D2").Cells(13, 3).Value)
+        If InStr(cb2, "LEVE") > 0 Then
+            sc = sc - 2
+        ElseIf InStr(cb2, "NÃO-CONFORMIDADE") > 0 Then
+            sc = sc - 4
+        ElseIf InStr(cb2, "ACEITÁVEL") > 0 Then
+            sc = sc - 1
+        End If
+    End If
 
     CalcularScore = WorksheetFunction.Max(0, WorksheetFunction.Min(100, sc))
 End Function
@@ -2982,9 +3035,11 @@ Sub GerarDashboard()
 
     Dim nms As Variant, abs_ As Variant
     nms  = Array("Classificação CAPEX/OPEX", "Duplicidades (intra-PEP)", "ATV DRT (Custos Adm.)", "Retroativos (CPC 23)", "Estornos", "Concentração Fornecedores", "Lei de Benford (MAD)", "Sobrepreço BPR ±10%", _
-                 "OPEX capitalizado em ODI", "CAPEX em ODM/ODD", "Despesas vedadas em obra", "Obrigações Especiais", "AIC / Unitização", "JOA acima do teto", "Custos Adicionais / COM", "Ativos administrativos (BAR)", "Duplicidade entre obras", "Integridade cadastral", "Obra sem lastro físico", "Terrenos / Servidões")
+                 "OPEX capitalizado em ODI", "CAPEX em ODM/ODD", "Despesas vedadas em obra", "Obrigações Especiais", "AIC / Unitização", "JOA acima do teto", "Custos Adicionais / COM", "Ativos administrativos (BAR)", "Duplicidade entre obras", "Integridade cadastral", "Obra sem lastro físico", "Terrenos / Servidões", _
+                 "Valores redondos", "Lançamentos em FDS/feriado", "Cutoff de exercício", "Fracionamento de despesa", "Benford 2º dígito (MAD)", "Concentração por usuário", "Estorno + relançamento")
     abs_ = Array("CLASSIFICACAO", "DUPLICIDADES", "ATV_DRT", "RETROATIVOS", "ESTORNOS", "FORNECEDORES", "BENFORD", "SOBREPRECO", _
-                 "OPEX EM ODI", "CAPEX ODM ODD", "DESPESAS VEDADAS", "OBRIG ESPECIAIS", "AIC UNITIZACAO", "JOA", "CUSTOS ADICIONAIS", "ATIVOS ADMIN", "DUPLIC ENTRE OBRAS", "INTEGRIDADE CAD", "OBRA SEM LASTRO", "TERRENOS SERVID")
+                 "OPEX EM ODI", "CAPEX ODM ODD", "DESPESAS VEDADAS", "OBRIG ESPECIAIS", "AIC UNITIZACAO", "JOA", "CUSTOS ADICIONAIS", "ATIVOS ADMIN", "DUPLIC ENTRE OBRAS", "INTEGRIDADE CAD", "OBRA SEM LASTRO", "TERRENOS SERVID", _
+                 "VALORES REDONDOS", "FDS FERIADOS", "CUTOFF EXERCICIO", "FRACIONAMENTO", "BENFORD D2", "USUARIOS", "ESTORNO RELANC")
 
     Dim a As Integer
     For a = 0 To UBound(nms)
@@ -3057,9 +3112,11 @@ Sub GerarResumoExecutivo()
 
     Dim nms As Variant, abs_ As Variant
     nms  = Array("Classificação CAPEX/OPEX", "Duplicidades", "ATV DRT", "Retroativos CPC 23", "Estornos", "Fornecedores", "Benford (MAD)", "Sobrepreço BPR", _
-                 "OPEX em ODI", "CAPEX em ODM/ODD", "Despesas vedadas", "Obrigações Especiais", "AIC / Unitização", "JOA", "Custos Adicionais", "Ativos administrativos", "Duplicidade entre obras", "Integridade cadastral", "Obra sem lastro", "Terrenos / Servidões")
+                 "OPEX em ODI", "CAPEX em ODM/ODD", "Despesas vedadas", "Obrigações Especiais", "AIC / Unitização", "JOA", "Custos Adicionais", "Ativos administrativos", "Duplicidade entre obras", "Integridade cadastral", "Obra sem lastro", "Terrenos / Servidões", _
+                 "Valores redondos", "FDS / feriados", "Cutoff de exercício", "Fracionamento", "Benford 2º dígito", "Concentração por usuário", "Estorno + relançamento")
     abs_ = Array("CLASSIFICACAO", "DUPLICIDADES", "ATV_DRT", "RETROATIVOS", "ESTORNOS", "FORNECEDORES", "BENFORD", "SOBREPRECO", _
-                 "OPEX EM ODI", "CAPEX ODM ODD", "DESPESAS VEDADAS", "OBRIG ESPECIAIS", "AIC UNITIZACAO", "JOA", "CUSTOS ADICIONAIS", "ATIVOS ADMIN", "DUPLIC ENTRE OBRAS", "INTEGRIDADE CAD", "OBRA SEM LASTRO", "TERRENOS SERVID")
+                 "OPEX EM ODI", "CAPEX ODM ODD", "DESPESAS VEDADAS", "OBRIG ESPECIAIS", "AIC UNITIZACAO", "JOA", "CUSTOS ADICIONAIS", "ATIVOS ADMIN", "DUPLIC ENTRE OBRAS", "INTEGRIDADE CAD", "OBRA SEM LASTRO", "TERRENOS SERVID", _
+                 "VALORES REDONDOS", "FDS FERIADOS", "CUTOFF EXERCICIO", "FRACIONAMENTO", "BENFORD D2", "USUARIOS", "ESTORNO RELANC")
 
     Dim a As Integer
     For a = 0 To UBound(nms)
@@ -4086,4 +4143,570 @@ NP:
     wo.Cells(lo + 1, 1).Value = "NOTA: valor a SEGREGAR (não é glosa) — terreno/servidão entra na BRR a valor de mercado, sem depreciação (Tab. XVI MCPSE)."
     wo.Cells(lo + 1, 1).Font.Italic = True: wo.Cells(lo + 1, 1).Font.Size = 9
     wo.Columns("A:G").AutoFit
+End Sub
+
+
+'##############################################################################
+'#                                                                            #
+'#   MÓDULO 4 — AUDITOR ANEEL: FORENSE DE DADOS (7 TESTES ADICIONAIS)         #
+'#                                                                            #
+'#   Técnicas de auditoria forense sobre lançamentos contábeis de obras       #
+'#   (padrões TCU/CGU/Big4, Nigrini 2012, ISA 240):                           #
+'#                                                                            #
+'#   21)  VALORES REDONDOS    — excesso de lançamentos em valores redondos    #
+'#   22)  FDS FERIADOS        — lançamentos em fim de semana e feriados       #
+'#   23)  CUTOFF EXERCICIO    — concentração de custos no fim do exercício    #
+'#   24)  FRACIONAMENTO       — múltiplos docs pequenos no mesmo dia/PEP      #
+'#   25)  BENFORD D2          — Lei de Benford no 2º dígito (MAD)             #
+'#   26)  USUARIOS            — concentração de lançamentos por usuário       #
+'#   27)  ESTORNO RELANC      — estorno seguido de relançamento alterado      #
+'#                                                                            #
+'##############################################################################
+
+' --- Constantes forenses ------------------------------------------------------
+Const FOR_REDONDO_ATEN  As Double = 0.05   ' > 5% dos lançamentos redondos = atenção
+Const FOR_REDONDO_CRIT  As Double = 0.15   ' > 15% = crítico
+Const FOR_DEZ_ATEN      As Double = 0.15   ' dezembro > 15% do ano = atenção
+Const FOR_DEZ_CRIT      As Double = 0.3    ' dezembro > 30% do ano = crítico
+Const FOR_FRAC_NDOC     As Long = 3        ' >= 3 docs no mesmo dia/PEP/usuário
+Const FOR_FRAC_NDOC_CR  As Long = 5        ' >= 5 docs = crítico
+Const FOR_USR_ATEN      As Double = 0.4    ' top usuário > 40% do valor = atenção
+Const FOR_USR_CRIT      As Double = 0.6    ' top usuário > 60% = crítico
+Const FOR_RELANC_DIAS   As Long = 30       ' janela estorno -> relançamento
+Const FOR_RELANC_DELTA  As Double = 0.2    ' delta de valor de 0% a 20%
+Const FOR_BENF2_CONF    As Double = 0.8    ' MAD 2º dígito (pp) — Nigrini
+Const FOR_BENF2_ACEIT   As Double = 1#
+Const FOR_BENF2_LEVE    As Double = 1.2
+
+Private Function EhFeriadoFixo(dt As Date) As Boolean
+    Select Case Format(dt, "dd/mm")
+        Case "01/01", "21/04", "01/05", "07/09", "12/10", "02/11", "15/11", "25/12"
+            EhFeriadoFixo = True
+        Case Else
+            EhFeriadoFixo = False
+    End Select
+End Function
+
+' =============================================================================
+' TESTE 21 — VALORES REDONDOS (round numbers, ISA 240)
+'   Custo real de obra raramente cai em múltiplos exatos de R$ 1.000.
+' =============================================================================
+Sub AnalisarValoresRedondos()
+    Dim ws As Worksheet, wo As Worksheet
+    Set ws = Sheets("DADOS"): Set wo = Sheets("VALORES REDONDOS")
+
+    Dim cab As Variant
+    cab = Array("PEP_3NIVEL", "DENOMINACAO", "N_LANC", "N_REDONDOS", "PCT_REDONDOS", "VALOR_REDONDO", "CLASSIFICACAO")
+    Dim k As Integer
+    For k = 0 To UBound(cab): wo.Cells(1, k + 1).Value = cab(k): Next k
+    CabecalhoFormatar wo, 1, UBound(cab) + 1, RGB(68, 114, 196)
+
+    Dim dN As Object, dR As Object, dV As Object, dDen As Object
+    Set dN = CreateObject("Scripting.Dictionary")
+    Set dR = CreateObject("Scripting.Dictionary")
+    Set dV = CreateObject("Scripting.Dictionary")
+    Set dDen = CreateObject("Scripting.Dictionary")
+
+    Dim i As Long, pep As String, p3 As String, vl As Double
+    Dim nTot As Long, nRed As Long
+    For i = 2 To ultimaLinha
+        pep = AudTxt(ws, i, colPEP): If pep = "" Then GoTo NX
+        vl = AudNum(ws, i, colVALOR): If vl < 1000 Then GoTo NX
+        p3 = PEP3(pep)
+        If Not dN.Exists(p3) Then dN(p3) = 0: dR(p3) = 0: dV(p3) = 0: dDen(p3) = AudTxt(ws, i, colDENOM)
+        dN(p3) = dN(p3) + 1: nTot = nTot + 1
+        If vl = Fix(vl / 1000) * 1000 Then
+            dR(p3) = dR(p3) + 1: dV(p3) = dV(p3) + vl: nRed = nRed + 1
+        End If
+NX:
+    Next i
+
+    Dim lo As Long: lo = 2
+    Dim pk As Variant, pct As Double, sev As String
+    For Each pk In dN.Keys
+        If dR(pk) = 0 Or dN(pk) < 10 Then GoTo NP      ' amostra mínima p/ significância
+        pct = dR(pk) / dN(pk)
+        If pct > FOR_REDONDO_CRIT Then
+            sev = "CRITICO"
+        ElseIf pct > FOR_REDONDO_ATEN Then
+            sev = "ATENCAO"
+        Else
+            GoTo NP
+        End If
+        wo.Cells(lo, 1).Value = pk
+        wo.Cells(lo, 2).Value = dDen(pk)
+        wo.Cells(lo, 3).Value = dN(pk)
+        wo.Cells(lo, 4).Value = dR(pk)
+        wo.Cells(lo, 5).Value = pct: wo.Cells(lo, 5).NumberFormat = "0.0%"
+        wo.Cells(lo, 6).Value = dV(pk): wo.Cells(lo, 6).NumberFormat = "R$ #,##0.00"
+        wo.Cells(lo, 7).Value = sev
+        wo.Rows(lo).Interior.Color = AudCor(sev)
+        lo = lo + 1
+NP:
+    Next pk
+    If lo = 2 Then wo.Cells(2, 1).Value = "Nenhuma concentração anormal de valores redondos identificada."
+    wo.Cells(lo + 1, 1).Value = "Base: lançamentos >= R$ 1.000 múltiplos exatos de R$ 1.000. Global: " & nRed & " de " & nTot & " lançamentos."
+    wo.Cells(lo + 1, 1).Font.Italic = True: wo.Cells(lo + 1, 1).Font.Size = 9
+    wo.Columns("A:G").AutoFit
+End Sub
+
+' =============================================================================
+' TESTE 22 — LANÇAMENTOS EM FIM DE SEMANA E FERIADOS
+'   Lançamento manual fora do expediente é red flag clássico de auditoria.
+' =============================================================================
+Sub AnalisarFimDeSemana()
+    Dim ws As Worksheet, wo As Worksheet
+    Set ws = Sheets("DADOS"): Set wo = Sheets("FDS FERIADOS")
+
+    Dim cab As Variant
+    cab = Array("USUARIO", "N_LANC_TOTAL", "N_FDS_FERIADO", "PCT", "VALOR_FDS_FERIADO", "CLASSIFICACAO")
+    Dim k As Integer
+    For k = 0 To UBound(cab): wo.Cells(1, k + 1).Value = cab(k): Next k
+    CabecalhoFormatar wo, 1, UBound(cab) + 1, RGB(155, 0, 0)
+
+    If colDATALANC = 0 Then
+        wo.Cells(2, 1).Value = "Coluna DATA_LANCAMENTO não encontrada — teste indisponível."
+        wo.Columns("A:F").AutoFit: Exit Sub
+    End If
+
+    Dim dTot As Object, dFds As Object, dVal As Object
+    Set dTot = CreateObject("Scripting.Dictionary")
+    Set dFds = CreateObject("Scripting.Dictionary")
+    Set dVal = CreateObject("Scripting.Dictionary")
+
+    Dim i As Long, pep As String, usr As String, vl As Double, dt As Date, ehFds As Boolean
+    For i = 2 To ultimaLinha
+        pep = AudTxt(ws, i, colPEP): If pep = "" Then GoTo NX
+        If Not IsDate(ws.Cells(i, colDATALANC).Value) Then GoTo NX
+        dt = CDate(ws.Cells(i, colDATALANC).Value)
+        vl = AudNum(ws, i, colVALOR)
+        usr = AudTxt(ws, i, colUSUARIO): If usr = "" Then usr = "(SEM USUARIO)"
+        If Not dTot.Exists(usr) Then dTot(usr) = 0: dFds(usr) = 0: dVal(usr) = 0
+        dTot(usr) = dTot(usr) + 1
+        ehFds = (Weekday(dt, vbMonday) >= 6) Or EhFeriadoFixo(dt)
+        If ehFds Then
+            dFds(usr) = dFds(usr) + 1
+            dVal(usr) = dVal(usr) + Abs(vl)
+        End If
+NX:
+    Next i
+
+    Dim lo As Long: lo = 2
+    Dim pk As Variant, pct As Double, sev As String
+    For Each pk In dTot.Keys
+        If dFds(pk) = 0 Then GoTo NP
+        pct = dFds(pk) / dTot(pk)
+        If dFds(pk) >= 5 And pct > 0.1 Then
+            sev = "CRITICO"
+        Else
+            sev = "ATENCAO"
+        End If
+        wo.Cells(lo, 1).Value = pk
+        wo.Cells(lo, 2).Value = dTot(pk)
+        wo.Cells(lo, 3).Value = dFds(pk)
+        wo.Cells(lo, 4).Value = pct: wo.Cells(lo, 4).NumberFormat = "0.0%"
+        wo.Cells(lo, 5).Value = dVal(pk): wo.Cells(lo, 5).NumberFormat = "R$ #,##0.00"
+        wo.Cells(lo, 6).Value = sev
+        wo.Rows(lo).Interior.Color = AudCor(sev)
+        lo = lo + 1
+NP:
+    Next pk
+    If lo = 2 Then wo.Cells(2, 1).Value = "Nenhum lançamento em fim de semana/feriado identificado."
+    wo.Cells(lo + 1, 1).Value = "Feriados considerados: fixos nacionais (01/01, 21/04, 01/05, 07/09, 12/10, 02/11, 15/11, 25/12). Lançamentos automáticos (batch) podem gerar falso positivo."
+    wo.Cells(lo + 1, 1).Font.Italic = True: wo.Cells(lo + 1, 1).Font.Size = 9
+    wo.Columns("A:F").AutoFit
+End Sub
+
+' =============================================================================
+' TESTE 23 — CUTOFF DE EXERCÍCIO (concentração de custos no fim do ano)
+'   Regularizações em bloco em dezembro comprometem competência (CPC 23).
+' =============================================================================
+Sub AnalisarCutoffExercicio()
+    Dim ws As Worksheet, wo As Worksheet
+    Set ws = Sheets("DADOS"): Set wo = Sheets("CUTOFF EXERCICIO")
+
+    Dim cab As Variant
+    cab = Array("ANO", "VALOR_ANO", "VALOR_DEZEMBRO", "PCT_DEZ", "MEDIA_MENSAL", "RAZAO_DEZ_MEDIA", "CLASSIFICACAO")
+    Dim k As Integer
+    For k = 0 To UBound(cab): wo.Cells(1, k + 1).Value = cab(k): Next k
+    CabecalhoFormatar wo, 1, UBound(cab) + 1, RGB(112, 48, 160)
+
+    If colDATALANC = 0 Then
+        wo.Cells(2, 1).Value = "Coluna DATA_LANCAMENTO não encontrada — teste indisponível."
+        wo.Columns("A:G").AutoFit: Exit Sub
+    End If
+
+    Dim dAno As Object, dDez As Object, dMeses As Object
+    Set dAno = CreateObject("Scripting.Dictionary")
+    Set dDez = CreateObject("Scripting.Dictionary")
+    Set dMeses = CreateObject("Scripting.Dictionary")
+
+    Dim i As Long, pep As String, vl As Double, dt As Date, an As String, mkey As String
+    For i = 2 To ultimaLinha
+        pep = AudTxt(ws, i, colPEP): If pep = "" Then GoTo NX
+        vl = AudNum(ws, i, colVALOR): If vl <= 0 Then GoTo NX
+        If Not IsDate(ws.Cells(i, colDATALANC).Value) Then GoTo NX
+        dt = CDate(ws.Cells(i, colDATALANC).Value)
+        an = CStr(Year(dt))
+        If Not dAno.Exists(an) Then dAno(an) = 0: dDez(an) = 0
+        dAno(an) = dAno(an) + vl
+        If Month(dt) = 12 Then dDez(an) = dDez(an) + vl
+        mkey = an & "-" & Format(Month(dt), "00")
+        If Not dMeses.Exists(mkey) Then dMeses(mkey) = 0
+        dMeses(mkey) = dMeses(mkey) + vl
+NX:
+    Next i
+
+    ' Meses com movimento por ano (média mensal justa)
+    Dim dNM As Object: Set dNM = CreateObject("Scripting.Dictionary")
+    Dim mk As Variant
+    For Each mk In dMeses.Keys
+        an = Left(CStr(mk), 4)
+        If Not dNM.Exists(an) Then dNM(an) = 0
+        dNM(an) = dNM(an) + 1
+    Next mk
+
+    Dim lo As Long: lo = 2
+    Dim pk As Variant, pct As Double, med As Double, raz As Double, sev As String
+    For Each pk In dAno.Keys
+        If dAno(pk) <= 0 Then GoTo NP
+        pct = dDez(pk) / dAno(pk)
+        med = dAno(pk) / dNM(pk)
+        raz = IIf(med > 0, dDez(pk) / med, 0)
+        If pct > FOR_DEZ_CRIT Then
+            sev = "CRITICO"
+        ElseIf pct > FOR_DEZ_ATEN Then
+            sev = "ATENCAO"
+        Else
+            sev = "OK"
+        End If
+        If dNM(pk) < 6 Then sev = "OK"                 ' ano parcial — sem base p/ concluir
+        wo.Cells(lo, 1).Value = pk
+        wo.Cells(lo, 2).Value = dAno(pk): wo.Cells(lo, 2).NumberFormat = "R$ #,##0.00"
+        wo.Cells(lo, 3).Value = dDez(pk): wo.Cells(lo, 3).NumberFormat = "R$ #,##0.00"
+        wo.Cells(lo, 4).Value = pct: wo.Cells(lo, 4).NumberFormat = "0.0%"
+        wo.Cells(lo, 5).Value = med: wo.Cells(lo, 5).NumberFormat = "R$ #,##0.00"
+        wo.Cells(lo, 6).Value = raz: wo.Cells(lo, 6).NumberFormat = "0.00"
+        wo.Cells(lo, 7).Value = sev
+        wo.Rows(lo).Interior.Color = AudCor(sev)
+        lo = lo + 1
+NP:
+    Next pk
+    wo.Cells(lo + 1, 1).Value = "Referência neutra: dezembro ~8,3% do ano (1/12). Acima de " & Format(FOR_DEZ_ATEN, "0%") & " indica regularização em bloco pré-fechamento."
+    wo.Cells(lo + 1, 1).Font.Italic = True: wo.Cells(lo + 1, 1).Font.Size = 9
+    wo.Columns("A:G").AutoFit
+End Sub
+
+' =============================================================================
+' TESTE 24 — FRACIONAMENTO (split de despesas para fugir de alçada)
+'   >= 3 documentos distintos, mesmo dia/PEP/usuário, todos abaixo da
+'   materialidade, somando acima dela.
+' =============================================================================
+Sub AnalisarFracionamento()
+    Dim ws As Worksheet, wo As Worksheet
+    Set ws = Sheets("DADOS"): Set wo = Sheets("FRACIONAMENTO")
+
+    Dim cab As Variant
+    cab = Array("PEP_3NIVEL", "USUARIO", "DATA", "N_DOCS", "MAIOR_DOC", "SOMA_DIA", "CLASSIFICACAO", "VALOR_RISCO")
+    Dim k As Integer
+    For k = 0 To UBound(cab): wo.Cells(1, k + 1).Value = cab(k): Next k
+    CabecalhoFormatar wo, 1, UBound(cab) + 1, RGB(197, 90, 17)
+
+    If colDATALANC = 0 Or colNUMDOC = 0 Then
+        wo.Cells(2, 1).Value = "Colunas DATA_LANCAMENTO e/ou NUM_DOC não encontradas — teste indisponível."
+        wo.Columns("A:H").AutoFit: Exit Sub
+    End If
+
+    Dim dSoma As Object, dDocs As Object, dMax As Object
+    Set dSoma = CreateObject("Scripting.Dictionary")
+    Set dDocs = CreateObject("Scripting.Dictionary")
+    Set dMax = CreateObject("Scripting.Dictionary")
+
+    Dim i As Long, pep As String, p3 As String, vl As Double, usr As String, ndoc As String, key As String
+    For i = 2 To ultimaLinha
+        pep = AudTxt(ws, i, colPEP): If pep = "" Then GoTo NX
+        vl = AudNum(ws, i, colVALOR): If vl <= 0 Then GoTo NX
+        If Not IsDate(ws.Cells(i, colDATALANC).Value) Then GoTo NX
+        ndoc = AudTxt(ws, i, colNUMDOC): If ndoc = "" Then GoTo NX
+        p3 = PEP3(pep)
+        usr = AudTxt(ws, i, colUSUARIO): If usr = "" Then usr = "(SEM USUARIO)"
+        key = p3 & "|" & usr & "|" & Format(CDate(ws.Cells(i, colDATALANC).Value), "yyyy-mm-dd")
+        If Not dSoma.Exists(key) Then dSoma(key) = 0: dDocs(key) = "|": dMax(key) = 0
+        dSoma(key) = dSoma(key) + vl
+        If vl > dMax(key) Then dMax(key) = vl
+        If InStr(dDocs(key), "|" & ndoc & "|") = 0 Then dDocs(key) = dDocs(key) & ndoc & "|"
+NX:
+    Next i
+
+    Dim lo As Long: lo = 2
+    Dim kk As Variant, nDocs As Long, parts() As String, sev As String
+    For Each kk In dSoma.Keys
+        nDocs = 0
+        If Len(dDocs(kk)) > 2 Then nDocs = UBound(Split(Mid(dDocs(kk), 2, Len(dDocs(kk)) - 2), "|")) + 1
+        If nDocs < FOR_FRAC_NDOC Then GoTo NP
+        If dMax(kk) >= MATERIALIDADE Then GoTo NP       ' nenhum doc isolado atinge a alçada
+        If dSoma(kk) < MATERIALIDADE Then GoTo NP       ' soma precisa ultrapassar a alçada
+        If nDocs >= FOR_FRAC_NDOC_CR Then sev = "CRITICO" Else sev = "ATENCAO"
+        parts = Split(CStr(kk), "|")
+        wo.Cells(lo, 1).Value = parts(0)
+        wo.Cells(lo, 2).Value = parts(1)
+        wo.Cells(lo, 3).Value = parts(2)
+        wo.Cells(lo, 4).Value = nDocs
+        wo.Cells(lo, 5).Value = dMax(kk): wo.Cells(lo, 5).NumberFormat = "R$ #,##0.00"
+        wo.Cells(lo, 6).Value = dSoma(kk): wo.Cells(lo, 6).NumberFormat = "R$ #,##0.00"
+        wo.Cells(lo, 7).Value = sev
+        wo.Cells(lo, 8).Value = dSoma(kk): wo.Cells(lo, 8).NumberFormat = "R$ #,##0.00"
+        wo.Rows(lo).Interior.Color = AudCor(sev)
+        lo = lo + 1
+NP:
+    Next kk
+    If lo = 2 Then wo.Cells(2, 1).Value = "Nenhum indício de fracionamento identificado."
+    wo.Cells(lo + 1, 1).Value = "Critério: >= " & FOR_FRAC_NDOC & " docs no mesmo dia/PEP/usuário, todos < R$ " & Format(MATERIALIDADE, "#,##0") & " e soma acima desse valor."
+    wo.Cells(lo + 1, 1).Font.Italic = True: wo.Cells(lo + 1, 1).Font.Size = 9
+    wo.Columns("A:H").AutoFit
+End Sub
+
+' =============================================================================
+' TESTE 25 — LEI DE BENFORD — 2º DÍGITO (MAD, Nigrini 2012)
+'   Complementa o 1º dígito: manipulações finas aparecem no 2º dígito.
+' =============================================================================
+Sub AnalisarBenfordD2()
+    Dim ws As Worksheet, wo As Worksheet
+    Set ws = Sheets("DADOS"): Set wo = Sheets("BENFORD D2")
+
+    ' Esperado do 2º dígito: P(d) = soma_{k=1..9} log10(1 + 1/(10k+d))
+    Dim esp(0 To 9) As Double
+    Dim d As Integer, k2 As Integer
+    For d = 0 To 9
+        For k2 = 1 To 9
+            esp(d) = esp(d) + Log(1 + 1# / (10 * k2 + d)) / Log(10)
+        Next k2
+    Next d
+
+    Dim cnt(0 To 9) As Long, tot As Long
+    Dim i As Long, vl As Double, sv As String, sd As Integer
+    For i = 2 To ultimaLinha
+        vl = AudNum(ws, i, colVALOR)
+        If vl < 10 Then GoTo NX                        ' precisa de 2 dígitos
+        sv = Format(Fix(Abs(vl)), "0")
+        If Len(sv) < 2 Then GoTo NX
+        sd = Val(Mid(sv, 2, 1))
+        cnt(sd) = cnt(sd) + 1: tot = tot + 1
+NX:
+    Next i
+
+    wo.Cells(1, 1).Value = "DÍGITO": wo.Cells(1, 2).Value = "FREQ_OBSERVADA"
+    wo.Cells(1, 3).Value = "FREQ_ESPERADA": wo.Cells(1, 4).Value = "DIFERENÇA": wo.Cells(1, 5).Value = "ABS_DIF"
+    CabecalhoFormatar wo, 1, 5, RGB(68, 114, 196)
+
+    Dim somaAbs As Double, fo As Double, dif As Double
+    For d = 0 To 9
+        fo = IIf(tot > 0, cnt(d) / tot, 0)
+        dif = fo - esp(d)
+        wo.Cells(d + 2, 1).Value = d
+        wo.Cells(d + 2, 2).Value = fo:      wo.Cells(d + 2, 2).NumberFormat = "0.000%"
+        wo.Cells(d + 2, 3).Value = esp(d):  wo.Cells(d + 2, 3).NumberFormat = "0.000%"
+        wo.Cells(d + 2, 4).Value = dif:     wo.Cells(d + 2, 4).NumberFormat = "0.000%"
+        wo.Cells(d + 2, 5).Value = Abs(dif): wo.Cells(d + 2, 5).NumberFormat = "0.000%"
+        somaAbs = somaAbs + Abs(dif)
+    Next d
+
+    Dim MAD As Double: MAD = (somaAbs / 10) * 100
+    Dim catB As String, corB As Long
+    If MAD < FOR_BENF2_CONF Then
+        catB = "CONFORMIDADE": corB = RGB(198, 239, 206)
+    ElseIf MAD < FOR_BENF2_ACEIT Then
+        catB = "ACEITÁVEL": corB = RGB(255, 235, 156)
+    ElseIf MAD < FOR_BENF2_LEVE Then
+        catB = "LEVE NÃO-CONFORMIDADE": corB = RGB(255, 165, 0)
+    Else
+        catB = "NÃO-CONFORMIDADE — INVESTIGAR": corB = RGB(255, 100, 100)
+    End If
+
+    wo.Cells(13, 1).Value = "MAD 2º dígito (Nigrini 2012):": wo.Cells(13, 1).Font.Bold = True
+    wo.Cells(13, 2).Value = MAD: wo.Cells(13, 2).NumberFormat = "0.000": wo.Cells(13, 2).Font.Bold = True
+    wo.Cells(13, 3).Value = catB: wo.Cells(13, 3).Font.Bold = True
+    wo.Range("A13:C13").Interior.Color = corB
+    wo.Cells(14, 1).Value = "Lançamentos analisados (>= R$ 10): " & tot
+    wo.Cells(16, 1).Value = "AVISO: desvio no 2º dígito NÃO é prova de fraude — indica priorização de amostra documental."
+    wo.Cells(16, 1).Font.Italic = True: wo.Cells(16, 1).Font.Color = RGB(128, 0, 0)
+    wo.Columns("A:E").AutoFit
+End Sub
+
+' =============================================================================
+' TESTE 26 — CONCENTRAÇÃO POR USUÁRIO
+'   Um único usuário concentrando o valor lançado enfraquece a segregação
+'   de funções (red flag ISA 240 / controles internos).
+' =============================================================================
+Sub AnalisarUsuarios()
+    Dim ws As Worksheet, wo As Worksheet
+    Set ws = Sheets("DADOS"): Set wo = Sheets("USUARIOS")
+
+    Dim cab As Variant
+    cab = Array("USUARIO", "N_LANC", "N_PEPS", "VALOR_TOTAL", "PARTICIPACAO_%", "CLASSIFICACAO")
+    Dim k As Integer
+    For k = 0 To UBound(cab): wo.Cells(1, k + 1).Value = cab(k): Next k
+    CabecalhoFormatar wo, 1, UBound(cab) + 1, RGB(0, 112, 192)
+
+    If colUSUARIO = 0 Then
+        wo.Cells(2, 1).Value = "Coluna USUARIO não encontrada — teste indisponível."
+        wo.Columns("A:F").AutoFit: Exit Sub
+    End If
+
+    Dim dVal As Object, dCnt As Object, dPeps As Object
+    Set dVal = CreateObject("Scripting.Dictionary")
+    Set dCnt = CreateObject("Scripting.Dictionary")
+    Set dPeps = CreateObject("Scripting.Dictionary")
+    Dim totalG As Double
+
+    Dim i As Long, pep As String, p3 As String, vl As Double, usr As String
+    For i = 2 To ultimaLinha
+        pep = AudTxt(ws, i, colPEP): If pep = "" Then GoTo NX
+        vl = AudNum(ws, i, colVALOR): If vl <= 0 Then GoTo NX
+        p3 = PEP3(pep)
+        usr = AudTxt(ws, i, colUSUARIO): If usr = "" Then usr = "(SEM USUARIO)"
+        If Not dVal.Exists(usr) Then dVal(usr) = 0: dCnt(usr) = 0: dPeps(usr) = "|"
+        dVal(usr) = dVal(usr) + vl: dCnt(usr) = dCnt(usr) + 1
+        totalG = totalG + vl
+        If InStr(dPeps(usr), "|" & p3 & "|") = 0 Then dPeps(usr) = dPeps(usr) & p3 & "|"
+NX:
+    Next i
+
+    ' Ordenar por valor decrescente
+    Dim n As Long: n = dVal.Count
+    If n = 0 Then
+        wo.Cells(2, 1).Value = "Nenhum lançamento com usuário identificado."
+        wo.Columns("A:F").AutoFit: Exit Sub
+    End If
+    Dim aU() As String: ReDim aU(n - 1)
+    Dim aV() As Double: ReDim aV(n - 1)
+    Dim idx As Long: idx = 0
+    Dim uk As Variant
+    For Each uk In dVal.Keys: aU(idx) = CStr(uk): aV(idx) = dVal(uk): idx = idx + 1: Next uk
+    Dim a As Long, b As Long, ts As String, td As Double
+    For a = 0 To n - 2
+        For b = a + 1 To n - 1
+            If aV(a) < aV(b) Then
+                td = aV(a): aV(a) = aV(b): aV(b) = td
+                ts = aU(a): aU(a) = aU(b): aU(b) = ts
+            End If
+        Next b
+    Next a
+
+    Dim lo As Long: lo = 2
+    Dim part As Double, nP As Long, sev As String
+    For idx = 0 To n - 1
+        part = IIf(totalG > 0, aV(idx) / totalG, 0)
+        nP = 0
+        If Len(dPeps(aU(idx))) > 2 Then nP = UBound(Split(Mid(dPeps(aU(idx)), 2, Len(dPeps(aU(idx))) - 2), "|")) + 1
+        sev = ""
+        If idx = 0 And part > FOR_USR_CRIT Then
+            sev = "CRITICO"
+        ElseIf idx = 0 And part > FOR_USR_ATEN Then
+            sev = "ATENCAO"
+        End If
+        wo.Cells(lo, 1).Value = aU(idx)
+        wo.Cells(lo, 2).Value = dCnt(aU(idx))
+        wo.Cells(lo, 3).Value = nP
+        wo.Cells(lo, 4).Value = aV(idx): wo.Cells(lo, 4).NumberFormat = "R$ #,##0.00"
+        wo.Cells(lo, 5).Value = part: wo.Cells(lo, 5).NumberFormat = "0.0%"
+        wo.Cells(lo, 6).Value = sev
+        If sev <> "" Then wo.Rows(lo).Interior.Color = AudCor(sev)
+        lo = lo + 1
+    Next idx
+    wo.Cells(lo + 1, 1).Value = "NOTA: usuários batch/integração concentram valor legitimamente — validar segregação de funções apenas para usuários pessoais."
+    wo.Cells(lo + 1, 1).Font.Italic = True: wo.Cells(lo + 1, 1).Font.Size = 9
+    wo.Columns("A:F").AutoFit
+End Sub
+
+' =============================================================================
+' TESTE 27 — ESTORNO SEGUIDO DE RELANÇAMENTO COM VALOR ALTERADO
+'   Estorno + relançamento com valor 1%-20% diferente em até 30 dias no
+'   mesmo PEP/material = indício de ajuste manual de custo.
+' =============================================================================
+Sub AnalisarEstornoRelanc()
+    Dim ws As Worksheet, wo As Worksheet
+    Set ws = Sheets("DADOS"): Set wo = Sheets("ESTORNO RELANC")
+
+    Dim cab As Variant
+    cab = Array("PEP_3NIVEL", "MATERIAL", "DATA_ESTORNO", "VALOR_ESTORNADO", "DATA_RELANC", "VALOR_RELANC", "DELTA_%", "CLASSIFICACAO", "VALOR_RISCO")
+    Dim k As Integer
+    For k = 0 To UBound(cab): wo.Cells(1, k + 1).Value = cab(k): Next k
+    CabecalhoFormatar wo, 1, UBound(cab) + 1, RGB(192, 0, 0)
+
+    If colDATALANC = 0 Then
+        wo.Cells(2, 1).Value = "Coluna DATA_LANCAMENTO não encontrada — teste indisponível."
+        wo.Columns("A:I").AutoFit: Exit Sub
+    End If
+
+    ' Coletar negativos e positivos por PEP3|MATERIAL (datas como serial Long)
+    Dim dNeg As Object, dPos As Object
+    Set dNeg = CreateObject("Scripting.Dictionary")
+    Set dPos = CreateObject("Scripting.Dictionary")
+
+    Dim i As Long, pep As String, p3 As String, vl As Double, mat As String, km As String, ent As String
+    For i = 2 To ultimaLinha
+        pep = AudTxt(ws, i, colPEP): If pep = "" Then GoTo NX
+        vl = AudNum(ws, i, colVALOR): If vl = 0 Then GoTo NX
+        If Not IsDate(ws.Cells(i, colDATALANC).Value) Then GoTo NX
+        mat = AudTxt(ws, i, colMATERIAL): If mat = "" Or mat = "0" Then GoTo NX
+        p3 = PEP3(pep)
+        km = p3 & "|" & mat
+        ' Int (não CLng): CLng arredondaria uma data com hora para o dia seguinte.
+        ' Str/Val são locale-independentes — CStr/CDbl quebrariam com vírgula decimal.
+        ent = CStr(CLng(Int(CDbl(CDate(ws.Cells(i, colDATALANC).Value))))) & ";" & Str(Abs(vl))
+        If vl < 0 Then
+            If Not dNeg.Exists(km) Then dNeg(km) = ""
+            dNeg(km) = IIf(dNeg(km) = "", ent, dNeg(km) & "#" & ent)
+        Else
+            If Not dPos.Exists(km) Then dPos(km) = ""
+            dPos(km) = IIf(dPos(km) = "", ent, dPos(km) & "#" & ent)
+        End If
+NX:
+    Next i
+
+    Dim lo As Long: lo = 2
+    Dim kk As Variant, negs() As String, poss() As String
+    Dim ni As Long, pi As Long, pn() As String, pp() As String
+    Dim dtN As Long, vN As Double, dtP As Long, vP As Double, delta As Double
+    Dim parts() As String, sev As String
+    For Each kk In dNeg.Keys
+        If Not dPos.Exists(kk) Then GoTo NK
+        negs = Split(CStr(dNeg(kk)), "#")
+        poss = Split(CStr(dPos(kk)), "#")
+        For ni = 0 To UBound(negs)
+            pn = Split(negs(ni), ";")
+            dtN = CLng(pn(0)): vN = Val(pn(1))
+            If vN <= 0 Then GoTo NN
+            For pi = 0 To UBound(poss)
+                pp = Split(poss(pi), ";")
+                dtP = CLng(pp(0)): vP = Val(pp(1))
+                If dtP >= dtN And dtP <= dtN + FOR_RELANC_DIAS Then
+                    delta = Abs(vP - vN) / vN
+                    If delta > 0.005 And delta <= FOR_RELANC_DELTA Then
+                        If vP > vN Then sev = "CRITICO" Else sev = "ATENCAO"
+                        parts = Split(CStr(kk), "|")
+                        wo.Cells(lo, 1).Value = parts(0)
+                        wo.Cells(lo, 2).Value = parts(1)
+                        wo.Cells(lo, 3).Value = CDate(dtN): wo.Cells(lo, 3).NumberFormat = "dd/mm/yyyy"
+                        wo.Cells(lo, 4).Value = vN: wo.Cells(lo, 4).NumberFormat = "R$ #,##0.00"
+                        wo.Cells(lo, 5).Value = CDate(dtP): wo.Cells(lo, 5).NumberFormat = "dd/mm/yyyy"
+                        wo.Cells(lo, 6).Value = vP: wo.Cells(lo, 6).NumberFormat = "R$ #,##0.00"
+                        wo.Cells(lo, 7).Value = delta: wo.Cells(lo, 7).NumberFormat = "0.0%"
+                        wo.Cells(lo, 8).Value = sev
+                        wo.Cells(lo, 9).Value = Abs(vP - vN): wo.Cells(lo, 9).NumberFormat = "R$ #,##0.00"
+                        wo.Rows(lo).Interior.Color = AudCor(sev)
+                        lo = lo + 1
+                        Exit For                        ' 1 par por estorno
+                    End If
+                End If
+            Next pi
+NN:
+        Next ni
+NK:
+    Next kk
+    If lo = 2 Then wo.Cells(2, 1).Value = "Nenhum estorno seguido de relançamento alterado identificado."
+    wo.Cells(lo + 1, 1).Value = "Critério: relançamento em até " & FOR_RELANC_DIAS & " dias com valor 0,5%-" & Format(FOR_RELANC_DELTA, "0%") & " diferente do estornado (mesmo PEP/material)."
+    wo.Cells(lo + 1, 1).Font.Italic = True: wo.Cells(lo + 1, 1).Font.Size = 9
+    wo.Columns("A:I").AutoFit
 End Sub

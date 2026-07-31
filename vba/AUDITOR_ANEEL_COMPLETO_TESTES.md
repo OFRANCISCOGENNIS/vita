@@ -16,7 +16,7 @@ Colunas reconhecidas (match exato de cabeçalho): `PEP`, `CLASSE_CUSTO`, `DESC_C
 `QTD_ENTRADA`, `DENOMINACAO`, `USUARIO`, `TIPO_DOC`, `TIPO_APLICACAO`, `UML`.
 Sufixo do PEP: `.I` = ODI (investimento), `.D` = ODD (desativação), `.M` = ODM (manutenção).
 
-## Os 20 testes
+## Os 27 testes
 
 ### Módulo 2 — Forenses (originais)
 | # | Aba | O que verifica | Referência |
@@ -46,9 +46,26 @@ Sufixo do PEP: `.I` = ODI (investimento), `.D` = ODD (desativação), `.M` = ODM
 | 19 | `OBRA SEM LASTRO` | ODI relevante (≥R$50k) só com serviço, sem material físico | PRORET 2.3 (validação campo) | 0% físico = CRÍTICO |
 | 20 | `TERRENOS SERVID` | Terreno/servidão a segregar (entra sem depreciação) | MCPSE Tab. XVI | >20% do PEP = CRÍTICO |
 
+### Módulo 4 — Forense de dados
+Indícios de manipulação nos próprios lançamentos. Não geram glosa direta — servem para
+**priorizar a amostra documental**. Peso menor no score.
+
+| # | Aba | O que detecta | Referência | Severidade |
+|---|-----|---------------|-----------|-----------|
+| 21 | `VALORES REDONDOS` | Excesso de lançamentos em múltiplos exatos de R$ 1.000 | ISA 240 | >15% dos lanç. = CRÍTICO |
+| 22 | `FDS FERIADOS` | Lançamentos em sábado/domingo/feriado nacional, por usuário | ISA 240 | ≥5 e >10% = CRÍTICO |
+| 23 | `CUTOFF EXERCICIO` | Concentração de custo em dezembro (regularização em bloco) | CPC 23 | dez >30% do ano = CRÍTICO |
+| 24 | `FRACIONAMENTO` | ≥3 docs no mesmo dia/PEP/usuário, todos < alçada, soma > alçada | praxe TCU/CGU | ≥5 docs = CRÍTICO |
+| 25 | `BENFORD D2` | Lei de Benford no 2º dígito (MAD) | Nigrini 2012 | MAD ≥1,2 = não-conformidade |
+| 26 | `USUARIOS` | Concentração de valor lançado por usuário (segregação de funções) | ISA 240 | top >60% = CRÍTICO |
+| 27 | `ESTORNO RELANC` | Estorno seguido de relançamento com valor alterado em ≤30 dias | ISA 240 | relançado a maior = CRÍTICO |
+
 ## Score de Compliance
 
-Parte de 100 e desconta por achado (CRÍTICO −2 / ATENÇÃO −0,5, com teto por teste).
+Parte de 100 e desconta por achado, com teto por teste:
+- **Testes de glosa** (9–20): CRÍTICO −2 / ATENÇÃO −0,5.
+- **Testes forenses** (21–27): CRÍTICO −1 / ATENÇÃO −0,25 (indiciários).
+
 Faixas: **≥85** Baixo Risco · **65–84** Atenção · **45–64** Risco Elevado · **<45** Crítico.
 
 ## Parâmetros (constantes no `.bas`, ajustáveis)
@@ -56,6 +73,10 @@ Faixas: **≥85** Baixo Risco · **65–84** Atenção · **45–64** Risco Elev
 `AUD_OPEX_ATENCAO=2%` · `AUD_JOA_TETO=8%` · `AUD_CA_TETO=35%` · `AUD_COM_TETO=40%`
 `AUD_AIC_ATEN_M=6` / `AUD_AIC_CRIT_M=12` / `AUD_AIC_IDADE_M=24` meses · `AUD_LASTRO_MIN=R$50k`
 `AUD_MAT_MIN=R$1k` (materialidade de ruído) · `AUD_OE_RATIO_MIN=10%`.
+
+Forenses: `FOR_REDONDO_ATEN=5%` / `FOR_REDONDO_CRIT=15%` · `FOR_DEZ_ATEN=15%` / `FOR_DEZ_CRIT=30%`
+`FOR_FRAC_NDOC=3` / `FOR_FRAC_NDOC_CR=5` · `FOR_USR_ATEN=40%` / `FOR_USR_CRIT=60%`
+`FOR_RELANC_DIAS=30` / `FOR_RELANC_DELTA=20%` · `FOR_BENF2_*` = 0,8 / 1,0 / 1,2 (MAD Nigrini).
 
 ## Observações metodológicas
 
@@ -68,3 +89,8 @@ Faixas: **≥85** Baixo Risco · **65–84** Atenção · **45–64** Risco Elev
 - Itens auditados pela ANEEL que **não** são verificáveis só com o export (inspeção física de campo,
   laudo de avaliação a valor de mercado, conciliação com a BDGD, WACC do ciclo) ficam fora do escopo
   automatizável e devem ser tratados na validação documental.
+- Os testes forenses (21–27) apontam **indícios estatísticos**, não irregularidade comprovada.
+  Usuários de integração/batch concentram lançamentos e podem rodar fora do expediente
+  legitimamente — validar a natureza do usuário antes de concluir (testes 22 e 26).
+- `ESTORNO RELANC` serializa data/valor com `Str`/`Val` (locale-independentes) em vez de
+  `CStr`/`CDbl`, que quebrariam em ambiente pt-BR com vírgula decimal.
