@@ -1374,6 +1374,7 @@ Private Sub CarregarCatalogoServicos()
 
     Dim caminho As String
     caminho = CaminhoCatalogo("CAT_SERVICOS", _
+        "%USERPROFILE%\Downloads\SERVICOS_ATUAIS_3.xlsx;%USERPROFILE%\Downloads\SERVICOS_ATUAIS (3).xlsx;" & _
         "%USERPROFILE%\Downloads\SERVICOS_ATUAIS_2.xlsx;%USERPROFILE%\Downloads\SERVICOS_ATUAIS (2).xlsx;" & _
         "%USERPROFILE%\Downloads\SERVICOS_ATUAIS.xlsx")
     If caminho = "" Then
@@ -6531,7 +6532,7 @@ Private Sub GarantirConfig()
     Dim def As Variant
     def = Array( _
         Array("CAT_MATERIAIS", "%USERPROFILE%\Downloads\MATERIAS_ATUAIS_4.xlsx;%USERPROFILE%\Downloads\MATERIAS_ATUAIS (2).xlsx;%USERPROFILE%\Downloads\MATERIAS_ATUAIS.xlsx", "Caminhos do catalogo de materiais (separar alternativas por ;)"), _
-        Array("CAT_SERVICOS", "%USERPROFILE%\Downloads\SERVICOS_ATUAIS_2.xlsx;%USERPROFILE%\Downloads\SERVICOS_ATUAIS.xlsx", "Caminho do catalogo de servicos"), _
+        Array("CAT_SERVICOS", "%USERPROFILE%\Downloads\SERVICOS_ATUAIS_3.xlsx;%USERPROFILE%\Downloads\SERVICOS_ATUAIS_2.xlsx;%USERPROFILE%\Downloads\SERVICOS_ATUAIS.xlsx", "Caminho do catalogo de servicos"), _
         Array("CAT_CLASSE", "%USERPROFILE%\Downloads\CLASSE_CUSTO_ATUAIS_2.xlsx;%USERPROFILE%\Downloads\CLASSE_CUSTO_ATUAIS.xlsx", "Caminhos do catalogo de classe de custo"), _
         Array("CAT_CABO", "%USERPROFILE%\Downloads\CONVERSOES_CABO_ATUAIS.xlsx", "Caminho da conversao de cabo KG->m (opcional)"), _
         Array("CAT_COMBO", "%USERPROFILE%\Downloads\SRV_COMBO_ATUAIS.xlsx", "Caminho do catalogo SRV COMBO"), _
