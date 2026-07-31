@@ -34,6 +34,34 @@ Private Const COR_HDR As Long = &H7D491F          ' azul escuro 1F497D (BGR)
 Private Const COR_OK As Long = &HCEEFC6           ' verde claro
 Private Const COR_BAD As Long = &HCEC7FF          ' vermelho claro
 
+' --- Design tokens da camada visual (fonte unica de verdade) ------------------
+' Observacao: Const nao aceita RGB(); os numeros sao r + g*256 + b*65536.
+Private Const FONTE_UI As String = "Segoe UI"
+' Superficies e estrutura
+Private Const COR_UI_HDR As Long = 4286720            ' RGB(0,105,65)   verde institucional
+Private Const COR_UI_HDR_ACENTO As Long = 2505728     ' RGB(0,60,38)    verde escuro
+Private Const COR_UI_ZEBRA As Long = 16251381         ' RGB(245,249,247)
+Private Const COR_UI_BORDA As Long = 15132390         ' RGB(230,230,230)
+Private Const COR_UI_GRADE As Long = 15658734         ' RGB(238,238,238)
+Private Const COR_UI_TINTA As Long = 4739144          ' RGB(72,80,72)   grafite
+Private Const COR_UI_CHAVE As Long = 3033344          ' RGB(0,73,46)
+Private Const COR_UI_MUDO As Long = 8620931           ' RGB(131,139,131)
+' Barras de dados
+Private Const COR_UI_BARRA As Long = 9879160          ' RGB(120,190,150)
+Private Const COR_UI_BARRA_NEG As Long = 6053078      ' RGB(214,92,92)
+Private Const COR_UI_BARRA_PCT As Long = 13413253     ' RGB(133,171,204)
+' Semantica: fundo / texto
+Private Const COR_UI_OK_BG As Long = 15531448         ' RGB(232,245,236)
+Private Const COR_UI_OK_FG As Long = 4681237          ' RGB(21,110,71)
+Private Const COR_UI_BAD_BG As Long = 15526909        ' RGB(253,235,236)
+Private Const COR_UI_BAD_FG As Long = 2629800         ' RGB(168,32,40)
+Private Const COR_UI_WARN_BG As Long = 14087423       ' RGB(255,244,214)
+Private Const COR_UI_WARN_FG As Long = 26258          ' RGB(146,102,0)
+Private Const COR_UI_NEU_BG As Long = 15922161        ' RGB(241,243,242)
+Private Const COR_UI_NEU_FG As Long = 8159352         ' RGB(120,128,124)
+Private Const COR_UI_INFO_BG As Long = 16314600       ' RGB(232,240,248)
+Private Const COR_UI_INFO_FG As Long = 9721621        ' RGB(21,87,148)
+
 Private wsRaw As Worksheet
 Private dados As Variant
 Private nLin As Long
@@ -4767,12 +4795,19 @@ PreCalc:
     Dim corB As Long, corBcl As Long, corBzb As Long
     Dim corC As Long, corCcl As Long, corCzb As Long
     Dim corE As Long, corEcl As Long, corEzb As Long
-    corInk = RGB(33, 37, 41)        ' texto principal
-    corMut = RGB(134, 142, 150)     ' texto secundario
-    corA = RGB(13, 110, 253): corAcl = RGB(217, 232, 254): corAzb = RGB(240, 246, 255)
-    corB = RGB(200, 35, 51): corBcl = RGB(249, 217, 221): corBzb = RGB(253, 240, 242)
-    corC = RGB(96, 50, 150): corCcl = RGB(234, 224, 244): corCzb = RGB(247, 243, 251)
-    corE = RGB(212, 105, 4): corEcl = RGB(252, 229, 205): corEzb = RGB(254, 245, 233)
+    corInk = RGB(45, 52, 56)        ' texto principal
+    corMut = COR_UI_MUDO            ' texto secundario
+    corA = RGB(21, 87, 148):  corAcl = RGB(232, 240, 248): corAzb = RGB(246, 250, 253)
+    corB = RGB(168, 32, 40):  corBcl = RGB(253, 235, 236): corBzb = RGB(253, 247, 247)
+    corC = RGB(90, 62, 138):  corCcl = RGB(238, 233, 246): corCzb = RGB(249, 247, 252)
+    corE = RGB(159, 96, 12):  corEcl = RGB(253, 243, 224): corEzb = RGB(254, 251, 244)
+
+    ' Tipografia base da aba inteira (evita mistura de fontes do Excel)
+    On Error Resume Next
+    ws.Cells.Font.Name = FONTE_UI
+    ws.Cells.Font.Size = 9.5
+    ws.Cells.VerticalAlignment = xlCenter
+    On Error GoTo 0
 
     Dim row As Long: row = 1
     Dim contA As Long, contB As Long, contC As Long, contE As Long
@@ -4781,14 +4816,14 @@ PreCalc:
     gEtapa = "Alertas: cabecalho"
     ' === CABECALHO DA ABA (banda verde institucional) ===
     With ws.Range(ws.Cells(1, 1), ws.Cells(2, 10))
-        .Interior.Color = RGB(0, 105, 65)
+        .Interior.Color = COR_UI_HDR
     End With
     ws.Cells(row, 1).Value = "ALERTAS CRITICOS"
     With ws.Cells(row, 1)
-        .Font.Size = 18: .Font.Bold = True: .Font.Color = vbWhite
+        .Font.Size = 20: .Font.Bold = True: .Font.Color = vbWhite
         .IndentLevel = 1
     End With
-    ws.Rows(row).RowHeight = 30
+    ws.Rows(row).RowHeight = 34
     row = row + 1
     ws.Cells(row, 1).Value = "Analise de custo / CKCP  -  gerado em " & Format(Now, "dd/mm/yyyy hh:nn")
     With ws.Cells(row, 1)
@@ -4807,13 +4842,13 @@ PreCalc:
     ' === CARDS DE RESUMO (numeros preenchidos no final, com contagens reais) ===
     ws.Cells(row, 1).Value = "RESUMO"
     With ws.Cells(row, 1)
-        .Font.Size = 8: .Font.Bold = True: .Font.Color = RGB(134, 142, 150)
+        .Font.Size = 8: .Font.Bold = True: .Font.Color = COR_UI_MUDO
         .IndentLevel = 1
     End With
     row = row + 1
     rowCards = row
-    ws.Rows(rowCards).RowHeight = 16
-    ws.Rows(rowCards + 1).RowHeight = 38
+    ws.Rows(rowCards).RowHeight = 18
+    ws.Rows(rowCards + 1).RowHeight = 40
     row = row + 3
 
     gEtapa = "Alertas: secao A"
@@ -5106,7 +5141,9 @@ ProxE:
     ws.Tab.Color = CorAba("ALERTAS CRITICOS")
     ws.Activate
     ActiveWindow.DisplayGridlines = False
+    ActiveWindow.Zoom = 90
     On Error GoTo 0
+    PrepararImpressao ws, "ALERTAS CRITICOS", row, 10
     ' Congela cabecalho + cards de resumo (sticky ao rolar as secoes)
     AplicarFreeze ws, "A" & (rowCards + 3), congelar:=True
 End Sub
@@ -5134,7 +5171,8 @@ Private Sub EscreverCardAlerta(ws As Worksheet, ByVal r As Long, ByVal c As Long
         .HorizontalAlignment = xlLeft: .VerticalAlignment = xlCenter
     End With
     With ws.Cells(r, c)
-        .Value = rotulo
+        .Value = UCase$(rotulo)
+        .Font.Name = FONTE_UI
         .Font.Size = 8: .Font.Bold = True: .Font.Color = cor
         .IndentLevel = 1
     End With
@@ -5145,9 +5183,12 @@ Private Sub EscreverCardAlerta(ws As Worksheet, ByVal r As Long, ByVal c As Long
     End With
     With ws.Cells(r + 1, c)
         .Value = valor
-        .Font.Size = 22: .Font.Bold = True
-        .Font.Color = IIf(valor > 0, cor, RGB(134, 142, 150))
+        .Font.Name = FONTE_UI
+        .Font.Size = 26: .Font.Bold = True
+        .Font.Color = IIf(valor > 0, cor, COR_UI_MUDO)
     End With
+    ws.Rows(r).RowHeight = 18
+    ws.Rows(r + 1).RowHeight = 40
 End Sub
 
 ' Helper: faixa de titulo da secao (cor cheia + texto branco) + cabecalho tintado
@@ -5161,12 +5202,14 @@ Private Function EscreverCabecalhoAlerta(ws As Worksheet, ByVal startRow As Long
     ws.Cells(r, 1).Value = titulo
     With ws.Range(ws.Cells(r, 1), ws.Cells(r, nCols))
         .Merge
+        .Font.Name = FONTE_UI
         .Font.Bold = True: .Font.Size = 11: .Font.Color = vbWhite
         .Interior.Color = corForte
         .HorizontalAlignment = xlLeft
+        .VerticalAlignment = xlCenter
         .IndentLevel = 1
     End With
-    ws.Rows(r).RowHeight = 22
+    ws.Rows(r).RowHeight = 26
     r = r + 1
 
     ' Cabecalho das colunas: tinta clara da secao + texto na cor forte
@@ -5175,13 +5218,17 @@ Private Function EscreverCabecalhoAlerta(ws As Worksheet, ByVal startRow As Long
         ws.Cells(r, j + 1).Value = cabecalhos(j)
     Next j
     With ws.Range(ws.Cells(r, 1), ws.Cells(r, nCols))
+        .Font.Name = FONTE_UI
         .Font.Bold = True: .Font.Size = 8.5
         .Font.Color = corForte
         .Interior.Color = corClara
+        .VerticalAlignment = xlCenter
+        .IndentLevel = 1
         .Borders(xlEdgeBottom).LineStyle = xlContinuous
         .Borders(xlEdgeBottom).Weight = xlMedium
         .Borders(xlEdgeBottom).Color = corForte
     End With
+    ws.Rows(r).RowHeight = 20
     r = r + 1
 
     EscreverCabecalhoAlerta = r
@@ -5272,6 +5319,9 @@ Private Sub Gerar_Regras()
     ws.Range(ws.Cells(2, 1), ws.Cells(cnt + 1, 3)).WrapText = True
     ws.Range(ws.Cells(2, 1), ws.Cells(cnt + 1, 3)).VerticalAlignment = xlTop
     ws.Range(ws.Cells(2, 1), ws.Cells(cnt + 1, 3)).EntireRow.AutoFit
+    On Error Resume Next
+    ws.PageSetup.Orientation = xlPortrait
+    On Error GoTo 0
 End Sub
 
 Private Sub EscreverAba(nome As String, outp() As Variant)
@@ -5609,19 +5659,19 @@ Prox:
     ' Grupos de colunas com cores distintas no cabecalho
     ' Financeiro (3-7): azul
     With ws.Range(ws.Cells(1, 3), ws.Cells(1, 7))
-        .Interior.Color = RGB(31, 78, 120)
+        .Interior.Color = RGB(28, 64, 99)
     End With
     ' Aderencia (8-10): verde escuro
     With ws.Range(ws.Cells(1, 8), ws.Cells(1, 10))
-        .Interior.Color = RGB(56, 87, 35)
+        .Interior.Color = COR_UI_HDR_ACENTO
     End With
     ' Alertas (11-15): vermelho escuro
     With ws.Range(ws.Cells(1, 11), ws.Cells(1, 15))
-        .Interior.Color = RGB(139, 0, 0)
+        .Interior.Color = RGB(122, 26, 32)
     End With
     ' CA detalhe (16-22): roxo escuro
     With ws.Range(ws.Cells(1, 16), ws.Cells(1, 22))
-        .Interior.Color = RGB(88, 24, 69)
+        .Interior.Color = RGB(72, 47, 102)
     End With
 
     ' Colore linhas por STATUS_ODI e QTD_ALERTAS
@@ -5632,32 +5682,33 @@ Prox:
             Dim nAlPn As Long: nAlPn = CLng(ws.Cells(rrPn, 15).Value)
             Select Case stODIPn
                 Case "REPROVADO"
-                    ws.Cells(rrPn, 8).Interior.Color = RGB(255, 199, 206)
-                    ws.Cells(rrPn, 8).Font.Color = RGB(156, 0, 6)
+                    ws.Cells(rrPn, 8).Interior.Color = COR_UI_BAD_BG
+                    ws.Cells(rrPn, 8).Font.Color = COR_UI_BAD_FG
                     ws.Cells(rrPn, 8).Font.Bold = True
                 Case "APROVADO"
-                    ws.Cells(rrPn, 8).Interior.Color = RGB(198, 239, 206)
-                    ws.Cells(rrPn, 8).Font.Color = RGB(0, 97, 0)
+                    ws.Cells(rrPn, 8).Interior.Color = COR_UI_OK_BG
+                    ws.Cells(rrPn, 8).Font.Color = COR_UI_OK_FG
                     ws.Cells(rrPn, 8).Font.Bold = True
                 Case Else
-                    ws.Cells(rrPn, 8).Interior.Color = RGB(217, 217, 217)
-                    ws.Cells(rrPn, 8).Font.Color = RGB(89, 89, 89)
+                    ws.Cells(rrPn, 8).Interior.Color = COR_UI_NEU_BG
+                    ws.Cells(rrPn, 8).Font.Color = COR_UI_NEU_FG
             End Select
             Select Case True
                 Case nAlPn = 0:
                 Case nAlPn = 1
-                    ws.Cells(rrPn, 15).Interior.Color = RGB(255, 235, 156)
+                    ws.Cells(rrPn, 15).Interior.Color = COR_UI_WARN_BG
+                    ws.Cells(rrPn, 15).Font.Color = COR_UI_WARN_FG
                     ws.Cells(rrPn, 15).Font.Bold = True
                 Case nAlPn >= 2
-                    ws.Cells(rrPn, 15).Interior.Color = RGB(255, 199, 206)
-                    ws.Cells(rrPn, 15).Font.Color = RGB(156, 0, 6)
+                    ws.Cells(rrPn, 15).Interior.Color = COR_UI_BAD_BG
+                    ws.Cells(rrPn, 15).Font.Color = COR_UI_BAD_FG
                     ws.Cells(rrPn, 15).Font.Bold = True
             End Select
             Dim jcPn As Long
             For jcPn = 11 To 14
                 If UCase$(Trim$(CStr(ws.Cells(rrPn, jcPn).Value))) = "S" Then
-                    ws.Cells(rrPn, jcPn).Interior.Color = RGB(255, 199, 206)
-                    ws.Cells(rrPn, jcPn).Font.Color = RGB(156, 0, 6)
+                    ws.Cells(rrPn, jcPn).Interior.Color = COR_UI_BAD_BG
+                    ws.Cells(rrPn, jcPn).Font.Color = COR_UI_BAD_FG
                     ws.Cells(rrPn, jcPn).Font.Bold = True
                 End If
             Next jcPn
@@ -6423,18 +6474,19 @@ Private Sub PintarRunVeredito(ws As Worksheet, ByVal jc As Long, _
                               ByVal linIni As Long, ByVal linFim As Long, _
                               ByVal cat As Long)
     With ws.Range(ws.Cells(linIni, jc), ws.Cells(linFim, jc))
+        .Font.Name = FONTE_UI
         Select Case cat
             Case 1
-                .Interior.Color = COR_OK
-                .Font.Color = RGB(0, 97, 0)
+                .Interior.Color = COR_UI_OK_BG
+                .Font.Color = COR_UI_OK_FG
                 .Font.Bold = True
             Case 2
-                .Interior.Color = COR_BAD
-                .Font.Color = RGB(156, 0, 6)
+                .Interior.Color = COR_UI_BAD_BG
+                .Font.Color = COR_UI_BAD_FG
                 .Font.Bold = True
             Case 3
-                .Interior.Color = RGB(217, 217, 217)
-                .Font.Color = RGB(89, 89, 89)
+                .Interior.Color = COR_UI_NEU_BG
+                .Font.Color = COR_UI_NEU_FG
         End Select
     End With
 End Sub
@@ -6443,18 +6495,19 @@ Private Sub PintarStatusRC(ws As Worksheet, ByVal linIni As Long, _
                            ByVal linFim As Long, ByVal st As String)
     Dim bgRC As Long, fgRC As Long
     Select Case st
-        Case "OK":                  bgRC = RGB(198, 239, 206): fgRC = RGB(0, 97, 0)
-        Case "ANCORA":              bgRC = RGB(222, 234, 241): fgRC = RGB(31, 73, 125)
-        Case "EXCESSO":             bgRC = RGB(255, 235, 156): fgRC = RGB(128, 96, 0)
-        Case "INSUFICIENTE":        bgRC = RGB(255, 199, 206): fgRC = RGB(156, 0, 6)
-        Case "ESTORNO SEM ENTRADA": bgRC = RGB(255, 199, 206): fgRC = RGB(156, 0, 6)
-        Case "QTD ZERO":            bgRC = RGB(255, 199, 206): fgRC = RGB(156, 0, 6)
-        Case "SEM ANCORA":          bgRC = RGB(255, 235, 156): fgRC = RGB(89, 89, 89)
-        Case Else:                  bgRC = RGB(217, 217, 217): fgRC = RGB(89, 89, 89)
+        Case "OK":                  bgRC = COR_UI_OK_BG:   fgRC = COR_UI_OK_FG
+        Case "ANCORA":              bgRC = COR_UI_INFO_BG: fgRC = COR_UI_INFO_FG
+        Case "EXCESSO":             bgRC = COR_UI_WARN_BG: fgRC = COR_UI_WARN_FG
+        Case "INSUFICIENTE":        bgRC = COR_UI_BAD_BG:  fgRC = COR_UI_BAD_FG
+        Case "ESTORNO SEM ENTRADA": bgRC = COR_UI_BAD_BG:  fgRC = COR_UI_BAD_FG
+        Case "QTD ZERO":            bgRC = COR_UI_BAD_BG:  fgRC = COR_UI_BAD_FG
+        Case "SEM ANCORA":          bgRC = COR_UI_WARN_BG: fgRC = COR_UI_NEU_FG
+        Case Else:                  bgRC = COR_UI_NEU_BG:  fgRC = COR_UI_NEU_FG
     End Select
     With ws.Range(ws.Cells(linIni, 15), ws.Cells(linFim, 15))
         .Interior.Color = bgRC
         .Font.Color = fgRC
+        .Font.Name = FONTE_UI
         .Font.Bold = True
     End With
 End Sub
@@ -6643,38 +6696,45 @@ Private Sub FormatarVisualAba(ws As Worksheet, ByVal nome As String, _
 
     ' Paleta institucional (verde Equatorial) + tons de apoio
     Dim corHdr As Long, corHdrLn As Long, corZebra As Long, corBorda As Long
-    corHdr = RGB(0, 105, 65)        ' verde institucional (cabecalho)
-    corHdrLn = RGB(0, 60, 38)       ' verde escuro (linha de acento)
-    corZebra = RGB(246, 249, 247)   ' zebra verde muito clara
-    corBorda = RGB(223, 227, 230)   ' borda cinza clara
+    Dim corTinta As Long, corChave As Long, corGrade As Long
+    corHdr = COR_UI_HDR             ' verde institucional (cabecalho)
+    corHdrLn = COR_UI_HDR_ACENTO    ' verde escuro (linha de acento)
+    corZebra = COR_UI_ZEBRA         ' zebra verde muito clara
+    corBorda = COR_UI_BORDA         ' borda cinza clara
+    corTinta = COR_UI_TINTA         ' texto do corpo
+    corChave = COR_UI_CHAVE         ' 1a coluna (chave)
+    corGrade = COR_UI_GRADE         ' linhas internas
 
     On Error Resume Next
     ws.Tab.Color = CorAba(nome)
     ws.Activate
     ActiveWindow.DisplayGridlines = False
+    ActiveWindow.DisplayHeadings = True
+    ActiveWindow.Zoom = 90
     On Error GoTo 0
 
     ' Cabecalho (verde, branco, negrito) + linha de acento por baixo
     With ws.Range(ws.Cells(1, 1), ws.Cells(1, nC))
         .Interior.Color = corHdr
         .Font.Color = vbWhite: .Font.Bold = True
-        .Font.Name = "Segoe UI": .Font.Size = 10
+        .Font.Name = FONTE_UI: .Font.Size = 9.5
         .VerticalAlignment = xlCenter
-        .HorizontalAlignment = xlCenter
+        .HorizontalAlignment = xlLeft
+        .IndentLevel = 1
         .WrapText = True
         .Borders(xlEdgeBottom).LineStyle = xlContinuous
         .Borders(xlEdgeBottom).Weight = xlMedium
         .Borders(xlEdgeBottom).Color = corHdrLn
     End With
-    ws.Rows(1).RowHeight = 30
+    ws.Rows(1).RowHeight = 34
 
     If nR >= 2 Then
         Dim corpo As Range
         Set corpo = ws.Range(ws.Cells(2, 1), ws.Cells(nR, nC))
-        corpo.Font.Name = "Segoe UI"
-        corpo.Font.Size = 9
+        corpo.Font.Name = FONTE_UI
+        corpo.Font.Size = 9.5
         corpo.VerticalAlignment = xlCenter
-        corpo.Font.Color = RGB(51, 63, 72)      ' texto grafite (menos duro que preto)
+        corpo.Font.Color = corTinta             ' texto grafite (menos duro que preto)
 
         ' Zebra por coluna, pulando colunas de veredito/alerta (as cores
         ' semanticas dessas colunas devem prevalecer sobre a zebra).
@@ -6702,12 +6762,16 @@ Private Sub FormatarVisualAba(ws As Worksheet, ByVal nome As String, _
             ' Formato numerico + alinhamento por tipo de coluna
             Dim fmt As String: fmt = FormatoColuna(hh)
             Dim colRg As Range: Set colRg = ws.Range(ws.Cells(2, jc), ws.Cells(nR, jc))
-            If fmt <> "" Then colRg.NumberFormat = fmt
+            If fmt <> "" Then colRg.NumberFormat = FormatoNegativo(fmt)
             If EhColunaVeredito(hh) Then
                 colRg.HorizontalAlignment = xlCenter
+                ws.Cells(1, jc).HorizontalAlignment = xlCenter
+                ws.Cells(1, jc).IndentLevel = 0
             ElseIf fmt <> "" Then
                 colRg.HorizontalAlignment = xlRight    ' numeros alinhados a direita
                 colRg.IndentLevel = 1
+                ws.Cells(1, jc).HorizontalAlignment = xlRight
+                ws.Cells(1, jc).IndentLevel = 1
             Else
                 colRg.HorizontalAlignment = xlLeft
                 colRg.IndentLevel = 1
@@ -6718,8 +6782,12 @@ Private Sub FormatarVisualAba(ws As Worksheet, ByVal nome As String, _
                Or InStr(hh, "TOTAL") > 0) And Not EhColunaVeredito(hh) Then
                 On Error Resume Next
                 With ws.Range(ws.Cells(2, jc), ws.Cells(nR, jc)).FormatConditions.AddDatabar
-                    .BarColor.Color = RGB(99, 190, 123)
-                    .BarFillType = xlDataBarFillGradient
+                    .BarColor.Color = COR_UI_BARRA
+                    .BarFillType = xlDataBarFillSolid
+                    .BarBorder.Type = xlDataBarBorderNone
+                    .Direction = xlContext
+                    .NegativeBarFormat.ColorType = xlDataBarColor
+                    .NegativeBarFormat.Color.Color = COR_UI_BARRA_NEG
                     .ShowValue = True
                 End With
                 On Error GoTo 0
@@ -6729,8 +6797,9 @@ Private Sub FormatarVisualAba(ws As Worksheet, ByVal nome As String, _
             If fmt = "0.0" And InStr(hh, "PERC") > 0 And Not EhColunaVeredito(hh) Then
                 On Error Resume Next
                 With ws.Range(ws.Cells(2, jc), ws.Cells(nR, jc)).FormatConditions.AddDatabar
-                    .BarColor.Color = RGB(91, 155, 213)
-                    .BarFillType = xlDataBarFillGradient
+                    .BarColor.Color = COR_UI_BARRA_PCT
+                    .BarFillType = xlDataBarFillSolid
+                    .BarBorder.Type = xlDataBarBorderNone
                     .MinPoint.Modify newtype:=xlConditionValueNumber, newvalue:=0
                     .MaxPoint.Modify newtype:=xlConditionValueNumber, newvalue:=100
                     .ShowValue = True
@@ -6746,17 +6815,18 @@ Private Sub FormatarVisualAba(ws As Worksheet, ByVal nome As String, _
             .Color = corBorda
         End With
         ' Linhas horizontais um pouco mais visiveis (leitura por linha)
-        corpo.Borders(xlInsideHorizontal).Color = RGB(232, 236, 239)
+        corpo.Borders(xlInsideHorizontal).Color = corGrade
+        corpo.Borders(xlInsideVertical).Color = corBorda
 
         ' 1a coluna em destaque (chave/PEP): negrito e cor institucional
         With ws.Range(ws.Cells(2, 1), ws.Cells(nR, 1))
             .Font.Bold = True
-            .Font.Color = RGB(0, 75, 46)
+            .Font.Color = corChave
         End With
 
         ' Altura de linha uniforme (visual mais limpo que o default variavel)
         On Error Resume Next
-        ws.Range(ws.Cells(2, 1), ws.Cells(nR, 1)).EntireRow.RowHeight = 18
+        ws.Range(ws.Cells(2, 1), ws.Cells(nR, 1)).EntireRow.RowHeight = 19
         On Error GoTo 0
 
         ' Contorno da tabela (fecha o bloco visualmente)
@@ -6770,16 +6840,74 @@ Private Sub FormatarVisualAba(ws As Worksheet, ByVal nome As String, _
     ' AutoFit amostrado: cabecalho + primeiras linhas (rapido em abas grandes)
     Dim amostraR As Long: amostraR = nR
     If amostraR > 200 Then amostraR = 200
-    ws.Range(ws.Cells(1, 1), ws.Cells(amostraR, nC)).Columns.AutoFit
-    ' Teto e piso de largura (evita colunas espremidas ou largas demais)
+    ws.Range(ws.Cells(2, 1), ws.Cells(amostraR, nC)).Columns.AutoFit
+    ' Teto e piso de largura por tipo de coluna (descricoes podem ser largas;
+    ' colunas de numero/veredito ficam compactas e nao se espremem)
     For jc = 1 To nC
-        If ws.Columns(jc).ColumnWidth > 45 Then ws.Columns(jc).ColumnWidth = 45
-        If ws.Columns(jc).ColumnWidth < 9 Then ws.Columns(jc).ColumnWidth = 9
+        hh = UCase$(CStr(ws.Cells(1, jc).Value))
+        Dim wMax As Double, wMin As Double, wAtual As Double
+        wMax = LarguraMaxColuna(hh): wMin = 10
+        If EhColunaVeredito(hh) Then wMin = 16
+        wAtual = ws.Columns(jc).ColumnWidth
+        If wAtual > wMax Then ws.Columns(jc).ColumnWidth = wMax
+        If wAtual < wMin Then ws.Columns(jc).ColumnWidth = wMin
     Next jc
     ' Congela cabecalho + 1a coluna quando o freeze padrao (A2) e usado
     Dim fCong As String: fCong = celFreeze
     If UCase$(fCong) = "A2" And nC > 3 Then fCong = "B2"
     AplicarFreeze ws, fCong
+    PrepararImpressao ws, nome, nR, nC
+End Sub
+
+' Largura maxima da coluna conforme o tipo de conteudo do cabecalho.
+Private Function LarguraMaxColuna(ByVal hh As String) As Double
+    hh = UCase$(Trim$(hh))
+    If InStr(hh, "DESC") > 0 Or InStr(hh, "TEXTO") > 0 Or InStr(hh, "DENOM") > 0 _
+       Or InStr(hh, "OBSERV") > 0 Or InStr(hh, "REGRA") > 0 Or InStr(hh, "ACAO") > 0 Then
+        LarguraMaxColuna = 52
+    ElseIf InStr(hh, "PEP") > 0 Then
+        LarguraMaxColuna = 34
+    ElseIf EhColunaVeredito(hh) Then
+        LarguraMaxColuna = 24
+    Else
+        LarguraMaxColuna = 28
+    End If
+End Function
+
+' Acrescenta o tratamento de negativo (vermelho) aos formatos numericos.
+Private Function FormatoNegativo(ByVal fmt As String) As String
+    Select Case fmt
+        Case "#,##0.00": FormatoNegativo = "#,##0.00;[Red]-#,##0.00;""-"""
+        Case "#,##0":    FormatoNegativo = "#,##0;[Red]-#,##0;""-"""
+        Case "0.0":      FormatoNegativo = "0.0;[Red]-0.0;""-"""
+        Case Else:       FormatoNegativo = fmt
+    End Select
+End Function
+
+' Impressao pronta: paisagem, ajuste a largura, cabecalho repetido e rodape.
+Private Sub PrepararImpressao(ws As Worksheet, ByVal nome As String, _
+                              ByVal nR As Long, ByVal nC As Long)
+    On Error Resume Next
+    Application.PrintCommunication = False
+    With ws.PageSetup
+        .Orientation = xlLandscape
+        .Zoom = False
+        .FitToPagesWide = 1
+        .FitToPagesTall = False
+        .PrintTitleRows = "$1:$1"
+        .LeftMargin = Application.InchesToPoints(0.3)
+        .RightMargin = Application.InchesToPoints(0.3)
+        .TopMargin = Application.InchesToPoints(0.5)
+        .BottomMargin = Application.InchesToPoints(0.45)
+        .HeaderMargin = Application.InchesToPoints(0.2)
+        .FooterMargin = Application.InchesToPoints(0.2)
+        .CenterHeader = "&""" & FONTE_UI & ",Bold""&11" & UCase$(nome)
+        .LeftFooter = "&""" & FONTE_UI & """&8CKCP RS2  |  Analise de Custos"
+        .RightFooter = "&""" & FONTE_UI & """&8Pagina &P de &N"
+        .PrintGridlines = False
+    End With
+    Application.PrintCommunication = True
+    On Error GoTo 0
 End Sub
 
 ' Ordena as guias por fluxo de leitura (gerencial -> detalhe -> apoio)
@@ -7791,15 +7919,21 @@ Private Sub EscreverAbaAT()
             .Value = headers(c - 1)
             .Font.Bold = True
             .Font.Color = RGB(255, 255, 255)
-            .Font.Size = 8
-            .Font.Name = "Calibri"
-            .Interior.Color = COR_HEADER
-            .HorizontalAlignment = xlCenter
+            .Font.Size = 9.5
+            .Font.Name = FONTE_UI
+            .Interior.Color = COR_UI_HDR
+            .HorizontalAlignment = xlLeft
             .VerticalAlignment = xlCenter
+            .IndentLevel = 1
             .WrapText = True
         End With
     Next c
-    ws.Rows(1).RowHeight = 28
+    With ws.Range(ws.Cells(1, 1), ws.Cells(1, nCols))
+        .Borders(xlEdgeBottom).LineStyle = xlContinuous
+        .Borders(xlEdgeBottom).Weight = xlMedium
+        .Borders(xlEdgeBottom).Color = COR_UI_HDR_ACENTO
+    End With
+    ws.Rows(1).RowHeight = 34
 
     ' Dados
     Dim prevPep As String, prevGrp As String, grpIdx As Integer
@@ -7853,9 +7987,11 @@ Private Sub EscreverAbaAT()
             Dim rng As Range
             Set rng = ws.Range(ws.Cells(r, 1), ws.Cells(r, nCols))
             rng.Interior.Color = bgColor
-            rng.Font.Size = 8
-            rng.Font.Name = "Calibri"
-            rng.RowHeight = 13
+            rng.Font.Size = 9
+            rng.Font.Name = FONTE_UI
+            rng.Font.Color = COR_UI_TINTA
+            rng.VerticalAlignment = xlCenter
+            rng.RowHeight = 17
 
             ' Formatos especificos
             ws.Cells(r, 10).NumberFormat = "#,##0.00"
@@ -7891,13 +8027,16 @@ Private Sub EscreverAbaAT()
             ' ADERENCIA
             Select Case .Aderencia
                 Case "ADERENTE"
-                    ws.Cells(r, 17).Interior.Color = COR_ADER_OK
+                    ws.Cells(r, 17).Interior.Color = COR_UI_OK_BG
+                    ws.Cells(r, 17).Font.Color = COR_UI_OK_FG
                     ws.Cells(r, 17).Font.Bold = True
                 Case "QTD DIVERGENTE"
-                    ws.Cells(r, 17).Interior.Color = COR_ADER_DIV
+                    ws.Cells(r, 17).Interior.Color = COR_UI_WARN_BG
+                    ws.Cells(r, 17).Font.Color = COR_UI_WARN_FG
                     ws.Cells(r, 17).Font.Bold = True
                 Case "SEM SERVI" & Chr(199) & "O CORRESPONDENTE", "SEM MATERIAL CORRESPONDENTE"
-                    ws.Cells(r, 17).Interior.Color = COR_ADER_ERR
+                    ws.Cells(r, 17).Interior.Color = COR_UI_BAD_BG
+                    ws.Cells(r, 17).Font.Color = COR_UI_BAD_FG
                     ws.Cells(r, 17).Font.Bold = True
             End Select
             ws.Cells(r, 17).HorizontalAlignment = xlCenter
@@ -7916,9 +8055,10 @@ Private Sub EscreverAbaAT()
     Set dataRng = ws.Range(ws.Cells(1, 1), ws.Cells(nItens + 1, nCols))
     With dataRng.Borders
         .LineStyle = xlContinuous
-        .Color = RGB(217, 217, 217)
-        .Weight = xlThin
+        .Color = COR_UI_BORDA
+        .Weight = xlHairline
     End With
+    dataRng.Borders(xlInsideHorizontal).Color = COR_UI_GRADE
 
     ' Auto-fit largura
     ws.Columns.AutoFit
@@ -7933,6 +8073,10 @@ Private Sub EscreverAbaAT()
     ActiveWindow.FreezePanes = True
     ws.Range(ws.Cells(1, 1), ws.Cells(1, nCols)).AutoFilter
     ActiveWindow.Zoom = 90
+    On Error Resume Next
+    ws.Tab.Color = CorAba("MATERIAL VS SERVICO")
+    On Error GoTo 0
+    PrepararImpressao ws, "MAT vs SERV AT", nItens + 1, nCols
 End Sub
 
 ' ============================================================
@@ -8088,8 +8232,8 @@ Private Sub CriarPremissas()
     With ws.Range("A1")
         .Value = "PREMISSAS DE VALIDACAO - ABA MAT vs SERV AT"
         .Font.Bold = True: .Font.Color = RGB(255, 255, 255)
-        .Font.Size = 12: .Font.Name = "Calibri"
-        .Interior.Color = COR_HDR
+        .Font.Size = 14: .Font.Name = FONTE_UI
+        .Interior.Color = COR_UI_HDR
         .HorizontalAlignment = xlCenter: .VerticalAlignment = xlCenter
     End With
     ws.Rows(1).RowHeight = 32
@@ -8098,7 +8242,7 @@ Private Sub CriarPremissas()
     With ws.Range("A2")
         .Value = "Regras aplicadas automaticamente nas colunas INCONFORMIDADE e ADERENCIA MAT X SERV"
         .Font.Italic = True: .Font.Color = RGB(85, 85, 85)
-        .Font.Size = 9: .Font.Name = "Calibri"
+        .Font.Size = 9: .Font.Name = FONTE_UI
         .Interior.Color = RGB(242, 244, 248)
         .HorizontalAlignment = xlCenter: .VerticalAlignment = xlCenter
     End With
@@ -8230,11 +8374,11 @@ Private Sub CriarPremissas()
         ws.Cells(rowT, 1).Font.Bold = True: ws.Cells(rowT, 1).HorizontalAlignment = xlCenter
         ws.Cells(rowT, 1).Interior.Color = bgT
         ws.Cells(rowT, 2).Value = trat(t, 0): ws.Cells(rowT, 2).Font.Bold = True
-        ws.Cells(rowT, 2).Font.Size = 8: ws.Cells(rowT, 2).Font.Name = "Calibri"
+        ws.Cells(rowT, 2).Font.Size = 8: ws.Cells(rowT, 2).Font.Name = FONTE_UI
         ws.Cells(rowT, 2).Interior.Color = bgT: ws.Cells(rowT, 2).VerticalAlignment = xlCenter
         ws.Range(ws.Cells(rowT, 3), ws.Cells(rowT, 5)).Merge
         ws.Cells(rowT, 3).Value = trat(t, 1): ws.Cells(rowT, 3).Font.Size = 8
-        ws.Cells(rowT, 3).Font.Name = "Calibri": ws.Cells(rowT, 3).Interior.Color = bgT
+        ws.Cells(rowT, 3).Font.Name = FONTE_UI: ws.Cells(rowT, 3).Interior.Color = bgT
         ws.Cells(rowT, 3).VerticalAlignment = xlCenter: ws.Cells(rowT, 3).WrapText = True
         ws.Rows(rowT).RowHeight = 24
     Next t
@@ -8274,11 +8418,11 @@ Private Sub CriarPremissas()
         ws.Cells(rowC, 1).Font.Color = RGB(255, 255, 255): ws.Cells(rowC, 1).Interior.Color = COR_HDR
         ws.Cells(rowC, 1).HorizontalAlignment = xlCenter: ws.Cells(rowC, 1).VerticalAlignment = xlCenter
         ws.Cells(rowC, 2).Value = cols(cl, 0): ws.Cells(rowC, 2).Font.Bold = True
-        ws.Cells(rowC, 2).Font.Size = 8: ws.Cells(rowC, 2).Font.Name = "Calibri"
+        ws.Cells(rowC, 2).Font.Size = 8: ws.Cells(rowC, 2).Font.Name = FONTE_UI
         ws.Cells(rowC, 2).Interior.Color = bgC: ws.Cells(rowC, 2).VerticalAlignment = xlCenter
         ws.Range(ws.Cells(rowC, 3), ws.Cells(rowC, 5)).Merge
         ws.Cells(rowC, 3).Value = cols(cl, 1): ws.Cells(rowC, 3).Font.Size = 8
-        ws.Cells(rowC, 3).Font.Name = "Calibri": ws.Cells(rowC, 3).Interior.Color = bgC
+        ws.Cells(rowC, 3).Font.Name = FONTE_UI: ws.Cells(rowC, 3).Interior.Color = bgC
         ws.Cells(rowC, 3).VerticalAlignment = xlCenter: ws.Cells(rowC, 3).WrapText = True
         ws.Rows(rowC).RowHeight = 20
     Next cl
@@ -8293,7 +8437,7 @@ Private Sub SecaoTitulo(ws As Worksheet, rowN As Integer, titulo As String)
     With ws.Cells(rowN, 1)
         .Value = titulo
         .Font.Bold = True: .Font.Color = RGB(255, 255, 255)
-        .Font.Size = 10: .Font.Name = "Calibri"
+        .Font.Size = 10: .Font.Name = FONTE_UI
         .Interior.Color = RGB(46, 117, 182)
         .HorizontalAlignment = xlCenter: .VerticalAlignment = xlCenter
     End With
@@ -8306,7 +8450,7 @@ Private Sub TabelaCabecalho(ws As Worksheet, rowN As Integer, cols As Variant)
         With ws.Cells(rowN, c)
             .Value = cols(c - 1)
             .Font.Bold = True: .Font.Color = RGB(255, 255, 255)
-            .Font.Size = 9: .Font.Name = "Calibri"
+            .Font.Size = 9: .Font.Name = FONTE_UI
             .Interior.Color = RGB(68, 114, 196)
             .HorizontalAlignment = xlCenter: .VerticalAlignment = xlCenter
             .WrapText = True
@@ -8321,24 +8465,24 @@ Private Sub LinhaDados(ws As Worksheet, rowN As Integer, _
 
     With ws.Cells(rowN, 1)
         .Value = col1: .Font.Bold = True: .Font.Color = RGB(255, 255, 255)
-        .Font.Size = 9: .Font.Name = "Calibri": .Interior.Color = corNr
+        .Font.Size = 9: .Font.Name = FONTE_UI: .Interior.Color = corNr
         .HorizontalAlignment = xlCenter: .VerticalAlignment = xlCenter
     End With
     With ws.Cells(rowN, 2)
-        .Value = col2: .Font.Bold = True: .Font.Size = 9: .Font.Name = "Calibri"
+        .Value = col2: .Font.Bold = True: .Font.Size = 9: .Font.Name = FONTE_UI
         .Interior.Color = bgRow: .VerticalAlignment = xlCenter: .WrapText = True
     End With
     With ws.Cells(rowN, 3)
-        .Value = col3: .Font.Size = 8: .Font.Name = "Calibri"
+        .Value = col3: .Font.Size = 8: .Font.Name = FONTE_UI
         .Interior.Color = bgRow: .VerticalAlignment = xlCenter: .WrapText = True
     End With
     With ws.Cells(rowN, 4)
-        .Value = col4: .Font.Size = 8: .Font.Bold = True: .Font.Name = "Calibri"
+        .Value = col4: .Font.Size = 8: .Font.Bold = True: .Font.Name = FONTE_UI
         .Interior.Color = msgBg: .Font.Color = msgFg
         .VerticalAlignment = xlCenter: .WrapText = True
     End With
     With ws.Cells(rowN, 5)
-        .Value = col5: .Font.Size = 8: .Font.Name = "Calibri"
+        .Value = col5: .Font.Size = 8: .Font.Name = FONTE_UI
         .Interior.Color = bgRow: .VerticalAlignment = xlCenter: .WrapText = True
     End With
     ws.Rows(rowN).RowHeight = altura
@@ -8477,8 +8621,9 @@ Public Sub GerarChecklistCKCP(Optional ByVal silencioso As Boolean = False)
     End With
     On Error Resume Next
     With ws.Cells(2, 5).FormatConditions.AddDatabar
-        .BarColor.Color = RGB(0, 176, 102)
-        .BarFillType = xlDataBarFillGradient
+        .BarColor.Color = COR_UI_BARRA
+        .BarFillType = xlDataBarFillSolid
+        .BarBorder.Type = xlDataBarBorderNone
         .MinPoint.Modify newtype:=xlConditionValueNumber, newvalue:=0
         .MaxPoint.Modify newtype:=xlConditionValueNumber, newvalue:=1
         .ShowValue = True
@@ -8499,21 +8644,22 @@ Public Sub GerarChecklistCKCP(Optional ByVal silencioso As Boolean = False)
     Dim rgS As Range: Set rgS = ws.Range(ws.Cells(5, 5), ws.Cells(ultLin, 5))
     rgS.HorizontalAlignment = xlCenter: rgS.Font.Bold = True
     With rgS.FormatConditions.Add(Type:=xlCellValue, Operator:=xlEqual, Formula1:="=""CONCLUIDO""")
-        .Interior.Color = RGB(198, 239, 206): .Font.Color = RGB(0, 97, 0)
+        .Interior.Color = COR_UI_OK_BG: .Font.Color = COR_UI_OK_FG
     End With
     With rgS.FormatConditions.Add(Type:=xlCellValue, Operator:=xlEqual, Formula1:="=""PENDENTE""")
-        .Interior.Color = RGB(255, 235, 156): .Font.Color = RGB(156, 101, 0)
+        .Interior.Color = COR_UI_WARN_BG: .Font.Color = COR_UI_WARN_FG
     End With
     With rgS.FormatConditions.Add(Type:=xlCellValue, Operator:=xlEqual, Formula1:="=""N/A""")
-        .Interior.Color = RGB(217, 217, 217): .Font.Color = RGB(89, 89, 89)
+        .Interior.Color = COR_UI_NEU_BG: .Font.Color = COR_UI_NEU_FG
     End With
 
     ' --- Corpo: fonte, bordas, alinhamento ------------------------------------
     With ws.Range(ws.Cells(5, 1), ws.Cells(ultLin, 8))
-        .Font.Name = "Segoe UI": .Font.Size = 9
+        .Font.Name = FONTE_UI: .Font.Size = 9.5
+        .Font.Color = COR_UI_TINTA
         .VerticalAlignment = xlCenter: .WrapText = False
         .Borders.LineStyle = xlContinuous
-        .Borders.Weight = xlHairline: .Borders.Color = RGB(223, 227, 230)
+        .Borders.Weight = xlHairline: .Borders.Color = COR_UI_BORDA
     End With
     ' Wrap apenas onde o texto e longo (ORIENTACAO e OBS), com altura fixa
     ws.Range(ws.Cells(5, 4), ws.Cells(ultLin, 4)).WrapText = True
@@ -8543,6 +8689,7 @@ Public Sub GerarChecklistCKCP(Optional ByVal silencioso As Boolean = False)
     ws.Columns(7).ColumnWidth = 12: ws.Columns(8).ColumnWidth = 26
 
     ws.Tab.Color = corHdr
+    PrepararImpressao ws, "CHECKLIST CKCP", ultLin, 8
     ws.Rows(4).AutoFilter
     ws.Range("A5").Select
     ActiveWindow.FreezePanes = True
