@@ -2482,3 +2482,235 @@ body.modo-foco .cmp-bar { display: none; }
 .tour-nav { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; }
 .tour-nav > span:first-child { font-size: 11px; color: var(--ink-muted); font-weight: 700; }
 @media (prefers-reduced-motion: reduce) { #tourSpot, #tourBalao { transition: none; animation: none; } }
+
+/* ============================================================================
+   TERMINAL LAYER v3 — skin institucional (paleta + ícones + acordeão)
+   ============================================================================ */
+/* ============ QUANT OPS · TERMINAL LAYER v3 (apresentação apenas) ============ */
+:root{
+  --bg-0:#04070d; --bg-1:#0a0f18; --bg-2:#101724; --bg-3:#182233;
+  --border:rgba(140,165,205,.10); --border-2:rgba(140,165,205,.20);
+  --text-1:#e8eefb; --text-2:#9fb0c8; --text-3:#5d6c84;
+  --long:#00c66c; --long-bg:rgba(0,198,108,.12);
+  --short:#ff4d5e; --short-bg:rgba(255,77,94,.12);
+  --wait:#e8a915; --wait-bg:rgba(232,169,21,.12);
+  --info:#31b6e7; --info-bg:rgba(49,182,231,.12);
+  --brand:#25a5c4; --brand-2:#4fd0ee; --brand-bg:rgba(37,165,196,.14);
+  --mono:ui-monospace,"SF Mono","Cascadia Mono","Roboto Mono",Menlo,Consolas,monospace;
+  --t:150ms cubic-bezier(.2,.7,.3,1);
+  /* remap dos tokens originais */
+  --page:var(--bg-0); --surface:var(--bg-1); --surface-2:var(--bg-2);
+  --ink:var(--text-1); --ink-2:var(--text-2); --ink-muted:var(--text-3);
+  --hairline:var(--border); --grid:#121a28;
+  --accent:var(--brand-2); --accent-2:var(--brand-2);
+  --good:var(--long); --critical:var(--short); --warning:var(--wait);
+  --call:var(--long); --put:var(--short);
+  --glass:rgba(8,12,20,.88); --glass-brd:var(--border);
+  --elev-1:0 1px 0 rgba(0,0,0,.5); --elev-2:0 10px 30px rgba(0,0,0,.45); --elev-3:0 24px 60px rgba(0,0,0,.6);
+  --radius:6px; --radius-sm:4px;
+}
+:root[data-theme=light]{
+  --bg-0:#e9edf4; --bg-1:#ffffff; --bg-2:#f2f5fa; --bg-3:#e4eaf3;
+  --border:rgba(24,44,80,.14); --border-2:rgba(24,44,80,.26);
+  --text-1:#0e1728; --text-2:#3b4a63; --text-3:#64718b;
+  --long:#087a3c; --long-bg:rgba(8,122,60,.10);
+  --short:#c01f2e; --short-bg:rgba(192,31,46,.09);
+  --wait:#8f6400; --wait-bg:rgba(143,100,0,.11);
+  --info:#0a6f96; --info-bg:rgba(10,111,150,.10);
+  --brand:#0c6d8c; --brand-2:#0f89b0; --brand-bg:rgba(12,109,140,.10);
+  --grid:#e2e8f2; --glass:rgba(255,255,255,.9);
+  --elev-1:0 1px 0 rgba(20,40,80,.08); --elev-2:0 10px 30px rgba(20,40,80,.10);
+}
+html{scrollbar-color:var(--bg-3) var(--bg-0)}
+body{
+  background:var(--bg-0)!important; color:var(--text-2);
+  font-family:-apple-system,system-ui,"Segoe UI",Roboto,sans-serif;
+  font-variant-numeric:tabular-nums;
+}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-thumb{background:var(--bg-3);border-radius:5px;border:2px solid var(--bg-0)}
+::-webkit-scrollbar-track{background:transparent}
+
+/* ---- números em mono tabular ---- */
+.qo-big,.qo-stat span,#qoConf,.decision-verdict,.tick-preco,.tick-var,.vela-timer,.conf-score,
+.stat-row strong,.metrics-grid,.entry-table td,.score-table td,.watch-list,.reg-list,.qo-kv,
+.pressao-list,#pilotoStats,#riscoPlano,.det-numeros,#bookDom,#bookFita,input[type=number],kbd,
+.tf-seg button{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+/* ---- cartões: chapa de terminal ---- */
+.chart-container,.ajuda-card{
+  background:var(--bg-1); border:1px solid var(--border); border-radius:6px;
+  box-shadow:var(--elev-1); contain:layout paint;
+}
+.chart-container{padding:14px 16px 16px}
+.chart-container>h2,.chart-container h2{
+  font-family:var(--mono); font-size:11.5px; font-weight:600;
+  letter-spacing:.14em; text-transform:uppercase; color:var(--text-3);
+  display:flex; align-items:center; gap:8px; border-bottom:1px solid var(--border);
+  padding-bottom:8px; margin-bottom:12px;
+}
+.chart-container>h2::before,.sidebar h3::before{
+  content:""; width:3px; height:12px; flex:none; background:var(--brand-2); border-radius:1px;
+}
+.chart-container h3,.fluxo-sub,.estudo-grid h4{
+  font-family:var(--mono); font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--text-3);
+}
+.group-note,.metrics-hint,.signal-hint{color:var(--text-3);font-size:11.5px;line-height:1.5}
+
+/* ---- topbar cockpit ---- */
+.qo-topbar{
+  position:sticky; top:0; z-index:70;
+  background:linear-gradient(180deg,rgba(10,15,24,.97),rgba(6,10,17,.97));
+  backdrop-filter:blur(10px) saturate(1.3);
+  border-bottom:1px solid var(--border-2); box-shadow:0 8px 24px rgba(0,0,0,.35);
+}
+:root[data-theme=light] .qo-topbar{background:rgba(255,255,255,.96)}
+.qo-brand strong{font-family:var(--mono); letter-spacing:.22em; color:var(--text-1)}
+.qo-brand small{font-family:var(--mono); letter-spacing:.18em; color:var(--text-3)}
+.qo-logo{color:var(--brand-2); text-shadow:0 0 12px var(--brand-bg)}
+.qo-stat{border-left:1px solid var(--border); padding-left:12px}
+.qo-stat small{font-family:var(--mono); font-size:9.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--text-3)}
+.qo-stat span{color:var(--text-1); font-weight:600}
+.qo-good{color:var(--long)!important}.qo-bad{color:var(--short)!important}
+
+/* ---- botões ---- */
+.btn-primary{
+  background:var(--brand); color:#04121a; border:none; border-radius:4px;
+  font-family:var(--mono); font-weight:700; font-size:12px; letter-spacing:.06em; text-transform:uppercase;
+  transition:background var(--t),transform var(--t),box-shadow var(--t);
+}
+.btn-primary:hover{background:var(--brand-2); box-shadow:0 0 0 1px var(--brand-2),0 4px 16px var(--brand-bg)}
+.btn-primary:active{transform:translateY(1px)}
+:root[data-theme=light] .btn-primary{color:#fff}
+.btn-mini,.btn-ghost,.qo-toggle{
+  background:transparent; color:var(--text-2); border:1px solid var(--border-2); border-radius:4px;
+  transition:background var(--t),color var(--t),border-color var(--t);
+}
+.btn-mini:hover,.btn-ghost:hover,.qo-toggle:hover{background:var(--bg-3); color:var(--text-1); border-color:var(--brand)}
+:where(button,select,input,textarea,a,[role=button],[tabindex]):focus-visible{outline:2px solid var(--brand-2); outline-offset:2px}
+button:disabled,input:disabled,select:disabled{opacity:.4; cursor:not-allowed}
+
+/* ---- inputs ---- */
+input[type=text],input[type=number],input[type=search],select,textarea{
+  background:var(--bg-0); color:var(--text-1); border:1px solid var(--border-2); border-radius:4px;
+  transition:border-color var(--t),box-shadow var(--t);
+}
+input:hover,select:hover,textarea:hover{border-color:var(--border-2)}
+input:focus,select:focus,textarea:focus{border-color:var(--brand); box-shadow:0 0 0 2px var(--brand-bg)}
+
+/* ---- checkboxes → switches ---- */
+.sidebar input[type=checkbox],.reg-filtro input[type=checkbox]{
+  appearance:none; -webkit-appearance:none; cursor:pointer; flex:none;
+  width:32px; height:18px; border-radius:9px; margin:0 6px 0 0; vertical-align:-4px;
+  background:var(--bg-3); border:1px solid var(--border-2); position:relative;
+  transition:background var(--t),border-color var(--t);
+}
+.sidebar input[type=checkbox]::before,.reg-filtro input[type=checkbox]::before{
+  content:""; position:absolute; top:2px; left:2px; width:12px; height:12px; border-radius:50%;
+  background:var(--text-3); transition:transform var(--t),background var(--t);
+}
+.sidebar input[type=checkbox]:checked,.reg-filtro input[type=checkbox]:checked{background:var(--brand-bg); border-color:var(--brand)}
+.sidebar input[type=checkbox]:checked::before,.reg-filtro input[type=checkbox]:checked::before{transform:translateX(14px); background:var(--brand-2)}
+#scanFiltro input[type=checkbox]{appearance:auto;-webkit-appearance:checkbox;width:14px;height:14px;accent-color:var(--brand)}
+
+/* ---- CONTROLES = DRAWER lateral direito ---- */
+.sidebar{
+  position:fixed; top:0; right:0; bottom:0; left:auto; z-index:90;
+  width:min(400px,94vw); max-height:none; height:auto; margin:0;
+  background:var(--bg-1); border:none; border-left:1px solid var(--border-2);
+  border-radius:0; box-shadow:-24px 0 60px rgba(0,0,0,.5);
+  overflow-y:auto; overscroll-behavior:contain; padding:0 16px 24px;
+  animation:qoDrawerIn .22s cubic-bezier(.2,.7,.3,1);
+}
+@keyframes qoDrawerIn{from{transform:translateX(40px);opacity:0}to{transform:none;opacity:1}}
+.sidebar.oculta{display:none}
+.sidebar>h2{
+  position:sticky; top:0; z-index:3; display:flex; align-items:center; gap:8px;
+  background:var(--bg-1); margin:0 -16px 10px; padding:14px 16px;
+  border-bottom:1px solid var(--border-2);
+  font-family:var(--mono); font-size:11.5px; letter-spacing:.16em; text-transform:uppercase; color:var(--text-1);
+}
+#qoDrawerFechar{
+  margin-left:auto; background:transparent; border:1px solid var(--border-2); border-radius:4px;
+  color:var(--text-2); width:26px; height:26px; line-height:1; cursor:pointer; font-size:13px;
+}
+#qoDrawerFechar:hover{color:var(--text-1); border-color:var(--brand)}
+#qoCtrlBusca{width:100%; padding:8px 10px; margin:2px 0 10px; font-size:13px}
+.control-group{
+  background:transparent; border:1px solid var(--border); border-radius:6px; padding:10px 12px; margin-bottom:8px;
+}
+.control-group h3{
+  display:flex; align-items:center; gap:8px; cursor:pointer; user-select:none; margin:0;
+  font-family:var(--mono); font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--text-2);
+}
+.control-group h3::after{
+  content:""; margin-left:auto; width:6px; height:6px; flex:none;
+  border-right:1.5px solid var(--text-3); border-bottom:1.5px solid var(--text-3);
+  transform:rotate(45deg); transition:transform var(--t);
+}
+.control-group.qo-acc-fechado h3::after{transform:rotate(-45deg)}
+.control-group h3~*{margin-top:8px}
+.control-group.qo-acc-fechado>*:not(h3){display:none!important}
+.control-group.qo-busca-off{display:none!important}
+.sidebar label{color:var(--text-2); font-size:12.5px}
+
+/* ---- VEREDITO herói ---- */
+.decision-panel{
+  border:1px solid var(--border-2); box-shadow:var(--elev-2); position:relative; overflow:hidden;
+}
+.decision-panel::before{content:""; position:absolute; inset:0 auto 0 0; width:4px; background:var(--wait); opacity:.9}
+.decision-panel:has(.verdict-call)::before{background:var(--long)}
+.decision-panel:has(.verdict-put)::before{background:var(--short)}
+.decision-label{font-family:var(--mono); font-size:10px; letter-spacing:.18em; text-transform:uppercase; color:var(--text-3)}
+.decision-verdict{font-size:clamp(30px,4vw,46px); font-weight:800; letter-spacing:.02em; line-height:1.05}
+.verdict-wait{color:var(--wait)} .verdict-call{color:var(--long)} .verdict-put{color:var(--short)}
+.decision-grade{font-family:var(--mono)}
+.semaforo{border:1px solid var(--border); border-radius:6px; background:var(--bg-2)}
+.decision-chips>*{border-radius:3px}
+
+/* ---- tabelas ---- */
+.entry-table-wrap{max-height:440px; overflow:auto; border:1px solid var(--border); border-radius:6px}
+.entry-table thead th,.score-table thead th{
+  position:sticky; top:0; z-index:2; background:var(--bg-2); color:var(--text-3);
+  font-family:var(--mono); font-size:10px; letter-spacing:.12em; text-transform:uppercase;
+  border-bottom:1px solid var(--border-2);
+}
+.entry-table td,.score-table td{border-bottom:1px solid var(--border); font-size:12px}
+.entry-table tbody tr:nth-child(even),.score-table tbody tr:nth-child(even){background:rgba(140,165,205,.04)}
+.entry-table tbody tr:hover{background:var(--brand-bg)}
+.entry-table td:nth-child(n+4):nth-child(-n+7),.score-table td:nth-child(n+2){text-align:right}
+.watch-list>*:hover,.reg-list>*:hover{background:var(--bg-3)}
+
+/* ---- modais ---- */
+.ajuda-overlay{background:rgba(2,5,10,.78); backdrop-filter:blur(5px)}
+.ajuda-card{box-shadow:var(--elev-3); border-radius:8px}
+kbd{font-family:var(--mono); background:var(--bg-3); border:1px solid var(--border-2); border-radius:4px; padding:1px 6px; color:var(--text-1)}
+
+/* ---- nav mobile ---- */
+.mnav{background:var(--glass); border-top:1px solid var(--border-2); backdrop-filter:blur(14px)}
+.mnav button{font-family:var(--mono); font-size:10px; letter-spacing:.08em; text-transform:uppercase; min-height:50px; color:var(--text-3)}
+.mnav button:hover,.mnav button.is-active{color:var(--brand-2)}
+.mnav svg{width:18px;height:18px;display:block;margin:0 auto 2px}
+
+/* ---- avisos / footer ---- */
+.otc-aviso{background:var(--wait-bg); border:1px solid var(--wait); border-radius:6px; color:var(--text-1)}
+.footer{color:var(--text-3); border-top:1px solid var(--border); font-size:11.5px}
+.live-badge{font-family:var(--mono); letter-spacing:.1em}
+.tv-sync-tag{font-family:var(--mono); font-size:10px; letter-spacing:.08em; color:var(--text-3); text-transform:none}
+.rail{background:var(--glass); border-right:1px solid var(--border)}
+
+/* ---- ícones injetados ---- */
+.qo-ico{width:15px;height:15px;flex:none;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;vertical-align:-2px}
+h2 .qo-ico,h3 .qo-ico{color:var(--brand-2)}
+/* .ico-info do app envolve o emoji e é alvo de clique — mantém o hit area, troca o emoji por ⓘ */
+h2 .ico-info,h3 .ico-info{font-size:0!important;line-height:0;display:inline-flex;align-items:center;cursor:pointer}
+h2 .ico-info::after,h3 .ico-info::after{content:"\24D8";font-size:12px;color:var(--text-3);font-family:var(--mono)}
+h2 .ico-info:hover::after,h3 .ico-info:hover::after{color:var(--brand-2)}
+
+@media (prefers-reduced-motion:reduce){*{transition-duration:.01ms!important;animation-duration:.01ms!important}}
+@media (max-width:900px){
+  .sidebar{width:100vw; border-left:none}
+  input,select,.btn-mini,.btn-ghost,.qo-toggle{min-height:40px}
+  .chart-container{padding:12px}
+  body{overflow-x:hidden}
+}
