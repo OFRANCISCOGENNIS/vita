@@ -774,6 +774,14 @@ h1.title{font-size:clamp(26px,3vw,34px);font-weight:800;letter-spacing:-.02em;ma
           <option value="gluteo">🍑 Glúteo & posterior — foco feminino (2 dias de glúteo/sem)</option>
         </select>
       </div>
+      <div class="field wide"><label>Método (atleta)</label>
+        <select id="method">
+          <option value="" selected>Nenhum (motor padrão)</option>
+          <option value="balestrin">🧬 Júlio Balestrin — volume + ABCD natural</option>
+          <option value="sardinha">🎯 Fernando Sardinha — Ponto Zero</option>
+          <option value="franco">🔥 Felipe Franco — técnicas de intensidade</option>
+        </select>
+      </div>
       <div class="pbreak">📏 Medidas corporais · cm (o valor cinza é a última medição)</div>
       <div class="field bm"><label>Ombros</label><input data-bodym="shoulders" type="number" step="0.5" min="60" max="200" placeholder="cm"></div>
       <div class="field bm"><label>Peitoral</label><input data-bodym="chest" type="number" step="0.5" min="40" max="200" placeholder="cm"></div>
@@ -1483,7 +1491,9 @@ const DAYPAT={full:["squat","push_h","pull_h","hinge","push_v","core"],upper:["p
   chesttri:["push_h","push_h","push_h","triceps","triceps","core"],backbi:["pull_v","pull_h","pull_h","biceps","biceps","forearm"],shoulders:["push_v","sdelt","sdelt","rdelt","core"],chest:["push_h","push_h","push_h","push_h","core"],back:["pull_v","pull_h","pull_v","pull_h","shrug"],arms:["biceps","triceps","biceps","triceps","forearm","biceps","triceps"],
   glutes:["hinge","glute","squat","glute","hinge","core"],lowerf:["squat","hinge","glute","quad","ham","calf"]};
 // divisões clássicas escolhíveis (A/B, A/B/C, A/B/C/D, A/B/C/D/E) — ciclam pelos dias da semana
-const SPLITMAP={ab:["upper","lower"],abc:["push","pull","legs"],abcd:["chesttri","backbi","legs","shoulders"],abcde:["chest","backbi","legs","shoulders","arms"],gluteo:["glutes","upper","lowerf","glutes","upper"]};
+const SPLITMAP={ab:["upper","lower"],abc:["push","pull","legs"],abcd:["chesttri","backbi","legs","shoulders"],abcde:["chest","backbi","legs","shoulders","arms"],gluteo:["glutes","upper","lowerf","glutes","upper"],bro5:["chest","back","legs","shoulders","arms"]};
+// métodos de atletas → divisão aplicada (estilos atribuídos, não protocolos científicos)
+const METHOD_SPLIT={balestrin:"abcd",sardinha:"bro5",franco:"bro5"};
 // lo/hi: faixa de reps composto; ilo/ihi: isolado (reps mais altas). rc: descanso composto; ri: isolado.
 const GP={hypertrophy:{lo:6,hi:12,ilo:10,ihi:15,rc:150,ri:75},strength:{lo:3,hi:6,ilo:8,ihi:12,rc:180,ri:90},fat_loss:{lo:8,hi:15,ilo:12,ihi:20,rc:120,ri:60},maintenance:{lo:8,hi:15,ilo:10,ihi:15,rc:120,ri:60}};
 const DAYNAME={full:"Corpo inteiro",upper:"Superior",lower:"Inferior",push:"Empurrar",pull:"Puxar",legs:"Pernas",chesttri:"Peito + Tríceps",backbi:"Costas + Bíceps",shoulders:"Ombros",chest:"Peito",back:"Costas",arms:"Braços",glutes:"Glúteos + Posterior",lowerf:"Inferior completo"};
@@ -1492,8 +1502,9 @@ const LEVEL_SETS=[2,3,4]; // iniciante/intermediário/avançado: volume base por
 function workoutPlan(p,equipment,conditions,level=1){
   level=Math.max(0,Math.min(+level||0,2));
   const days=Math.min(Math.max(p.days,1),6);
-  const custom=p.split&&SPLITMAP[p.split];
-  const gfocus=p.split==="gluteo";
+  const effSplit=(p.method&&METHOD_SPLIT[p.method])||p.split;
+  const custom=effSplit&&SPLITMAP[effSplit];
+  const gfocus=effSplit==="gluteo";
   const split=custom?Array.from({length:days},(_,i)=>custom[i%custom.length]):SPLITS[days];
   const gp=GP[p.goal]||GP.maintenance;const sets=LEVEL_SETS[level];
   const pool=EX.filter(e=>e.eq.some(x=>equipment.includes(x))&&!e.ctr.some(c=>conditions.includes(c)));
@@ -1538,7 +1549,7 @@ function saveProfile(){
     pt.profile={
       sex:document.querySelector("#sexseg .on").dataset.sex,
       weight:$("#weight").value,height:$("#height").value,age:$("#age").value,bf:$("#bf").value,waist:$("#waist").value,
-      goal:$("#goal").value,activity:$("#activity").value,days:$("#days").value,strategy:$("#strategy").value,level:$("#level").value,split:($("#split")||{}).value||"auto",
+      goal:$("#goal").value,activity:$("#activity").value,days:$("#days").value,strategy:$("#strategy").value,level:$("#level").value,split:($("#split")||{}).value||"auto",method:($("#method")||{}).value||"",
       allergies:chipsOn("allergies"),equipment:chipsOn("equipment"),injuries:chipsOn("injuries"),
     };
     pt.labs=LABVALS;
@@ -1549,10 +1560,10 @@ function loadProfile(){
   $("#pname").value=pt.name||"Paciente";
   const d=pt.profile||{};
   // aplica default quando o campo do paciente está vazio (evita herdar o perfil do paciente anterior)
-  const DEF={weight:"80",height:"180",age:"30",bf:"20",waist:"85",goal:"fat_loss",activity:"moderate",days:"4",strategy:"flexible",level:"1",split:"auto"};
+  const DEF={weight:"80",height:"180",age:"30",bf:"20",waist:"85",goal:"fat_loss",activity:"moderate",days:"4",strategy:"flexible",level:"1",split:"auto",method:""};
   const set=(id,v)=>{if($("#"+id))$("#"+id).value=(v!=null&&v!=="")?v:DEF[id];};
   set("weight",d.weight);set("height",d.height);set("age",d.age);set("bf",d.bf);set("waist",d.waist);
-  set("goal",d.goal);set("activity",d.activity);set("days",d.days);set("strategy",d.strategy);set("level",d.level);set("split",d.split);
+  set("goal",d.goal);set("activity",d.activity);set("days",d.days);set("strategy",d.strategy);set("level",d.level);set("split",d.split);set("method",d.method);
   document.querySelectorAll("#sexseg button").forEach(b=>b.classList.toggle("on",b.dataset.sex===(d.sex||"M")));
   const applyChips=(id,vals,def)=>{const v=vals||def||[];document.querySelectorAll("#"+id+" button").forEach(b=>b.classList.toggle("on",v.includes(b.dataset.v)));};
   applyChips("allergies",d.allergies,[]);
@@ -1580,7 +1591,7 @@ function P(){
     sex:document.querySelector("#sexseg .on").dataset.sex,
     weightKg:+$("#weight").value,heightCm:+$("#height").value,age:+$("#age").value,
     bf:+$("#bf").value,waist:+$("#waist").value,goal:$("#goal").value,activity:$("#activity").value,days:+$("#days").value,level:+$("#level").value,split:(($("#split")||{}).value)||"auto",
-    strategy:$("#strategy").value,
+    strategy:$("#strategy").value,method:(($("#method")||{}).value)||"",
     allergies:chipsOn("allergies"),equipment:chipsOn("equipment"),
     conditions:mergedConditions(),
     kcalAdjustPct:(pActive()&&pActive().kcalAdjustPct)||0,
@@ -3355,6 +3366,18 @@ function render(){
     <div class="src" style="margin-top:10px">Dias com séries registradas já aparecem em verde automaticamente. Marque manualmente treinos feitos fora do app (ex.: corrida, quadra).</div></div>`;
 
   // ================= TREINO COM FOCO FEMININO (evidência) + CICLO (opcional, honesto) =================
+  // ===== MÉTODO DO ATLETA (estilo atribuído; o motor mantém volume/landmarks) =====
+  const FRANCO_TEC=[["Rest-pause","Chegue à falha, descanse 15 s e faça mais reps até nova falha — repita 1–2 vezes."],["Drop-set","Chegue à falha, reduza ~20% da carga sem descanso e continue até falhar de novo."],["Pico de contração","Segure 1–2 s na posição de máxima contração de cada rep da última série."]];
+  const francoIdx=(typeof isoWeek==="function"?isoWeek(dT0):1)%3;
+  const METHODS={
+    balestrin:{n:"Júlio Balestrin",ic:"🧬",tag:"Volume semanal + ABCD natural",body:`Para Balestrin, o que determina o resultado é o <b>volume semanal de séries por músculo</b> — não o split em si. Ele recomenda o <b>ABCD para naturais</b> (treina 3 dias, descansa, +2 dias, descansa). O app aplicou a divisão <b>ABCD</b> e você acompanha o volume nos landmarks <b>MEV/MAV/MRV</b> (card Volume abaixo). Amplitude completa em todas as reps.`,src:"entrevistas IronCast/Podpah"},
+    sardinha:{n:"Fernando Sardinha",ic:"🎯",tag:"Ponto Zero + divisão por grupo",body:`Técnica <b>Ponto Zero</b>: leve o músculo à amplitude máxima e faça uma <b>pausa isométrica de 1–2 s no ponto de maior alongamento</b> antes de voltar — mais recrutamento com amplitude total. Divisão clássica por grupo (peito · costas · perna · ombro · braço). Aplique o Ponto Zero na <b>última série</b> de cada exercício.`,src:"Método Sardinha Evolution"},
+    franco:{n:"Felipe Franco",ic:"🔥",tag:"Bodybuilding + técnicas de intensidade",body:`Divisão clássica de fisiculturismo com <b>técnica de intensidade na série final</b>. Técnica da semana: <b>${FRANCO_TEC[francoIdx][0]}</b> — ${FRANCO_TEC[francoIdx][1]} (rotaciona sozinha a cada semana). Use com moderação: são muito fatigantes e pedem boa recuperação.`,src:"Pump 10 / entrevistas"},
+  };
+  const _mth=METHODS[p.method];
+  const cardMethod=_mth?`<div class="card span-12"><h3>${_mth.ic} Método ${_mth.n} <span class="pill accent">${_mth.tag}</span></h3><div class="cap">estilo de treino atribuído ao atleta · aplicado sobre o motor determinístico (volume, progressão e landmarks continuam ativos)</div>
+    <div class="src" style="font-size:13px;line-height:1.7;color:var(--text);margin-top:6px">${_mth.body}</div>
+    <div class="src" style="margin-top:10px">Referência: ${_mth.src}. <b>Importante:</b> métodos de atletas/coaches não são protocolos científicos revisados — o Vitα os oferece como estilo, mantendo a segurança do motor (piso calórico, deload, faixas de rep e volume por músculo).</div></div>`:"";
   const cardFem=`<div class="card span-6"><h3>🍑 Treino com foco feminino <span class="pill accent">glúteos & posterior</span></h3><div class="cap">baseado em evidência — hipertrofia de glúteo e prevenção de lesão de LCA (Frontiers 2025 · Plotkin 2024)</div>
     <div class="src" style="font-size:12.5px;line-height:1.75;color:var(--text)">
     • <b>Hip thrust (elevação pélvica)</b> é o exercício mais glúteo-específico e o que mais aumenta a espessura do glúteo — priorize-o (+9,3% vs +6% sem ele).<br>
@@ -3416,7 +3439,7 @@ function render(){
     week:{title:"Semana",sub:"7 dias com rotação determinística de fontes + lista de compras agregada.",html:cardWeek+cardShop},
     diario:{title:"Diário alimentar",sub:"Fotografe a refeição ou registre o consumo real; a Análise passa a usar o que foi comido, não o plano.",html:cardMealPhoto+cardDiary+cardIntake},
     analise:{title:"Análise de precisão",sub:"Micronutrientes vs DRI, qualidade proteica (PDCAAS), leucina por refeição, carga glicêmica e lacunas com fontes alimentares.",html:cardMicros+cardProtQual+cardProtDist+cardGL+cardSupp+cardSupps+cardEvid+cardMacros},
-    train:{title:"Treino",sub:"Split por frequência com isolamento direto de braços/panturrilha, calendário de treinos, volume graduado por landmarks, base aeróbica e biblioteca de exercícios.",html:cardWorkoutMain+cardTrainCal+cardFem+(p.sex==="F"?cardCycle:"")+cardVolume+cardZone2+cardExLib+cardReady+cardTrend},
+    train:{title:"Treino",sub:"Split por frequência com isolamento direto de braços/panturrilha, calendário de treinos, volume graduado por landmarks, base aeróbica e biblioteca de exercícios.",html:cardMethod+cardWorkoutMain+cardTrainCal+cardFem+(p.sex==="F"?cardCycle:"")+cardVolume+cardZone2+cardExLib+cardReady+cardTrend},
     calc:{title:"Calculadoras",sub:"1RM, zonas de FC, pace, gasto calórico e VO₂máx — todas determinísticas.",html:cardCalc+cardBody},
     labs:{title:"Exames",sub:"Comparação com faixas de referência + tendência entre exames — educativo, nunca prescreve.",html:cardCheckup+cardLabs+cardLabSummary+cardLabTrend},
     habits:{title:"Hábitos",sub:"Checklist diário, sequência, conquistas e nível — tudo por regras determinísticas.",html:cardHabits+cardWater+cardStreak+cardGami+cardCoach},
