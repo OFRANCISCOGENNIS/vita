@@ -2375,6 +2375,34 @@ function render(){
     <div class="src" style="font-size:12.5px;line-height:1.7">• Base aeróbica: <b>${rx4.z2}</b><br>• Alta intensidade: <b>${rx4.hi}</b><br>${rx4.note}</div>
     <div class="src" style="margin-top:10px">Cada <b>+1 ml/kg/min</b> de VO₂máx ≈ <b>10% menos risco de morte</b>; o quintil menos condicionado tem risco <b>5× maior</b> que o de elite (JAMA 2018 · 122 mil pessoas).</div></div>`;
 
+  // ---- SONO & RECUPERAÇÃO (débito, impacto anabólico, higiene, cronotipo) ----
+  const _weS=wearableData();
+  const sleepNights=[];for(let i=1;i<=7;i++){const d=dateStrAgo(i);if(_weS[d]&&_weS[d].sleep!=null)sleepNights.push(_weS[d].sleep);}
+  const sleepAvg=sleepNights.length?Math.round(sleepNights.reduce((a,b)=>a+b,0)/sleepNights.length*10)/10:null;
+  const sleepNeed=p.days>=5?8.5:8;
+  const sleepDebt=sleepNights.length?Math.round(sleepNights.reduce((s,n)=>s+Math.max(0,sleepNeed-n),0)*10)/10:null;
+  let sleepMsg,sleepSev;
+  if(sleepAvg==null){sleepMsg="Conecte um wearable ou registre o sono (aba Dispositivos) para acompanhar débito e recuperação.";sleepSev="";}
+  else if(sleepAvg<6){sleepMsg="Abaixo de 6 h: a síntese proteica cai ~18%, a testosterona ~24% e o cortisol sobe ~21% no dia seguinte. É o ajuste de <b>maior retorno</b> que você tem agora — antes de mudar treino ou dieta.";sleepSev="bad";}
+  else if(sleepAvg<7){sleepMsg="6–7 h: as adaptações ao treino começam a ser prejudicadas e o risco de lesão sobe. Buscar +30–60 min já melhora recuperação e humor.";sleepSev="warn";}
+  else if(sleepAvg<8){sleepMsg="7–8 h: adequado para adulto geral. Quem treina forte rende mais perto de 8–9 h.";sleepSev="";}
+  else{sleepMsg="8 h+: faixa ótima para recuperação, hormônios anabólicos e menor risco de lesão. 👏";sleepSev="good";}
+  const bed=(_pt&&_pt.bedtime)||"23:00";const bh=+bed.split(":")[0],bm=+bed.split(":")[1]||0;
+  let cutoffH=bh-8;if(cutoffH<0)cutoffH+=24;const caffCut=String(cutoffH).padStart(2,"0")+":"+String(bm).padStart(2,"0");
+  const chrono=(_pt&&_pt.chronotype)||"";
+  const chronoTip={matutino:"Você rende cedo — prefira treinar de manhã/início da tarde e corte cafeína logo após o meio-dia.",intermediario:"Perfil flexível — o mais importante é a <b>consistência</b> de horário (inclusive fim de semana) para não desalinhar o relógio.",vespertino:"Coruja: não se force a dormir às 22 h se o corpo pede mais tarde — foque em consistência e corte a cafeína mais cedo (metabolismo CYP1A2 mais lento prejudica o sono)."}[chrono]||"Escolha seu cronotipo acima para dicas personalizadas.";
+  const HYG=[`☀️ Sol nos olhos 5–10 min ao acordar — o sincronizador mais forte do relógio biológico`,`☕ Cafeína só até ~<b>${caffCut}</b> (meia-vida 5–7 h; às ${bed} metade ainda estaria ativa)`,`❄️ Quarto a 18–20 °C — o corpo precisa esfriar ~1 °C para dormir`,`🕐 Mesmo horário de dormir e acordar, <b>inclusive no fim de semana</b>`,`🏋️ Terminar o treino 2–3 h antes de deitar`,`🍷 Evitar álcool à noite — fragmenta o sono profundo (recuperação)`];
+  const cardSleep=`<div class="card span-6"><h3>Sono & recuperação ${sleepAvg!=null?`<span class="pill ${sleepSev==="good"?"good":sleepSev==="warn"?"warn":sleepSev==="bad"?"crit":"accent"}">média ${sleepAvg} h</span>`:'<span class="pill accent">sem dados</span>'}</h3><div class="cap">o pilar mais negligenciado — sono guia hormônios anabólicos, síntese proteica e risco de lesão</div>
+    <div class="calcout"><div class="cores"><div class="k">Débito (7 noites)</div><div class="v tnum">${sleepDebt!=null?sleepDebt:"—"}<small> h</small></div><div class="meta">meta ${sleepNeed} h/noite</div></div>
+    <div class="cores"><div class="k">Média por noite</div><div class="v tnum">${sleepAvg!=null?sleepAvg:"—"}<small> h</small></div><div class="meta">${sleepNights.length} noite(s)</div></div></div>
+    <div class="insight ${sleepSev}" style="margin-top:10px"><span class="iic">😴</span><span class="ib">${sleepMsg}</span></div>
+    <div class="daytag" style="margin-top:12px">Higiene do sono (evidência)</div>
+    ${HYG.map(x=>`<div class="src" style="font-size:12.5px;line-height:1.6;margin:3px 0">${x}</div>`).join("")}
+    <div class="daytag" style="margin-top:12px">Cronotipo</div>
+    <div class="wtabs" style="margin:6px 0"><button class="${chrono==="matutino"?"on":""}" data-chrono="matutino">🌅 Matutino</button><button class="${chrono==="intermediario"?"on":""}" data-chrono="intermediario">🌤️ Intermediário</button><button class="${chrono==="vespertino"?"on":""}" data-chrono="vespertino">🌙 Vespertino</button></div>
+    <div class="logadd" style="margin-bottom:6px"><label style="font-size:12px;color:var(--muted)">Costumo dormir às</label><input class="wnum" type="time" data-bedtime value="${bed}" style="width:auto"></div>
+    <div class="src" style="font-size:12.5px;line-height:1.6">${chronoTip}</div></div>`;
+
   // ---- biblioteca de exercícios com instruções de execução ----
   const exMuscles=["all","fav",...new Set(EX.map(e=>e.mu))];
   const favEx=favs().ex;
@@ -3490,7 +3518,7 @@ function render(){
     week:{title:"Semana",sub:"7 dias com rotação determinística de fontes + lista de compras agregada.",html:cardWeek+cardShop},
     diario:{title:"Diário alimentar",sub:"Fotografe a refeição ou registre o consumo real; a Análise passa a usar o que foi comido, não o plano.",html:cardMealPhoto+cardDiary+cardIntake},
     analise:{title:"Análise de precisão",sub:"Micronutrientes vs DRI, qualidade proteica (PDCAAS), leucina por refeição, carga glicêmica e lacunas com fontes alimentares.",html:cardMicros+cardProtQual+cardProtDist+cardGL+cardSupp+cardSupps+cardEvid+cardMacros},
-    train:{title:"Treino",sub:"Split por frequência com isolamento direto de braços/panturrilha, calendário de treinos, volume graduado por landmarks, base aeróbica e biblioteca de exercícios.",html:cardMethod+cardWorkoutMain+cardTrainCal+cardFem+(p.sex==="F"?cardCycle:"")+cardVolume+cardZone2+cardCardio+cardExLib+cardReady+cardTrend},
+    train:{title:"Treino",sub:"Split por frequência com isolamento direto de braços/panturrilha, calendário de treinos, volume graduado por landmarks, base aeróbica e biblioteca de exercícios.",html:cardMethod+cardWorkoutMain+cardTrainCal+cardFem+(p.sex==="F"?cardCycle:"")+cardVolume+cardZone2+cardCardio+cardSleep+cardExLib+cardReady+cardTrend},
     calc:{title:"Calculadoras",sub:"1RM, zonas de FC, pace, gasto calórico e VO₂máx — todas determinísticas.",html:cardCalc+cardBody},
     labs:{title:"Exames",sub:"Comparação com faixas de referência + tendência entre exames — educativo, nunca prescreve.",html:cardCheckup+cardLabs+cardLabSummary+cardLabTrend},
     habits:{title:"Hábitos",sub:"Checklist diário, sequência, conquistas e nível — tudo por regras determinísticas.",html:cardHabits+cardWater+cardStreak+cardGami+cardCoach},
@@ -3620,6 +3648,7 @@ $("#views").addEventListener("click",e=>{
   const dg=e.target.closest("[data-dgtoggle]");if(dg){const id=dg.dataset.dgtoggle;pUpdate(p=>{p.dailyDone=p.dailyDone||{};const t=todayKey();const a=new Set(p.dailyDone[t]||[]);a.has(id)?a.delete(id):a.add(id);p.dailyDone[t]=[...a];});render();return;}
   const dgr=e.target.closest("[data-dgrm]");if(dgr){pUpdate(p=>{p.dailyGoals=(p.dailyGoals||[]).filter(g=>g.id!==dgr.dataset.dgrm);});render();return;}
   if(e.target.closest("#dgAdd")){const inp=document.querySelector("#dgnew");const v=inp&&inp.value.trim();if(v){pUpdate(p=>{p.dailyGoals=p.dailyGoals||[];p.dailyGoals.push({id:"dg"+Date.now(),t:v});});histLog("meta","meta diária criada: "+v);render();}return;}
+  const chr=e.target.closest("[data-chrono]");if(chr){pUpdate(p=>{p.chronotype=chr.dataset.chrono;});render();return;}
   const tcm=e.target.closest("[data-trainmark]");if(tcm){const d=tcm.dataset.trainmark;pUpdate(p=>{p.trainMarks=p.trainMarks||[];const i=p.trainMarks.indexOf(d);i>=0?p.trainMarks.splice(i,1):p.trainMarks.push(d);});histLog("treino","dia "+d.slice(5)+(pActive().trainMarks.includes(d)?" marcado como treinado":" desmarcado"));render();return;}
   const sw=e.target.closest("[data-swap]");if(sw){SWAP=SWAP===sw.dataset.swap?null:sw.dataset.swap;render();return;}
 });
@@ -3641,6 +3670,7 @@ $("#views").addEventListener("change",e=>{
   const pf=e.target.closest("#photofile");if(pf&&pf.files&&pf.files[0]){handlePhotoFile(pf.files[0],($("#photopose")||{value:"frente"}).value);pf.value="";return;}
   const wf=e.target.closest("#wearfile");if(wf&&wf.files&&wf.files[0]){const fr=new FileReader();fr.onload=()=>importWearableText(fr.result);fr.readAsText(wf.files[0]);wf.value="";return;}
   const mpf=e.target.closest("#mealphoto");if(mpf&&mpf.files&&mpf.files[0]){handleMealPhoto(mpf.files[0]);mpf.value="";return;}
+  const bdt=e.target.closest("[data-bedtime]");if(bdt){pUpdate(p=>{p.bedtime=bdt.value||undefined;});render();return;}
   const cys=e.target.closest("[data-cyclestart]");if(cys){pUpdate(p=>{p.cycleStart=cys.value||undefined;});render();return;}
   const cyl=e.target.closest("[data-cyclelen]");if(cyl){pUpdate(p=>{p.cycleLen=+cyl.value;});render();return;}
   const lms=e.target.closest("#lockminSel");if(lms){secSet({lockMin:+lms.value});secLog("bloqueio automático: "+(+lms.value?lms.value+" min":"desligado"));return;}
