@@ -2403,6 +2403,22 @@ function render(){
     <div class="logadd" style="margin-bottom:6px"><label style="font-size:12px;color:var(--muted)">Costumo dormir às</label><input class="wnum" type="time" data-bedtime value="${bed}" style="width:auto"></div>
     <div class="src" style="font-size:12.5px;line-height:1.6">${chronoTip}</div></div>`;
 
+  // ---- MOBILIDADE & PREVENÇÃO DE LESÃO (RAMP + prehab por condição) ----
+  const day1M=wp[0];
+  const day1mus=day1M?[...new Set(day1M.items.map(it=>it.mu))]:[];
+  const lowerD=day1mus.some(mm=>["Quadríceps","Posteriores","Glúteos","Panturrilha"].includes(mm));
+  const upperD=day1mus.some(mm=>["Peito","Costas","Dorsais","Ombros","Bíceps","Tríceps","Trapézio"].includes(mm));
+  const mobList=(lowerD&&upperD)?"tornozelo, quadril, coluna torácica e ombro":lowerD?"tornozelo, quadril e joelho":"coluna torácica, ombro e punho";
+  const PREHAB={knee:["Joelho","extensão terminal (TKE), agachamento isométrico na parede, fortalecer VMO e glúteo médio; controle o valgo (joelho não cai para dentro) no agachamento e no afundo."],shoulder:["Ombro","face pull, rotação externa com elástico, YTW e mobilidade torácica ANTES de empurrar — o ombro é a articulação mais lesionada na musculação."],lumbar:["Lombar","bird-dog, dead bug e prancha para o core; treine o hip hinge com bastão; evite flexão da lombar sob carga (terra/remada curvada)."],wrist:["Punho","mobilidade e fortalecimento de antebraço; use pegada neutra ou straps quando doer; evite hiperextensão do punho no apoio."]};
+  const prehabL=(p.conditions||[]).map(cc=>PREHAB[cc]).filter(Boolean);
+  const cardMobility=`<div class="card span-6"><h3>Mobilidade & prevenção de lesão <span class="pill accent">protocolo RAMP</span></h3><div class="cap">aquecimento estruturado reduz lesão e melhora rendimento (FIFA 11+: −30 a −50% de lesões)</div>
+    <div class="daytag">Aquecimento RAMP (5–10 min)</div>
+    <div class="src" style="font-size:12.5px;line-height:1.75"><b>R</b>aise — 5 min de cardio leve (bike/esteira) até suar levemente.<br><b>A</b>ctivate — ativar core e glúteo (prancha, ponte de glúteo, bird-dog).<br><b>M</b>obilize — mobilidade <b>dinâmica</b> de ${mobList} (do treino de hoje).<br><b>P</b>otentiate — 2–3 séries de aproximação no 1º composto (já no seu treino).</div>
+    <div class="src" style="margin-top:8px">⚠️ Antes de treinar faça <b>alongamento dinâmico</b>, não estático — o estático antes reduz força e potência. Deixe o alongamento estático para o fim.</div>
+    <div class="daytag" style="margin-top:12px">Prehab ${prehabL.length?"para as suas condições":"— proteção geral"}</div>
+    ${prehabL.length?prehabL.map(([l,t])=>`<div class="src" style="font-size:12.5px;line-height:1.6;margin:3px 0"><b>${l}:</b> ${t}</div>`).join(""):`<div class="src" style="font-size:12.5px;line-height:1.6">Sem lesões marcadas. Base de proteção: fortalecer posterior e glúteo, dominar a técnica e progredir carga aos poucos.</div>`}
+    <div class="src" style="margin-top:8px"><b>Flexão nórdica</b> (excêntrico de posterior) reduz lesão de posterior em <b>65–70%</b> e faz parte da prevenção de LCA${p.sex==="F"?" — ainda mais importante para mulheres, que têm 8× mais risco de LCA":""}. Está na sua biblioteca de exercícios.</div></div>`;
+
   // ---- biblioteca de exercícios com instruções de execução ----
   const exMuscles=["all","fav",...new Set(EX.map(e=>e.mu))];
   const favEx=favs().ex;
@@ -3518,7 +3534,7 @@ function render(){
     week:{title:"Semana",sub:"7 dias com rotação determinística de fontes + lista de compras agregada.",html:cardWeek+cardShop},
     diario:{title:"Diário alimentar",sub:"Fotografe a refeição ou registre o consumo real; a Análise passa a usar o que foi comido, não o plano.",html:cardMealPhoto+cardDiary+cardIntake},
     analise:{title:"Análise de precisão",sub:"Micronutrientes vs DRI, qualidade proteica (PDCAAS), leucina por refeição, carga glicêmica e lacunas com fontes alimentares.",html:cardMicros+cardProtQual+cardProtDist+cardGL+cardSupp+cardSupps+cardEvid+cardMacros},
-    train:{title:"Treino",sub:"Split por frequência com isolamento direto de braços/panturrilha, calendário de treinos, volume graduado por landmarks, base aeróbica e biblioteca de exercícios.",html:cardMethod+cardWorkoutMain+cardTrainCal+cardFem+(p.sex==="F"?cardCycle:"")+cardVolume+cardZone2+cardCardio+cardSleep+cardExLib+cardReady+cardTrend},
+    train:{title:"Treino",sub:"Split por frequência com isolamento direto de braços/panturrilha, calendário de treinos, volume graduado por landmarks, base aeróbica e biblioteca de exercícios.",html:cardMethod+cardWorkoutMain+cardTrainCal+cardMobility+cardFem+(p.sex==="F"?cardCycle:"")+cardVolume+cardZone2+cardCardio+cardSleep+cardExLib+cardReady+cardTrend},
     calc:{title:"Calculadoras",sub:"1RM, zonas de FC, pace, gasto calórico e VO₂máx — todas determinísticas.",html:cardCalc+cardBody},
     labs:{title:"Exames",sub:"Comparação com faixas de referência + tendência entre exames — educativo, nunca prescreve.",html:cardCheckup+cardLabs+cardLabSummary+cardLabTrend},
     habits:{title:"Hábitos",sub:"Checklist diário, sequência, conquistas e nível — tudo por regras determinísticas.",html:cardHabits+cardWater+cardStreak+cardGami+cardCoach},
