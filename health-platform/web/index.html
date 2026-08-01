@@ -2353,6 +2353,28 @@ function render(){
     <div class="cores"><div class="k">Sua faixa Z2</div><div class="v tnum">${hz.z2.min}–${hz.z2.max}<small> bpm</small></div><div class="meta">Karvonen · manter conversável</div></div></div>
     <div class="src" style="margin-top:12px">Z2 aumenta densidade mitocondrial e oxidação de gordura — a base sobre a qual as zonas altas rendem. ${["performance","running","cycling"].includes(p.goal)?"Volume elevado pelo objetivo de endurance.":"150–200 min/sem cobrem saúde e longevidade."}</div></div>`;
 
+  // ---- CARDIO & CONDICIONAMENTO (VO₂máx, Norueguês 4×4, 80/20, interferência) ----
+  const hrMax4=Math.round(208-0.7*p.age); // Tanaka 2001
+  const vo2est=Math.round(15.3*hrMax4/Math.max(_rhr,40)); // Uth-Sørensen 2004 (FCmáx/FCrepouso)
+  const vo2B=(()=>{const f=p.sex==="F";if(vo2est>=(f?45:50))return{t:"excelente",p:"good"};if(vo2est>=(f?38:42))return{t:"bom",p:"good"};if(vo2est>=(f?32:35))return{t:"regular",p:"warn"};return{t:"abaixo da média",p:"crit"};})();
+  const hi4=[Math.round(hrMax4*.85),Math.round(hrMax4*.95)],rec4=[Math.round(hrMax4*.6),Math.round(hrMax4*.7)];
+  const goalLbl4={fat_loss:"Emagrecimento",hypertrophy:"Hipertrofia",maintenance:"Manutenção · saúde",performance:"Performance"}[p.goal]||p.goal;
+  const CARDIO_RX={
+    fat_loss:{z2:"3–4× Zona 2 (30–45 min)",hi:"1–2× HIIT ou 4×4",note:"Déficit + cardio acelera a perda; HIIT e Zona 2 emagrecem igual (meta-análise 2023) — alterne: Z2 queima gordura direto, HIIT gasta mais no pós-treino em menos tempo."},
+    hypertrophy:{z2:"2–3× Zona 2 (20–30 min, de preferência bike)",hi:"opcional 1× 4×4 curto",note:"Mantenha ≤3 sessões e separe do treino de força (outro período do dia): minimiza o efeito de interferência. Bike interfere menos que corrida."},
+    maintenance:{z2:"150–200 min de Zona 2/sem",hi:"1× 4×4 para VO₂máx",note:"150 min/sem é o mínimo para saúde; 1 sessão de VO₂máx melhora bastante o principal preditor de longevidade."},
+    performance:{z2:"~80% do volume em Zona 2",hi:"~20% em alta intensidade (4×4/intervalados)",note:"Modelo 80/20 (polarizado): base aeróbica grande + doses de alta intensidade rendem mais que treinar sempre no médio."},
+  };
+  const rx4=CARDIO_RX[p.goal]||CARDIO_RX.maintenance;
+  const cardCardio=`<div class="card span-6"><h3>Cardio & condicionamento <span class="pill ${vo2B.p}">VO₂máx ~${vo2est} · ${vo2B.t}</span></h3><div class="cap">VO₂máx é o preditor não-sanguíneo mais forte de mortalidade (JAMA 2018) · estimativa Uth 2004</div>
+    <div class="calcout"><div class="cores"><div class="k">VO₂máx estimado</div><div class="v tnum">${vo2est}<small> ml/kg/min</small></div><div class="meta">${vo2B.t} · ${p.sex==="F"?"mulher":"homem"} ${p.age}a</div></div>
+    <div class="cores"><div class="k">FC máxima</div><div class="v tnum">${hrMax4}<small> bpm</small></div><div class="meta">Tanaka: 208 − 0,7×idade</div></div></div>
+    <div class="daytag" style="margin-top:12px">Protocolo Norueguês 4×4 (VO₂máx)</div>
+    <div class="src" style="font-size:12.5px;line-height:1.7">4 blocos de [<b>4 min forte a ${hi4[0]}–${hi4[1]} bpm</b> (85–95% FCmáx) + <b>3 min leve a ${rec4[0]}–${rec4[1]} bpm</b>] · ~38 min. É o protocolo mais validado para VO₂máx: <b>+7–10% em 8 semanas</b>.</div>
+    <div class="daytag" style="margin-top:12px">Sua prescrição — ${goalLbl4}</div>
+    <div class="src" style="font-size:12.5px;line-height:1.7">• Base aeróbica: <b>${rx4.z2}</b><br>• Alta intensidade: <b>${rx4.hi}</b><br>${rx4.note}</div>
+    <div class="src" style="margin-top:10px">Cada <b>+1 ml/kg/min</b> de VO₂máx ≈ <b>10% menos risco de morte</b>; o quintil menos condicionado tem risco <b>5× maior</b> que o de elite (JAMA 2018 · 122 mil pessoas).</div></div>`;
+
   // ---- biblioteca de exercícios com instruções de execução ----
   const exMuscles=["all","fav",...new Set(EX.map(e=>e.mu))];
   const favEx=favs().ex;
@@ -3468,7 +3490,7 @@ function render(){
     week:{title:"Semana",sub:"7 dias com rotação determinística de fontes + lista de compras agregada.",html:cardWeek+cardShop},
     diario:{title:"Diário alimentar",sub:"Fotografe a refeição ou registre o consumo real; a Análise passa a usar o que foi comido, não o plano.",html:cardMealPhoto+cardDiary+cardIntake},
     analise:{title:"Análise de precisão",sub:"Micronutrientes vs DRI, qualidade proteica (PDCAAS), leucina por refeição, carga glicêmica e lacunas com fontes alimentares.",html:cardMicros+cardProtQual+cardProtDist+cardGL+cardSupp+cardSupps+cardEvid+cardMacros},
-    train:{title:"Treino",sub:"Split por frequência com isolamento direto de braços/panturrilha, calendário de treinos, volume graduado por landmarks, base aeróbica e biblioteca de exercícios.",html:cardMethod+cardWorkoutMain+cardTrainCal+cardFem+(p.sex==="F"?cardCycle:"")+cardVolume+cardZone2+cardExLib+cardReady+cardTrend},
+    train:{title:"Treino",sub:"Split por frequência com isolamento direto de braços/panturrilha, calendário de treinos, volume graduado por landmarks, base aeróbica e biblioteca de exercícios.",html:cardMethod+cardWorkoutMain+cardTrainCal+cardFem+(p.sex==="F"?cardCycle:"")+cardVolume+cardZone2+cardCardio+cardExLib+cardReady+cardTrend},
     calc:{title:"Calculadoras",sub:"1RM, zonas de FC, pace, gasto calórico e VO₂máx — todas determinísticas.",html:cardCalc+cardBody},
     labs:{title:"Exames",sub:"Comparação com faixas de referência + tendência entre exames — educativo, nunca prescreve.",html:cardCheckup+cardLabs+cardLabSummary+cardLabTrend},
     habits:{title:"Hábitos",sub:"Checklist diário, sequência, conquistas e nível — tudo por regras determinísticas.",html:cardHabits+cardWater+cardStreak+cardGami+cardCoach},
