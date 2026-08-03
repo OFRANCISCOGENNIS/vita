@@ -1,0 +1,386 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>OMEGA JARVIS X — Cockpit</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root{
+    --bg:#070B14;--panel:#0C1322;--panel-2:#101A2E;--line:#1B2A44;
+    --cyan:#5FD4F4;--cyan-dim:#2A7FA0;--amber:#E8B45A;--green:#6FE3A5;--red:#F07178;
+    --ink:#D9E4F5;--mut:#7C8DA6;
+    --mono:ui-monospace,"SF Mono","Cascadia Mono",Menlo,Consolas,monospace;
+    --sans:"Segoe UI",system-ui,-apple-system,Roboto,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;background:var(--bg);color:var(--ink);font:14px/1.55 var(--sans);min-height:100vh;
+    background-image:radial-gradient(1200px 600px at 70% -10%,rgba(95,212,244,.07),transparent 60%);
+  }
+  ::selection{background:rgba(95,212,244,.25)}
+  .hud{display:grid;grid-template-rows:auto 1fr;min-height:100vh;max-width:1440px;margin:0 auto;padding:0 20px 20px}
+  header{display:flex;align-items:center;gap:18px;padding:14px 4px;border-bottom:1px solid var(--line);
+    position:sticky;top:0;background:linear-gradient(var(--bg) 80%,transparent);z-index:5}
+  .core{width:38px;height:38px;border-radius:50%;flex:none;position:relative;
+    background:radial-gradient(circle at 50% 50%,#BFF0FF 0%,var(--cyan) 35%,rgba(95,212,244,.15) 60%,transparent 70%);
+    box-shadow:0 0 24px rgba(95,212,244,.55),inset 0 0 8px rgba(255,255,255,.6)}
+  .core::after{content:"";position:absolute;inset:-6px;border-radius:50%;border:1px solid rgba(95,212,244,.4);
+    border-top-color:transparent;border-bottom-color:transparent;animation:spin 6s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .brand h1{margin:0;font:700 17px/1 var(--sans);letter-spacing:.14em}
+  .brand h1 em{font-style:normal;color:var(--cyan)}
+  .brand small{display:block;margin-top:4px;font:11px var(--mono);color:var(--mut);letter-spacing:.22em}
+  .topstats{margin-left:auto;display:flex;gap:26px;font-family:var(--mono)}
+  .topstats div{text-align:right}
+  .topstats b{display:block;font-size:16px;font-weight:600;font-variant-numeric:tabular-nums}
+  .topstats span{font-size:10px;letter-spacing:.18em;color:var(--mut);text-transform:uppercase}
+  .topstats b.ok{color:var(--green)} .topstats b.off{color:var(--red)}
+  @media(max-width:840px){.topstats div:nth-child(n+3){display:none}}
+  .deck{display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:16px;padding-top:16px;align-items:start}
+  @media(max-width:900px){.deck{grid-template-columns:1fr}}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px}
+  .panel-h{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line);
+    font:11px var(--mono);letter-spacing:.2em;color:var(--mut);text-transform:uppercase}
+  .panel-h::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--cyan);box-shadow:0 0 8px var(--cyan)}
+  .console{display:flex;flex-direction:column;min-height:560px}
+  .feed{flex:1;overflow-y:auto;padding:18px;display:flex;flex-direction:column;gap:14px;scroll-behavior:smooth;max-height:70vh}
+  .msg{max-width:82%;padding:10px 14px;border-radius:10px;white-space:pre-wrap;overflow-wrap:break-word}
+  .msg .tag{display:block;font:10px var(--mono);letter-spacing:.18em;color:var(--mut);margin-bottom:5px;text-transform:uppercase}
+  .msg.user{align-self:flex-end;background:var(--panel-2);border:1px solid var(--line);border-radius:10px 10px 2px 10px}
+  .msg.jarvis{align-self:flex-start;background:rgba(95,212,244,.06);border:1px solid rgba(95,212,244,.25);border-radius:10px 10px 10px 2px}
+  .msg.jarvis .tag{color:var(--cyan)}
+  .route{align-self:flex-start;font:11px var(--mono);color:var(--mut);padding:2px 4px}
+  .route b{color:var(--cyan);font-weight:600}
+  .composer{display:flex;gap:10px;padding:12px;border-top:1px solid var(--line)}
+  .composer input{flex:1;background:var(--bg);border:1px solid var(--line);border-radius:8px;color:var(--ink);
+    padding:11px 14px;font:14px var(--sans)}
+  .composer input:focus{outline:none;border-color:var(--cyan-dim);box-shadow:0 0 0 3px rgba(95,212,244,.12)}
+  .composer button{background:var(--cyan);color:#04121B;border:0;border-radius:8px;padding:0 20px;
+    font:600 13px var(--sans);letter-spacing:.06em;cursor:pointer}
+  .composer button:disabled{opacity:.5;cursor:wait}
+  .composer button:hover:not(:disabled){filter:brightness(1.1)}
+  .composer button:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+  .chips{display:flex;gap:8px;flex-wrap:wrap;padding:0 12px 12px}
+  .chips button{all:unset;cursor:pointer;font:11px var(--mono);color:var(--mut);border:1px solid var(--line);
+    border-radius:999px;padding:5px 12px}
+  .chips button:hover{color:var(--cyan);border-color:var(--cyan-dim)}
+  .chips button:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+  .col-r{display:flex;flex-direction:column;gap:16px}
+  .agents{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);border-radius:0 0 10px 10px;overflow:hidden}
+  .agent{background:var(--panel);padding:9px 12px;display:flex;align-items:center;gap:9px;min-width:0}
+  .agent .dot{width:7px;height:7px;border-radius:50%;flex:none;background:var(--mut)}
+  .agent.run .dot{background:var(--green);box-shadow:0 0 6px var(--green)}
+  .agent.busy .dot{background:var(--amber);box-shadow:0 0 6px var(--amber)}
+  .agent b{font:600 12px var(--mono);letter-spacing:.05em}
+  .agent span{font-size:11px;color:var(--mut);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .agent.prime{grid-column:1/-1;background:linear-gradient(90deg,rgba(95,212,244,.08),var(--panel))}
+  .agent.prime b{color:var(--cyan)}
+  .provs{padding:8px 14px;display:flex;flex-direction:column;gap:6px}
+  .prov{display:flex;align-items:center;gap:9px;font:12px var(--mono)}
+  .prov .dot{width:7px;height:7px;border-radius:50%;background:var(--mut)}
+  .prov.on .dot{background:var(--green);box-shadow:0 0 6px var(--green)}
+  .prov span{color:var(--mut);margin-left:auto;font-size:11px}
+  .mem{padding:8px 14px;display:flex;flex-direction:column;gap:6px;font-size:12.5px}
+  .mem .empty{color:var(--mut);font-style:italic}
+  .mem div{display:flex;gap:8px;align-items:baseline}
+  .mem div::before{content:"◆";color:var(--cyan-dim);font-size:9px}
+  .auto{padding:10px 14px;display:flex;flex-direction:column;gap:8px}
+  .auto .row{display:flex;gap:8px;align-items:center;font-size:12.5px}
+  .auto .flow{display:flex;flex-direction:column;gap:3px;padding:8px 10px;background:var(--panel-2);
+    border:1px solid var(--line);border-radius:8px}
+  .auto .flow b{font:600 12px var(--sans)}
+  .auto .flow .pipe{font:10px var(--mono);color:var(--mut);letter-spacing:.04em}
+  .auto .flow .pipe .ext{color:var(--amber)}
+  .auto button{all:unset;cursor:pointer;font:11px var(--mono);border:1px solid var(--line);
+    border-radius:7px;padding:5px 10px;color:var(--ink)}
+  .auto button:hover{border-color:var(--cyan-dim);color:var(--cyan)}
+  .auto button:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+  .auto button.mk{border-color:var(--cyan-dim);color:var(--cyan)}
+  .runlog{font:11px var(--mono);color:var(--mut);display:flex;flex-direction:column;gap:2px;
+    max-height:120px;overflow-y:auto;padding-top:4px;border-top:1px solid var(--line)}
+  .runlog .ok{color:var(--green)} .runlog .rej{color:var(--red)} .runlog .wait{color:var(--amber)}
+  .approval{display:flex;flex-direction:column;gap:8px;padding:10px;background:rgba(232,180,90,.08);
+    border:1px solid rgba(232,180,90,.4);border-radius:8px}
+  .approval b{color:var(--amber);font-size:12px}
+  .approval .acts{display:flex;gap:8px}
+  .approval button.yes{border-color:var(--green);color:var(--green)}
+  .approval button.no{border-color:var(--red);color:var(--red)}
+  footer{padding:14px 4px 0;font:11px var(--mono);color:var(--mut);letter-spacing:.08em}
+  footer b{color:var(--cyan-dim)}
+  @media(prefers-reduced-motion:reduce){.core::after{animation:none}.feed{scroll-behavior:auto}}
+</style>
+</head>
+<body>
+<div class="hud">
+  <header>
+    <div class="core" aria-hidden="true"></div>
+    <div class="brand">
+      <h1>OMEGA <em>JARVIS</em> X</h1>
+      <small>INFINITY ASCENSION · MVP FASE 1</small>
+    </div>
+    <div class="topstats" aria-label="estado do sistema">
+      <div><b class="off" id="stSys">…</b><span>núcleo</span></div>
+      <div><b id="stAg">—</b><span>agentes</span></div>
+      <div><b id="stTask">0</b><span>tarefas hoje</span></div>
+      <div><b id="stUp">—</b><span>uptime</span></div>
+    </div>
+  </header>
+
+  <div class="deck">
+    <main class="panel console" aria-label="console do assistente">
+      <div class="panel-h">Console · conectado ao OMEGA Core</div>
+      <div class="feed" id="feed" aria-live="polite"></div>
+      <div class="composer">
+        <input id="inp" type="text" placeholder="Fale com o JARVIS…" autocomplete="off" aria-label="mensagem para o JARVIS">
+        <button id="send">Enviar</button>
+      </div>
+      <div class="chips" aria-label="sugestões">
+        <button data-q="Meu nome é Francisco e meu objetivo é construir o OMEGA JARVIS">apresentar-se</button>
+        <button data-q="Monte um plano para analisar meus custos mensais">plano de custos</button>
+        <button data-q="Desenhe uma automação que resume e-mails no Slack">automação</button>
+        <button data-q="O que você sabe sobre mim?">memória</button>
+      </div>
+    </main>
+
+    <div class="col-r">
+      <section class="panel" aria-label="agentes permanentes">
+        <div class="panel-h">Agentes permanentes</div>
+        <div class="agents" id="agents"></div>
+      </section>
+      <section class="panel" aria-label="provedores de modelo">
+        <div class="panel-h">Model Router · provedores</div>
+        <div class="provs" id="provs"></div>
+      </section>
+      <section class="panel" aria-label="central de automações">
+        <div class="panel-h">Central de Automações · Camada 7</div>
+        <div class="auto" id="auto">
+          <div class="row">
+            <button class="mk" id="mkFlow">+ Criar fluxo de exemplo</button>
+          </div>
+          <div id="flows"></div>
+          <div id="approval"></div>
+          <div class="runlog" id="runlog"></div>
+        </div>
+      </section>
+      <section class="panel" aria-label="memória persistente">
+        <div class="panel-h">Memória · fatos aprendidos</div>
+        <div class="mem" id="mem"><div class="empty">nenhum fato aprendido ainda</div></div>
+      </section>
+    </div>
+  </div>
+
+  <footer><b>OMEGA CORE</b> orquestrador · <b>ROUTER</b> anthropic → openai → local · <b>AUTOMAÇÃO</b> fluxos com aprovação humana — fases 1–2 do roadmap</footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var sessionId = "web-" + Math.random().toString(36).slice(2, 10);
+  var feed = document.getElementById("feed"),
+      inp = document.getElementById("inp"),
+      btn = document.getElementById("send");
+
+  function el(cls, html){ var d=document.createElement("div"); d.className=cls; d.innerHTML=html;
+    feed.appendChild(d); feed.scrollTop=feed.scrollHeight; return d; }
+  function esc(s){ return s.replace(/[<>&]/g, function(c){ return {"<":"&lt;",">":"&gt;","&":"&amp;"}[c]; }); }
+
+  /* ---------- estado do sistema ---------- */
+  function refreshStatus(){
+    fetch("/api/status").then(r=>r.json()).then(function(s){
+      var sys=document.getElementById("stSys");
+      sys.textContent=s.status; sys.className="ok";
+      document.getElementById("stAg").textContent=s.agents;
+      document.getElementById("stTask").textContent=s.tasksToday;
+      var up=s.uptimeSeconds;
+      document.getElementById("stUp").textContent = up<3600 ? Math.floor(up/60)+"min" : (up/3600).toFixed(1)+"h";
+      var pv=document.getElementById("provs"); pv.innerHTML="";
+      s.providers.forEach(function(p){
+        pv.insertAdjacentHTML("beforeend",
+          '<div class="prov'+(p.available?" on":"")+'"><span class="dot"></span><b>'+esc(p.name)+'</b><span>'+esc(p.model)+'</span></div>');
+      });
+    }).catch(function(){ document.getElementById("stSys").textContent="OFF"; });
+  }
+
+  function refreshMemory(){
+    fetch("/api/memory").then(r=>r.json()).then(function(facts){
+      var m=document.getElementById("mem");
+      m.innerHTML = facts.length
+        ? facts.map(function(f){ return "<div>"+esc(f.text)+"</div>"; }).join("")
+        : '<div class="empty">nenhum fato aprendido ainda</div>';
+    });
+  }
+
+  /* ---------- agentes ---------- */
+  var wrap=document.getElementById("agents");
+  fetch("/api/agents").then(r=>r.json()).then(function(list){
+    list.forEach(function(a){
+      var d=document.createElement("div");
+      d.className="agent run"+(a.name==="OMEGA PRIME"?" prime":"");
+      d.innerHTML='<span class="dot"></span><b>'+esc(a.name)+'</b><span>'+esc(a.domain)+'</span>';
+      d.dataset.name=a.name; wrap.appendChild(d);
+    });
+  });
+  function setAgent(name,state){
+    var a=wrap.querySelector('[data-name="'+name+'"]');
+    if(a) a.className=a.className.replace(/ (run|busy)/g,"")+" "+state;
+  }
+
+  /* ---------- chat via SSE ---------- */
+  function send(){
+    var q=inp.value.trim(); if(!q||btn.disabled) return;
+    el("msg user",'<span class="tag">Você</span>'+esc(q));
+    inp.value=""; btn.disabled=true;
+
+    fetch("/api/chat",{
+      method:"POST",
+      headers:{"content-type":"application/json"},
+      body:JSON.stringify({sessionId:sessionId,text:q})
+    }).then(function(res){
+      var reader=res.body.getReader(), dec=new TextDecoder(), buf="";
+      function pump(){
+        return reader.read().then(function(x){
+          if(x.done){ btn.disabled=false; refreshStatus(); refreshMemory(); return; }
+          buf+=dec.decode(x.value,{stream:true});
+          var blocks=buf.split("\n\n"); buf=blocks.pop();
+          blocks.forEach(function(b){
+            var ev=(b.match(/^event: (.+)$/m)||[])[1],
+                data=(b.match(/^data: (.+)$/m)||[])[1];
+            if(ev&&data) handle(ev,JSON.parse(data));
+          });
+          return pump();
+        });
+      }
+      return pump();
+    }).catch(function(err){
+      el("msg jarvis",'<span class="tag">SISTEMA</span>Falha de conexão com o OMEGA Core: '+esc(err.message));
+      btn.disabled=false;
+    });
+  }
+
+  function handle(ev,d){
+    if(ev==="plan"){
+      var names=d.agents.map(function(a){return a.name;}).join(" · ");
+      el("route","⇢ plano: <b>"+esc(names)+"</b> → "+esc(d.reviewer)+
+        (d.memoryHits?" · "+d.memoryHits+" fato(s) da memória":""));
+      d.agents.forEach(function(a){ setAgent(a.name,"busy"); });
+      setAgent("OMEGA PRIME","busy");
+    }
+    if(ev==="step"&&(d.status==="concluído"||d.status==="aprovado")) setAgent(d.agent,"run");
+    if(ev==="memory") el("route","◆ memória: aprendi — "+esc(d.learned.join("; ")));
+    if(ev==="final")
+      el("msg jarvis",'<span class="tag">JARVIS · '+esc(d.agents.join(" + "))+" · "+esc(d.provider)+"/"+esc(d.model)+"</span>"+esc(d.text));
+    if(ev==="error")
+      el("msg jarvis",'<span class="tag">SISTEMA</span>Erro no orquestrador: '+esc(d.message));
+  }
+
+  btn.addEventListener("click",send);
+  inp.addEventListener("keydown",function(e){ if(e.key==="Enter") send(); });
+  document.querySelectorAll(".chips button").forEach(function(c){
+    c.addEventListener("click",function(){ inp.value=c.dataset.q; send(); });
+  });
+
+  /* ---------- Central de Automações (Camada 7) ---------- */
+  var flowsBox=document.getElementById("flows"),
+      approvalBox=document.getElementById("approval"),
+      runlog=document.getElementById("runlog");
+
+  function logRun(msg,cls){
+    var d=document.createElement("div"); if(cls) d.className=cls;
+    d.textContent=msg; runlog.insertBefore(d,runlog.firstChild);
+    while(runlog.children.length>30) runlog.removeChild(runlog.lastChild);
+  }
+
+  function refreshFlows(){
+    fetch("/api/flows").then(r=>r.json()).then(function(flows){
+      flowsBox.innerHTML="";
+      flows.forEach(function(f){
+        var pipe=f.steps.map(function(s){
+          var ext=(s.connector==="slack"||s.connector==="http");
+          return '<span class="'+(ext?"ext":"")+'">'+esc(s.connector)+'</span>';
+        }).join(" → ");
+        var d=document.createElement("div"); d.className="flow";
+        d.innerHTML='<b>'+esc(f.name)+(f.active?' ·<span style="color:var(--green)"> ativo</span>':'')+'</b>'+
+          '<div class="pipe">'+pipe+'</div>'+
+          '<div class="row"><button data-run="'+f.id+'">▶ Executar</button>'+
+          '<button data-act="'+f.id+'" data-on="'+(f.active?0:1)+'">'+(f.active?"Desativar":"Ativar")+'</button></div>';
+        flowsBox.appendChild(d);
+      });
+      flowsBox.querySelectorAll("[data-run]").forEach(function(b){
+        b.addEventListener("click",function(){ runFlow(b.dataset.run); });
+      });
+      flowsBox.querySelectorAll("[data-act]").forEach(function(b){
+        b.addEventListener("click",function(){
+          fetch("/api/flows/"+b.dataset.act+"/"+(b.dataset.on==="1"?"activate":"deactivate"),{method:"POST"})
+            .then(refreshFlows);
+        });
+      });
+    });
+  }
+
+  document.getElementById("mkFlow").addEventListener("click",function(){
+    fetch("/api/flows",{method:"POST",headers:{"content-type":"application/json"},
+      body:JSON.stringify({name:"Resumo de fatura no Slack",steps:[
+        {connector:"trigger",config:{source:"manual"}},
+        {connector:"summarize",config:{}},
+        {connector:"transform",config:{template:"Resumo: ${summary}"}},
+        {connector:"slack",config:{channel:"#financeiro"}}
+      ]})}).then(function(){ logRun("fluxo criado","ok"); refreshFlows(); });
+  });
+
+  function runFlow(id){
+    logRun("▶ executando fluxo "+id,"wait");
+    fetch("/api/flows/"+id+"/run",{method:"POST",headers:{"content-type":"application/json"},
+      body:JSON.stringify({input:"Fatura de energia: R$ 340, vence sexta-feira. Verificar consumo elevado."})
+    }).then(function(res){
+      var reader=res.body.getReader(),dec=new TextDecoder(),buf="";
+      function pump(){
+        return reader.read().then(function(x){
+          if(x.done) return;
+          buf+=dec.decode(x.value,{stream:true});
+          var blocks=buf.split("\n\n"); buf=blocks.pop();
+          blocks.forEach(function(b){
+            var ev=(b.match(/^event: (.+)$/m)||[])[1],
+                data=(b.match(/^data: (.+)$/m)||[])[1];
+            if(ev&&data) onRun(ev,JSON.parse(data));
+          });
+          return pump();
+        });
+      }
+      return pump();
+    });
+  }
+
+  function onRun(ev,d){
+    if(ev==="run:start") logRun("· fluxo iniciado ("+d.flow+")","wait");
+    if(ev==="run:step") logRun("  passo "+d.step+": "+d.status+(d.note?" ("+d.note+")":""),
+      d.status==="ok"?"ok":"");
+    if(ev==="run:approval"){
+      approvalBox.innerHTML="";
+      var box=document.createElement("div"); box.className="approval";
+      box.innerHTML='<b>⚠ Aprovação necessária</b><span>Ação externa: '+esc(d.action)+'</span>'+
+        '<div class="acts"><button class="yes">Aprovar</button><button class="no">Rejeitar</button></div>';
+      box.querySelector(".yes").addEventListener("click",function(){ decide(d.runId,"approve"); });
+      box.querySelector(".no").addEventListener("click",function(){ decide(d.runId,"reject"); });
+      approvalBox.appendChild(box);
+    }
+    if(ev==="run:end"){
+      logRun("· fluxo "+d.status,d.status==="concluído"?"ok":(d.status==="rejeitado"?"rej":""));
+    }
+  }
+
+  function decide(runId,what){
+    fetch("/api/runs/"+runId+"/"+what,{method:"POST"}).then(function(){
+      approvalBox.innerHTML="";
+      logRun("ação externa "+(what==="approve"?"APROVADA":"REJEITADA")+" pelo usuário",
+        what==="approve"?"ok":"rej");
+    });
+  }
+
+  refreshStatus(); refreshMemory(); refreshFlows();
+  setInterval(refreshStatus,10000);
+  el("msg jarvis",'<span class="tag">JARVIS</span>Núcleo OMEGA online. Orquestrador, roteador multi-modelo, memória persistente e Motor de Automação (com aprovação humana para ações externas) ativos. Em que posso ajudar?');
+})();
+</script>
+</body>
+</html>

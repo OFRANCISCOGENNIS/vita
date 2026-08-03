@@ -1,0 +1,362 @@
+<title>OMEGA JARVIS X — Cockpit</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  /* ============ OMEGA JARVIS X — cockpit HUD (tema único deliberado) ============ */
+  :root{
+    --bg:#070B14;          /* espaço profundo */
+    --panel:#0C1322;       /* painel */
+    --panel-2:#101A2E;     /* painel elevado */
+    --line:#1B2A44;        /* hairline */
+    --cyan:#5FD4F4;        /* reator — acento único */
+    --cyan-dim:#2A7FA0;
+    --amber:#E8B45A;       /* atenção */
+    --green:#6FE3A5;       /* ok */
+    --red:#F07178;         /* crítico */
+    --ink:#D9E4F5;         /* texto */
+    --mut:#7C8DA6;         /* secundário */
+    --mono:ui-monospace,"SF Mono","Cascadia Mono","JetBrains Mono",Menlo,Consolas,monospace;
+    --sans:"Segoe UI",system-ui,-apple-system,Roboto,"Helvetica Neue",sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;background:var(--bg);color:var(--ink);font:14px/1.55 var(--sans);
+    background-image:
+      radial-gradient(1200px 600px at 70% -10%, rgba(95,212,244,.07), transparent 60%),
+      radial-gradient(800px 500px at 0% 110%, rgba(95,212,244,.05), transparent 60%);
+    min-height:100vh;
+  }
+  ::selection{background:rgba(95,212,244,.25)}
+
+  .hud{display:grid;grid-template-rows:auto 1fr;min-height:100vh;max-width:1440px;margin:0 auto;padding:0 20px 20px}
+
+  /* ---------- topo ---------- */
+  header{
+    display:flex;align-items:center;gap:18px;padding:14px 4px;border-bottom:1px solid var(--line);
+    position:sticky;top:0;background:linear-gradient(var(--bg) 80%,transparent);z-index:5;
+  }
+  .core{
+    width:38px;height:38px;border-radius:50%;flex:none;position:relative;
+    background:radial-gradient(circle at 50% 50%, #BFF0FF 0%, var(--cyan) 35%, rgba(95,212,244,.15) 60%, transparent 70%);
+    box-shadow:0 0 24px rgba(95,212,244,.55), inset 0 0 8px rgba(255,255,255,.6);
+  }
+  .core::after{content:"";position:absolute;inset:-6px;border-radius:50%;border:1px solid rgba(95,212,244,.4);
+    border-top-color:transparent;border-bottom-color:transparent;animation:spin 6s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .brand h1{margin:0;font:700 17px/1 var(--sans);letter-spacing:.14em}
+  .brand h1 em{font-style:normal;color:var(--cyan)}
+  .brand small{display:block;margin-top:4px;font:11px var(--mono);color:var(--mut);letter-spacing:.22em}
+  .topstats{margin-left:auto;display:flex;gap:26px;font-family:var(--mono)}
+  .topstats div{text-align:right}
+  .topstats b{display:block;font-size:16px;font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums}
+  .topstats span{font-size:10px;letter-spacing:.18em;color:var(--mut);text-transform:uppercase}
+  .topstats b.ok{color:var(--green)}
+  @media(max-width:840px){.topstats div:nth-child(n+3){display:none}}
+
+  /* ---------- grade principal ---------- */
+  .deck{display:grid;grid-template-columns:200px minmax(0,1fr) 330px;gap:16px;padding-top:16px;align-items:start}
+  @media(max-width:1100px){.deck{grid-template-columns:200px minmax(0,1fr)}.col-r{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:16px}}
+  @media(max-width:760px){.deck{grid-template-columns:1fr}.rail{display:flex;overflow-x:auto}.col-r{grid-template-columns:1fr}}
+
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px}
+  .panel-h{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line);
+    font:11px var(--mono);letter-spacing:.2em;color:var(--mut);text-transform:uppercase}
+  .panel-h::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--cyan);box-shadow:0 0 8px var(--cyan)}
+
+  /* ---------- trilho de módulos ---------- */
+  .rail{display:flex;flex-direction:column;gap:2px;padding:8px}
+  .rail button{
+    all:unset;display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:7px;cursor:pointer;
+    color:var(--mut);font:13px var(--sans);white-space:nowrap;
+  }
+  .rail button:hover{background:var(--panel-2);color:var(--ink)}
+  .rail button:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+  .rail button.on{background:var(--panel-2);color:var(--ink);box-shadow:inset 2px 0 0 var(--cyan)}
+  .rail .glyph{font-family:var(--mono);font-size:11px;color:var(--cyan-dim);width:26px;flex:none;text-align:center}
+  .rail button.on .glyph{color:var(--cyan)}
+
+  /* ---------- console ---------- */
+  .console{display:flex;flex-direction:column;min-height:560px}
+  .feed{flex:1;overflow-y:auto;padding:18px;display:flex;flex-direction:column;gap:14px;scroll-behavior:smooth}
+  .msg{max-width:78%;padding:10px 14px;border-radius:10px;white-space:pre-wrap}
+  .msg .tag{display:block;font:10px var(--mono);letter-spacing:.18em;color:var(--mut);margin-bottom:5px;text-transform:uppercase}
+  .msg.user{align-self:flex-end;background:var(--panel-2);border:1px solid var(--line);border-radius:10px 10px 2px 10px}
+  .msg.jarvis{align-self:flex-start;background:rgba(95,212,244,.06);border:1px solid rgba(95,212,244,.25);border-radius:10px 10px 10px 2px}
+  .msg.jarvis .tag{color:var(--cyan)}
+  .route{align-self:flex-start;font:11px var(--mono);color:var(--mut);padding:2px 4px}
+  .route b{color:var(--cyan);font-weight:600}
+  .composer{display:flex;gap:10px;padding:12px;border-top:1px solid var(--line)}
+  .composer input{
+    flex:1;background:var(--bg);border:1px solid var(--line);border-radius:8px;color:var(--ink);
+    padding:11px 14px;font:14px var(--sans);
+  }
+  .composer input:focus{outline:none;border-color:var(--cyan-dim);box-shadow:0 0 0 3px rgba(95,212,244,.12)}
+  .composer button{
+    background:var(--cyan);color:#04121B;border:0;border-radius:8px;padding:0 20px;font:600 13px var(--sans);
+    letter-spacing:.06em;cursor:pointer;
+  }
+  .composer button:hover{filter:brightness(1.1)}
+  .composer button:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+  .chips{display:flex;gap:8px;flex-wrap:wrap;padding:0 12px 12px}
+  .chips button{
+    all:unset;cursor:pointer;font:11px var(--mono);color:var(--mut);border:1px solid var(--line);
+    border-radius:999px;padding:5px 12px;
+  }
+  .chips button:hover{color:var(--cyan);border-color:var(--cyan-dim)}
+  .chips button:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+
+  /* ---------- coluna direita ---------- */
+  .col-r{display:flex;flex-direction:column;gap:16px}
+  .agents{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);border-radius:0 0 10px 10px;overflow:hidden}
+  .agent{background:var(--panel);padding:9px 12px;display:flex;align-items:center;gap:9px;min-width:0}
+  .agent .dot{width:7px;height:7px;border-radius:50%;flex:none;background:var(--mut)}
+  .agent.run .dot{background:var(--green);box-shadow:0 0 6px var(--green)}
+  .agent.busy .dot{background:var(--amber);box-shadow:0 0 6px var(--amber)}
+  .agent b{font:600 12px var(--mono);letter-spacing:.05em}
+  .agent span{font-size:11px;color:var(--mut);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .agent.prime{grid-column:1/-1;background:linear-gradient(90deg,rgba(95,212,244,.08),var(--panel))}
+  .agent.prime b{color:var(--cyan)}
+
+  .tele{padding:14px;display:flex;flex-direction:column;gap:12px}
+  .tele canvas{width:100%;height:64px;display:block}
+  .kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  .kpi{background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:9px 11px}
+  .kpi b{display:block;font:600 17px var(--mono);font-variant-numeric:tabular-nums}
+  .kpi span{font-size:10px;letter-spacing:.14em;color:var(--mut);text-transform:uppercase}
+  .kpi b.ok{color:var(--green)} .kpi b.warn{color:var(--amber)}
+
+  .autos{display:flex;flex-direction:column}
+  .auto{display:flex;align-items:center;gap:10px;padding:10px 14px;border-top:1px solid var(--line);font-size:12.5px}
+  .auto:first-of-type{border-top:0}
+  .auto .st{font:10px var(--mono);letter-spacing:.1em;padding:2px 8px;border-radius:999px;margin-left:auto;flex:none}
+  .st.ok{color:var(--green);border:1px solid rgba(111,227,165,.4)}
+  .st.run{color:var(--cyan);border:1px solid rgba(95,212,244,.4)}
+  .st.wait{color:var(--amber);border:1px solid rgba(232,180,90,.4)}
+  .auto span{color:var(--mut)}
+
+  footer{padding:14px 4px 0;font:11px var(--mono);color:var(--mut);letter-spacing:.08em;display:flex;gap:8px;flex-wrap:wrap}
+  footer b{color:var(--cyan-dim)}
+
+  .cursor{display:inline-block;width:7px;height:14px;background:var(--cyan);vertical-align:-2px;animation:blink 1s steps(1) infinite}
+  @keyframes blink{50%{opacity:0}}
+  @media(prefers-reduced-motion:reduce){
+    .core::after{animation:none}
+    .cursor{animation:none}
+    .feed{scroll-behavior:auto}
+  }
+</style>
+
+<div class="hud">
+  <header>
+    <div class="core" aria-hidden="true"></div>
+    <div class="brand">
+      <h1>OMEGA <em>JARVIS</em> X</h1>
+      <small>INFINITY ASCENSION · PROTÓTIPO v0.1</small>
+    </div>
+    <div class="topstats" aria-label="estado do sistema">
+      <div><b class="ok" id="stSys">ONLINE</b><span>núcleo</span></div>
+      <div><b id="stAg">14</b><span>agentes</span></div>
+      <div><b id="stTask">0</b><span>tarefas hoje</span></div>
+      <div><b id="stLat">—</b><span>latência p95</span></div>
+    </div>
+  </header>
+
+  <div class="deck">
+    <!-- trilho de módulos -->
+    <nav class="panel rail" aria-label="módulos">
+      <button class="on"><span class="glyph">◉</span>Assistente</button>
+      <button><span class="glyph">⬡</span>Agentes</button>
+      <button><span class="glyph">⇄</span>Automações</button>
+      <button><span class="glyph">$</span>Financeiro</button>
+      <button><span class="glyph">▤</span>Projetos</button>
+      <button><span class="glyph">✎</span>Pesquisa</button>
+      <button><span class="glyph">⛨</span>Segurança</button>
+      <button><span class="glyph">◫</span>Memória</button>
+      <button><span class="glyph">⚙</span>Config</button>
+    </nav>
+
+    <!-- console central -->
+    <main class="panel console" aria-label="console do assistente">
+      <div class="panel-h">Console · sessão segura · criptografia AES-256</div>
+      <div class="feed" id="feed" aria-live="polite"></div>
+      <div class="composer">
+        <input id="inp" type="text" placeholder="Fale com o JARVIS… (ex.: analise meus custos do mês)"
+               autocomplete="off" aria-label="mensagem para o JARVIS">
+        <button id="send">Enviar</button>
+      </div>
+      <div class="chips" aria-label="sugestões">
+        <button data-q="Analise meus custos do mês">custos do mês</button>
+        <button data-q="Crie uma automação para resumir e-mails no Slack">automação de e-mails</button>
+        <button data-q="Pesquise tendências de IA para 2027">pesquisa de tendências</button>
+        <button data-q="Gere uma API de cadastro de clientes">gerar API</button>
+        <button data-q="Qual o status do sistema?">status</button>
+      </div>
+    </main>
+
+    <!-- coluna direita -->
+    <div class="col-r">
+      <section class="panel" aria-label="agentes permanentes">
+        <div class="panel-h">Agentes permanentes</div>
+        <div class="agents" id="agents"></div>
+      </section>
+
+      <section class="panel" aria-label="telemetria">
+        <div class="panel-h">Telemetria</div>
+        <div class="tele">
+          <canvas id="spark" width="600" height="128" role="img" aria-label="gráfico de carga do orquestrador"></canvas>
+          <div class="kpis">
+            <div class="kpi"><b class="ok" id="kUp">99.98%</b><span>uptime</span></div>
+            <div class="kpi"><b id="kCost">$ 0.42</b><span>custo/h</span></div>
+            <div class="kpi"><b class="warn" id="kQ">3</b><span>na fila</span></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel autos" aria-label="automações">
+        <div class="panel-h">Automações ativas</div>
+        <div class="auto">Resumo diário de e-mails <span>→ Slack</span><em class="st ok">OK 07:00</em></div>
+        <div class="auto">Backup projetos <span>→ Drive</span><em class="st run">RODANDO</em></div>
+        <div class="auto">Radar de faturas <span>→ Financeiro</span><em class="st ok">OK 06:30</em></div>
+        <div class="auto">Monitor de PRs <span>→ GitHub</span><em class="st wait">AGUARDANDO</em></div>
+      </section>
+    </div>
+  </div>
+
+  <footer>
+    <b>OMEGA CORE</b> orquestrador stateless · <b>ROUTER</b> multi-modelo com fallback ·
+    <b>MEMÓRIA</b> redis + pg + vetorial + grafo · protótipo de interface — camadas 1 e 17 da arquitetura
+  </footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  /* ---------- agentes ---------- */
+  var AGENTS = [
+    ["ALPHA","Lógica"],["BETA","Criatividade"],["GAMMA","Dados"],["DELTA","Programação"],
+    ["EPSILON","Negócios"],["ZETA","Marketing"],["ETA","Pesquisa"],["THETA","Segurança"],
+    ["IOTA","Finanças"],["KAPPA","Automação"],["LAMBDA","Educação"],["SIGMA","Psicologia"],
+    ["PHI","Saúde"],["OMEGA PRIME","Validação final"]
+  ];
+  var wrap = document.getElementById("agents");
+  AGENTS.forEach(function(a){
+    var d = document.createElement("div");
+    d.className = "agent run" + (a[0]==="OMEGA PRIME" ? " prime" : "");
+    d.innerHTML = '<span class="dot"></span><b>'+a[0]+'</b><span>'+a[1]+'</span>';
+    d.dataset.name = a[0];
+    wrap.appendChild(d);
+  });
+  function setAgent(name, state){ // state: run | busy
+    var el = wrap.querySelector('[data-name="'+name+'"]');
+    if(el){ el.className = el.className.replace(/ (run|busy)/g,"") + " " + state; }
+  }
+  // vida ambiente: um agente pisca ocupado de vez em quando
+  if(!reduced) setInterval(function(){
+    var a = AGENTS[Math.floor(Math.random()*13)][0];
+    setAgent(a,"busy"); setTimeout(function(){ setAgent(a,"run"); }, 1800+Math.random()*2000);
+  }, 4200);
+
+  /* ---------- telemetria ---------- */
+  var cv = document.getElementById("spark"), cx = cv.getContext("2d");
+  var pts = []; for(var i=0;i<60;i++) pts.push(35+Math.sin(i/6)*12+Math.random()*10);
+  function draw(){
+    var w=cv.width, h=cv.height;
+    cx.clearRect(0,0,w,h);
+    cx.strokeStyle="rgba(27,42,68,.9)"; cx.lineWidth=1;
+    [0.25,0.5,0.75].forEach(function(f){ cx.beginPath(); cx.moveTo(0,h*f); cx.lineTo(w,h*f); cx.stroke(); });
+    var step=w/(pts.length-1);
+    cx.beginPath();
+    pts.forEach(function(p,i){ var y=h-(p/100)*h; i?cx.lineTo(i*step,y):cx.moveTo(0,y); });
+    cx.strokeStyle="#5FD4F4"; cx.lineWidth=2; cx.stroke();
+    cx.lineTo(w,h); cx.lineTo(0,h); cx.closePath();
+    var g=cx.createLinearGradient(0,0,0,h);
+    g.addColorStop(0,"rgba(95,212,244,.22)"); g.addColorStop(1,"rgba(95,212,244,0)");
+    cx.fillStyle=g; cx.fill();
+    var lastY=h-(pts[pts.length-1]/100)*h;
+    cx.beginPath(); cx.arc(w-3,lastY,3.5,0,7); cx.fillStyle="#BFF0FF"; cx.fill();
+  }
+  draw();
+  var lat = document.getElementById("stLat");
+  function tick(){
+    pts.shift(); pts.push(Math.max(8,Math.min(92, pts[pts.length-1]+(Math.random()-0.5)*14)));
+    draw();
+    lat.textContent = Math.round(320+Math.random()*280)+" ms";
+    document.getElementById("kCost").textContent = "$ 0."+(38+Math.floor(Math.random()*12));
+    document.getElementById("kQ").textContent = Math.floor(Math.random()*6);
+  }
+  tick();
+  if(!reduced) setInterval(tick, 2000);
+
+  /* ---------- console ---------- */
+  var feed = document.getElementById("feed"),
+      inp  = document.getElementById("inp"),
+      btn  = document.getElementById("send"),
+      tasks = 0, tEl = document.getElementById("stTask");
+
+  function el(cls, html){ var d=document.createElement("div"); d.className=cls; d.innerHTML=html; feed.appendChild(d); feed.scrollTop=feed.scrollHeight; return d; }
+
+  function typeInto(node, text, done){
+    if(reduced){ node.textContent=text; done&&done(); return; }
+    var i=0, cur=document.createElement("span"); cur.className="cursor";
+    node.textContent=""; node.appendChild(cur);
+    (function step(){
+      if(i<text.length){
+        cur.insertAdjacentText("beforebegin", text.slice(i, i+2)); i+=2;
+        feed.scrollTop=feed.scrollHeight;
+        setTimeout(step, 12);
+      } else { cur.remove(); done&&done(); }
+    })();
+  }
+
+  function jarvis(text, route){
+    if(route){ el("route","⇢ roteando → <b>"+route+"</b>"); }
+    var m = el("msg jarvis",'<span class="tag">JARVIS</span><span class="body"></span>');
+    setTimeout(function(){ typeInto(m.querySelector(".body"), text); }, reduced?0:350);
+  }
+
+  var BRAINS = [
+    { k:/custo|financ|gasto|fatura|or[çc]amento/i, r:"IOTA · GAMMA → OMEGA PRIME",
+      a:"Análise concluída. Seus custos do mês somam R$ 12.480 — 8% abaixo do orçamento. Maior variação: infraestrutura de nuvem (+14%), compensada pela queda em ferramentas (−22%). Detectei 2 assinaturas sem uso há 60 dias; posso cancelá-las mediante sua aprovação. Relatório completo disponível no Centro Financeiro.",
+      busy:["IOTA","GAMMA"] },
+    { k:/automa|fluxo|slack|e-?mail|gatilho/i, r:"KAPPA → THETA (revisão) → OMEGA PRIME",
+      a:"Fluxo desenhado: [Gatilho] novo e-mail com fatura ➝ [GAMMA] extração de valores ➝ [resumo] ➝ [Slack #financeiro]. THETA validou as permissões: somente leitura no Gmail, escrita restrita ao canal escolhido. O fluxo está em modo rascunho aguardando sua ativação na Central de Automações.",
+      busy:["KAPPA","THETA"] },
+    { k:/pesquis|tend[êe]ncia|artigo|estudo|mercado/i, r:"ETA · GAMMA → OMEGA PRIME",
+      a:"Varredura em 42 fontes concluída. Três tendências dominantes para 2027: (1) agentes autônomos com supervisão humana como padrão corporativo; (2) inferência local em dispositivos para dados sensíveis; (3) consolidação de plataformas multi-modelo. Sínteses com as fontes citadas foram salvas no Centro de Pesquisa — nenhuma afirmação sem rastreabilidade.",
+      busy:["ETA","GAMMA"] },
+    { k:/api|c[óo]digo|sistema|app|gerar|criar.*(site|painel|dashboard)/i, r:"DELTA → sandbox → THETA → OMEGA PRIME",
+      a:"Especificação gerada: API REST de clientes (CRUD + busca), PostgreSQL, autenticação JWT, OpenAPI 3.1. Executei os 24 testes no sandbox — todos verdes; scan de segurança do THETA sem apontamentos. O artefato está pronto para revisão: nada será publicado sem sua aprovação explícita.",
+      busy:["DELTA","THETA"] },
+    { k:/status|sa[úu]de|sistema|online/i, r:"OMEGA CORE",
+      a:"Todos os sistemas nominais. 14 agentes permanentes ativos, roteador multi-modelo com 6 provedores disponíveis, memória universal sincronizada (temporária, persistente, vetorial e grafo). Uptime 99,98%. Nenhum alerta de segurança nas últimas 24 h.",
+      busy:[] },
+    { k:/.*/, r:"ALPHA (planejamento) → OMEGA PRIME",
+      a:"Entendido. Decompus sua solicitação em um plano de tarefas e selecionei os agentes adequados. Este é um protótipo de interface — na plataforma completa, o OMEGA Core executaria o plano de verdade: recuperando sua memória, roteando para o melhor modelo e pedindo sua aprovação antes de qualquer ação externa. Experimente os atalhos abaixo do console.",
+      busy:["ALPHA"] }
+  ];
+
+  function respond(q){
+    var b = BRAINS.find(function(x){ return x.k.test(q); });
+    b.busy.forEach(function(n){ setAgent(n,"busy"); setTimeout(function(){ setAgent(n,"run"); }, 5000); });
+    setAgent("OMEGA PRIME","busy"); setTimeout(function(){ setAgent("OMEGA PRIME","run"); }, 6000);
+    tasks++; tEl.textContent = tasks;
+    setTimeout(function(){ jarvis(b.a, b.r); }, reduced?0:400);
+  }
+
+  function send(){
+    var q = inp.value.trim(); if(!q) return;
+    el("msg user",'<span class="tag">Você</span>'+q.replace(/[<>&]/g,function(c){return{"<":"&lt;",">":"&gt;","&":"&amp;"}[c];}));
+    inp.value=""; respond(q);
+  }
+  btn.addEventListener("click", send);
+  inp.addEventListener("keydown", function(e){ if(e.key==="Enter") send(); });
+  document.querySelectorAll(".chips button").forEach(function(c){
+    c.addEventListener("click", function(){ inp.value=c.dataset.q; send(); });
+  });
+
+  /* ---------- boot ---------- */
+  jarvis("Bom dia. Núcleo OMEGA inicializado: 14 agentes permanentes online, memória universal sincronizada, canais seguros estabelecidos. Em que posso ajudar?");
+})();
+</script>

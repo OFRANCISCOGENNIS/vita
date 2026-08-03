@@ -1,0 +1,12 @@
+{
+  "name": "omega-jarvis",
+  "version": "0.1.0",
+  "description": "OMEGA JARVIS X INFINITY ASCENSION — MVP cognitivo (Fase 1): orquestrador, model router multi-provedor, 14 agentes permanentes, memória persistente e cockpit web.",
+  "type": "module",
+  "private": true,
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "start": "node server/index.js",
+    "test": "node test/smoke.mjs"
+  }
+}
