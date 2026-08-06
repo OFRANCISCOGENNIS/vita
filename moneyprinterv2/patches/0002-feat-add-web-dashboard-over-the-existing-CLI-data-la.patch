@@ -1,0 +1,600 @@
+From ed403d3aec64033031ea4203cf8cf68d41002ed0 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 4 Jul 2026 12:18:25 +0000
+Subject: [PATCH 2/3] feat: add web dashboard over the existing CLI data layer
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+- web/server.py: FastAPI REST API reusing cache.py/config.py — accounts
+  CRUD (youtube/twitter), AFM products, masked config view, status with
+  Ollama health, and a job endpoint that fires src/cron.py
+- web/static/index.html: single-page frontend (tabs, forms, live status)
+- config.py: import srt_equalizer lazily inside equalize_subtitles so
+  config-only consumers don't need the subtitle toolchain installed
+- bootstrap config.json from config.example.json on first run
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+---
+ src/config.py         |   5 +-
+ web/README.md         |  27 +++++
+ web/requirements.txt  |   2 +
+ web/server.py         | 231 +++++++++++++++++++++++++++++++++++++
+ web/static/index.html | 261 ++++++++++++++++++++++++++++++++++++++++++
+ 5 files changed, 525 insertions(+), 1 deletion(-)
+ create mode 100644 web/README.md
+ create mode 100644 web/requirements.txt
+ create mode 100644 web/server.py
+ create mode 100644 web/static/index.html
+
+diff --git a/src/config.py b/src/config.py
+index 2f761f6..6085573 100644
+--- a/src/config.py
++++ b/src/config.py
+@@ -1,7 +1,6 @@
+ import os
+ import sys
+ import json
+-import srt_equalizer
+ 
+ from termcolor import colored
+ 
+@@ -306,6 +305,10 @@ def equalize_subtitles(srt_path: str, max_chars: int = 10) -> None:
+     Returns:
+         None
+     """
++    # Imported lazily so consumers that only need config getters (e.g. the
++    # web dashboard) don't require the subtitle toolchain to be installed.
++    import srt_equalizer
++
+     srt_equalizer.equalize_srt_file(srt_path, srt_path, max_chars)
+ 
+ def get_font() -> str:
+diff --git a/web/README.md b/web/README.md
+new file mode 100644
+index 0000000..c5778e1
+--- /dev/null
++++ b/web/README.md
+@@ -0,0 +1,27 @@
++# Painel web do MoneyPrinterV2
++
++Dashboard que substitui o menu de terminal, operando sobre os mesmos dados do
++CLI (`.mp/*.json` e `config.json`): contas criadas aqui aparecem no menu de
++terminal e vice-versa.
++
++## Rodando
++
++```bash
++pip install -r web/requirements.txt
++uvicorn web.server:app --port 8000
++```
++
++Abra <http://127.0.0.1:8000>. A documentação interativa da API fica em
++`/api/docs`.
++
++Se `config.json` não existir, o servidor cria um a partir de
++`config.example.json` na primeira subida.
++
++## O que dá para fazer
++
++- **Painel** — contagem de contas, vídeos, posts e produtos + status do Ollama.
++- **YouTube / Twitter** — listar, criar e remover contas.
++- **Afiliados** — listar e cadastrar produtos vinculados a uma conta Twitter.
++- **Config** — visualizar `config.json` com segredos mascarados.
++- **Jobs** — `POST /api/jobs/{provider}/{account_id}` dispara a mesma geração
++  usada pelo agendador do CLI (`src/cron.py`); exige Ollama acessível.
+diff --git a/web/requirements.txt b/web/requirements.txt
+new file mode 100644
+index 0000000..364e2ee
+--- /dev/null
++++ b/web/requirements.txt
+@@ -0,0 +1,2 @@
++fastapi
++uvicorn[standard]
+diff --git a/web/server.py b/web/server.py
+new file mode 100644
+index 0000000..0c76f24
+--- /dev/null
++++ b/web/server.py
+@@ -0,0 +1,231 @@
++"""
++MoneyPrinterV2 web dashboard.
++
++Serves a REST API over the same JSON caches and config.json the CLI uses,
++plus a single-page frontend. Run from the project root:
++
++    uvicorn web.server:app --port 8000
++"""
++
++import os
++import sys
++import json
++import shutil
++import subprocess
++from uuid import uuid4
++
++PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
++SRC_DIR = os.path.join(PROJECT_ROOT, "src")
++
++# config.py derives ROOT_DIR from sys.path[0], so src must be first on the
++# path before it is imported (same contract as `python src/main.py`).
++if sys.path[0] != SRC_DIR:
++    sys.path.insert(0, SRC_DIR)
++
++# The CLI requires config.json to exist; the web server bootstraps it from
++# the example so a fresh clone can start without manual setup.
++_config_path = os.path.join(PROJECT_ROOT, "config.json")
++if not os.path.exists(_config_path):
++    shutil.copyfile(os.path.join(PROJECT_ROOT, "config.example.json"), _config_path)
++
++import config as mp_config
++
++mp_config.ROOT_DIR = PROJECT_ROOT
++
++from cache import (
++    get_accounts,
++    add_account,
++    remove_account,
++    get_products,
++    add_product,
++)
++
++from fastapi import FastAPI, HTTPException
++from fastapi.responses import FileResponse
++from fastapi.staticfiles import StaticFiles
++from pydantic import BaseModel, Field
++
++app = FastAPI(title="MoneyPrinterV2", docs_url="/api/docs", openapi_url="/api/openapi.json")
++
++PROVIDERS = {"youtube", "twitter"}
++
++SECRET_MARKERS = ("api_key", "password", "smtp", "token", "secret")
++
++
++class YouTubeAccountIn(BaseModel):
++    nickname: str = Field(min_length=1)
++    firefox_profile: str = ""
++    niche: str = Field(min_length=1)
++    language: str = Field(min_length=1)
++
++
++class TwitterAccountIn(BaseModel):
++    nickname: str = Field(min_length=1)
++    firefox_profile: str = ""
++    topic: str = Field(min_length=1)
++
++
++class ProductIn(BaseModel):
++    affiliate_link: str = Field(min_length=1)
++    twitter_uuid: str = Field(min_length=1)
++
++
++def _require_provider(provider: str) -> None:
++    if provider not in PROVIDERS:
++        raise HTTPException(status_code=404, detail=f"Unknown provider '{provider}'.")
++
++
++def _mask_secrets(value, key_hint: str = ""):
++    """Recursively masks values whose keys look like credentials."""
++    if isinstance(value, dict):
++        return {k: _mask_secrets(v, k) for k, v in value.items()}
++    if isinstance(value, list):
++        return [_mask_secrets(v, key_hint) for v in value]
++    hint = key_hint.lower()
++    if isinstance(value, str) and value and any(m in hint for m in SECRET_MARKERS):
++        return "••••••" + value[-4:] if len(value) > 4 else "••••••"
++    return value
++
++
++@app.get("/api/status")
++def status():
++    youtube_accounts = get_accounts("youtube")
++    twitter_accounts = get_accounts("twitter")
++    products = get_products()
++
++    ollama_ok = False
++    ollama_models: list[str] = []
++    try:
++        from llm_provider import list_models
++
++        ollama_models = list_models()
++        ollama_ok = True
++    except Exception:
++        pass
++
++    return {
++        "youtube_accounts": len(youtube_accounts),
++        "twitter_accounts": len(twitter_accounts),
++        "products": len(products),
++        "videos": sum(len(a.get("videos", [])) for a in youtube_accounts),
++        "posts": sum(len(a.get("posts", [])) for a in twitter_accounts),
++        "ollama": {"reachable": ollama_ok, "models": ollama_models},
++    }
++
++
++@app.get("/api/accounts/{provider}")
++def list_accounts(provider: str):
++    _require_provider(provider)
++    return get_accounts(provider)
++
++
++@app.post("/api/accounts/youtube", status_code=201)
++def create_youtube_account(payload: YouTubeAccountIn):
++    account = {
++        "id": str(uuid4()),
++        "nickname": payload.nickname,
++        "firefox_profile": payload.firefox_profile,
++        "niche": payload.niche,
++        "language": payload.language,
++        "videos": [],
++    }
++    add_account("youtube", account)
++    return account
++
++
++@app.post("/api/accounts/twitter", status_code=201)
++def create_twitter_account(payload: TwitterAccountIn):
++    account = {
++        "id": str(uuid4()),
++        "nickname": payload.nickname,
++        "firefox_profile": payload.firefox_profile,
++        "topic": payload.topic,
++        "posts": [],
++    }
++    add_account("twitter", account)
++    return account
++
++
++@app.delete("/api/accounts/{provider}/{account_id}", status_code=204)
++def delete_account(provider: str, account_id: str):
++    _require_provider(provider)
++    if not any(a["id"] == account_id for a in get_accounts(provider)):
++        raise HTTPException(status_code=404, detail="Account not found.")
++    remove_account(provider, account_id)
++
++
++@app.get("/api/accounts/youtube/{account_id}/videos")
++def list_videos(account_id: str):
++    for account in get_accounts("youtube"):
++        if account["id"] == account_id:
++            return account.get("videos", [])
++    raise HTTPException(status_code=404, detail="Account not found.")
++
++
++@app.get("/api/accounts/twitter/{account_id}/posts")
++def list_posts(account_id: str):
++    for account in get_accounts("twitter"):
++        if account["id"] == account_id:
++            return account.get("posts", [])
++    raise HTTPException(status_code=404, detail="Account not found.")
++
++
++@app.get("/api/products")
++def list_products():
++    return get_products()
++
++
++@app.post("/api/products", status_code=201)
++def create_product(payload: ProductIn):
++    if not any(a["id"] == payload.twitter_uuid for a in get_accounts("twitter")):
++        raise HTTPException(status_code=422, detail="twitter_uuid does not match any Twitter account.")
++    product = {
++        "id": str(uuid4()),
++        "affiliate_link": payload.affiliate_link,
++        "twitter_uuid": payload.twitter_uuid,
++    }
++    add_product(product)
++    return product
++
++
++@app.get("/api/config")
++def read_config():
++    with open(_config_path, "r") as file:
++        return _mask_secrets(json.load(file))
++
++
++@app.post("/api/jobs/{provider}/{account_id}", status_code=202)
++def run_job(provider: str, account_id: str):
++    """
++    Fires a one-off generation job (same entry point the CLI scheduler uses).
++    Requires a reachable Ollama server with at least one model.
++    """
++    _require_provider(provider)
++    if not any(a["id"] == account_id for a in get_accounts(provider)):
++        raise HTTPException(status_code=404, detail="Account not found.")
++
++    try:
++        from llm_provider import list_models
++
++        models = list_models()
++    except Exception as e:
++        raise HTTPException(status_code=503, detail=f"Ollama unreachable: {e}")
++    if not models:
++        raise HTTPException(status_code=503, detail="No Ollama models available.")
++
++    model = mp_config.get_ollama_model() or models[0]
++    cron_path = os.path.join(SRC_DIR, "cron.py")
++    process = subprocess.Popen(
++        [sys.executable, cron_path, provider, account_id, model],
++        cwd=PROJECT_ROOT,
++    )
++    return {"pid": process.pid, "provider": provider, "account_id": account_id, "model": model}
++
++
++STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
++app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
++
++
++@app.get("/", include_in_schema=False)
++def index():
++    return FileResponse(os.path.join(STATIC_DIR, "index.html"))
+diff --git a/web/static/index.html b/web/static/index.html
+new file mode 100644
+index 0000000..47304db
+--- /dev/null
++++ b/web/static/index.html
+@@ -0,0 +1,261 @@
++<!DOCTYPE html>
++<html lang="pt-BR">
++<head>
++<meta charset="utf-8">
++<meta name="viewport" content="width=device-width, initial-scale=1">
++<title>MoneyPrinterV2 — Painel</title>
++<style>
++  :root{
++    --paper:#ECEEF0; --raised:#F7F8F9; --ink:#14161A; --soft:#4B4F56;
++    --rule:#CBCFD3; --rule2:#A6ABB2;
++    --cyan:#0089C7; --cyan-ink:#006B99; --magenta:#C22868; --magenta-ink:#A01B54;
++    --yellow:#E8A400; --good:#1E7B4D; --bad:#B23B3B;
++    --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
++    --body:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
++    --display:Georgia,"Times New Roman",serif;
++  }
++  @media (prefers-color-scheme: dark){
++    :root{ --paper:#101114; --raised:#17181C; --ink:#E7E8EA; --soft:#A7ABB3;
++      --rule:#2B2E33; --rule2:#40444B; --cyan:#35B4F0; --cyan-ink:#55C2F5;
++      --magenta:#F14F92; --magenta-ink:#F27DA9; --yellow:#F5C24B; --good:#45C685; --bad:#E2695F; }
++  }
++  *{ box-sizing:border-box; }
++  body{ margin:0; background:var(--paper); color:var(--ink); font-family:var(--body); line-height:1.55; }
++  .wrap{ max-width:960px; margin:0 auto; padding:2rem 1.25rem 4rem; }
++
++  header.mast{ display:flex; align-items:flex-end; justify-content:space-between; gap:1rem;
++    border-bottom:3px solid var(--ink); padding-bottom:1rem; margin-bottom:1.5rem; flex-wrap:wrap; }
++  .brand h1{ font-family:var(--display); font-size:1.7rem; margin:0; line-height:1.1; }
++  .brand h1 em{ font-style:normal; color:var(--cyan-ink); }
++  .brand .kick{ font-family:var(--mono); font-size:.68rem; letter-spacing:.14em; text-transform:uppercase; color:var(--soft); }
++  .marks{ display:flex; gap:5px; margin-bottom:.35rem; }
++  .marks span{ width:13px; height:13px; border-radius:50%; border:1.5px solid; position:relative; display:inline-block; }
++  .marks span::before,.marks span::after{ content:""; position:absolute; background:currentColor; }
++  .marks span::before{ left:50%; top:-3px; bottom:-3px; width:1.5px; transform:translateX(-50%); }
++  .marks span::after{ top:50%; left:-3px; right:-3px; height:1.5px; transform:translateY(-50%); }
++  .m-c{ color:var(--cyan);} .m-m{ color:var(--magenta);} .m-y{ color:var(--yellow);}
++
++  nav.tabs{ display:flex; gap:.4rem; flex-wrap:wrap; margin-bottom:1.5rem; }
++  nav.tabs button{ font-family:var(--mono); font-size:.75rem; letter-spacing:.08em; text-transform:uppercase;
++    background:none; border:1px solid var(--rule2); color:var(--soft); border-radius:3px;
++    padding:.45rem .8rem; cursor:pointer; }
++  nav.tabs button:hover{ color:var(--ink); border-color:var(--ink); }
++  nav.tabs button[aria-selected="true"]{ background:var(--ink); color:var(--paper); border-color:var(--ink); }
++  nav.tabs button:focus-visible{ outline:2px solid var(--cyan); outline-offset:2px; }
++
++  .panel{ display:none; } .panel.on{ display:block; }
++
++  .cards{ display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:.8rem; margin-bottom:1.4rem; }
++  .card{ background:var(--raised); border:1px solid var(--rule); border-radius:6px; padding:.9rem 1rem; }
++  .card .n{ font-size:1.6rem; font-weight:700; font-variant-numeric:tabular-nums; }
++  .card .l{ font-family:var(--mono); font-size:.66rem; letter-spacing:.1em; text-transform:uppercase; color:var(--soft); }
++
++  .pill{ font-family:var(--mono); font-size:.7rem; padding:.15rem .55rem; border-radius:999px; }
++  .pill.ok{ background:color-mix(in srgb, var(--good) 16%, transparent); color:var(--good); }
++  .pill.err{ background:color-mix(in srgb, var(--bad) 16%, transparent); color:var(--bad); }
++
++  h2{ font-family:var(--display); font-size:1.25rem; margin:0 0 .8rem; }
++  h3{ font-size:.95rem; margin:1.4rem 0 .6rem; }
++
++  table{ width:100%; border-collapse:collapse; font-size:.88rem; }
++  .twrap{ overflow-x:auto; border:1px solid var(--rule); border-radius:6px; background:var(--raised); }
++  th{ text-align:left; font-family:var(--mono); font-size:.66rem; letter-spacing:.07em; text-transform:uppercase;
++    color:var(--soft); padding:.55rem .8rem; border-bottom:2px solid var(--cyan); }
++  td{ padding:.55rem .8rem; border-bottom:1px solid var(--rule); vertical-align:top; }
++  tr:last-child td{ border-bottom:none; }
++  td.mono{ font-family:var(--mono); font-size:.78rem; color:var(--soft); }
++  .empty{ color:var(--soft); font-size:.88rem; padding:1rem; }
++
++  form.new{ display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:.6rem; align-items:end;
++    background:var(--raised); border:1px solid var(--rule); border-radius:6px; padding:1rem; margin-top:1rem; }
++  form.new label{ display:flex; flex-direction:column; gap:.25rem; font-family:var(--mono);
++    font-size:.66rem; letter-spacing:.08em; text-transform:uppercase; color:var(--soft); }
++  form.new input{ font:inherit; font-size:.88rem; padding:.45rem .6rem; border:1px solid var(--rule2);
++    border-radius:4px; background:var(--paper); color:var(--ink); }
++  form.new input:focus-visible{ outline:2px solid var(--cyan); outline-offset:1px; }
++  button.act{ font-family:var(--mono); font-size:.75rem; letter-spacing:.06em; text-transform:uppercase;
++    background:var(--cyan); color:#fff; border:none; border-radius:4px; padding:.55rem .9rem; cursor:pointer; }
++  button.act:hover{ filter:brightness(1.08); }
++  button.act:focus-visible{ outline:2px solid var(--ink); outline-offset:2px; }
++  button.del{ font-family:var(--mono); font-size:.68rem; background:none; border:1px solid var(--rule2);
++    color:var(--bad); border-radius:3px; padding:.2rem .5rem; cursor:pointer; }
++  button.del:hover{ border-color:var(--bad); }
++
++  pre.cfg{ background:var(--raised); border:1px solid var(--rule); border-radius:6px; padding:1rem;
++    overflow-x:auto; font-family:var(--mono); font-size:.78rem; line-height:1.5; margin:0; }
++
++  #toast{ position:fixed; bottom:1.2rem; left:50%; transform:translateX(-50%); background:var(--ink);
++    color:var(--paper); font-family:var(--mono); font-size:.75rem; padding:.55rem 1rem; border-radius:4px;
++    opacity:0; pointer-events:none; transition:opacity .2s; max-width:90vw; }
++  #toast.show{ opacity:1; }
++  @media (prefers-reduced-motion: reduce){ #toast{ transition:none; } }
++</style>
++</head>
++<body>
++<div class="wrap">
++
++  <header class="mast">
++    <div class="brand">
++      <div class="marks" aria-hidden="true"><span class="m-c"></span><span class="m-m"></span><span class="m-y"></span></div>
++      <div class="kick">painel de operação</div>
++      <h1>MoneyPrinter<em>V2</em></h1>
++    </div>
++    <div id="ollama-pill" class="pill err">ollama: verificando…</div>
++  </header>
++
++  <nav class="tabs" role="tablist">
++    <button role="tab" aria-selected="true" data-tab="painel">Painel</button>
++    <button role="tab" aria-selected="false" data-tab="youtube">YouTube</button>
++    <button role="tab" aria-selected="false" data-tab="twitter">Twitter</button>
++    <button role="tab" aria-selected="false" data-tab="afm">Afiliados</button>
++    <button role="tab" aria-selected="false" data-tab="config">Config</button>
++  </nav>
++
++  <section class="panel on" id="p-painel">
++    <div class="cards" id="stat-cards"></div>
++    <p style="color:var(--soft); font-size:.88rem; max-width:60ch">
++      Este painel opera sobre os mesmos dados do CLI (<code>.mp/*.json</code> e <code>config.json</code>).
++      Contas criadas aqui aparecem no menu de terminal e vice-versa.
++    </p>
++  </section>
++
++  <section class="panel" id="p-youtube">
++    <h2>Contas YouTube</h2>
++    <div class="twrap"><table>
++      <thead><tr><th>Apelido</th><th>Nicho</th><th>Idioma</th><th>Vídeos</th><th>UUID</th><th></th></tr></thead>
++      <tbody id="yt-rows"></tbody>
++    </table></div>
++    <form class="new" id="yt-form">
++      <label>Apelido<input name="nickname" required></label>
++      <label>Nicho<input name="niche" required></label>
++      <label>Idioma<input name="language" required value="Português"></label>
++      <label>Perfil Firefox<input name="firefox_profile" placeholder="opcional"></label>
++      <button class="act" type="submit">Criar conta</button>
++    </form>
++  </section>
++
++  <section class="panel" id="p-twitter">
++    <h2>Contas Twitter/X</h2>
++    <div class="twrap"><table>
++      <thead><tr><th>Apelido</th><th>Tema</th><th>Posts</th><th>UUID</th><th></th></tr></thead>
++      <tbody id="tw-rows"></tbody>
++    </table></div>
++    <form class="new" id="tw-form">
++      <label>Apelido<input name="nickname" required></label>
++      <label>Tema<input name="topic" required></label>
++      <label>Perfil Firefox<input name="firefox_profile" placeholder="opcional"></label>
++      <button class="act" type="submit">Criar conta</button>
++    </form>
++  </section>
++
++  <section class="panel" id="p-afm">
++    <h2>Produtos de afiliado</h2>
++    <div class="twrap"><table>
++      <thead><tr><th>Link de afiliado</th><th>Conta Twitter</th><th>UUID</th></tr></thead>
++      <tbody id="afm-rows"></tbody>
++    </table></div>
++    <form class="new" id="afm-form">
++      <label>Link de afiliado<input name="affiliate_link" required placeholder="https://amzn.to/…"></label>
++      <label>UUID da conta Twitter<input name="twitter_uuid" required></label>
++      <button class="act" type="submit">Adicionar produto</button>
++    </form>
++  </section>
++
++  <section class="panel" id="p-config">
++    <h2>Configuração <span style="font-family:var(--mono);font-size:.7rem;color:var(--soft)">(segredos mascarados)</span></h2>
++    <pre class="cfg" id="cfg-view">carregando…</pre>
++  </section>
++
++</div>
++<div id="toast" role="status"></div>
++
++<script>
++const $ = s => document.querySelector(s);
++const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
++
++function toast(msg){
++  const t = $('#toast'); t.textContent = msg; t.classList.add('show');
++  clearTimeout(t._h); t._h = setTimeout(()=>t.classList.remove('show'), 2600);
++}
++
++async function api(path, opts={}){
++  const r = await fetch('/api'+path, {headers:{'Content-Type':'application/json'}, ...opts});
++  if (r.status === 204) return null;
++  const body = await r.json().catch(()=>null);
++  if (!r.ok) throw new Error(body && body.detail ? (typeof body.detail==='string'?body.detail:JSON.stringify(body.detail)) : r.statusText);
++  return body;
++}
++
++document.querySelectorAll('nav.tabs button').forEach(btn=>{
++  btn.addEventListener('click', ()=>{
++    document.querySelectorAll('nav.tabs button').forEach(b=>b.setAttribute('aria-selected','false'));
++    btn.setAttribute('aria-selected','true');
++    document.querySelectorAll('.panel').forEach(p=>p.classList.remove('on'));
++    $('#p-'+btn.dataset.tab).classList.add('on');
++  });
++});
++
++async function loadStatus(){
++  const s = await api('/status');
++  $('#stat-cards').innerHTML = [
++    ['Contas YouTube', s.youtube_accounts], ['Contas Twitter', s.twitter_accounts],
++    ['Vídeos', s.videos], ['Posts', s.posts], ['Produtos', s.products],
++  ].map(([l,n])=>`<div class="card"><div class="n">${n}</div><div class="l">${l}</div></div>`).join('');
++  const pill = $('#ollama-pill');
++  if (s.ollama.reachable){ pill.className='pill ok'; pill.textContent=`ollama: ok (${s.ollama.models.length} modelos)`; }
++  else { pill.className='pill err'; pill.textContent='ollama: fora do ar'; }
++}
++
++async function loadYouTube(){
++  const list = await api('/accounts/youtube');
++  $('#yt-rows').innerHTML = list.length ? list.map(a=>`<tr>
++    <td>${esc(a.nickname)}</td><td>${esc(a.niche)}</td><td>${esc(a.language)}</td>
++    <td>${(a.videos||[]).length}</td><td class="mono">${a.id}</td>
++    <td><button class="del" data-prov="youtube" data-id="${a.id}">remover</button></td></tr>`).join('')
++    : '<tr><td colspan="6" class="empty">Nenhuma conta ainda — crie a primeira abaixo.</td></tr>';
++}
++
++async function loadTwitter(){
++  const list = await api('/accounts/twitter');
++  $('#tw-rows').innerHTML = list.length ? list.map(a=>`<tr>
++    <td>${esc(a.nickname)}</td><td>${esc(a.topic)}</td>
++    <td>${(a.posts||[]).length}</td><td class="mono">${a.id}</td>
++    <td><button class="del" data-prov="twitter" data-id="${a.id}">remover</button></td></tr>`).join('')
++    : '<tr><td colspan="5" class="empty">Nenhuma conta ainda — crie a primeira abaixo.</td></tr>';
++}
++
++async function loadAfm(){
++  const list = await api('/products');
++  $('#afm-rows').innerHTML = list.length ? list.map(p=>`<tr>
++    <td>${esc(p.affiliate_link)}</td><td class="mono">${esc(p.twitter_uuid)}</td><td class="mono">${p.id}</td></tr>`).join('')
++    : '<tr><td colspan="3" class="empty">Nenhum produto cadastrado.</td></tr>';
++}
++
++async function loadConfig(){
++  $('#cfg-view').textContent = JSON.stringify(await api('/config'), null, 2);
++}
++
++function bindForm(sel, path, after){
++  $(sel).addEventListener('submit', async e=>{
++    e.preventDefault();
++    const data = Object.fromEntries(new FormData(e.target).entries());
++    try{ await api(path, {method:'POST', body:JSON.stringify(data)}); e.target.reset(); toast('Criado.'); after(); loadStatus(); }
++    catch(err){ toast('Erro: '+err.message); }
++  });
++}
++bindForm('#yt-form','/accounts/youtube', loadYouTube);
++bindForm('#tw-form','/accounts/twitter', loadTwitter);
++bindForm('#afm-form','/products', loadAfm);
++
++document.addEventListener('click', async e=>{
++  const b = e.target.closest('button.del'); if(!b) return;
++  if(!confirm('Remover esta conta?')) return;
++  try{ await api(`/accounts/${b.dataset.prov}/${b.dataset.id}`, {method:'DELETE'});
++    toast('Removida.'); loadYouTube(); loadTwitter(); loadStatus(); }
++  catch(err){ toast('Erro: '+err.message); }
++});
++
++loadStatus(); loadYouTube(); loadTwitter(); loadAfm(); loadConfig();
++</script>
++</body>
++</html>
+-- 
+2.43.0
+

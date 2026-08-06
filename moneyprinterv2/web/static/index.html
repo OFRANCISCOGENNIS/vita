@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MoneyPrinterV2 — Painel</title>
+<style>
+  :root{
+    --paper:#ECEEF0; --raised:#F7F8F9; --ink:#14161A; --soft:#4B4F56;
+    --rule:#CBCFD3; --rule2:#A6ABB2;
+    --cyan:#0089C7; --cyan-ink:#006B99; --magenta:#C22868; --magenta-ink:#A01B54;
+    --yellow:#E8A400; --good:#1E7B4D; --bad:#B23B3B;
+    --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+    --body:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --display:Georgia,"Times New Roman",serif;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --paper:#101114; --raised:#17181C; --ink:#E7E8EA; --soft:#A7ABB3;
+      --rule:#2B2E33; --rule2:#40444B; --cyan:#35B4F0; --cyan-ink:#55C2F5;
+      --magenta:#F14F92; --magenta-ink:#F27DA9; --yellow:#F5C24B; --good:#45C685; --bad:#E2695F; }
+  }
+  *{ box-sizing:border-box; }
+  body{ margin:0; background:var(--paper); color:var(--ink); font-family:var(--body); line-height:1.55; }
+  .wrap{ max-width:960px; margin:0 auto; padding:2rem 1.25rem 4rem; }
+
+  header.mast{ display:flex; align-items:flex-end; justify-content:space-between; gap:1rem;
+    border-bottom:3px solid var(--ink); padding-bottom:1rem; margin-bottom:1.5rem; flex-wrap:wrap; }
+  .brand h1{ font-family:var(--display); font-size:1.7rem; margin:0; line-height:1.1; }
+  .brand h1 em{ font-style:normal; color:var(--cyan-ink); }
+  .brand .kick{ font-family:var(--mono); font-size:.68rem; letter-spacing:.14em; text-transform:uppercase; color:var(--soft); }
+  .marks{ display:flex; gap:5px; margin-bottom:.35rem; }
+  .marks span{ width:13px; height:13px; border-radius:50%; border:1.5px solid; position:relative; display:inline-block; }
+  .marks span::before,.marks span::after{ content:""; position:absolute; background:currentColor; }
+  .marks span::before{ left:50%; top:-3px; bottom:-3px; width:1.5px; transform:translateX(-50%); }
+  .marks span::after{ top:50%; left:-3px; right:-3px; height:1.5px; transform:translateY(-50%); }
+  .m-c{ color:var(--cyan);} .m-m{ color:var(--magenta);} .m-y{ color:var(--yellow);}
+
+  nav.tabs{ display:flex; gap:.4rem; flex-wrap:wrap; margin-bottom:1.5rem; }
+  nav.tabs button{ font-family:var(--mono); font-size:.75rem; letter-spacing:.08em; text-transform:uppercase;
+    background:none; border:1px solid var(--rule2); color:var(--soft); border-radius:3px;
+    padding:.45rem .8rem; cursor:pointer; }
+  nav.tabs button:hover{ color:var(--ink); border-color:var(--ink); }
+  nav.tabs button[aria-selected="true"]{ background:var(--ink); color:var(--paper); border-color:var(--ink); }
+  nav.tabs button:focus-visible{ outline:2px solid var(--cyan); outline-offset:2px; }
+
+  .panel{ display:none; } .panel.on{ display:block; }
+
+  .cards{ display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:.8rem; margin-bottom:1.4rem; }
+  .card{ background:var(--raised); border:1px solid var(--rule); border-radius:6px; padding:.9rem 1rem; }
+  .card .n{ font-size:1.6rem; font-weight:700; font-variant-numeric:tabular-nums; }
+  .card .l{ font-family:var(--mono); font-size:.66rem; letter-spacing:.1em; text-transform:uppercase; color:var(--soft); }
+
+  .pill{ font-family:var(--mono); font-size:.7rem; padding:.15rem .55rem; border-radius:999px; }
+  .pill.ok{ background:color-mix(in srgb, var(--good) 16%, transparent); color:var(--good); }
+  .pill.err{ background:color-mix(in srgb, var(--bad) 16%, transparent); color:var(--bad); }
+  .pill.run{ background:color-mix(in srgb, var(--cyan) 16%, transparent); color:var(--cyan-ink); }
+  .pill.wait{ background:color-mix(in srgb, var(--yellow) 20%, transparent); color:var(--ink); }
+  button.go{ font-family:var(--mono); font-size:.68rem; background:none; border:1px solid var(--rule2);
+    color:var(--cyan-ink); border-radius:3px; padding:.2rem .5rem; cursor:pointer; margin-right:.3rem; }
+  button.go:hover{ border-color:var(--cyan-ink); }
+
+  h2{ font-family:var(--display); font-size:1.25rem; margin:0 0 .8rem; }
+  h3{ font-size:.95rem; margin:1.4rem 0 .6rem; }
+
+  table{ width:100%; border-collapse:collapse; font-size:.88rem; }
+  .twrap{ overflow-x:auto; border:1px solid var(--rule); border-radius:6px; background:var(--raised); }
+  th{ text-align:left; font-family:var(--mono); font-size:.66rem; letter-spacing:.07em; text-transform:uppercase;
+    color:var(--soft); padding:.55rem .8rem; border-bottom:2px solid var(--cyan); }
+  td{ padding:.55rem .8rem; border-bottom:1px solid var(--rule); vertical-align:top; }
+  tr:last-child td{ border-bottom:none; }
+  td.mono{ font-family:var(--mono); font-size:.78rem; color:var(--soft); }
+  .empty{ color:var(--soft); font-size:.88rem; padding:1rem; }
+
+  form.new{ display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:.6rem; align-items:end;
+    background:var(--raised); border:1px solid var(--rule); border-radius:6px; padding:1rem; margin-top:1rem; }
+  form.new label{ display:flex; flex-direction:column; gap:.25rem; font-family:var(--mono);
+    font-size:.66rem; letter-spacing:.08em; text-transform:uppercase; color:var(--soft); }
+  form.new input{ font:inherit; font-size:.88rem; padding:.45rem .6rem; border:1px solid var(--rule2);
+    border-radius:4px; background:var(--paper); color:var(--ink); }
+  form.new input:focus-visible{ outline:2px solid var(--cyan); outline-offset:1px; }
+  button.act{ font-family:var(--mono); font-size:.75rem; letter-spacing:.06em; text-transform:uppercase;
+    background:var(--cyan); color:#fff; border:none; border-radius:4px; padding:.55rem .9rem; cursor:pointer; }
+  button.act:hover{ filter:brightness(1.08); }
+  button.act:focus-visible{ outline:2px solid var(--ink); outline-offset:2px; }
+  button.del{ font-family:var(--mono); font-size:.68rem; background:none; border:1px solid var(--rule2);
+    color:var(--bad); border-radius:3px; padding:.2rem .5rem; cursor:pointer; }
+  button.del:hover{ border-color:var(--bad); }
+
+  pre.cfg{ background:var(--raised); border:1px solid var(--rule); border-radius:6px; padding:1rem;
+    overflow-x:auto; font-family:var(--mono); font-size:.78rem; line-height:1.5; margin:0; }
+
+  #toast{ position:fixed; bottom:1.2rem; left:50%; transform:translateX(-50%); background:var(--ink);
+    color:var(--paper); font-family:var(--mono); font-size:.75rem; padding:.55rem 1rem; border-radius:4px;
+    opacity:0; pointer-events:none; transition:opacity .2s; max-width:90vw; }
+  #toast.show{ opacity:1; }
+  @media (prefers-reduced-motion: reduce){ #toast{ transition:none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="mast">
+    <div class="brand">
+      <div class="marks" aria-hidden="true"><span class="m-c"></span><span class="m-m"></span><span class="m-y"></span></div>
+      <div class="kick">painel de operação</div>
+      <h1>MoneyPrinter<em>V2</em></h1>
+    </div>
+    <div id="ollama-pill" class="pill err">ollama: verificando…</div>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button role="tab" aria-selected="true" data-tab="painel">Painel</button>
+    <button role="tab" aria-selected="false" data-tab="youtube">YouTube</button>
+    <button role="tab" aria-selected="false" data-tab="twitter">Twitter</button>
+    <button role="tab" aria-selected="false" data-tab="afm">Afiliados</button>
+    <button role="tab" aria-selected="false" data-tab="jobs">Jobs</button>
+    <button role="tab" aria-selected="false" data-tab="config">Config</button>
+  </nav>
+
+  <section class="panel on" id="p-painel">
+    <div class="cards" id="stat-cards"></div>
+    <p style="color:var(--soft); font-size:.88rem; max-width:60ch">
+      Este painel opera sobre os mesmos dados do CLI (<code>.mp/*.json</code> e <code>config.json</code>).
+      Contas criadas aqui aparecem no menu de terminal e vice-versa.
+    </p>
+  </section>
+
+  <section class="panel" id="p-youtube">
+    <h2>Contas YouTube</h2>
+    <div class="twrap"><table>
+      <thead><tr><th>Apelido</th><th>Nicho</th><th>Idioma</th><th>Vídeos</th><th>UUID</th><th></th></tr></thead>
+      <tbody id="yt-rows"></tbody>
+    </table></div>
+    <form class="new" id="yt-form">
+      <label>Apelido<input name="nickname" required></label>
+      <label>Nicho<input name="niche" required></label>
+      <label>Idioma<input name="language" required value="Português"></label>
+      <label>Perfil Firefox<input name="firefox_profile" placeholder="opcional"></label>
+      <button class="act" type="submit">Criar conta</button>
+    </form>
+  </section>
+
+  <section class="panel" id="p-twitter">
+    <h2>Contas Twitter/X</h2>
+    <div class="twrap"><table>
+      <thead><tr><th>Apelido</th><th>Tema</th><th>Posts</th><th>UUID</th><th></th></tr></thead>
+      <tbody id="tw-rows"></tbody>
+    </table></div>
+    <form class="new" id="tw-form">
+      <label>Apelido<input name="nickname" required></label>
+      <label>Tema<input name="topic" required></label>
+      <label>Perfil Firefox<input name="firefox_profile" placeholder="opcional"></label>
+      <button class="act" type="submit">Criar conta</button>
+    </form>
+  </section>
+
+  <section class="panel" id="p-afm">
+    <h2>Produtos de afiliado</h2>
+    <div class="twrap"><table>
+      <thead><tr><th>Link de afiliado</th><th>Conta Twitter</th><th>UUID</th></tr></thead>
+      <tbody id="afm-rows"></tbody>
+    </table></div>
+    <form class="new" id="afm-form">
+      <label>Link de afiliado<input name="affiliate_link" required placeholder="https://amzn.to/…"></label>
+      <label>UUID da conta Twitter<input name="twitter_uuid" required></label>
+      <button class="act" type="submit">Adicionar produto</button>
+    </form>
+  </section>
+
+  <section class="panel" id="p-jobs">
+    <h2>Jobs de geração</h2>
+    <p style="color:var(--soft); font-size:.85rem; max-width:62ch">
+      Dispare pelo botão <b>▶ gerar</b> nas abas de contas. Cada job roda
+      <code>src/cron.py</code> em segundo plano; clique em <b>log</b> para ver a saída.
+    </p>
+    <div class="twrap"><table>
+      <thead><tr><th>Status</th><th>Plataforma</th><th>Modelo</th><th>Criado</th><th>Código</th><th></th></tr></thead>
+      <tbody id="job-rows"></tbody>
+    </table></div>
+    <pre class="cfg" id="job-log" hidden></pre>
+  </section>
+
+  <section class="panel" id="p-config">
+    <h2>Configuração <span style="font-family:var(--mono);font-size:.7rem;color:var(--soft)">(segredos mascarados)</span></h2>
+    <pre class="cfg" id="cfg-view">carregando…</pre>
+  </section>
+
+</div>
+<div id="toast" role="status"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+function toast(msg){
+  const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(t._h); t._h = setTimeout(()=>t.classList.remove('show'), 2600);
+}
+
+async function api(path, opts={}){
+  const r = await fetch('/api'+path, {headers:{'Content-Type':'application/json'}, ...opts});
+  if (r.status === 204) return null;
+  const body = await r.json().catch(()=>null);
+  if (!r.ok) throw new Error(body && body.detail ? (typeof body.detail==='string'?body.detail:JSON.stringify(body.detail)) : r.statusText);
+  return body;
+}
+
+document.querySelectorAll('nav.tabs button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('nav.tabs button').forEach(b=>b.setAttribute('aria-selected','false'));
+    btn.setAttribute('aria-selected','true');
+    document.querySelectorAll('.panel').forEach(p=>p.classList.remove('on'));
+    $('#p-'+btn.dataset.tab).classList.add('on');
+  });
+});
+
+async function loadStatus(){
+  const s = await api('/status');
+  $('#stat-cards').innerHTML = [
+    ['Contas YouTube', s.youtube_accounts], ['Contas Twitter', s.twitter_accounts],
+    ['Vídeos', s.videos], ['Posts', s.posts], ['Produtos', s.products],
+  ].map(([l,n])=>`<div class="card"><div class="n">${n}</div><div class="l">${l}</div></div>`).join('');
+  const pill = $('#ollama-pill');
+  if (s.ollama.reachable){ pill.className='pill ok'; pill.textContent=`ollama: ok (${s.ollama.models.length} modelos)`; }
+  else { pill.className='pill err'; pill.textContent='ollama: fora do ar'; }
+}
+
+async function loadYouTube(){
+  const list = await api('/accounts/youtube');
+  $('#yt-rows').innerHTML = list.length ? list.map(a=>`<tr>
+    <td>${esc(a.nickname)}</td><td>${esc(a.niche)}</td><td>${esc(a.language)}</td>
+    <td>${(a.videos||[]).length}</td><td class="mono">${a.id}</td>
+    <td><button class="go" data-prov="youtube" data-id="${a.id}">▶ gerar</button><button class="del" data-prov="youtube" data-id="${a.id}">remover</button></td></tr>`).join('')
+    : '<tr><td colspan="6" class="empty">Nenhuma conta ainda — crie a primeira abaixo.</td></tr>';
+}
+
+async function loadTwitter(){
+  const list = await api('/accounts/twitter');
+  $('#tw-rows').innerHTML = list.length ? list.map(a=>`<tr>
+    <td>${esc(a.nickname)}</td><td>${esc(a.topic)}</td>
+    <td>${(a.posts||[]).length}</td><td class="mono">${a.id}</td>
+    <td><button class="go" data-prov="twitter" data-id="${a.id}">▶ gerar</button><button class="del" data-prov="twitter" data-id="${a.id}">remover</button></td></tr>`).join('')
+    : '<tr><td colspan="5" class="empty">Nenhuma conta ainda — crie a primeira abaixo.</td></tr>';
+}
+
+async function loadAfm(){
+  const list = await api('/products');
+  $('#afm-rows').innerHTML = list.length ? list.map(p=>`<tr>
+    <td>${esc(p.affiliate_link)}</td><td class="mono">${esc(p.twitter_uuid)}</td><td class="mono">${p.id}</td></tr>`).join('')
+    : '<tr><td colspan="3" class="empty">Nenhum produto cadastrado.</td></tr>';
+}
+
+async function loadConfig(){
+  $('#cfg-view').textContent = JSON.stringify(await api('/config'), null, 2);
+}
+
+function bindForm(sel, path, after){
+  $(sel).addEventListener('submit', async e=>{
+    e.preventDefault();
+    const data = Object.fromEntries(new FormData(e.target).entries());
+    try{ await api(path, {method:'POST', body:JSON.stringify(data)}); e.target.reset(); toast('Criado.'); after(); loadStatus(); }
+    catch(err){ toast('Erro: '+err.message); }
+  });
+}
+bindForm('#yt-form','/accounts/youtube', loadYouTube);
+bindForm('#tw-form','/accounts/twitter', loadTwitter);
+bindForm('#afm-form','/products', loadAfm);
+
+document.addEventListener('click', async e=>{
+  const del = e.target.closest('button.del');
+  if (del){
+    if(!confirm('Remover esta conta?')) return;
+    try{ await api(`/accounts/${del.dataset.prov}/${del.dataset.id}`, {method:'DELETE'});
+      toast('Removida.'); loadYouTube(); loadTwitter(); loadStatus(); }
+    catch(err){ toast('Erro: '+err.message); }
+    return;
+  }
+  const lg = e.target.closest('button.logbtn');
+  const go = !lg && e.target.closest('button.go');
+  if (go){
+    try{ await api(`/jobs/${go.dataset.prov}/${go.dataset.id}`, {method:'POST'});
+      toast('Job enfileirado — acompanhe na aba Jobs.'); loadJobs(); }
+    catch(err){ toast('Erro: '+err.message); }
+    return;
+  }
+  if (lg){
+    try{
+      const j = await api(`/jobs/${lg.dataset.id}`);
+      const pre = $('#job-log');
+      pre.hidden = false;
+      pre.textContent = `# job ${j.id} — ${j.status}\n# ${j.command}\n\n` + (j.log_tail || '(log vazio)');
+      pre.scrollIntoView({behavior:'smooth', block:'nearest'});
+    }catch(err){ toast('Erro: '+err.message); }
+  }
+});
+
+const STATUS_PT = {queued:['na fila','wait'], running:['rodando','run'], succeeded:['concluído','ok'], failed:['falhou','err']};
+
+async function loadJobs(){
+  const list = await api('/jobs');
+  $('#job-rows').innerHTML = list.length ? list.map(j=>{
+    const [label, cls] = STATUS_PT[j.status] || [j.status,'wait'];
+    return `<tr>
+      <td><span class="pill ${cls}">${label}</span></td>
+      <td>${esc(j.provider||'')}</td><td class="mono">${esc(j.model||'')}</td>
+      <td class="mono">${esc((j.created_at||'').replace('T',' ').replace('+00:00',' UTC'))}</td>
+      <td class="mono">${j.returncode ?? '—'}</td>
+      <td><button class="logbtn go" data-id="${j.id}">log</button></td></tr>`;
+  }).join('') : '<tr><td colspan="6" class="empty">Nenhum job ainda — use ▶ gerar nas abas de contas.</td></tr>';
+}
+
+setInterval(()=>{
+  if ($('#p-jobs').classList.contains('on')) loadJobs();
+}, 5000);
+
+loadStatus(); loadYouTube(); loadTwitter(); loadAfm(); loadConfig(); loadJobs();
+</script>
+</body>
+</html>
