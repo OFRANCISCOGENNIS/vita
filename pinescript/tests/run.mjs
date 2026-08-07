@@ -827,6 +827,41 @@ check('radar: TFs alinhados = sinal · conflito = nada', radar.alinhado === 1 &&
 check('radar: TF maior mapeado (1→5, 5→15, 15→30, 60→60)', JSON.stringify(radar.tfM) === '[5,15,30,60]');
 check('radar: cooldown de 15min bloqueia e depois libera', radar.bloqueado && radar.liberado);
 check('radar: aviso registra no painel e toggle existe', radar.infoOk && radar.temToggle);
+// Correções do gráfico de Forex (Yahoo): range dentro do teto, parse robusto
+const fx = await p.evaluate(async () => {
+  // 1) ranges respeitam os limites do Yahoo (intraday ≤60d; 1m ≤7d)
+  const ranges = { m1: yahooRangeFor(1), m5: yahooRangeFor(5), m15: yahooRangeFor(15), m30: yahooRangeFor(30), h1: yahooRangeFor(60) };
+  // 2) parse: série faltando não quebra; ordena e remove timestamps repetidos
+  const semOpen = parseYahooResult({ timestamp: [1, 2], indicators: { quote: [{ high: [2, 3], low: [1, 1], close: [1.5, 2] }] } });
+  const bagunçado = parseYahooResult({
+    timestamp: [300, 100, 200, 200],
+    indicators: { quote: [{ open: [3, 1, 2, 2], high: [3, 1, 2, 2], low: [3, 1, 2, 2], close: [3, 1, 2, 2] }] }
+  });
+  const nulos = parseYahooResult({
+    timestamp: [100, 200, 300],
+    indicators: { quote: [{ open: [1, null, 3], high: [1, null, 3], low: [1, null, 3], close: [1, null, 3] }] }
+  });
+  // 3) poll usa janela CURTA (não baixa o mês inteiro a cada 15s)
+  const urls = [];
+  const bak = window.fetchYahooJson;
+  window.fetchYahooJson = async (u) => { urls.push(u); return { timestamp: [1], indicators: { quote: [{ open: [1], high: [1], low: [1], close: [1] }] } }; };
+  await carregarHistoricoYahoo('EURUSD', 15, 3);     // poll (limit pequeno)
+  await carregarHistoricoYahoo('EURUSD', 15, 400);   // carga inicial
+  window.fetchYahooJson = bak;
+  return {
+    ranges,
+    semOpenVazio: semOpen.length === 0,
+    ordenado: bagunçado.map(v => v.time).join(',') === '100,200,300',
+    puloNulo: nulos.length === 2,
+    urlPoll: urls[0] || '', urlCarga: urls[1] || ''
+  };
+});
+check('Yahoo: M30 não estoura o teto de 60 dias (era 3mo)', fx.ranges.m30 === '1mo' && fx.ranges.m15 === '1mo', JSON.stringify(fx.ranges));
+check('Yahoo: M1 usa 5d e H1 usa 6mo', fx.ranges.m1 === '5d' && fx.ranges.h1 === '6mo');
+check('parse robusto: série ausente não quebra', fx.semOpenVazio);
+check('parse ordena e remove timestamps repetidos', fx.ordenado);
+check('parse pula velas sem pregão (nulos)', fx.puloNulo);
+check('poll pede janela curta (1d) e carga inicial o range cheio', /range=1d/.test(fx.urlPoll) && /range=1mo/.test(fx.urlCarga), fx.urlPoll + ' | ' + fx.urlCarga);
 check('botões de timeframe no gráfico trocam o TF (M15)', quick.tfMudou);
 check('trocar moeda cripto pelo gráfico muda o símbolo', quick.symMudou);
 check('escolher forex pelo gráfico ajusta o par', quick.forexMudou);

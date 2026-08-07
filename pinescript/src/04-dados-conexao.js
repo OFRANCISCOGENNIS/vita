@@ -233,33 +233,46 @@ async function fetchYahooJson(url, rodadas) {
 }
 
 function yahooIntervalStr(min) { return (min === 60 ? '60' : String(min)) + 'm'; }
+// LIMITES REAIS do Yahoo p/ dados intraday (pedir mais devolve erro/vazio):
+//   1m → no máx. 7 dias · 2m–30m → no máx. 60 dias · 60m → até 2 anos.
+// Pedir '3mo' de M30 (o que fazíamos) estoura o teto e o gráfico vinha vazio.
 function yahooRangeFor(min) {
     if (min <= 1) return '5d';
-    if (min <= 15) return '1mo';
-    if (min <= 30) return '3mo';
-    return '6mo';
+    if (min <= 30) return '1mo';   // ~30d: dentro do teto de 60d
+    return '6mo';                  // 60m: teto é 2y
 }
 
 function parseYahooResult(r) {
-    const ts = r.timestamp || [];
-    const q = (r.indicators.quote || [{}])[0] || {};
+    const ts = (r && r.timestamp) || [];
+    const q = ((r && r.indicators && r.indicators.quote) || [{}])[0] || {};
+    // Yahoo às vezes devolve o bloco sem alguma série: sem isso, q.open[i] quebrava
+    const O = q.open || [], H = q.high || [], L = q.low || [], C = q.close || [], V = q.volume || [];
     const out = [];
     for (let i = 0; i < ts.length; i++) {
-        const o = q.open[i], h = q.high[i], l = q.low[i], c = q.close[i];
+        const o = O[i], h = H[i], l = L[i], c = C[i];
         if (o == null || h == null || l == null || c == null) continue;   // vela sem pregão (mercado fechado)
+        if (!isFinite(+o) || !isFinite(+h) || !isFinite(+l) || !isFinite(+c)) continue;
         // Forex/índices via Yahoo não têm volume agressor real: sem dado -> 0
         // e buyVol = metade (neutro), para não simular fluxo inexistente.
-        const vol = (q.volume && q.volume[i] != null) ? q.volume[i] : 0;
+        const vol = V[i] != null ? V[i] : 0;
         out.push({ time: ts[i], open: +o, high: +h, low: +l, close: +c, volume: vol, buyVol: vol / 2 });
     }
-    return out;
+    // O gráfico exige tempo ESTRITAMENTE crescente: ordena e remove repetidos
+    // (o Yahoo repete/desordena timestamps na virada de sessão e nos gaps).
+    out.sort((a, b) => a.time - b.time);
+    return out.filter((v, i, arr) => i === 0 || v.time > arr[i - 1].time);
 }
 
 async function carregarHistoricoYahoo(codigo, intervalMin, limit) {
     const par = PARES_YAHOO[codigo];
     if (!par) throw new Error('par não suportado nesta fonte: ' + codigo);
+    // PESO DA REQUISIÇÃO: o `limit` só cortava o array DEPOIS de baixar o range
+    // inteiro — o polling de 15s puxava ~1 mês de velas por vez (lento, e os
+    // proxies CORS públicos passavam a recusar por excesso). Quando só as
+    // últimas velas interessam (poll), pede uma janela curta.
+    const range = limit <= 10 ? (intervalMin >= 60 ? '5d' : '1d') : yahooRangeFor(intervalMin);
     const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(par.yahoo)}` +
-        `?interval=${yahooIntervalStr(intervalMin)}&range=${yahooRangeFor(intervalMin)}`;
+        `?interval=${yahooIntervalStr(intervalMin)}&range=${range}`;
     const r = await fetchYahooJson(url);
     const candles = parseYahooResult(r);
     return candles.slice(Math.max(0, candles.length - limit));
@@ -339,11 +352,16 @@ async function carregarHistoricoTwelveData(codigo, intervalMin, limit) {
 // real" reconsultando as últimas velas por polling (REST) a cada 15s.
 function iniciarPollForex(codigo, intervalMin, carregador, label) {
     pararPollYahoo();
+    let falhas = 0, ocupado = false;
     yahooPollTimer = setInterval(async () => {
-        if (!ehForex() || treino) return;
+        if (!ehForex() || treino || ocupado) return;   // ocupado: proxy lento não empilha requisições
+        if (document.hidden) return;                    // aba oculta: não gasta rede à toa
+        ocupado = true;
         try {
             const recentes = await carregador(codigo, intervalMin, 3);
-            recentes.forEach(bar => {
+            if (!recentes || !recentes.length) throw new Error('sem velas novas');
+            // ordena: velas fora de ordem quebravam a série do gráfico
+            recentes.slice().sort((a, b) => a.time - b.time).forEach(bar => {
                 const last = dados.length ? dados[dados.length - 1] : null;
                 if (last && bar.time === last.time) {
                     dados[dados.length - 1] = bar;
@@ -353,10 +371,14 @@ function iniciarPollForex(codigo, intervalMin, carregador, label) {
                     atualizarUltimoCandle(true);
                 }
             });
+            falhas = 0;
             setStatus('on', `AO VIVO (polling 15s) • ${label}`);
         } catch (e) {
-            setStatus('err', 'Falha ao atualizar: ' + (e.message || e));
-        }
+            // Proxies CORS públicos falham de vez em quando: uma falha isolada não
+            // é "offline" — só alarma (e não apaga o gráfico) depois de 3 seguidas.
+            if (++falhas >= 3) setStatus('err', `Sinal instável (${falhas} falhas) • ${label} — dados podem estar atrasados`);
+            else setStatus('connecting', `Reconsultando ${label}…`);
+        } finally { ocupado = false; }
     }, 15000);
 }
 
