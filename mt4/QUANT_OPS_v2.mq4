@@ -29,6 +29,17 @@
 //      tem (ou nao tem) vantagem no historico visivel
 //    - GESTAO DE RISCO: stop/alvo por ATR e lote sugerido pelo risco %
 //
+//  v2.2:
+//    - BOTOES no grafico: liga/desliga Zonas, LT, Fib, Div e painel
+//      compacto sem abrir a janela de propriedades
+//    - LINHAS DE TRADE: entrada, stop e alvo desenhados ao vivo quando
+//      o semaforo abre ENTRAR
+//    - RADAR (pre-alerta): aviso quando o preco esta TESTANDO uma zona
+//      a favor com confluencia quase completa - antes do sinal fechar
+//    - RELOGIO da vela (contagem regressiva) via timer, mesmo sem tick
+//    - PLACAR DO DIA no painel (quantos sinais A/B sairam hoje)
+//    - EXPORTACAO CSV dos sinais (botao) p/ estudar no app web
+//
 //  SEM REPINTURA: um pivo so e considerado ForcaPivo velas depois de
 //  acontecer - exatamente como o mercado o confirmaria em tempo real.
 //  As setas sao gravadas apenas em velas FECHADAS (SoNoFechamento).
@@ -38,9 +49,9 @@
 //+------------------------------------------------------------------+
 #property copyright "QUANT OPS - ferramenta de estudo"
 #property link      "https://github.com/OFRANCISCOGENNIS"
-#property version   "2.10"
+#property version   "2.20"
 #property strict
-#property description "QUANT OPS v2.1 - confluencia + price action + semaforo + evidencia. ESTUDO, nao e recomendacao."
+#property description "QUANT OPS v2.2 - confluencia + price action + semaforo + evidencia + radar. ESTUDO, nao e recomendacao."
 #property indicator_chart_window
 #property indicator_buffers 7
 
@@ -149,6 +160,18 @@ extern int     MaxBarras     = 1500;   // Maximo de velas calculadas
 extern int     RedesenhoMs   = 350;    // Intervalo minimo de redesenho (ms)
 
 //====================================================================
+//  9) EXTRAS v2.2
+//====================================================================
+extern string  _s9_          = "===== 9) EXTRAS v2.2 =====";
+extern bool    MostrarBotoes = true;   // Botoes de atalho no grafico
+extern bool    MostrarTrade  = true;   // Linhas entrada/stop/alvo quando ENTRAR
+extern bool    MostrarRelogio= true;   // Contagem regressiva da vela
+extern bool    MostrarPlacar = true;   // Placar do dia no painel
+extern bool    PreAlertaZona = true;   // RADAR: pre-alerta no teste da zona
+extern int     RadarCooldownMin = 15;  // Cooldown do pre-alerta (minutos)
+extern bool    ExportarCsvAuto  = false; // Reexportar CSV a cada vela fechada
+
+//====================================================================
 //  BUFFERS
 //====================================================================
 double BufEmaR[];     // 0
@@ -226,7 +249,12 @@ datetime ultimaBarra    = 0;
 uint     ultimoRedesenho= 0;
 int      tfEfe = 0, tf2Efe = 0;
 bool     temaClaro = false;
-string   nomeCurto = "QUANT OPS v2.1";
+string   nomeCurto = "QUANT OPS v2.2";
+
+// --- v2.2: toggles vivos (os botoes mexem aqui, nao nos externs) ---
+bool     vZonas = true, vLt = true, vFib = true, vDiv = true, vCompacto = false;
+datetime ultimoRadar    = 0;
+datetime ultimaBarraCsv = 0;
 
 //====================================================================
 //  INIT / DEINIT
@@ -255,14 +283,51 @@ int OnInit()
    tf2Efe = ProximoTf(tfEfe);
    temaClaro = TemaClaro();
 
+   // toggles vivos partem do que o usuario configurou
+   vZonas    = MostrarZonas;
+   vLt       = MostrarLt;
+   vFib      = MostrarFib;
+   vDiv      = MostrarDiv;
+   vCompacto = PainelCompacto;
+
+   if(MostrarRelogio) EventSetTimer(1);   // relogio anda mesmo sem tick
+
    ResetarCache();
    return(INIT_SUCCEEDED);
   }
 //+------------------------------------------------------------------+
 void OnDeinit(const int reason)
   {
+   EventKillTimer();
    LimparObjetos();
    Comment("");
+   ChartRedraw();
+  }
+//+------------------------------------------------------------------+
+//| Timer 1s: so o relogio da vela - barato de verdade                |
+//+------------------------------------------------------------------+
+void OnTimer()
+  {
+   if(!MostrarRelogio) return;
+   DesenharRelogio();
+   ChartRedraw();
+  }
+//+------------------------------------------------------------------+
+//| Clique nos botoes de atalho                                       |
+//+------------------------------------------------------------------+
+void OnChartEvent(const int id, const long &lparam, const double &dparam, const string &sparam)
+  {
+   if(id != CHARTEVENT_OBJECT_CLICK) return;
+   bool mexeu = true;
+   if(sparam == PFX + "btnZonas")      vZonas    = !vZonas;
+   else if(sparam == PFX + "btnLt")    vLt       = !vLt;
+   else if(sparam == PFX + "btnFib")   vFib      = !vFib;
+   else if(sparam == PFX + "btnDiv")   vDiv      = !vDiv;
+   else if(sparam == PFX + "btnMini")  vCompacto = !vCompacto;
+   else if(sparam == PFX + "btnCsv") { ExportarCsv(true); mexeu = false; }
+   else return;
+   ObjectSetInteger(0, sparam, OBJPROP_STATE, false);   // solta o botao
+   if(mexeu) Desenhar(ctxAtual);
    ChartRedraw();
   }
 //+------------------------------------------------------------------+
@@ -611,6 +676,13 @@ int OnCalculate(const int rates_total,
       ChartRedraw();
      }
    Alertar();
+   PreAlertar();
+
+   if(ExportarCsvAuto && Time[0] != ultimaBarraCsv)
+     {
+      ultimaBarraCsv = Time[0];
+      ExportarCsv(false);                       // silencioso: sem popup por vela
+     }
 
    return(rates_total);
   }
@@ -912,15 +984,93 @@ void Desenhar(Ctx &c)
    DesenharLTs();
    DesenharFib(tFim);
    DesenharDivergencias(tol);
+   DesenharTrade(c);
    if(MostrarPainel) DesenharPainel(c);
    else ApagarPainel();
+   if(MostrarBotoes) DesenharBotoes();
+   if(MostrarRelogio) DesenharRelogio();
+  }
+//+------------------------------------------------------------------+
+//| Linhas de trade: entrada, stop e alvo quando o semaforo abre.     |
+//| Sao REFERENCIA de estudo por ATR - nao sao ordem nem promessa.    |
+//+------------------------------------------------------------------+
+void DesenharTrade(Ctx &c)
+  {
+   string ns[6] = {"trE","trS","trA","txE","txS","txA"};
+   for(int k = 0; k < 6; k++) ObjectDelete(PFX + ns[k]);
+   if(!MostrarTrade || c.semaforo != SEM_ENTRAR) return;
+
+   double e    = Close[0];
+   int    dir  = c.dirDom;
+   double stop = e - dir * c.atr * MultStopAtr;
+   double alvo = e + dir * c.atr * MultAlvoAtr;
+   datetime t1 = Time[0];
+   datetime t2 = Time[0] + 8 * Period() * 60;
+
+   CriarLinha(PFX + "trE", t1, e,    t2, e,    CorFraca());
+   CriarLinha(PFX + "trS", t1, stop, t2, stop, CorBaixa());
+   CriarLinha(PFX + "trA", t1, alvo, t2, alvo, CorAlta());
+   CriarTexto(PFX + "txE", t2, e,    "  entrada", CorFraca());
+   CriarTexto(PFX + "txS", t2, stop, "  stop "  + DoubleToString(MultStopAtr, 1) + " ATR", CorBaixa());
+   CriarTexto(PFX + "txA", t2, alvo, "  alvo "  + DoubleToString(MultAlvoAtr, 1) + " ATR", CorAlta());
+  }
+//+------------------------------------------------------------------+
+//| Botoes de atalho (canto inferior direito)                         |
+//+------------------------------------------------------------------+
+void CriarBotao(string id, int x, string txt, bool ligado)
+  {
+   string n = PFX + id;
+   ObjectCreate(0, n, OBJ_BUTTON, 0, 0, 0);
+   ObjectSetInteger(0, n, OBJPROP_CORNER,    CORNER_RIGHT_LOWER);
+   ObjectSetInteger(0, n, OBJPROP_XDISTANCE, x);
+   ObjectSetInteger(0, n, OBJPROP_YDISTANCE, 22);
+   ObjectSetInteger(0, n, OBJPROP_XSIZE,     46);
+   ObjectSetInteger(0, n, OBJPROP_YSIZE,     17);
+   ObjectSetString (0, n, OBJPROP_TEXT,      txt);
+   ObjectSetString (0, n, OBJPROP_FONT,      "Verdana");
+   ObjectSetInteger(0, n, OBJPROP_FONTSIZE,  7);
+   ObjectSetInteger(0, n, OBJPROP_BGCOLOR,   ligado ? (temaClaro ? clrGainsboro : C'32,44,62') : (temaClaro ? clrWhiteSmoke : C'18,24,34'));
+   ObjectSetInteger(0, n, OBJPROP_COLOR,     ligado ? CorTexto() : CorFraca());
+   ObjectSetInteger(0, n, OBJPROP_BORDER_COLOR, temaClaro ? clrSilver : C'40,52,70');
+   ObjectSetInteger(0, n, OBJPROP_STATE,     false);
+   ObjectSetInteger(0, n, OBJPROP_HIDDEN,    true);
+  }
+//+------------------------------------------------------------------+
+void DesenharBotoes()
+  {
+   CriarBotao("btnZonas", 250, "Zonas", vZonas);
+   CriarBotao("btnLt",    202, "LT",    vLt);
+   CriarBotao("btnFib",   154, "Fib",   vFib);
+   CriarBotao("btnDiv",   106, "Div",   vDiv);
+   CriarBotao("btnMini",   58, "Mini",  vCompacto);
+   CriarBotao("btnCsv",    10, "CSV",   false);
+  }
+//+------------------------------------------------------------------+
+//| Relogio: quanto falta para a vela atual fechar                    |
+//+------------------------------------------------------------------+
+void DesenharRelogio()
+  {
+   string n = PFX + "relogio";
+   int resta = (int)(Time[0] + Period() * 60 - TimeCurrent());
+   if(resta < 0) resta = 0;
+   string txt = StringFormat("vela fecha em %02d:%02d", resta / 60, resta % 60);
+   ObjectCreate(0, n, OBJ_LABEL, 0, 0, 0);
+   ObjectSetInteger(0, n, OBJPROP_CORNER,    CORNER_RIGHT_LOWER);
+   ObjectSetInteger(0, n, OBJPROP_ANCHOR,    ANCHOR_RIGHT_LOWER);
+   ObjectSetInteger(0, n, OBJPROP_XDISTANCE, 10);
+   ObjectSetInteger(0, n, OBJPROP_YDISTANCE, 44);
+   ObjectSetInteger(0, n, OBJPROP_COLOR,     resta <= 10 ? clrGoldenrod : CorFraca());
+   ObjectSetInteger(0, n, OBJPROP_FONTSIZE,  8);
+   ObjectSetString (0, n, OBJPROP_FONT,      "Consolas");
+   ObjectSetString (0, n, OBJPROP_TEXT,      txt);
+   Enfeitar(n);
   }
 //+------------------------------------------------------------------+
 void DesenharZonas(Ctx &c, double tol, datetime tFim)
   {
    string ns[8] = {"zRes","zRes2","zSup","zSup2","tRes","tRes2","tSup","tSup2"};
    for(int k = 0; k < 8; k++) ObjectDelete(PFX + ns[k]);
-   if(!MostrarZonas) return;
+   if(!vZonas) return;
 
    datetime tRot = Time[MathMin(Bars - 1, 12)];
 
@@ -960,7 +1110,7 @@ void DesenharLTs()
   {
    ObjectDelete(PFX + "lta");
    ObjectDelete(PFX + "ltb");
-   if(!MostrarLt) return;
+   if(!vLt) return;
 
    int passo = Period() * 60;
 
@@ -992,7 +1142,7 @@ void DesenharFib(datetime tFim)
   {
    string ns[6] = {"f382","f500","f618","n382","n500","n618"};
    for(int k = 0; k < 6; k++) ObjectDelete(PFX + ns[k]);
-   if(!MostrarFib) return;
+   if(!vFib) return;
 
    int look = MathMin(FibLookback, Bars - 2);
    if(look < 10) return;
@@ -1024,7 +1174,7 @@ void DesenharDivergencias(double tol)
   {
    ObjectDelete(PFX + "divA");
    ObjectDelete(PFX + "divB");
-   if(!MostrarDiv) return;
+   if(!vDiv) return;
 
    if(cTopoN >= 2 && TopoRec(0) > TopoRec(1))
      {
@@ -1188,7 +1338,15 @@ void DesenharPainel(Ctx &c)
    if(SpreadMaximo > 0) ctx = ctx + " | spread " + IntegerToString((int)MarketInfo(Symbol(), MODE_SPREAD)) + "pts";
    PainelLinha(L++, ctx, c.sess ? CorAlta() : CorBaixa(), PainelFonte);
 
-   if(!PainelCompacto && MedirEvidencia)
+   if(MostrarPlacar)
+     {
+      int qa = 0, qb = 0;
+      SinaisHoje(qa, qb);
+      PainelLinha(L++, "Hoje  " + IntegerToString(qa) + " sinal(is) A / " + IntegerToString(qb) + " B",
+                  (qa + qb > 0) ? CorTexto() : CorFraca(), PainelFonte);
+     }
+
+   if(!vCompacto && MedirEvidencia)
      {
       PainelLinha(L++, "--- evidencia (" + IntegerToString(VelasAvaliacao) + " velas) ---", CorFraca(), PainelFonte);
       PainelLinha(L++, LinhaEvidencia("A", evNA, evWA, evLbA), CorEvidencia(evNA, evLbA), PainelFonte);
@@ -1201,7 +1359,7 @@ void DesenharPainel(Ctx &c)
                   (expR > 0) ? CorAlta() : CorBaixa(), PainelFonte);
      }
 
-   if(!PainelCompacto && MostrarRisco)
+   if(!vCompacto && MostrarRisco)
      {
       double stopP = c.atr * MultStopAtr;
       double alvoP = c.atr * MultAlvoAtr;
@@ -1214,7 +1372,7 @@ void DesenharPainel(Ctx &c)
      }
 
    PainelLinha(L++, "ESTUDO - nao e recomendacao", clrGoldenrod, PainelFonte);
-   if(!PainelCompacto) PainelLinha(L++, "evidencia bruta: sem spread/swap", CorFraca(), PainelFonte - 1);
+   if(!vCompacto) PainelLinha(L++, "evidencia bruta: sem spread/swap", CorFraca(), PainelFonte - 1);
 
    PainelFundo(L);
   }
@@ -1267,5 +1425,85 @@ void Alertar()
    if(AlertaPopup) Alert(msg);
    if(AlertaPush)  SendNotification(msg);
    if(AlertaSom)   PlaySound("alert.wav");
+  }
+//+------------------------------------------------------------------+
+//| RADAR: pre-alerta quando o preco esta TESTANDO uma zona a favor   |
+//| com a confluencia quase completa (alvo - 1). E um "chegue perto   |
+//| do grafico" - nao e sinal, e o painel/alerta dizem isso.          |
+//+------------------------------------------------------------------+
+void PreAlertar()
+  {
+   if(!PreAlertaZona) return;
+   if(TimeCurrent() - ultimoRadar < RadarCooldownMin * 60) return;
+   if(ctxAtual.semaforo == SEM_ENTRAR) return;        // sinal cheio ja alerta
+   if(!ctxAtual.sess) return;
+   if(ctxAtual.distZonaAtr < 0 || ctxAtual.distZonaAtr > PaDistAtrMax) return;
+   int scoreDom = (ctxAtual.dirDom == 1) ? ctxAtual.scoreL : ctxAtual.scoreS;
+   if(scoreDom < ctxAtual.alvo - 1 || ctxAtual.alvo < 2) return;
+
+   ultimoRadar = TimeCurrent();
+   string lado = (ctxAtual.dirDom == 1) ? "SUPORTE (possivel CALL)" : "RESISTENCIA (possivel PUT)";
+   string msg  = "QUANT OPS RADAR: " + Symbol() + " " + TfNome(Period())
+               + " testando zona de " + lado + " a " + DoubleToString(ctxAtual.distZonaAtr, 1)
+               + " ATR, confluencia " + IntegerToString(scoreDom) + "/" + IntegerToString(ctxAtual.alvo)
+               + ". Pre-sinal: aguarde a confirmacao. Estudo.";
+   if(AlertaPopup) Alert(msg);
+   if(AlertaPush)  SendNotification(msg);
+  }
+//+------------------------------------------------------------------+
+//| Placar do dia: sinais A/B gravados desde a abertura do dia (D1)   |
+//+------------------------------------------------------------------+
+void SinaisHoje(int &qa, int &qb)
+  {
+   qa = 0; qb = 0;
+   datetime hoje = iTime(NULL, PERIOD_D1, 0);
+   if(hoje <= 0) return;
+   for(int i = 1; i < Bars && Time[i] >= hoje; i++)
+     {
+      if(BufCallA[i] != 0.0 || BufPutA[i] != 0.0) qa++;
+      if(BufCallB[i] != 0.0 || BufPutB[i] != 0.0) qb++;
+     }
+  }
+//+------------------------------------------------------------------+
+//| CSV dos sinais em MQL4\Files - da para abrir no Excel ou levar    |
+//| para o registro do app web. Uma linha por sinal, com o resultado  |
+//| bruto N velas depois (mesma regra do painel de evidencia).        |
+//+------------------------------------------------------------------+
+void ExportarCsv(bool avisar)
+  {
+   string nomeArq = "QUANTOPS_" + Symbol() + "_" + TfNome(Period()) + ".csv";
+   int h = FileOpen(nomeArq, FILE_WRITE | FILE_CSV, ';');
+   if(h < 0)
+     {
+      if(avisar) Alert("QUANT OPS: falha ao criar " + nomeArq);
+      return;
+     }
+   FileWrite(h, "data_hora", "tipo", "nivel", "preco",
+             "resultado_" + IntegerToString(VelasAvaliacao) + "_velas");
+   int cont = 0;
+   int ini = MathMin(MaxBarras, Bars - 2);
+   for(int i = ini; i >= 1; i--)
+     {
+      string tipo = "", nivel = "";
+      if(BufCallA[i] != 0.0)      { tipo = "CALL"; nivel = "A"; }
+      else if(BufPutA[i]  != 0.0) { tipo = "PUT";  nivel = "A"; }
+      else if(BufCallB[i] != 0.0) { tipo = "CALL"; nivel = "B"; }
+      else if(BufPutB[i]  != 0.0) { tipo = "PUT";  nivel = "B"; }
+      if(tipo == "") continue;
+
+      string res = "aberto";
+      if(i > VelasAvaliacao)
+        {
+         double fut = Close[i - VelasAvaliacao];
+         bool   win = (tipo == "CALL") ? (fut > Close[i]) : (fut < Close[i]);
+         res = win ? "acerto" : "erro";
+        }
+      FileWrite(h, TimeToStr(Time[i], TIME_DATE | TIME_MINUTES), tipo, nivel,
+                DoubleToString(Close[i], Digits), res);
+      cont++;
+     }
+   FileClose(h);
+   if(avisar) Alert("QUANT OPS: " + IntegerToString(cont)
+                    + " sinais exportados em MQL4\\Files\\" + nomeArq);
   }
 //+------------------------------------------------------------------+

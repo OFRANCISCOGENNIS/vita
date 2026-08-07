@@ -1,4 +1,4 @@
-# QUANT OPS v2.1 — MetaTrader 4 (Pepperstone e outras corretoras)
+# QUANT OPS v2.2 — MetaTrader 4 (Pepperstone e outras corretoras)
 
 ⚠️ **Ferramenta de ESTUDO. Não é recomendação de investimento.** Operação
 alavancada (CFD/forex) é de risco altíssimo — spread, swap, comissão e
@@ -39,6 +39,24 @@ sua cara em vez de fingir confiança.
 
 Com `ExigirEvidencia = true`, o semáforo **só abre o verde** se houver ao
 menos 30 casos e o limite inferior superar o break-even.
+
+### Novidades da v2.2
+
+- **Botões no gráfico** (canto inferior direito): liga/desliga Zonas, LT, Fib,
+  Div e painel compacto com um clique, sem abrir a janela de propriedades. O
+  botão **CSV** exporta os sinais na hora.
+- **Linhas de trade ao vivo**: quando o semáforo abre ENTRAR, o gráfico mostra
+  entrada, stop e alvo (múltiplos de ATR) — referência de estudo, não ordem.
+- **RADAR (pré-alerta)**: aviso push quando o preço está *testando* uma zona a
+  favor com a confluência quase completa (alvo−1) — o "chegue perto do
+  gráfico" antes do sinal fechar. Cooldown configurável (15 min padrão).
+- **Relógio da vela**: contagem regressiva até o fechamento, atualizada por
+  timer — anda mesmo sem tick chegando.
+- **Placar do dia** no painel: quantos sinais A/B saíram hoje.
+- **Exportação CSV** (`MQL4\Files\QUANTOPS_<par>_<tf>.csv`): uma linha por
+  sinal com data, tipo, nível, preço e o resultado bruto N velas depois —
+  abre no Excel ou alimenta o registro do app web. `ExportarCsvAuto`
+  reexporta a cada vela fechada.
 
 ### Gestão de risco
 Stop e alvo por múltiplo de ATR, convertidos em pips, e o **lote sugerido**
