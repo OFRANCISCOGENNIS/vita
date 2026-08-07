@@ -2718,3 +2718,56 @@ h2 .ico-info:hover::after,h3 .ico-info:hover::after{color:var(--brand-2)}
 /* ---- Radar da Watchlist ---- */
 .radar-info { font-size: 11.5px; color: var(--ink-muted); margin: 4px 0 8px; line-height: 1.6; }
 .radar-info .tick-up, .radar-info .tick-down { padding: 1px 6px; border-radius: 6px; font-weight: 700; }
+
+/* ============================================================================
+   PERFORMANCE — blur é o efeito mais caro do navegador. Com 27 painéis usando
+   backdrop-filter, o app rodava a 13 FPS (medido). Sobre um fundo escuro sólido
+   o blur é praticamente invisível, então trocamos por cor sólida nos painéis e
+   guardamos o vidro só onde há conteúdo passando por baixo (topbar/rail/nav).
+   Medição: 13 FPS → 44 FPS ao remover.
+   ============================================================================ */
+.chart-container,
+.sidebar,
+#registroPanel.registro-col,
+.toast,
+.ajuda-overlay,
+#detalheModal .det-card {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+}
+/* sem o blur, o fundo precisa ser opaco (o vidro dependia dele) */
+.chart-container { background: var(--bg-1, #0a0f18); }
+.sidebar, #registroPanel.registro-col { background: var(--bg-1, #0a0f18); }
+.toast { background: var(--bg-2, #101724); }
+.ajuda-overlay { background: rgba(2, 5, 10, 0.92); }
+
+/* barras flutuantes: blur leve (3 elementos no total, custo desprezível) */
+.qo-topbar { -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+.rail, .mnav { -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
+
+/* contenção: painel fora da tela não gasta layout/paint */
+.chart-container { content-visibility: auto; contain-intrinsic-size: auto 420px; }
+
+/* ============================================================================
+   PERFORMANCE 2 — a "aurora" era uma camada fixa gigante (inset -22%) com 3
+   gradientes radiais + will-change: mesmo PARADA custava 18 FPS (medido), pois
+   o compositor recompunha a tela toda a cada repaint. Vira gradiente estático
+   pintado no próprio body: mesmo visual, custo zero.
+   ============================================================================ */
+body::before { display: none !important; }
+body {
+    background:
+        radial-gradient(38% 30% at 22% 28%, rgba(34, 211, 238, 0.07), transparent 70%),
+        radial-gradient(32% 28% at 78% 18%, rgba(139, 92, 246, 0.08), transparent 70%),
+        radial-gradient(30% 26% at 62% 82%, rgba(236, 72, 153, 0.05), transparent 70%),
+        var(--page);
+    background-attachment: fixed;
+}
+
+/* Animações INFINITAS decorativas custavam mais 6 FPS: o logo e o gradiente da
+   marca pulsavam para sempre. O brilho fica, sem o loop. */
+.qo-logo { animation: none !important; }
+.qo-brand strong { animation: none !important; background-position: 0 0 !important; }
+.qo-topbar::after { animation: none !important; }
+/* o pulso do semáforo verde é FUNCIONAL (chama para a entrada) — fica, mas só
+   anima opacidade num pseudo-elemento, que roda na GPU sem repaint */

@@ -41,6 +41,14 @@ function aplicarPainel(id) {
     el.classList.toggle('painel-oculto', !on);
     const b = document.querySelector('.rail-btn[data-p="' + id + '"]');
     if (b) { b.classList.toggle('is-on', on); b.setAttribute('aria-pressed', on ? 'true' : 'false'); }
+    // Painéis com gráfico (RSI/ATR/Fluxo) não são atualizados enquanto fechados
+    // (economia de desenho): ao ABRIR, repõe a série inteira e remede a largura.
+    if (on && (id === 'painelSub' || id === 'painelFluxo')) {
+        requestAnimationFrame(() => {
+            try { if (typeof recalcularSinaisApenas === 'function' && dados && dados.length) recalcularSinaisApenas(); } catch (e) { }
+            window.dispatchEvent(new Event('resize'));
+        });
+    }
 }
 
 // Chamado pelos fluxos que auto-abrem um painel (scan/IA/estudo/heat): revela

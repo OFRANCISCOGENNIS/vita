@@ -74,6 +74,12 @@ function montarGraficos() {
     graficosMontados = true;
 }
 
+// Um gráfico em painel fechado tem altura 0: não vale desenhar nele.
+function graficoVisivel(id) {
+    const el = document.getElementById(id);
+    return !!el && el.clientHeight > 0;
+}
+
 function barraFluxo(c) {
     const d = deltaPorVela(c);
     return { time: c.time, value: d, color: d >= 0 ? 'rgba(38,166,154,0.75)' : 'rgba(239,83,80,0.75)' };
@@ -197,10 +203,12 @@ function atualizarUltimoCandle(fechou) {
     upd(serieEma9, computed.emaR[last]);
     upd(serieEma21, computed.emaL[last]);
     if (document.getElementById('useEma200').checked) upd(serieEma200, computed.ema200[last]);
-    upd(serieRsi, computed.rsiValues[last]);
-    upd(serieAtr, computed.atrValues[last]);
-    upd(serieAtrMedia, computed.atrMedia[last]);
-    serieFluxo.update(barraFluxo(dados[last]));
+    // PERFORMANCE: RSI/ATR/Fluxo ficam em painéis que quase sempre estão FECHADOS
+    // no modo minimalista — atualizá-los a cada tick era desenho jogado fora.
+    // Ao reabrir o painel, o redesenho completo repõe a série inteira (ver 11).
+    if (graficoVisivel('chartRsi')) { upd(serieRsi, computed.rsiValues[last]); }
+    if (graficoVisivel('chartAtr')) { upd(serieAtr, computed.atrValues[last]); upd(serieAtrMedia, computed.atrMedia[last]); }
+    if (graficoVisivel('chartFluxo')) serieFluxo.update(barraFluxo(dados[last]));
     atualizarLegenda();
     // alertas de preço: dispara quando o preço cruza um nível marcado (bloco 30)
     try { if (typeof alertasVerificar === 'function') alertasVerificar(); } catch (e) { }
