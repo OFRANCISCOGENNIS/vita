@@ -7,12 +7,17 @@
 // favorece a casa, e spread/taxas corroem qualquer edge. Valide em backtest e
 // forward test antes de qualquer uso com capital real.
 //
-// Traz para o TradingView o que o app QUANT OPS faz:
+// Traz para o TradingView o que o app QUANT OPS faz — e já abre com TODOS os
+// parâmetros ligados (todos os fatores, todos os portões incl. Price Action):
 //   • Confluência multi-fator (tendência, EMA200, RSI, ATR, estrutura, MACD,
 //     Bollinger, padrão de vela) com pontuação mínima configurável
-//   • Portões de contexto: multi-timeframe, sessão forte, distância de S/R
-//   • Zonas de Suporte/Resistência com FORÇA por número de toques
+//   • Portões de contexto: multi-timeframe, sessão forte, distância de S/R,
+//     Price Action (só entrar no TESTE de zona/LT)
+//   • Zonas de Suporte/Resistência (2 por lado) com FORÇA por nº de toques
+//   • Fibonacci automático da última perna (38.2 / 50 / 61.8)
 //   • LTA / LTB (linhas de tendência automáticas por pivôs)
+//   • ENTRADAS NÍVEL A e B: setas separadas (A grande, B menor) e alertas
+//     próprios — o semáforo abre ENTRAR para selo A **ou** B
 //   • Estrutura de mercado: HH / HL / LH / LL e CHoCH
 //   • Divergências RSI × preço (regulares e ocultas)
 //   • SEMÁFORO: ENTRAR / ESPERAR / EVITAR — a decisão única, no painel
@@ -44,9 +49,9 @@ atrLen    = input.int(14,  "Período ATR", minval = 1, group = gF)
 atrMedLen = input.int(50,  "Média do ATR", minval = 1, group = gF)
 useEstr   = input.bool(true,  "Estrutura (rompimento de topo/fundo)", group = gF)
 estrLook  = input.int(20,  "Lookback da estrutura", minval = 2, group = gF)
-useMacd   = input.bool(false, "MACD (momentum)", group = gF)
-useBoll   = input.bool(false, "Bollinger (reversão nas bandas 2σ)", group = gF)
-usePadrao = input.bool(false, "Padrão de vela (engolfo / martelo)", group = gF)
+useMacd   = input.bool(true,  "MACD (momentum)", group = gF)
+useBoll   = input.bool(true,  "Bollinger (reversão nas bandas 2σ)", group = gF)
+usePadrao = input.bool(true,  "Padrão de vela (engolfo / martelo)", group = gF)
 
 gC = "② Confluência"
 minScore  = input.int(4, "Mínimo de fatores a favor", minval = 1, maxval = 8, group = gC, tooltip = "Quantos fatores precisam apontar na mesma direção. 4 é o equilíbrio do app.")
@@ -63,7 +68,7 @@ useSessao = input.bool(true, "Só nas sessões fortes (Londres/NY)", group = gP)
 sessaoStr = input.session("0700-2100", "Janela de sessão (UTC)", group = gP)
 useSR     = input.bool(true, "Vetar entrada colada em S/R contrário", group = gP)
 srAtrMin  = input.float(0.5, "Distância mínima de S/R (× ATR)", minval = 0.1, step = 0.1, group = gP)
-usePA     = input.bool(false, "Price Action: só entrar no TESTE de zona/LT", group = gP, tooltip = "Como o Filtro Price Action do app: CALL perto de suporte/LTA, PUT perto de resistência/LTB.")
+usePA     = input.bool(true, "Price Action: só entrar no TESTE de zona/LT", group = gP, tooltip = "Como o Filtro Price Action do app: CALL perto de suporte/LTA, PUT perto de resistência/LTB.")
 paAtrMax  = input.float(0.8, "Distância máxima da zona (× ATR)", minval = 0.1, step = 0.1, group = gP)
 
 // ---------------------------------------------------------------------------
@@ -75,6 +80,8 @@ mostrarZonas = input.bool(true,  "Zonas de S/R (força por nº de toques)", grou
 mostrarLT    = input.bool(true,  "LTA / LTB automáticas", group = gV)
 mostrarEstr  = input.bool(true,  "Rótulos HH / HL / LH / LL", group = gV)
 mostrarDiv   = input.bool(true,  "Divergências RSI × preço", group = gV)
+mostrarFib   = input.bool(true,  "Fibonacci automático (38.2 / 50 / 61.8)", group = gV, tooltip = "Retrações da última perna de ~120 velas, como no painel Price Action do app.")
+fibLook      = input.int(120, "Lookback da perna do Fibonacci", minval = 20, group = gV)
 mostrarPainel = input.bool(true, "Painel de decisão (semáforo)", group = gV)
 posPainel    = input.string("Superior direito", "Posição do painel", options = ["Superior direito", "Superior esquerdo", "Inferior direito", "Inferior esquerdo"], group = gV)
 
@@ -166,18 +173,40 @@ contaToques(arr, nivel, tol) =>
                 n += 1
     n
 
+// Segundo nível DISTINTO (fora da tolerância do primeiro), do mais recente p/ trás
+segundoNivel(arr, primeiro, tol) =>
+    float nv = na
+    if array.size(arr) > 1
+        for i = array.size(arr) - 2 to 0
+            v = array.get(arr, i)
+            if na(nv) and math.abs(v - primeiro) > tol
+                nv := v
+    nv
+
 tolZona = atr * 0.6
 resistProx = array.size(topos) > 0 ? array.get(topos, array.size(topos) - 1) : na
 supProx    = array.size(fundos) > 0 ? array.get(fundos, array.size(fundos) - 1) : na
 forcaRes = na(resistProx) ? 0 : contaToques(topos, resistProx, tolZona)
 forcaSup = na(supProx)    ? 0 : contaToques(fundos, supProx, tolZona)
+resist2 = na(resistProx) ? na : segundoNivel(topos, resistProx, tolZona)
+sup2    = na(supProx)    ? na : segundoNivel(fundos, supProx, tolZona)
+forcaRes2 = na(resist2) ? 0 : contaToques(topos, resist2, tolZona)
+forcaSup2 = na(sup2)    ? 0 : contaToques(fundos, sup2, tolZona)
 
-// Desenha as zonas como caixas (só a mais recente de cada lado, como no app)
+// Desenha as zonas como caixas (2 por lado: a mais recente forte + a anterior)
 var box zonaRes = na
 var box zonaSup = na
+var box zonaRes2 = na
+var box zonaSup2 = na
 if mostrarZonas and barstate.islast
     box.delete(zonaRes)
     box.delete(zonaSup)
+    box.delete(zonaRes2)
+    box.delete(zonaSup2)
+    if not na(resist2)
+        zonaRes2 := box.new(bar_index - 100, resist2 + tolZona, bar_index + 10, resist2 - tolZona, border_color = color.new(color.red, 70), border_style = line.style_dotted, bgcolor = color.new(color.red, 96), text = "R2 · " + str.tostring(forcaRes2) + "×", text_color = color.new(color.red, 45), text_size = size.tiny, text_halign = text.align_left)
+    if not na(sup2)
+        zonaSup2 := box.new(bar_index - 100, sup2 + tolZona, bar_index + 10, sup2 - tolZona, border_color = color.new(color.green, 70), border_style = line.style_dotted, bgcolor = color.new(color.green, 96), text = "S2 · " + str.tostring(forcaSup2) + "×", text_color = color.new(color.green, 45), text_size = size.tiny, text_halign = text.align_left)
     if not na(resistProx)
         corR = forcaRes >= 3 ? color.new(color.red, 82) : color.new(color.red, 92)
         zonaRes := box.new(bar_index - 100, resistProx + tolZona, bar_index + 10, resistProx - tolZona, border_color = color.new(color.red, 45), border_style = line.style_dashed, bgcolor = corR, text = "R " + (forcaRes >= 3 ? "forte" : forcaRes == 2 ? "média" : "fraca") + " · " + str.tostring(forcaRes) + "×", text_color = color.new(color.red, 25), text_size = size.tiny, text_halign = text.align_left)
@@ -207,6 +236,38 @@ if mostrarLT and barstate.islast
         if t1 < t0 and y1 > y0
             projLtb = t1 + (t1 - t0) / (y1 - y0) * (bar_index + 5 - y1)
             ltbLinha := line.new(y0, t0, bar_index + 5, projLtb, color = color.new(color.red, 35), style = line.style_dashed, width = 1)
+
+// Fibonacci automático — retrações da última perna (fundo→topo ou topo→fundo)
+// dentro do lookback, como o painel Price Action do app (níveis 38.2/50/61.8).
+fibHi = ta.highest(high, fibLook)
+fibLo = ta.lowest(low, fibLook)
+fibHiOff = ta.highestbars(high, fibLook)
+fibLoOff = ta.lowestbars(low, fibLook)
+altaFib = fibLoOff < fibHiOff
+fibAmp = fibHi - fibLo
+fib382 = altaFib ? fibHi - fibAmp * 0.382 : fibLo + fibAmp * 0.382
+fib500 = altaFib ? fibHi - fibAmp * 0.500 : fibLo + fibAmp * 0.500
+fib618 = altaFib ? fibHi - fibAmp * 0.618 : fibLo + fibAmp * 0.618
+
+var line fibLn382 = na
+var line fibLn500 = na
+var line fibLn618 = na
+var label fibLb382 = na
+var label fibLb500 = na
+var label fibLb618 = na
+if mostrarFib and barstate.islast and fibAmp > 0
+    line.delete(fibLn382)
+    line.delete(fibLn500)
+    line.delete(fibLn618)
+    label.delete(fibLb382)
+    label.delete(fibLb500)
+    label.delete(fibLb618)
+    fibLn382 := line.new(bar_index - fibLook, fib382, bar_index + 10, fib382, color = color.new(color.purple, 45), style = line.style_dotted, width = 1)
+    fibLn500 := line.new(bar_index - fibLook, fib500, bar_index + 10, fib500, color = color.new(color.purple, 30), style = line.style_dotted, width = 1)
+    fibLn618 := line.new(bar_index - fibLook, fib618, bar_index + 10, fib618, color = color.new(color.purple, 45), style = line.style_dotted, width = 1)
+    fibLb382 := label.new(bar_index + 10, fib382, "38.2", style = label.style_label_left, color = color.new(color.black, 100), textcolor = color.new(color.purple, 25), size = size.tiny)
+    fibLb500 := label.new(bar_index + 10, fib500, "50.0", style = label.style_label_left, color = color.new(color.black, 100), textcolor = color.new(color.purple, 10), size = size.tiny)
+    fibLb618 := label.new(bar_index + 10, fib618, "61.8", style = label.style_label_left, color = color.new(color.black, 100), textcolor = color.new(color.purple, 25), size = size.tiny)
 
 // Rótulos de estrutura HH/HL/LH/LL
 if mostrarEstr and not na(ph)
@@ -293,11 +354,18 @@ temSinal = brutoL or brutoS
 paOk = dirDom == 1 ? paOkL : paOkS
 mtfContra = useMtf and htfDir != 0 and htfDir == -dirDom
 
-semaforo = not naSessao ? "EVITAR" : mtfContra ? "EVITAR" : (selo == "C" and temSinal) ? "EVITAR" : not temSinal ? "ESPERAR" : not paOk ? "ESPERAR" : selo == "A" ? "ENTRAR" : "ESPERAR"
+// ENTRAR em selo A **ou B** (entradas nível A e B, como pedido)
+semaforo = not naSessao ? "EVITAR" : mtfContra ? "EVITAR" : (selo == "C" and temSinal) ? "EVITAR" : not temSinal ? "ESPERAR" : not paOk ? "ESPERAR" : (selo == "A" or selo == "B") ? "ENTRAR" : "ESPERAR"
 semCor = semaforo == "ENTRAR" ? color.new(color.green, 15) : semaforo == "EVITAR" ? color.new(color.red, 25) : color.new(color.orange, 25)
 motivoSemSinal = "sem confluência (" + str.tostring(scoreL) + " CALL / " + str.tostring(scoreS) + " PUT)"
-motivoSeloA = dirDom == 1 ? "CALL ▲ selo A · portões fechados" : "PUT ▼ selo A · portões fechados"
-semMotivo = not naSessao ? "fora da sessão forte" : mtfContra ? "contra o TF maior" : not temSinal ? motivoSemSinal : not paOk ? "longe da zona — espere o teste" : selo == "A" ? motivoSeloA : "selo " + selo + " — aguarde grau A"
+motivoEntrar = (dirDom == 1 ? "CALL ▲ selo " : "PUT ▼ selo ") + selo + (selo == "A" ? " · portões fechados" : " · qualidade boa")
+semMotivo = not naSessao ? "fora da sessão forte" : mtfContra ? "contra o TF maior" : not temSinal ? motivoSemSinal : not paOk ? "longe da zona — espere o teste" : (selo == "A" or selo == "B") ? motivoEntrar : "selo " + selo + " — aguarde grau A/B"
+
+// Sinais separados por nível (A = melhor, B = bom)
+sinalAL = sinalL and selo == "A"
+sinalAS = sinalS and selo == "A"
+sinalBL = sinalL and selo == "B"
+sinalBS = sinalS and selo == "B"
 
 // ---------------------------------------------------------------------------
 // PLOTS
@@ -305,8 +373,11 @@ semMotivo = not naSessao ? "fora da sessão forte" : mtfContra ? "contra o TF ma
 plot(emaR, "EMA rápida", color = color.new(#3987e5, 0), linewidth = 1)
 plot(emaL, "EMA lenta",  color = color.new(#c98500, 0), linewidth = 1)
 plot(useEma200 ? ema200 : na, "EMA 200", color = color.new(#9085e9, 0), linewidth = 2)
-plotshape(sinalL, "Sinal CALL", shape.triangleup,   location.belowbar, color.new(color.lime, 0), size = size.small)
-plotshape(sinalS, "Sinal PUT",  shape.triangledown, location.abovebar, color.new(color.red, 0),  size = size.small)
+// Nível A = grande (lime/vermelho) com letra; nível B = menor (laranja/marrom)
+plotshape(sinalAL, "CALL nível A", shape.triangleup,   location.belowbar, color.new(color.lime, 0),   size = size.small, text = "A", textcolor = color.new(color.lime, 0))
+plotshape(sinalAS, "PUT nível A",  shape.triangledown, location.abovebar, color.new(color.red, 0),    size = size.small, text = "A", textcolor = color.new(color.red, 0))
+plotshape(sinalBL, "CALL nível B", shape.triangleup,   location.belowbar, color.new(color.orange, 0), size = size.tiny,  text = "B", textcolor = color.new(color.orange, 0))
+plotshape(sinalBS, "PUT nível B",  shape.triangledown, location.abovebar, color.new(color.maroon, 0), size = size.tiny,  text = "B", textcolor = color.new(color.maroon, 0))
 
 // ---------------------------------------------------------------------------
 // PAINEL DE DECISÃO (semáforo + contexto)
@@ -338,7 +409,9 @@ if mostrarPainel and barstate.islast
 // ---------------------------------------------------------------------------
 alertcondition(sinalL, "CALL — confluência + portões", "QUANT OPS: sinal de CALL em {{ticker}} ({{interval}}) — confira o semáforo antes de agir. Estudo, não é recomendação.")
 alertcondition(sinalS, "PUT — confluência + portões",  "QUANT OPS: sinal de PUT em {{ticker}} ({{interval}}) — confira o semáforo antes de agir. Estudo, não é recomendação.")
-alertcondition(sinalL and selo == "A", "CALL nível A (o melhor)", "QUANT OPS: CALL NÍVEL A em {{ticker}} ({{interval}}) — todos os portões fechados. Estudo, não é recomendação.")
-alertcondition(sinalS and selo == "A", "PUT nível A (o melhor)",  "QUANT OPS: PUT NÍVEL A em {{ticker}} ({{interval}}) — todos os portões fechados. Estudo, não é recomendação.")
+alertcondition(sinalAL, "CALL nível A (o melhor)", "QUANT OPS: CALL NÍVEL A em {{ticker}} ({{interval}}) — todos os portões fechados. Estudo, não é recomendação.")
+alertcondition(sinalAS, "PUT nível A (o melhor)",  "QUANT OPS: PUT NÍVEL A em {{ticker}} ({{interval}}) — todos os portões fechados. Estudo, não é recomendação.")
+alertcondition(sinalAL or sinalBL, "CALL nível A ou B", "QUANT OPS: CALL nível A/B em {{ticker}} ({{interval}}) — confira o selo no painel. Estudo, não é recomendação.")
+alertcondition(sinalAS or sinalBS, "PUT nível A ou B",  "QUANT OPS: PUT nível A/B em {{ticker}} ({{interval}}) — confira o selo no painel. Estudo, não é recomendação.")
 alertcondition(divAlta,  "Divergência de alta (RSI)",  "QUANT OPS: divergência de ALTA em {{ticker}} ({{interval}}).")
 alertcondition(divBaixa, "Divergência de baixa (RSI)", "QUANT OPS: divergência de BAIXA em {{ticker}} ({{interval}}).")
