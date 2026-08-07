@@ -2714,3 +2714,7 @@ h2 .ico-info:hover::after,h3 .ico-info:hover::after{color:var(--brand-2)}
   .chart-container{padding:12px}
   body{overflow-x:hidden}
 }
+
+/* ---- Radar da Watchlist ---- */
+.radar-info { font-size: 11.5px; color: var(--ink-muted); margin: 4px 0 8px; line-height: 1.6; }
+.radar-info .tick-up, .radar-info .tick-down { padding: 1px 6px; border-radius: 6px; font-weight: 700; }

@@ -437,6 +437,8 @@
                         <input type="text" id="watchAddSym" placeholder="BTCUSDT / EURUSD / XAUUSD" spellcheck="false" autocomplete="off">
                         <button id="watchAddBtn" class="btn-mini" type="button">+ Adicionar</button>
                     </div>
+                    <label class="reg-filtro"><input type="checkbox" id="radarAtivo"> <span>📡 <strong>Radar</strong>: avisar (som/notificação) quando um ativo da lista <strong>alinhar os timeframes</strong> — funciona com a aba em 2º plano</span></label>
+                    <div id="radarInfo" class="radar-info"></div>
                     <div id="watchBody" class="watch-list"></div>
                     <p class="group-note">Preço + variação da janela, atualizado a cada 30s. Clique numa linha para abrir o ativo no gráfico. Ordenada pela maior variação.</p>
                 </div>
@@ -871,6 +873,7 @@
     <script src="src/33-mobile.js"></script>
     <script src="src/34-tour.js"></script>
     <script src="src/35-terminal.js"></script>
+    <script src="src/36-radar.js"></script>
     <!-- APP:END -->
 </body>
 </html>

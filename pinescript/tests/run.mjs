@@ -800,6 +800,33 @@ const tour = await p.evaluate(async () => {
 });
 check('tour guiado abre com o 1º passo (Semáforo)', tour.aberto && tour.temBalao);
 check('tour fecha e marca como visto · botão de rever existe', tour.fechou && tour.temBtn);
+// Radar 🟢 da Watchlist: sinal puro, cooldown, TF maior e registro do aviso
+const radar = await p.evaluate(() => {
+  const sobe = Array.from({ length: 30 }, (_, i) => ({ close: 100 + i }));
+  const cai = Array.from({ length: 30 }, (_, i) => ({ close: 130 - i }));
+  const alinhado = radarSinal(sobe, sobe);          // ambos de alta → 1
+  const divergente = radarSinal(sobe, cai);         // conflito → 0
+  const tfM = [radarTFMaior(1), radarTFMaior(5), radarTFMaior(15), radarTFMaior(60)];
+  // cooldown: recém-alertado não repete; após 15min pode
+  const cd = { BTCUSDT: Date.now() - 5 * 60000 };
+  const bloqueado = !radarPodeAlertar(cd, 'BTCUSDT', Date.now());
+  const liberado = radarPodeAlertar(cd, 'BTCUSDT', Date.now() + 16 * 60000);
+  // registro do aviso renderiza no painel (radar ligado)
+  radarAtivo = true; _radarUltimos = [];
+  _radarRegistrar('BTCUSDT', 1);
+  const info = document.getElementById('radarInfo').textContent;
+  radarAtivo = false; _radarUltimos = []; renderRadarInfo();
+  return {
+    alinhado, divergente, tfM,
+    bloqueado, liberado,
+    infoOk: /BTC/.test(info) && /CALL/.test(info),
+    temToggle: !!document.getElementById('radarAtivo')
+  };
+});
+check('radar: TFs alinhados = sinal · conflito = nada', radar.alinhado === 1 && radar.divergente === 0);
+check('radar: TF maior mapeado (1→5, 5→15, 15→30, 60→60)', JSON.stringify(radar.tfM) === '[5,15,30,60]');
+check('radar: cooldown de 15min bloqueia e depois libera', radar.bloqueado && radar.liberado);
+check('radar: aviso registra no painel e toggle existe', radar.infoOk && radar.temToggle);
 check('botões de timeframe no gráfico trocam o TF (M15)', quick.tfMudou);
 check('trocar moeda cripto pelo gráfico muda o símbolo', quick.symMudou);
 check('escolher forex pelo gráfico ajusta o par', quick.forexMudou);
