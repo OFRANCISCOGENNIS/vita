@@ -65,8 +65,20 @@ function tracarLTs(on) {
     const lta = calcularLT(piv.sup, dados.length, 'LTA', 0.35, atrV);
     const ltb = calcularLT(piv.res, dados.length, 'LTB', 0.35, atrV);
     const mk = (lt, cor) => {
-        const s = chartPreco.addLineSeries({ color: cor, lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
-        s.setData([{ time: dados[lt.i0].time, value: lt.p0 }, { time: dados[dados.length - 1].time, value: lt.atual }]);
+        const s = chartPreco.addLineSeries({
+            color: cor, lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed,
+            priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false,
+            // FORA DO AUTOSCALE: a LT é uma reta PROJETADA — quando a inclinação é
+            // forte, o valor no fim extrapola muito a faixa de preço e o gráfico
+            // reescalava para caber a reta, espremendo as velas até "sumirem"
+            // (medido: 94% de compressão). A linha continua desenhada; ela só não
+            // manda mais na escala.
+            autoscaleInfoProvider: () => null
+        });
+        if (!dados[lt.i0]) return null;                       // pivô fora do array atual
+        const t0 = dados[lt.i0].time, t1 = dados[dados.length - 1].time;
+        if (!(t1 > t0)) return null;                          // tempos iguais quebram a série
+        s.setData([{ time: t0, value: lt.p0 }, { time: t1, value: lt.atual }]);
         return s;
     };
     if (lta) serieLTA = mk(lta, 'rgba(34, 197, 94, 0.55)');

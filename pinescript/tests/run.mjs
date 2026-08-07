@@ -862,6 +862,25 @@ check('parse robusto: série ausente não quebra', fx.semOpenVazio);
 check('parse ordena e remove timestamps repetidos', fx.ordenado);
 check('parse pula velas sem pregão (nulos)', fx.puloNulo);
 check('poll pede janela curta (1d) e carga inicial o range cheio', /range=1d/.test(fx.urlPoll) && /range=1mo/.test(fx.urlCarga), fx.urlPoll + ' | ' + fx.urlCarga);
+// REGRESSÃO: LTA/LTB projetada não pode espremer as velas (o "gráfico sumia")
+const lt = await p.evaluate(() => {
+  const precos = dados.map(d => d.close);
+  const min = Math.min(...precos), max = Math.max(...precos);
+  const alturaVelas = () => Math.abs(serieVelas.priceToCoordinate(max) - serieVelas.priceToCoordinate(min));
+  const antes = alturaVelas();
+  // linha igual à das LTs, projetando MUITO longe (LT íngreme faz isso na vida real)
+  const s = chartPreco.addLineSeries({ color: '#0f0', lineWidth: 1, priceLineVisible: false, lastValueVisible: false, autoscaleInfoProvider: () => null });
+  s.setData([{ time: dados[0].time, value: min }, { time: dados[dados.length - 1].time, value: max * 4 }]);
+  const depois = alturaVelas();
+  chartPreco.removeSeries(s);
+  // e as LTs reais desenham sem quebrar
+  tracarLTs(true);
+  const comLT = alturaVelas();
+  tracarLTs(false);
+  return { antes, depois, comLT, canvas: document.querySelectorAll('#chartPreco canvas').length };
+});
+check('LT projetada longe NÃO espreme as velas (autoscale isolado)', lt.depois >= lt.antes * 0.95, `antes=${lt.antes.toFixed(0)}px depois=${lt.depois.toFixed(0)}px`);
+check('traçar LTA/LTB reais mantém a escala e o gráfico', lt.comLT >= lt.antes * 0.95 && lt.canvas > 0, `comLT=${lt.comLT.toFixed(0)}px`);
 check('botões de timeframe no gráfico trocam o TF (M15)', quick.tfMudou);
 check('trocar moeda cripto pelo gráfico muda o símbolo', quick.symMudou);
 check('escolher forex pelo gráfico ajusta o par', quick.forexMudou);
