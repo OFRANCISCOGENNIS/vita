@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Inventário Inteligente 15kV</title>
+  <link rel="stylesheet" href="css/style.css">
+  <!-- SheetJS para leitura de Excel no browser -->
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+  <!-- Chart.js para gráficos -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+<!-- ── LOADING OVERLAY ─────────────────────────────────────── -->
+<div id="loading-overlay">
+  <div class="spinner"></div>
+  <p>Processando inventário...</p>
+</div>
+
+<!-- ── UPLOAD SCREEN ───────────────────────────────────────── -->
+<div id="upload-section">
+  <div class="upload-logo">⚡ Equatorial Energia · NT.006 / NT.018</div>
+
+  <div class="upload-card">
+    <h1>Inventário Inteligente 15kV</h1>
+    <p>Carregue sua planilha de inventário e obtenha análise completa SAP × Projeto, racionalização COM, alertas e ranking de risco — tudo no navegador, sem instalação.</p>
+
+    <div class="drop-zone" id="drop-zone">
+      <div class="drop-icon">📊</div>
+      <h3>Arraste o arquivo aqui</h3>
+      <span>ou clique para selecionar</span>
+      <br>
+      <button class="btn-upload" onclick="document.getElementById('file-input').click()">Selecionar arquivo Excel</button>
+    </div>
+
+    <input type="file" id="file-input" accept=".xlsx,.xlsm,.xls">
+
+    <div class="upload-error" id="upload-error"></div>
+
+    <p class="upload-note">
+      ✅ Processamento 100% no browser — nenhum dado é enviado a servidores.<br>
+      Formatos aceitos: .xlsx · .xlsm · .xls<br>
+      A planilha precisa ter as colunas <b>MAT LIB SAP</b> e <b>MAT PRJ CAD</b>.
+    </p>
+  </div>
+</div>
+
+<!-- ── APP ─────────────────────────────────────────────────── -->
+<div id="app">
+
+  <header class="app-header">
+    <span class="brand">⚡ Inventário Inteligente 15kV</span>
+    <span class="file-name" id="app-filename"></span>
+    <button class="btn-reset" id="btn-reset">↩ Nova análise</button>
+  </header>
+
+  <nav class="tab-nav">
+    <button class="tab-btn active" data-tab="painel">📊 Painel do Gestor</button>
+    <button class="tab-btn" data-tab="analise">⚡ Análise SAP × PRJ</button>
+    <button class="tab-btn" data-tab="com">🔧 Racionalização COM</button>
+    <button class="tab-btn" data-tab="preco">💰 Preço Unitário</button>
+    <button class="tab-btn" data-tab="alertas">🚨 Alertas Críticos</button>
+    <button class="tab-btn" data-tab="ranking">📈 Ranking de Risco</button>
+  </nav>
+
+  <!-- PAINEL DO GESTOR -->
+  <div class="tab-pane active" id="pane-painel">
+    <div id="painel-content"></div>
+  </div>
+
+  <!-- ANÁLISE SAP × PRJ -->
+  <div class="tab-pane" id="pane-analise">
+    <div style="margin-bottom:20px">
+      <div class="section-title">Análise SAP × Projeto — item a item</div>
+      <p style="font-size:12px;color:var(--muted)">
+        Comparação entre material liberado (SAP) e material projetado (CAD). Um único item não aderente reprova o PEP3 inteiro.
+      </p>
+    </div>
+    <div id="analise-content"></div>
+  </div>
+
+  <!-- RACIONALIZAÇÃO COM -->
+  <div class="tab-pane" id="pane-com">
+    <div style="margin-bottom:20px">
+      <div class="section-title">Racionalização COM — NT.006 / NT.018</div>
+      <p style="font-size:12px;color:var(--muted)">
+        Materiais TIPO=COM comparados com a faixa prevista pela NT.006, usando âncoras (cruzetas, hastes, suportes) como referência.
+      </p>
+    </div>
+    <div id="com-content"></div>
+  </div>
+
+  <!-- PREÇO UNITÁRIO -->
+  <div class="tab-pane" id="pane-preco">
+    <div style="margin-bottom:20px">
+      <div class="section-title">Análise de Preço Unitário</div>
+      <p style="font-size:12px;color:var(--muted)">
+        PU = VALOR ÷ QTD comparado com a faixa MIN/MAX da base de preços. Requer o arquivo
+        <b>BASE DE PREÇOS.xlsx</b> (colunas <b>MATERIAL</b>, <b>MIN PU</b>, <b>MAX PU</b>) — ou uma aba
+        <b>BASE PRECOS</b> dentro da própria planilha.
+      </p>
+    </div>
+    <div id="preco-content"></div>
+  </div>
+
+  <!-- ALERTAS CRÍTICOS -->
+  <div class="tab-pane" id="pane-alertas">
+    <div style="margin-bottom:20px">
+      <div class="section-title">Painel de Alertas Críticos</div>
+      <p style="font-size:12px;color:var(--muted)">
+        ODI sem UC, materiais com sinal invertido, lacre × medidor fora de proporção, postagem em PEP incorreto e outros apontamentos críticos.
+      </p>
+    </div>
+    <div id="alertas-content"></div>
+  </div>
+
+  <!-- RANKING DE RISCO -->
+  <div class="tab-pane" id="pane-ranking">
+    <div style="margin-bottom:20px">
+      <div class="section-title">Ranking de Risco por Obra (PEP3)</div>
+      <p style="font-size:12px;color:var(--muted)">
+        Score 0–100 calculado por reprovação (40 pts) + alertas críticos (até 24 pts) + divergências de preço (até 18 pts) + COM fora do NT.006 (até 18 pts).
+        Ordenado do maior para o menor risco.
+      </p>
+    </div>
+    <div id="ranking-content"></div>
+  </div>
+
+</div>
+
+<script src="js/inventario.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
