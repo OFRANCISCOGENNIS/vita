@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QUANT OPS — Institutional Trading Intelligence</title>
+    <!-- TradingView Lightweight Charts vendorizado localmente (100% offline) -->
+    <script src="lightweight-charts.standalone.production.js"></script>
+    <!-- Widget oficial do TradingView (gráfico real; requer internet) -->
+    <script src="https://s3.tradingview.com/tv.js" async></script>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <!-- QUANT OPS — BARRA EXECUTIVA -->
+        <header class="qo-topbar">
+            <div class="qo-brand">
+                <span class="qo-logo">◈</span>
+                <span><strong>QUANT OPS</strong><small>INSTITUTIONAL TRADING INTELLIGENCE</small></span>
+            </div>
+            <div class="qo-stat"><small>Mercado Atual</small><span id="qoMercado" class="qo-big">—</span></div>
+            <div class="qo-stat qo-ring-wrap">
+                <small>Confiança</small>
+                <span class="qo-ring" id="qoRing"><span id="qoConf">—</span></span>
+            </div>
+            <div class="qo-stat"><small>Regime</small><span id="qoRegime">—</span></div>
+            <div class="qo-stat"><small>Volatilidade</small><span id="qoVolat">—</span></div>
+            <div class="qo-stat"><small>Sessão</small><span id="qoSessao">—</span></div>
+            <div class="qo-stat"><small>Operações Aprovadas</small><span id="qoAprov" class="qo-good">—</span></div>
+            <div class="qo-stat"><small>Bloqueadas</small><span id="qoBloq" class="qo-bad">—</span></div>
+            <div class="qo-stat"><small>Expectativa Matemática</small><span id="qoExpect">—</span></div>
+        </header>
+
+        <main class="main-content">
+            <!-- SIDEBAR CONTROLES -->
+            <aside class="sidebar">
+                <h2>⚙️ Controles</h2>
+
+                <!-- Fonte de dados -->
+                <section class="control-group">
+                    <h3>📡 Fonte de dados</h3>
+                    <label>
+                        Fonte
+                        <select id="fonte">
+                            <option value="binance" selected>Binance — Cripto (ao vivo)</option>
+                            <option value="twelvedata">Forex/Índices/Ouro — Twelve Data (chave)</option>
+                            <option value="yahoo">Forex/Índices/Ouro — Yahoo (keyless)</option>
+                            <option value="sim">Simulado (offline)</option>
+                        </select>
+                    </label>
+                    <label>
+                        Chave Twelve Data (grátis)
+                        <input type="text" id="tdKey" value="demo" spellcheck="false" autocomplete="off" style="width:100%;">
+                    </label>
+                    <p class="group-note">Twelve Data = Forex/Índices/Ouro estável (CORS próprio, sem proxy). Pegue sua chave grátis em <strong>twelvedata.com</strong> e cole acima. A chave "demo" só funciona no EUR/USD.</p>
+                    <label>
+                        Par / moeda (cripto)
+                        <input type="text" id="symbol" value="BTCUSDT" list="listaSimbolos" autocomplete="off" spellcheck="false">
+                        <datalist id="listaSimbolos"></datalist>
+                    </label>
+                    <button id="btnCryptoIdx" class="btn-mini" style="width:100%;">📊 Crypto IDX (proxy Binomo)</button>
+                    <p class="group-note">Crypto IDX = índice sintético <strong>proprietário da Binomo</strong> (sem dados públicos). Este é um <strong>proxy</strong>: cesta de criptos reais da Binance normalizada. Comportamento parecido, mas <strong>não idêntico</strong> às velas da Binomo — use para leitura/estudo, não como espelho exato.</p>
+                    <label>
+                        Pares Forex / Índices / Ouro
+                        <select id="parPopular">
+                            <option value="">— selecionar —</option>
+                            <option value="EURUSD">EUR/USD</option>
+                            <option value="USDJPY">USD/JPY</option>
+                            <option value="GBPUSD">GBP/USD</option>
+                            <option value="AUDUSD">AUD/USD</option>
+                            <option value="USDCAD">USD/CAD</option>
+                            <option value="USDCHF">USD/CHF</option>
+                            <option value="EURJPY">EUR/JPY</option>
+                            <option value="GBPJPY">GBP/JPY</option>
+                            <option value="EURGBP">EUR/GBP</option>
+                            <option value="NZDUSD">NZD/USD</option>
+                            <option value="XAUUSD">XAU/USD (Ouro)</option>
+                            <option value="NAS100">NAS100 (Índice Nasdaq)</option>
+                            <option value="US30">US30 (Dow Jones)</option>
+                            <option value="GER40">GER40 (DAX)</option>
+                        </select>
+                    </label>
+                    <div class="conn-row">
+                        <span id="connDot" class="conn-dot conn-off"></span>
+                        <span id="connText" class="conn-text">Offline</span>
+                    </div>
+                </section>
+
+                <!-- Gráfico & Expiração -->
+                <section class="control-group">
+                    <h3>🕒 Gráfico & Expiração</h3>
+                    <label>
+                        Timeframe do gráfico
+                        <select id="timeframe">
+                            <option value="1">M1 (1 min)</option>
+                            <option value="5" selected>M5 (5 min)</option>
+                            <option value="15">M15 (15 min)</option>
+                            <option value="30">M30 (30 min)</option>
+                            <option value="60">H1 (1 hora)</option>
+                        </select>
+                    </label>
+                    <label>
+                        Expiração da entrada
+                        <select id="expiracao">
+                            <option value="1">1 min</option>
+                            <option value="5" selected>5 min</option>
+                            <option value="15">15 min</option>
+                            <option value="30">30 min</option>
+                            <option value="60">1 hora</option>
+                        </select>
+                    </label>
+                </section>
+
+                <!-- Dados -->
+                <section class="control-group">
+                    <h3>📈 Dados</h3>
+                    <label>
+                        <input type="number" id="numCandles" value="300" min="20" max="1000">
+                        <span>Nº de velas (histórico / limite Binance 1000, Yahoo ~500)</span>
+                    </label>
+                    <label>
+                        <input type="number" id="volatility" value="2" min="0.5" max="10" step="0.5">
+                        <span>Volatilidade % (só no modo Simulado)</span>
+                    </label>
+                    <button id="btnGerar" class="btn-primary">Recarregar / Gerar</button>
+                </section>
+
+                <!-- Tendência -->
+                <section class="control-group">
+                    <h3>📌 Tendência (EMAs)</h3>
+                    <label><input type="checkbox" id="useTendencia" checked> <span>Ativar EMA</span></label>
+                    <label>EMA Rápida <input type="number" id="emaRapida" value="9" min="1" max="50"></label>
+                    <label>EMA Lenta <input type="number" id="emaLenta" value="21" min="1" max="50"></label>
+                    <label><input type="checkbox" id="useEma200" checked> <span>EMA 200 (viés macro)</span></label>
+                </section>
+
+                <!-- Momentum -->
+                <section class="control-group">
+                    <h3>🔥 Momentum (RSI)</h3>
+                    <label><input type="checkbox" id="useMomentum" checked> <span>Ativar RSI</span></label>
+                    <label>Período RSI <input type="number" id="rsiLen" value="14" min="1" max="50"></label>
+                    <label>Sobrevenda <input type="number" id="rsiSobrevenda" value="30" min="1" max="50"></label>
+                    <label>Sobrecompra <input type="number" id="rsiSobrecompra" value="70" min="50" max="99"></label>
+                </section>
+
+                <!-- Volatilidade -->
+                <section class="control-group">
+                    <h3>⚡ Volatilidade (ATR)</h3>
+                    <label><input type="checkbox" id="useVolatilidade" checked> <span>Ativar ATR</span></label>
+                    <label>Período ATR <input type="number" id="atrLen" value="14" min="1" max="50"></label>
+                    <label>Média ATR <input type="number" id="atrMediaLen" value="50" min="1" max="100"></label>
+                </section>
+
+                <!-- Estrutura -->
+                <section class="control-group">
+                    <h3>🏗️ Estrutura</h3>
+                    <label><input type="checkbox" id="useEstrutura" checked> <span>Ativar rompimento</span></label>
+                    <label>Lookback (velas) <input type="number" id="estruturaLookback" value="20" min="2" max="100"></label>
+                </section>
+
+                <!-- Confluência -->
+                <section class="control-group">
+                    <h3>🎯 Confluência</h3>
+                    <label>
+                        Modo
+                        <select id="confMode">
+                            <option value="score" selected>Pontuação (mín. X de Y)</option>
+                            <option value="estrita">Estrita (todos os filtros)</option>
+                        </select>
+                    </label>
+                    <label>Mín. de fatores (X) <input type="number" id="minScore" value="3" min="1" max="7"></label>
+                    <label>Janela de confluência (velas) <input type="number" id="confJanela" value="3" min="1" max="20"></label>
+                    <label><input type="checkbox" id="useNewsFilter"> <span>Filtro de notícias (evitar entradas perto de notícia)</span></label>
+                    <label>Janela de notícia (min) <input type="number" id="newsJanela" value="15" min="1" max="240"></label>
+                    <label><input type="checkbox" id="useHtf"> <span>Filtro Multi-Timeframe (só operar a favor do TF maior)</span></label>
+                    <span id="htfInfo" class="group-note" style="display:none;"></span>
+                    <label><input type="checkbox" id="usePadrao"> <span>Padrão de vela (engolfo / martelo confirmando o sinal)</span></label>
+                    <label><input type="checkbox" id="useSessao"> <span>Só sessões fortes (Londres / Nova York)</span></label>
+                    <label><input type="checkbox" id="useSR"> <span>Vetar entradas coladas em Suporte/Resistência</span></label>
+                    <label>Distância mín. de S/R (× ATR) <input type="number" id="srAtr" value="0.5" min="0.1" max="3" step="0.1"></label>
+                    <label><input type="checkbox" id="usePesoIA"> <span>Pontuação dinâmica (pesos por regime de mercado × acerto IA)</span></label>
+                    <label><input type="checkbox" id="useGrade" checked> <span>Selo de qualidade A/B/C no veredito</span></label>
+                </section>
+
+                <!-- Treino de Leitura -->
+                <section class="control-group">
+                    <h3>🎓 Treino</h3>
+                    <button id="btnTreinar" class="btn-primary">Treinar leitura (replay)</button>
+                    <p class="group-note">Esconde o futuro do gráfico e testa sua leitura vela a vela, pontuando você contra o indicador.</p>
+                </section>
+
+                <!-- Alertas -->
+                <section class="control-group">
+                    <h3>🔔 Alertas</h3>
+                    <label><input type="checkbox" id="somAtivo" checked> <span>Som quando o veredito virar CALL/PUT</span></label>
+                    <button id="btnTestarSom" class="btn-mini" style="width:100%; margin-top:4px;">🔊 Testar som</button>
+                    <button id="btnScan" class="btn-primary" style="margin-top:8px;">🔎 Escanear melhores entradas</button>
+                    <button id="btnIA" class="btn-primary" style="margin-top:6px;">🤖 IA: otimizar parâmetros</button>
+                    <button id="btnEstudo" class="btn-primary" style="margin-top:6px;">📚 Estudar o mercado</button>
+                </section>
+
+                <!-- Fluxo de Volume -->
+                <section class="control-group">
+                    <h3>🔄 Fluxo de Volume</h3>
+                    <label><input type="checkbox" id="useFluxo" checked> <span>Fator Fluxo (delta compra×venda do par)</span></label>
+                    <label>Janela do fluxo (velas) <input type="number" id="fluxoJanela" value="10" min="2" max="100"></label>
+                    <label><input type="checkbox" id="useCorrelacao"> <span>Fator Correlação (pares de referência)</span></label>
+                    <label>
+                        Pares de referência
+                        <input type="text" id="refPairs" value="BTCUSDT,ETHUSDT" spellcheck="false" style="width:100%;">
+                    </label>
+                    <p class="group-note">Compra = volume agressor (taker buy) da Binance; venda = restante. Correlação vota pela maioria dos pares de referência na mesma janela. <strong>Indisponível para Forex/Índices/Ouro</strong> (sem volume real) — desativado automaticamente nessa fonte.</p>
+                </section>
+
+                <!-- Anti-Ruído -->
+                <section class="control-group">
+                    <h3>🚫 Anti-Ruído</h3>
+                    <label><input type="checkbox" id="confirmarFechamento" checked> <span>Confirmação de fechamento</span></label>
+                    <label>Cooldown (velas) <input type="number" id="cooldownVelas" value="5" min="0" max="50"></label>
+                </section>
+
+                <button id="btnRecalcular" class="btn-primary" style="width:100%; margin-top:20px;">🔄 Recalcular Sinais</button>
+            </aside>
+
+            <!-- MAIN CHART AREA -->
+            <section class="charts-area">
+                <!-- PAINEL DE DECISÃO (assertividade: entrar ou aguardar, e por quê) -->
+                <div class="chart-container decision-panel">
+                    <div class="decision-main">
+                        <span class="decision-label">Decisão agora</span>
+                        <span id="decisionVerdict" class="decision-verdict verdict-wait">AGUARDAR</span>
+                        <span id="decisionGrade" class="decision-grade" style="display:none;"></span>
+                        <span id="decisionReason" class="decision-reason">Carregando dados…</span>
+                    </div>
+                    <div class="decision-side">
+                        <div class="decision-chips" id="decisionChips"></div>
+                        <div class="decision-context" id="decisionContext">—</div>
+                    </div>
+                </div>
+
+                <!-- INTELIGÊNCIA: Price Action | Volume/Delta | Análise da Operação -->
+                <div class="qo-intel">
+                    <div class="chart-container qo-panel">
+                        <h2>PRICE ACTION</h2>
+                        <div id="qoPA" class="qo-kv"></div>
+                    </div>
+                    <div class="chart-container qo-panel">
+                        <h2>LIQUIDEZ</h2>
+                        <div id="qoLiq" class="qo-kv"></div>
+                    </div>
+                    <div class="chart-container qo-panel">
+                        <h2>SMART MONEY</h2>
+                        <div id="qoSM" class="qo-kv"></div>
+                    </div>
+                    <div class="chart-container qo-panel">
+                        <h2>VOLUME / DELTA</h2>
+                        <div id="qoVol" class="qo-kv"></div>
+                    </div>
+                    <div class="chart-container qo-panel qo-op">
+                        <h2>ANÁLISE DA OPERAÇÃO</h2>
+                        <div id="qoOp" class="qo-kv"></div>
+                        <div id="qoBanner" class="qo-banner" style="display:none;"></div>
+                    </div>
+                </div>
+
+                <div class="chart-container" id="heatPanel" style="display:none;">
+                    <h2>🗺️ Heatmap de Ativos <span id="heatMeta" class="tv-sync-tag"></span></h2>
+                    <div id="heatList" class="qo-heat"></div>
+                </div>
+
+                <div class="chart-container" id="scanPanel" style="display:none;">
+                    <h2>🔎 Melhores entradas agora <span id="scanMeta" class="tv-sync-tag"></span></h2>
+                    <div id="scanList" class="decision-chips"></div>
+                </div>
+
+                <div class="chart-container" id="registroPanel" style="display:none;">
+                    <h2>🗓️ Registro de entradas <span id="registroMeta" class="tv-sync-tag"></span>
+                        <button id="btnLimparReg" class="btn-ghost" style="float:right;">Limpar</button></h2>
+                    <div id="chartRegistro" style="height:150px;"></div>
+                    <div id="registroBody" class="reg-list"></div>
+                </div>
+
+                <div class="chart-container" id="iaPanel" style="display:none;">
+                    <h2>🤖 IA — melhores parâmetros <span id="iaMeta" class="tv-sync-tag"></span></h2>
+                    <div id="iaContext" class="decision-context"></div>
+                    <div id="iaList" class="reg-list"></div>
+                </div>
+
+                <div class="chart-container" id="estudoPanel" style="display:none;">
+                    <h2>📚 Estudos de Mercado <span id="estudoMeta" class="tv-sync-tag"></span></h2>
+                    <div id="estudoRegime" class="decision-chips"></div>
+                    <div class="estudo-grid">
+                        <div>
+                            <h4>⏰ Acerto por horário</h4>
+                            <div id="estudoHoras"></div>
+                        </div>
+                        <div>
+                            <h4>🧩 Acerto por fator de confluência</h4>
+                            <div id="estudoFatores"></div>
+                        </div>
+                        <div>
+                            <h4>🌍 Acerto por sessão de mercado</h4>
+                            <div id="estudoSessoes"></div>
+                        </div>
+                    </div>
+                    <div id="estudoDica" class="decision-context"></div>
+                </div>
+
+                <!-- Treino de Leitura (replay: futuro escondido, você decide) -->
+                <div class="chart-container train-panel" id="trainPanel" style="display:none;">
+                    <h2>🎓 Treino de Leitura <span class="train-pos" id="trainPos"></span></h2>
+                    <div class="train-reading" id="trainReading">—</div>
+                    <div class="train-actions">
+                        <button id="btnTreinoCall" class="btn-train btn-train-call">▲ CALL — vai subir</button>
+                        <button id="btnTreinoPut" class="btn-train btn-train-put">▼ PUT — vai cair</button>
+                        <button id="btnTreinoPular" class="btn-train btn-train-skip">⏭ Pular vela</button>
+                        <button id="btnTreinoSair" class="btn-mini">Encerrar treino</button>
+                    </div>
+                    <div class="train-feedback" id="trainFeedback"></div>
+                    <div class="train-stats" id="trainStats"></div>
+                </div>
+
+                <!-- Gráfico de Velas (Candlestick) + EMAs (com meus sinais) -->
+                <div class="chart-container">
+                    <h2>💹 <span id="chartTitulo">Preço (Velas) & EMAs + sinais</span> <span id="liveBadge" class="live-badge">● AO VIVO</span></h2>
+                    <div id="chartPreco" class="tv-chart tv-chart-main"></div>
+                    <div class="chart-legend" id="legendPreco"></div>
+                </div>
+
+                <!-- RSI e ATR lado a lado -->
+                <div class="sub-row">
+                    <div class="chart-container">
+                        <h2>📊 RSI (Momentum)</h2>
+                        <div id="chartRsi" class="tv-chart tv-chart-sub"></div>
+                    </div>
+                    <div class="chart-container">
+                        <h2>⚡ ATR (Volatilidade)</h2>
+                        <div id="chartAtr" class="tv-chart tv-chart-sub"></div>
+                    </div>
+                </div>
+
+                <!-- Fluxo de Volume: delta compra×venda + pressão por par -->
+                <div class="chart-container">
+                    <h2>🔄 Fluxo de Volume — compra × venda</h2>
+                    <div class="fluxo-cols">
+                        <div>
+                            <h3 class="fluxo-sub">Delta por vela (par atual)</h3>
+                            <div id="chartFluxo" class="tv-chart tv-chart-sub"></div>
+                        </div>
+                        <div>
+                            <h3 class="fluxo-sub">Pressão na janela <span id="pressaoJanelaLbl"></span></h3>
+                            <div id="pressaoPares" class="pressao-list"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Avisos de Entrada com Expiração -->
+                <div class="chart-container">
+                    <h2>🔔 Avisos de Entrada (com expiração)</h2>
+                    <div id="newsRiskBanner" class="news-risk-banner"></div>
+                    <div class="entry-summary" id="entrySummary"></div>
+                    <div class="entry-table-wrap">
+                        <table class="entry-table" id="entryTable">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Hora da vela</th>
+                                    <th>Direção</th>
+                                    <th>Preço entrada</th>
+                                    <th>Fatores</th>
+                                    <th>Expiração</th>
+                                    <th>Hora expiração</th>
+                                    <th>Resultado</th>
+                                </tr>
+                            </thead>
+                            <tbody id="entryTableBody"></tbody>
+                        </table>
+                    </div>
+                    <p id="entryHint" class="signal-hint"></p>
+                </div>
+
+                <!-- Métricas de Análise (backtest) -->
+                <div class="chart-container">
+                    <h2>📈 Métricas de Análise (backtest)</h2>
+                    <div class="metrics-toolbar">
+                        <label>Payout por WIN (%) <input type="number" id="payout" value="87" min="1" max="500" step="1"></label>
+                        <button id="btnExport" class="btn-mini">⬇️ Exportar CSV</button>
+                        <span class="metrics-hint">Opções binárias: retorno típico 70–90% por acerto; um LOSS perde 1× a aposta.</span>
+                    </div>
+                    <div class="metrics-grid" id="metricsGrid"></div>
+                    <div class="metrics-cols">
+                        <div class="metrics-equity">
+                            <h3>Curva de capital (unidades de aposta)</h3>
+                            <div id="chartEquity" class="tv-chart tv-chart-sub"></div>
+                        </div>
+                        <div class="metrics-scores">
+                            <h3>Win rate por confluência (score)</h3>
+                            <table class="score-table">
+                                <thead><tr><th>Score</th><th>Ops</th><th>WIN</th><th>Win rate</th></tr></thead>
+                                <tbody id="scoreTableBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Widget OFICIAL do TradingView (gráfico real, para conferência) -->
+                <div class="chart-container">
+                    <h2>📺 Gráfico oficial TradingView <span class="tv-sync-tag" id="tvSyncTag">—</span></h2>
+                    <div class="tv-widget-wrap">
+                        <div id="tvWidget"></div>
+                        <div id="tvWidgetMsg" class="tv-widget-msg">Carregando gráfico do TradingView… (requer internet)</div>
+                    </div>
+                </div>
+
+                <!-- Notícias em tempo real -->
+                <div class="chart-container">
+                    <h2>📰 Notícias em tempo real (cripto)</h2>
+                    <div class="news-toolbar">
+                        <label class="news-filter"><input type="checkbox" id="newsSoMoeda"> <span>Só notícias da moeda atual</span></label>
+                        <span id="newsStatus" class="news-status">—</span>
+                        <button id="btnNews" class="btn-mini">Atualizar</button>
+                    </div>
+                    <div id="newsList" class="news-list"></div>
+                </div>
+
+                <!-- Status resumido -->
+                <div class="chart-container status-container">
+                    <h2>🎯 Status</h2>
+                    <div class="status-panel">
+                        <div class="stat-row"><span>Sinais LONG (CALL):</span><strong id="countLong">0</strong></div>
+                        <div class="stat-row"><span>Sinais SHORT (PUT):</span><strong id="countShort">0</strong></div>
+                        <div class="stat-row"><span>Viés atual:</span><strong id="currentBias">NEUTRO</strong></div>
+                        <div class="conf-meter">
+                            <div class="conf-meter-row">
+                                <span class="conf-lbl conf-lbl-call">Confluência CALL</span>
+                                <div class="conf-bar"><div id="confBarCall" class="conf-bar-fill conf-fill-call"></div></div>
+                                <span id="confScoreCall" class="conf-score">0/0</span>
+                            </div>
+                            <div class="conf-meter-row">
+                                <span class="conf-lbl conf-lbl-put">Confluência PUT</span>
+                                <div class="conf-bar"><div id="confBarPut" class="conf-bar-fill conf-fill-put"></div></div>
+                                <span id="confScorePut" class="conf-score">0/0</span>
+                            </div>
+                        </div>
+                        <div class="filters-status">
+                            <h3>Status dos Filtros</h3>
+                            <div id="filtersStatus"></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- FOOTER -->
+        <footer class="footer">
+            <p>⚠️ <strong>FERRAMENTA DE ESTUDO.</strong> Não é recomendação. Opções binárias/expirações curtas (1m/5m) são de altíssimo risco — spread e taxas corroem o edge. Sinais exigem backtest e validação antes de qualquer uso real.</p>
+            <p>Indicador Pine Script v5 em: <code>pinescript/Confluencia_Multi_Fator_Forex_Cripto.pine</code></p>
+        </footer>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
