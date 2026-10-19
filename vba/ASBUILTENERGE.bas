@@ -1,14 +1,13 @@
 ' =============================================================================
-'  ExportTextos.bas  -  VBA para ZWCAD 2024+  -  v3.2
+'  ASBUILTENERGE.bas  -  VBA para ZWCAD 2024+  -  v4.0
 '  -----------------------------------------------------------------
-'  NOVIDADE v3.2: LEITURA DE BLOCOS DE CABO + REORDENACAO DE ABAS
+'  NOVIDADE v4.0: RASTREABILIDADE, PENDENCIAS E LOG DE EXECUCAO
 '  -----------------------------------------------------------------
-'  - Le blocos de CABO (RDARA1110) com atributos:
-'      TCABO (tipo/spec), DISTANCIA, =DISTANC (calculada), AM_AI_FA,
-'      AM_AI_NE, DIST_OB. Classifica em COND MT / COND BT.
-'      Gera aba "Cabos (Blocos)" com resumo por familia + status.
-'  - As abas de blocos (Postes e Cabos) agora aparecem como as
-'      PRIMEIRAS da planilha.
+'  - Centraliza metadados e status criticos em constantes.
+'  - Adiciona Fonte da Classificacao e Revisao na aba Textos.
+'  - Substitui Alertas ocultos por Pendencias visiveis.
+'  - Registra parametros, contagens, duracao e destino na aba Log.
+'  - Corrige a ordenacao para abranger todas as colunas da aba Textos.
 '
 '  v3.1: LEITURA DE BLOCOS DE POSTE (RDARA1100) com atributos
 '        NUMERO, EXISTENTE, PROJETADO, ESTAI, OCUPANTES, COORD Z.
@@ -21,6 +20,16 @@ Option Explicit
 
 ' Constante de diagnostico: True mostra MsgBox com os primeiros 15 layers lidos.
 Private Const DIAGNOSTICO_LAYERS As Boolean = False
+Private Const APP_NOME As String = "ASBUILT ENERGE"
+Private Const APP_VERSAO As String = "4.0.0"
+Private Const FORMATO_XLSX As Long = 51
+Private Const XL_CENTRO As Long = -4108
+Private Const XL_PLANILHA_OCULTA As Long = 0
+
+Private Const STATUS_INSTALADO As String = "MATERIAIS INSTALADOS"
+Private Const STATUS_DESINSTALADO As String = "MATERIAIS DESINSTALADOS"
+Private Const STATUS_EXISTENTE As String = "MATERIAIS EXISTENTES"
+Private Const STATUS_NAO_CLASSIFICADO As String = "NAO CLASSIFICADO"
 
 ' =============================================================================
 '  LEITURA SEGURA DE COR
@@ -122,21 +131,21 @@ Private Function StatusPorLayer(ByVal layerName As String) As String
     s = UCase$(Trim$(layerName))
     ' Regra explicita: RAMAIS_NO_MODEL sempre conta como Instalado
     If InStr(s, "RAMAIS_NO_MODEL") > 0 Or InStr(s, "RAMAIS NO MODEL") > 0 Then
-        StatusPorLayer = "MATERIAIS INSTALADOS"
+        StatusPorLayer = STATUS_INSTALADO
     ' Layer "#INSTALADO" -> MATERIAIS INSTALADOS
     ElseIf InStr(s, "#INSTALADO") > 0 Then
-        StatusPorLayer = "MATERIAIS INSTALADOS"
+        StatusPorLayer = STATUS_INSTALADO
     ' Layer "#RETIRADO" -> MATERIAIS DESINSTALADOS (planilha RECLASSIFICAR)
     ElseIf InStr(s, "#RETIRADO") > 0 Then
-        StatusPorLayer = "MATERIAIS DESINSTALADOS"
+        StatusPorLayer = STATUS_DESINSTALADO
     ElseIf InStr(s, "TEXTOS A IMPLANTAR") > 0 Or InStr(s, "A IMPLANTAR") > 0 Then
-        StatusPorLayer = "MATERIAIS INSTALADOS"
+        StatusPorLayer = STATUS_INSTALADO
     ElseIf InStr(s, "TEXTOS A REMOVER") > 0 Or InStr(s, "A REMOVER") > 0 Then
-        StatusPorLayer = "MATERIAIS DESINSTALADOS"
+        StatusPorLayer = STATUS_DESINSTALADO
     ElseIf InStr(s, "TEXTOS EXISTENTES") > 0 Or InStr(s, "EXISTENTES") > 0 Then
-        StatusPorLayer = "MATERIAIS EXISTENTES"
+        StatusPorLayer = STATUS_EXISTENTE
     Else
-        StatusPorLayer = "NAO CLASSIFICADO"
+        StatusPorLayer = STATUS_NAO_CLASSIFICADO
     End If
 End Function
 
@@ -864,6 +873,73 @@ Private Function ExtrairQuantidadeInicial(ByVal txt As String) As Double
     End If
 End Function
 
+' Extrai quantidade declarada explicitamente em um texto, pelos marcadores
+' Q, QT ou QTD seguidos de "=" ou ":". Exemplos aceitos: "Q=3",
+' "QT: 3" e "QTD = 3". Nao confunde Q2 (usado por regras especificas).
+' Retorna 0 quando o marcador nao existir ou quando o valor nao for positivo.
+Private Function ExtrairQuantidadeMarcada(ByVal txt As String) As Double
+    Dim s As String, i As Long, j As Long, k As Long
+    Dim ch As String, num As String
+
+    s = UCase$(RemoverEnvoltorioHashtag(Trim$(txt)))
+    For i = 1 To Len(s)
+        If Mid$(s, i, 1) = "Q" And _
+           (i = 1 Or InStr("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_", Mid$(s, i - 1, 1)) = 0) Then
+            j = i + 1
+            If Mid$(s, j, 1) = "T" Then
+                j = j + 1
+                If Mid$(s, j, 1) = "D" Then
+                    j = j + 1
+                End If
+            End If
+
+            Do While j <= Len(s) And Mid$(s, j, 1) = " "
+                j = j + 1
+            Loop
+
+            If j <= Len(s) And (Mid$(s, j, 1) = "=" Or Mid$(s, j, 1) = ":") Then
+                j = j + 1
+                Do While j <= Len(s) And Mid$(s, j, 1) = " "
+                    j = j + 1
+                Loop
+                num = ""
+                k = j
+                Do While k <= Len(s)
+                    ch = Mid$(s, k, 1)
+                    If (ch >= "0" And ch <= "9") Or ch = "," Or ch = "." Then
+                        num = num & ch
+                        k = k + 1
+                    Else
+                        Exit Do
+                    End If
+                Loop
+                If Len(num) > 0 Then
+                    num = Replace$(num, ",", ".")
+                    If IsNumeric(num) Then
+                        If CDbl(num) > 0 Then
+                            ExtrairQuantidadeMarcada = CDbl(num)
+                            Exit Function
+                        End If
+                    End If
+                End If
+            End If
+        End If
+    Next i
+    ExtrairQuantidadeMarcada = 0
+End Function
+
+' Quantidade que deve entrar nos quantitativos de TEXTOS. Sem marcador
+' explicito, cada texto continua valendo uma unidade para manter compatibilidade.
+Private Function QuantidadeDoTexto(ByVal txt As String) As Long
+    Dim qtd As Double
+    qtd = ExtrairQuantidadeMarcada(txt)
+    If qtd > 0 Then
+        QuantidadeDoTexto = CLng(qtd)
+    Else
+        QuantidadeDoTexto = 1
+    End If
+End Function
+
 ' Extrai o valor numerico de uma chave especifica dentro de uma descricao
 ' no formato "TAG1=val1 | TAG2=val2 | ...". Ex.:
 '   ExtrairValorChaveNumerico("ELO=15K | Q2=3 | MATERIAL=POL.", "Q2") -> 3
@@ -1046,6 +1122,45 @@ Private Function NivelConfianca(ByVal score As Integer) As String
         NivelConfianca = "Media"
     Else
         NivelConfianca = "Baixa"
+    End If
+End Function
+
+' Explica qual pista teve maior peso na classificacao de um texto.
+' O objetivo e tornar o resultado auditavel sem alterar o algoritmo legado.
+Private Function FonteClassificacaoTexto(ByVal txt As String, _
+                                          ByVal layerName As String, _
+                                          ByVal familia As String, _
+                                          ByVal codEstrutura As String) As String
+    Dim ly As String
+    ly = UCase$(Trim$(layerName))
+
+    If Len(Trim$(txt)) = 0 Then
+        FonteClassificacaoTexto = "TEXTO VAZIO"
+    ElseIf ComecaComHashtag(txt) Then
+        FonteClassificacaoTexto = "HASHTAG + CONTEUDO"
+    ElseIf InStr(ly, "RAMAIS_NO_MODEL") > 0 Or _
+           InStr(ly, "RAMAIS NO MODEL") > 0 Then
+        FonteClassificacaoTexto = "REGRA DO LAYER RAMAL"
+    ElseIf Len(Trim$(codEstrutura)) > 0 And _
+           Len(ExtrairNomeBasePoste(codEstrutura)) > 0 Then
+        FonteClassificacaoTexto = "CODIGO SAP"
+    ElseIf Len(FamiliaPorLayer(ly)) > 0 Then
+        FonteClassificacaoTexto = "CONTEUDO + LAYER"
+    ElseIf familia = "CLASSIFICAR" Or familia = "-" Then
+        FonteClassificacaoTexto = "SEM REGRA SUFICIENTE"
+    Else
+        FonteClassificacaoTexto = "CONTEUDO"
+    End If
+End Function
+
+' Sinaliza as linhas que merecem conferencia humana na propria aba Textos.
+Private Function RevisaoTexto(ByVal status As String, ByVal familia As String, _
+                               ByVal confianca As String) As String
+    If status = STATUS_NAO_CLASSIFICADO Or familia = "CLASSIFICAR" Or _
+       familia = "-" Or confianca = "Baixa" Then
+        RevisaoTexto = "REVISAR"
+    Else
+        RevisaoTexto = "OK"
     End If
 End Function
 
@@ -1297,6 +1412,7 @@ Private Sub CriarAbaStatus(ByVal wb As Object, ByVal wsAntes As Object, _
     Set aggDesc = CreateObject("Scripting.Dictionary")
 
     Dim gFam As String, gMat As String, gKey As String, gMet As Double, gDesc As String
+    Dim qtdTexto As Long
 
     ' --- Agrega TEXTOS (exceto familia por classificar) --------------------
     For i = 1 To nTotal
@@ -1307,13 +1423,14 @@ Private Sub CriarAbaStatus(ByVal wb As Object, ByVal wsAntes As Object, _
             gMat = Trim$(arrNomeMaterial(i))
             If Len(gMat) = 0 Then gMat = NormalizarChave(arrTexto(i))
             gMet = 0
+            qtdTexto = QuantidadeDoTexto(arrTexto(i))
             If gFam = "RAMAL" Then gMet = SomarMetrosRamal(arrTexto(i))
             gKey = gFam & "|" & gMat
             If aggQtd.Exists(gKey) Then
-                aggQtd(gKey) = aggQtd(gKey) + 1
+                aggQtd(gKey) = aggQtd(gKey) + qtdTexto
                 aggMet(gKey) = aggMet(gKey) + gMet
             Else
-                aggQtd.Add gKey, 1
+                aggQtd.Add gKey, qtdTexto
                 aggMet.Add gKey, gMet
                 aggDesc.Add gKey, arrTexto(i)   ' 1a ocorrencia como descricao representativa
             End If
@@ -1523,7 +1640,7 @@ End Sub
 '    D) Status NAO CLASSIFICADO
 '    E) Mesmo poste (nome base) em layers com status conflitantes
 ' =============================================================================
-Private Sub CriarAbaAlertas(ByVal wb As Object, _
+Private Sub CriarAbaPendencias(ByVal wb As Object, _
                              ByRef arrLayer() As String, _
                              ByRef arrStatus() As String, _
                              ByRef arrFam() As String, _
@@ -1532,13 +1649,18 @@ Private Sub CriarAbaAlertas(ByVal wb As Object, _
                              ByRef arrConfianca() As String, _
                              ByRef arrX() As Double, _
                              ByRef arrY() As Double, _
-                             ByVal n As Long)
+                             ByVal n As Long, _
+                             ByRef rejeitadoNome() As String, _
+                             ByRef rejeitadoMotivo() As String, _
+                             ByRef rejeitadoX() As Double, _
+                             ByRef rejeitadoY() As Double, _
+                             ByVal postesIgnorados As Long)
     Dim ws As Object
     Set ws = wb.Worksheets.Add(After:=wb.Worksheets(wb.Worksheets.Count))
-    ws.Name = "Alertas"
+    ws.Name = "Pendencias"
 
     ' Cabecalho geral
-    ws.Cells(1, 1).Value = "ALERTAS E INCONSISTENCIAS"
+    ws.Cells(1, 1).Value = "PENDENCIAS E INCONSISTENCIAS"
     With ws.Range(ws.Cells(1, 1), ws.Cells(1, 6))
         .Merge
         .Font.Bold = True
@@ -1747,12 +1869,41 @@ Private Sub CriarAbaAlertas(ByVal wb As Object, _
         row = row + 1
     End If
 
+    ' --- F) Blocos de poste ignorados pelo filtro -------------------------
+    row = row + 2
+    ws.Cells(row, 1).Value = "F) Blocos de poste ignorados pelo filtro Existente/Projetado"
+    ws.Cells(row, 1).Font.Bold = True
+    ws.Cells(row, 1).Font.Color = RGB(192, 0, 0)
+    row = row + 1
+    ws.Cells(row, 1).Value = "Bloco"
+    ws.Cells(row, 2).Value = "Motivo"
+    ws.Cells(row, 3).Value = "X"
+    ws.Cells(row, 4).Value = "Y"
+    With ws.Range(ws.Cells(row, 1), ws.Cells(row, 4))
+        .Font.Bold = True
+        .Interior.Color = RGB(220, 230, 241)
+    End With
+    row = row + 1
+    If postesIgnorados = 0 Then
+        ws.Cells(row, 1).Value = "(nenhum)"
+    Else
+        For i = 1 To postesIgnorados
+            ws.Cells(row, 1).Value = rejeitadoNome(i)
+            ws.Cells(row, 2).Value = rejeitadoMotivo(i)
+            ws.Cells(row, 3).Value = rejeitadoX(i)
+            ws.Cells(row, 4).Value = rejeitadoY(i)
+            ws.Range(ws.Cells(row, 1), ws.Cells(row, 4)).Interior.Color = RGB(255, 235, 156)
+            row = row + 1
+        Next i
+    End If
+
     ' --- Resumo no topo ---------------------------------------------------
     ws.Cells(2, 1).Value = "Confianca baixa: " & totA & _
                            "   |   Nao classificados: " & totB & _
                            "   |   Sobreposicoes: " & totC & _
                            "   |   Status desconhecido: " & totD & _
-                           "   |   Conflitos de poste: " & totE
+                           "   |   Conflitos de poste: " & totE & _
+                           "   |   Postes ignorados: " & postesIgnorados
     ws.Cells(2, 1).Font.Italic = True
 
     ws.Columns("A").ColumnWidth = 32
@@ -1912,12 +2063,13 @@ Private Sub CriarAbaBOM(ByVal wb As Object, _
     Set agg = CreateObject("Scripting.Dictionary")
     Set qtdM = CreateObject("Scripting.Dictionary")
 
-    Dim i As Long, fam As String, st As String, cont As String
+    Dim i As Long, fam As String, st As String, cont As String, qtdTexto As Long
     Dim desc As String, key As String, eMetros As Boolean, m As Double
     For i = 1 To n
         st  = arrStatus(i)
         fam = arrFam(i)
         cont = arrTexto(i)
+        qtdTexto = QuantidadeDoTexto(cont)
         eMetros = (fam = "COND NU" Or fam = "COND ISOLADO" Or fam = "RAMAL")
 
         ' Descricao normalizada por familia
@@ -1945,17 +2097,17 @@ Private Sub CriarAbaBOM(ByVal wb As Object, _
                 m = ExtrairMetrosCabo(cont)
             End If
             If agg.Exists(key) Then
-                agg(key) = agg(key) + 1
+                agg(key) = agg(key) + qtdTexto
                 qtdM(key) = qtdM(key) + m
             Else
-                agg.Add key, 1
+                agg.Add key, qtdTexto
                 qtdM.Add key, m
             End If
         Else
             If agg.Exists(key) Then
-                agg(key) = agg(key) + 1
+                agg(key) = agg(key) + qtdTexto
             Else
-                agg.Add key, 1
+                agg.Add key, qtdTexto
                 qtdM.Add key, 0
             End If
         End If
@@ -3635,12 +3787,75 @@ Private Function EscreverSecaoFamilia(ByVal ws As Object, ByVal startRow As Long
     EscreverSecaoFamilia = r
 End Function
 
+' =============================================================================
+'  LOG DE EXECUCAO
+'  Registra versao, desenho, destino, contagens e duracao para auditoria.
+' =============================================================================
+Private Sub CriarAbaLog(ByVal wb As Object, ByVal nomeDwg As String, _
+                        ByVal caminhoSaida As String, ByVal inicio As Date, _
+                        ByVal totalTextos As Long, ByVal totalPostes As Long, _
+                        ByVal postesIgnorados As Long, ByVal totalCabos As Long, _
+                        ByVal totalOutros As Long, ByVal totalPiaui As Long, _
+                        ByVal totalUnificado As Long)
+    Dim ws As Object
+    Set ws = wb.Worksheets.Add(After:=wb.Worksheets(wb.Worksheets.Count))
+    ws.Name = "Log"
+
+    ws.Cells(1, 1).Value = "LOG DA EXPORTACAO"
+    With ws.Range("A1:B1")
+        .Merge
+        .Font.Bold = True
+        .Font.Size = 14
+        .Font.Color = RGB(255, 255, 255)
+        .Interior.Color = RGB(64, 64, 64)
+        .HorizontalAlignment = XL_CENTRO
+    End With
+
+    ws.Cells(3, 1).Value = "Campo"
+    ws.Cells(3, 2).Value = "Valor"
+    With ws.Range("A3:B3")
+        .Font.Bold = True
+        .Interior.Color = RGB(220, 230, 241)
+    End With
+
+    Dim linha As Long
+    linha = 4
+    EscreverCampoLog ws, linha, "Aplicacao", APP_NOME
+    EscreverCampoLog ws, linha, "Versao", APP_VERSAO
+    EscreverCampoLog ws, linha, "DWG", nomeDwg
+    EscreverCampoLog ws, linha, "Inicio", Format$(inicio, "dd/mm/yyyy hh:nn:ss")
+    EscreverCampoLog ws, linha, "Fim", Format$(Now, "dd/mm/yyyy hh:nn:ss")
+    EscreverCampoLog ws, linha, "Duracao (segundos)", DateDiff("s", inicio, Now)
+    EscreverCampoLog ws, linha, "Textos", totalTextos
+    EscreverCampoLog ws, linha, "Postes aceitos", totalPostes
+    EscreverCampoLog ws, linha, "Postes ignorados", postesIgnorados
+    EscreverCampoLog ws, linha, "Cabos", totalCabos
+    EscreverCampoLog ws, linha, "Outros materiais", totalOutros
+    EscreverCampoLog ws, linha, "Blocos Piaui", totalPiaui
+    EscreverCampoLog ws, linha, "Registros unificados", totalUnificado
+    EscreverCampoLog ws, linha, "Arquivo de saida", caminhoSaida
+
+    ws.Columns("A").ColumnWidth = 24
+    ws.Columns("B").ColumnWidth = 75
+    ws.Range(ws.Cells(3, 1), ws.Cells(linha - 1, 2)).Borders.LineStyle = 1
+End Sub
+
+Private Sub EscreverCampoLog(ByVal ws As Object, ByRef linha As Long, _
+                              ByVal campo As String, ByVal valor As Variant)
+    ws.Cells(linha, 1).Value = campo
+    ws.Cells(linha, 2).Value = valor
+    linha = linha + 1
+End Sub
+
 
 ' =============================================================================
 '  MACRO PRINCIPAL
 ' =============================================================================
 Public Sub ExportarTextosParaExcel()
     On Error GoTo TratarErro
+
+    Dim inicioExecucao As Date
+    inicioExecucao = Now
 
     Dim errNum As Long
     Dim errDesc As String
@@ -3870,7 +4085,7 @@ Public Sub ExportarTextosParaExcel()
     Set ws = wb.Worksheets(1)
     ws.Name = "Textos"
 
-    ' Cabecalho com coluna Status, Nome Base, Confianca e Score
+    ' Cabecalho com classificacao auditavel e sinalizacao de revisao
     ws.Cells(1, 1).Value = "Layer"
     ws.Cells(1, 2).Value = "Status"
     ws.Cells(1, 3).Value = "Cor ACI"
@@ -3885,12 +4100,14 @@ Public Sub ExportarTextosParaExcel()
     ws.Cells(1, 12).Value = "Altura Texto"
     ws.Cells(1, 13).Value = "Cod. Estrutura"   ' Mid(texto,10,7)
     ws.Cells(1, 14).Value = "Nome do Material"
+    ws.Cells(1, 15).Value = "Fonte da Classificacao"
+    ws.Cells(1, 16).Value = "Revisao"
 
     ' Escrita em bloco (mais rapido) -- so se houver textos
     Dim dados() As Variant
     Dim i As Long
     If n > 0 Then
-    ReDim dados(1 To n, 1 To 14)
+    ReDim dados(1 To n, 1 To 16)
     For i = 1 To n
         dados(i, 1)  = arrLayer(i)
         dados(i, 2)  = arrStatus(i)
@@ -3906,12 +4123,15 @@ Public Sub ExportarTextosParaExcel()
         dados(i, 12) = arrH(i)
         dados(i, 13) = arrCodEst(i)
         dados(i, 14) = arrNomeMaterial(i)
+        dados(i, 15) = FonteClassificacaoTexto(arrTexto(i), arrLayer(i), _
+                                                arrFam(i), arrCodEst(i))
+        dados(i, 16) = RevisaoTexto(arrStatus(i), arrFam(i), arrConfianca(i))
     Next i
     estagio = "escrevendo aba Textos (bloco de dados)"
-    ws.Range(ws.Cells(2, 1), ws.Cells(n + 1, 14)).Value = dados
+    ws.Range(ws.Cells(2, 1), ws.Cells(n + 1, 16)).Value = dados
     End If   ' n > 0
 
-    With ws.Range("A1:N1")
+    With ws.Range("A1:P1")
         .Font.Bold = True
         .Interior.Color = RGB(220, 230, 241)
     End With
@@ -3920,8 +4140,14 @@ Public Sub ExportarTextosParaExcel()
         .Interior.Color = RGB(255, 230, 153)
         .Font.Bold = True
     End With
-    ws.Range(ws.Cells(1, 1), ws.Cells(n + 1, 14)).Columns.AutoFit
-    ws.Range("A1:N1").AutoFilter
+    With ws.Range(ws.Cells(1, 15), ws.Cells(1, 16))
+        .Interior.Color = RGB(255, 235, 156)
+        .Font.Bold = True
+    End With
+    ws.Range(ws.Cells(1, 1), ws.Cells(n + 1, 16)).Columns.AutoFit
+    If ws.Columns(5).ColumnWidth > 60 Then ws.Columns(5).ColumnWidth = 60
+    If ws.Columns(15).ColumnWidth > 32 Then ws.Columns(15).ColumnWidth = 32
+    ws.Range("A1:P1").AutoFilter
 
     ' Formata condicional simples: pinta a celula Confianca por nivel
     Dim rng As Object, cel As Object
@@ -3935,6 +4161,16 @@ Public Sub ExportarTextosParaExcel()
         End Select
     Next cel
 
+    Set rng = ws.Range(ws.Cells(2, 16), ws.Cells(n + 1, 16))
+    For Each cel In rng
+        If cel.Value = "REVISAR" Then
+            cel.Interior.Color = RGB(255, 199, 206)
+            cel.Font.Bold = True
+        Else
+            cel.Interior.Color = RGB(198, 239, 206)
+        End If
+    Next cel
+
     estagio = "ordenando aba Textos"
     With ws.Sort
         .SortFields.Clear
@@ -3942,7 +4178,7 @@ Public Sub ExportarTextosParaExcel()
         .SortFields.Add Key:=ws.Range("C2:C" & (n + 1)), Order:=1
         .SortFields.Add Key:=ws.Range("F2:F" & (n + 1)), Order:=1
         .SortFields.Add Key:=ws.Range("A2:A" & (n + 1)), Order:=1
-        .SetRange ws.Range("A1:L" & (n + 1))
+        .SetRange ws.Range("A1:P" & (n + 1))
         .Header = 1
         .Apply
     End With
@@ -3972,7 +4208,7 @@ Public Sub ExportarTextosParaExcel()
     Set cabosQtd   = CreateObject("Scripting.Dictionary")
     Set outroItem  = CreateObject("Scripting.Dictionary")
 
-    Dim fam As String, cont As String, key As String, stat As String
+    Dim fam As String, cont As String, key As String, stat As String, qtdTexto As Long
     Dim altPoste As Double, altKey As String
     Dim metros As Double, spec As String
     Dim nomeBase As String
@@ -3984,17 +4220,18 @@ Public Sub ExportarTextosParaExcel()
         fam  = arrFam(i)
         cont = arrTexto(i)
         stat = arrStatus(i)
+        qtdTexto = QuantidadeDoTexto(cont)
 
         ' Totais globais
         If totFam.Exists(fam) Then
-            totFam(fam) = totFam(fam) + 1
+            totFam(fam) = totFam(fam) + qtdTexto
         Else
-            totFam.Add fam, 1
+            totFam.Add fam, qtdTexto
         End If
         If totStatus.Exists(stat) Then
-            totStatus(stat) = totStatus(stat) + 1
+            totStatus(stat) = totStatus(stat) + qtdTexto
         Else
-            totStatus.Add stat, 1
+            totStatus.Add stat, qtdTexto
         End If
 
         Select Case fam
@@ -4012,16 +4249,16 @@ Public Sub ExportarTextosParaExcel()
                     altKey = "Sem altura"
                 End If
                 If posteAlt.Exists(altKey) Then
-                    posteAlt(altKey) = posteAlt(altKey) + 1
+                    posteAlt(altKey) = posteAlt(altKey) + qtdTexto
                 Else
-                    posteAlt.Add altKey, 1
+                    posteAlt.Add altKey, qtdTexto
                 End If
                 key = stat & "|" & arrLayer(i) & "|" & fam & "|" & _
                       NormalizarChave(nomeBase) & "|" & altKey
                 If postesItem.Exists(key) Then
-                    postesItem(key) = postesItem(key) + 1
+                    postesItem(key) = postesItem(key) + qtdTexto
                 Else
-                    postesItem.Add key, 1
+                    postesItem.Add key, qtdTexto
                 End If
 
             Case "COND NU", "COND ISOLADO"
@@ -4030,10 +4267,10 @@ Public Sub ExportarTextosParaExcel()
                 key = stat & "|" & arrLayer(i) & "|" & fam & "|" & spec
                 If cabosItem.Exists(key) Then
                     cabosItem(key) = cabosItem(key) + metros
-                    cabosQtd(key)  = cabosQtd(key) + 1
+                    cabosQtd(key)  = cabosQtd(key) + qtdTexto
                 Else
                     cabosItem.Add key, metros
-                    cabosQtd.Add key, 1
+                    cabosQtd.Add key, qtdTexto
                 End If
 
             Case "RAMAL"
@@ -4047,19 +4284,19 @@ Public Sub ExportarTextosParaExcel()
                 key = stat & "|" & arrLayer(i) & "|" & fam & "|" & ramalCod
                 If cabosItem.Exists(key) Then
                     cabosItem(key) = cabosItem(key) + metros
-                    cabosQtd(key)  = cabosQtd(key) + 1
+                    cabosQtd(key)  = cabosQtd(key) + qtdTexto
                 Else
                     cabosItem.Add key, metros
-                    cabosQtd.Add key, 1
+                    cabosQtd.Add key, qtdTexto
                 End If
 
             Case Else
                 key = stat & "|" & arrLayer(i) & "|" & fam & "|" & _
                       NormalizarChave(cont)
                 If outroItem.Exists(key) Then
-                    outroItem(key) = outroItem(key) + 1
+                    outroItem(key) = outroItem(key) + qtdTexto
                 Else
-                    outroItem.Add key, 1
+                    outroItem.Add key, qtdTexto
                 End If
 
         End Select
@@ -4229,6 +4466,17 @@ Public Sub ExportarTextosParaExcel()
     Call LerBlocosComAtributos(bnome, blayer, bstatus, bNumero, bExistente, _
                                 bProjetado, bEstai, bOcupantes, bCoordZ, _
                                 bX, bY, bNomeBaseExist, bNomeBaseProj, nB)
+    Dim totalPostesLidos As Long, postesIgnorados As Long
+    totalPostesLidos = nB
+    Dim rejeitadoNome() As String, rejeitadoMotivo() As String
+    Dim rejeitadoX() As Double, rejeitadoY() As Double
+    Dim nRejeitado As Long, capRejeitado As Long
+    capRejeitado = totalPostesLidos
+    If capRejeitado < 1 Then capRejeitado = 1
+    ReDim rejeitadoNome(1 To capRejeitado)
+    ReDim rejeitadoMotivo(1 To capRejeitado)
+    ReDim rejeitadoX(1 To capRejeitado)
+    ReDim rejeitadoY(1 To capRejeitado)
 
     Dim cNome() As String, cLayer() As String, cStatus() As String
     Dim cCabo() As String, cFamiliaCabo() As String
@@ -4290,7 +4538,16 @@ Public Sub ExportarTextosParaExcel()
             descB = bExistente(kb)
             baseB = bNomeBaseExist(kb)
         Else
-            ' Else: ambos vazios OU ambos preenchidos -> PULA
+            ' Registra a rejeicao para revisao antes de pular o item.
+            nRejeitado = nRejeitado + 1
+            rejeitadoNome(nRejeitado) = bnome(kb)
+            rejeitadoX(nRejeitado) = bX(kb)
+            rejeitadoY(nRejeitado) = bY(kb)
+            If Len(bExistente(kb)) > 0 And Len(bProjetado(kb)) > 0 Then
+                rejeitadoMotivo(nRejeitado) = "EXISTENTE E PROJETADO PREENCHIDOS"
+            Else
+                rejeitadoMotivo(nRejeitado) = "EXISTENTE E PROJETADO VAZIOS"
+            End If
             GoTo ProxPoste
         End If
 
@@ -4346,6 +4603,7 @@ Public Sub ExportarTextosParaExcel()
 ProxPoste:
     Next kb
     nB = u  ' Atualiza nB com o total de postes apos filtro
+    postesIgnorados = nRejeitado
     For kb = 1 To nC
         u = u + 1
         Dim dd As String
@@ -4442,7 +4700,7 @@ ProxPoste:
     Dim wsUlt As Object
 
     estagio = "aba Mat. Instalados"
-    Call CriarAbaStatus(wb, ws2, "Mat. Instalados", "MATERIAIS INSTALADOS", _
+    Call CriarAbaStatus(wb, ws2, "Mat. Instalados", STATUS_INSTALADO, _
                         arrLayer, arrAci, arrCor, arrTexto, arrFam, arrStatus, _
                         arrX, arrY, arrH, arrNomeMaterial, n, _
                         uTipo, uBloco, uStat, uNum, uDesc, uBase, uDist, uMet, _
@@ -4450,7 +4708,7 @@ ProxPoste:
 
     estagio = "aba Mat. Desinstalados"
     Set wsUlt = wb.Worksheets(wb.Worksheets.Count)
-    Call CriarAbaStatus(wb, wsUlt, "Mat. Desinstalados", "MATERIAIS DESINSTALADOS", _
+    Call CriarAbaStatus(wb, wsUlt, "Mat. Desinstalados", STATUS_DESINSTALADO, _
                         arrLayer, arrAci, arrCor, arrTexto, arrFam, arrStatus, _
                         arrX, arrY, arrH, arrNomeMaterial, n, _
                         uTipo, uBloco, uStat, uNum, uDesc, uBase, uDist, uMet, _
@@ -4458,23 +4716,23 @@ ProxPoste:
 
     estagio = "aba Mat. Existentes"
     Set wsUlt = wb.Worksheets(wb.Worksheets.Count)
-    Call CriarAbaStatus(wb, wsUlt, "Mat. Existentes", "MATERIAIS EXISTENTES", _
+    Call CriarAbaStatus(wb, wsUlt, "Mat. Existentes", STATUS_EXISTENTE, _
                         arrLayer, arrAci, arrCor, arrTexto, arrFam, arrStatus, _
                         arrX, arrY, arrH, arrNomeMaterial, n, _
                         uTipo, uBloco, uStat, uNum, uDesc, uBase, uDist, uMet, _
                         uX, uY, nU)
 
     ' =====================================================================
-    '  ABAS AUXILIARES (mantidas mas OCULTAS): Alertas, Vinculos, BOM
-    '  So fazem sentido com TEXTOS -> puladas quando n = 0 (so blocos).
+    '  PENDENCIAS VISIVEIS + ABAS TECNICAS OCULTAS
     ' =====================================================================
     Dim arrPosteProximo() As String
     Dim arrDistPoste() As Double
-    If n > 0 Then
-        estagio = "aba Alertas"
-        Call CriarAbaAlertas(wb, arrLayer, arrStatus, arrFam, arrTexto, arrNomeBase, _
-                             arrConfianca, arrX, arrY, n)
+    estagio = "aba Pendencias"
+    Call CriarAbaPendencias(wb, arrLayer, arrStatus, arrFam, arrTexto, arrNomeBase, _
+                            arrConfianca, arrX, arrY, n, rejeitadoNome, _
+                            rejeitadoMotivo, rejeitadoX, rejeitadoY, postesIgnorados)
 
+    If n > 0 Then
         ReDim arrPosteProximo(1 To n)
         ReDim arrDistPoste(1 To n)
         Call CalcularProximidade(arrFam, arrNomeBase, arrX, arrY, n, _
@@ -4496,13 +4754,16 @@ ProxPoste:
     Call CriarAbaBlocosPorFamilia(wb, uTipo, uFam, uBloco, uStat, uNum, _
             uDesc, uBase, uDist, uMet, uX, uY, nU, nB, nC, nO)
 
+    estagio = "aba Log"
+    Call CriarAbaLog(wb, dwgName, outPath, inicioExecucao, n, nB, _
+                     postesIgnorados, nC, nO, nP, nU)
+
     ' =====================================================================
     '  OCULTA as abas auxiliares (mantem, mas escondidas)
     ' =====================================================================
     On Error Resume Next
-    wb.Worksheets("Alertas").Visible = 0      ' xlSheetHidden
-    wb.Worksheets("Vinculos").Visible = 0
-    wb.Worksheets("Quantitativo (BOM)").Visible = 0
+    wb.Worksheets("Vinculos").Visible = XL_PLANILHA_OCULTA
+    wb.Worksheets("Quantitativo (BOM)").Visible = XL_PLANILHA_OCULTA
     On Error GoTo TratarErro
 
     ' =====================================================================
@@ -4520,7 +4781,7 @@ ProxPoste:
     ' Ativa a primeira aba ("Blocos") e salva
     estagio = "ativando aba e salvando arquivo"
     wb.Worksheets(1).Activate
-    wb.SaveAs outPath, 51  ' xlOpenXMLWorkbook
+    wb.SaveAs outPath, FORMATO_XLSX
     wb.Close False
     xl.Quit
     Set ws2 = Nothing
@@ -4528,7 +4789,7 @@ ProxPoste:
     Set wb  = Nothing
     Set xl  = Nothing
 
-    MostrarAnimacaoVelocidade n, nB, nC, nO, nP, outPath
+    MostrarAnimacaoVelocidade n, nB, postesIgnorados, nC, nO, nP, outPath
     Exit Sub
 
 TratarErro:
@@ -4537,6 +4798,7 @@ TratarErro:
     errDesc = Err.Description
     errSrc = Err.Source
     On Error Resume Next
+    If Not wb Is Nothing Then wb.Close False
     If Not xl Is Nothing Then
         xl.DisplayAlerts = False
         xl.Quit
@@ -4547,7 +4809,7 @@ TratarErro:
            "  Descricao: " & errDesc & vbCrLf & _
            "  Origem: " & errSrc & vbCrLf & _
            "  Estagio: " & estagio, _
-           vbCritical, "Erro"
+           vbCritical, APP_NOME & " v" & APP_VERSAO
 End Sub
 
 ' =============================================================================
@@ -4557,6 +4819,7 @@ End Sub
 '  Requer Windows com mshta.exe (presente em todas versoes Win7+).
 ' =============================================================================
 Private Sub MostrarAnimacaoVelocidade(ByVal nTxt As Long, ByVal nPos As Long, _
+                                       ByVal nPosIgn As Long, _
                                        ByVal nCab As Long, ByVal nOut As Long, _
                                        ByVal nPia As Long, _
                                        ByVal caminhoArq As String)
@@ -4568,14 +4831,14 @@ Private Sub MostrarAnimacaoVelocidade(ByVal nTxt As Long, ByVal nPos As Long, _
     ' --- Monta o HTML/HTA em partes ---
     Dim H As String
     H = "<!DOCTYPE html><html><head><meta charset='UTF-8'>"
-    H = H & "<title>ZWCAD - Exportar Textos v3.4</title>"
+    H = H & "<title>" & APP_NOME & " v" & APP_VERSAO & "</title>"
     H = H & "<HTA:APPLICATION APPLICATIONNAME='ZWCADExport' "
     H = H & "MAXIMIZEBUTTON='no' MINIMIZEBUTTON='no' SCROLL='no' "
     H = H & "SINGLEINSTANCE='yes' BORDER='thin' INNERBORDER='no' SHOWINTASKBAR='yes'/>"
     H = H & "<script>window.onload=function(){"
-    H = H & "window.resizeTo(460,500);"
+    H = H & "window.resizeTo(460,540);"
     H = H & "window.moveTo(Math.round((screen.availWidth-460)/2),"
-    H = H & "Math.round((screen.availHeight-500)/2));};</script>"
+    H = H & "Math.round((screen.availHeight-540)/2));};</script>"
     H = H & "<style>"
     H = H & "*{box-sizing:border-box;margin:0;padding:0;"
     H = H & "font-family:'Segoe UI',Arial,sans-serif}"
@@ -4603,12 +4866,14 @@ Private Sub MostrarAnimacaoVelocidade(ByVal nTxt As Long, ByVal nPos As Long, _
     H = H & "<div class='wrap'>"
     H = H & "<div class='check'>&#10004;</div>"
     H = H & "<div class='ttl'>Exportacao concluida</div>"
-    H = H & "<div class='sub'>ZWCAD &mdash; Exportar Textos v3.4</div>"
+    H = H & "<div class='sub'>" & APP_NOME & " &mdash; v" & APP_VERSAO & "</div>"
     H = H & "<div class='grid'>"
     H = H & "<div class='row'><span class='k'>Total de textos</span>"
     H = H & "<span class='v'>" & nTxt & "</span></div>"
     H = H & "<div class='row'><span class='k'>Blocos de poste</span>"
     H = H & "<span class='v'>" & nPos & "</span></div>"
+    H = H & "<div class='row'><span class='k'>Postes para revisar</span>"
+    H = H & "<span class='v'>" & nPosIgn & "</span></div>"
     H = H & "<div class='row'><span class='k'>Blocos de cabo</span>"
     H = H & "<span class='v'>" & nCab & "</span></div>"
     H = H & "<div class='row'><span class='k'>Outros materiais</span>"
@@ -4616,8 +4881,8 @@ Private Sub MostrarAnimacaoVelocidade(ByVal nTxt As Long, ByVal nPos As Long, _
     H = H & "<div class='row'><span class='k'>Blocos padrao Piaui</span>"
     H = H & "<span class='v'>" & nPia & "</span></div>"
     H = H & "</div>"
-    H = H & "<div class='note'>Filtro aplicado: blocos com ambos "
-    H = H & "Existente e Projetado (<i>'Exist: | Proj:'</i>) foram excluidos.</div>"
+    H = H & "<div class='note'>Consulte a aba Pendencias para revisar "
+    H = H & "classificacoes e blocos que nao entraram no quantitativo.</div>"
     H = H & "<div class='path'>" & Replace(caminhoArq, "\", "&#92;") & "</div>"
     H = H & "</div>"
     H = H & "<div class='bar'>"
@@ -4640,8 +4905,9 @@ FallbackMsgV:
     MsgBox "Exportacao concluida com sucesso!" & vbCrLf & vbCrLf & _
            "Total de textos: " & nTxt & vbCrLf & _
            "Blocos de poste: " & nPos & "   |   Blocos de cabo: " & nCab & vbCrLf & _
+           "Postes para revisar: " & nPosIgn & vbCrLf & _
            "Outros materiais (trafo, chave, etc.): " & nOut & vbCrLf & _
            "Blocos padrao Piaui: " & nPia & vbCrLf & vbCrLf & _
            "Arquivo salvo em:" & vbCrLf & caminhoArq, _
-           vbInformation, "ZWCAD - Exportar Textos v3.4"
+           vbInformation, APP_NOME & " v" & APP_VERSAO
 End Sub

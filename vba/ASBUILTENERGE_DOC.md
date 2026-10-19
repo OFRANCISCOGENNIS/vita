@@ -1,240 +1,228 @@
-# ASBUILTENERGE (ExportTextos.bas) — Extração de As-Built de Desenhos CAD
+# ASBUILTENERGE — Documentação do módulo VBA (v4.0)
+
+> **Arquivo principal e editável:** `vba/ASBUILTENERGE.bas` (cabeçalho interno `ASBUILTENERGE.bas v4.0`).
+> Este MD é a **fonte de verdade** da documentação do módulo.
+>
+> **Fluxo de trabalho obrigatório para qualquer ajuste:**
+> 1. **Ler este MD** antes de alterar o `.bas`.
+> 2. Fazer o ajuste no `vba/ASBUILTENERGE.bas`.
+> 3. **Atualizar este MD** refletindo o que mudou.
 
 Módulo VBA para **ZWCAD 2024+** (compatível AutoCAD) que varre um desenho CAD de as-built de rede elétrica de distribuição e gera uma planilha Excel estruturada com o quantitativo de materiais (postes, cabos, chaves, trafos, aterramentos, etc.), classificados por status (instalado / desinstalado / existente) e família.
 
-## Arquivo fonte
+## Identidade e constantes (v4.0)
 
-`vba/ASBUILTENERGE.bas` — cabeçalho interno `ExportTextos.bas v3.2`, 4.481 linhas.
+Metadados e status críticos agora ficam centralizados em constantes no topo do módulo:
 
-> Observação: o nome interno do módulo (`ExportTextos`) difere do nome do arquivo enviado (`ASBUILTENERGE`). Ambos se referem ao mesmo código-fonte.
+| Constante | Valor | Uso |
+|---|---|---|
+| `APP_NOME` | `"ASBUILT ENERGE"` | Nome exibido na aba Log e na tela final |
+| `APP_VERSAO` | `"4.0.0"` | Versão registrada na aba Log |
+| `FORMATO_XLSX` | `51` | `xlOpenXMLWorkbook` no `SaveAs` |
+| `XL_CENTRO` | `-4108` | `xlCenter` (alinhamento) |
+| `XL_PLANILHA_OCULTA` | `0` | `xlSheetHidden` (abas auxiliares) |
+| `STATUS_INSTALADO` | `"MATERIAIS INSTALADOS"` | Status padrão |
+| `STATUS_DESINSTALADO` | `"MATERIAIS DESINSTALADOS"` | Status padrão |
+| `STATUS_EXISTENTE` | `"MATERIAIS EXISTENTES"` | Status padrão |
+| `STATUS_NAO_CLASSIFICADO` | `"NAO CLASSIFICADO"` | Status padrão |
+| `DIAGNOSTICO_LAYERS` | `False` | Diagnóstico: MsgBox com os 1os 15 layers |
+
+## Novidades da v4.0 (rastreabilidade, pendências e log)
+
+- **Rastreabilidade na aba `Textos`**: duas colunas novas — **Fonte da Classificação** (col. 15) e **Revisão** (col. 16).
+- **Pendências visíveis**: a antiga aba oculta `Alertas` virou a aba **visível** `Pendencias` (`CriarAbaPendencias`), que inclusive lista os **blocos de poste ignorados pelo filtro** (seção F).
+- **Aba `Log`** (`CriarAbaLog`): registra aplicação, versão, DWG, início/fim, duração (segundos), contagens por fonte e o caminho do arquivo gerado.
+- **Quantidade marcada em texto**: `ExtrairQuantidadeMarcada`/`QuantidadeDoTexto` leem marcadores `Q=`, `QT:`, `QTD =` no texto (sem confundir com `Q2=` de regras específicas).
+- **Ordenação da aba Textos** corrigida para abranger todas as 16 colunas.
 
 ## Como usar
 
-1. Abrir o desenho `.dwg` do as-built no ZWCAD (ou AutoCAD).
+1. Abrir o `.dwg` do as-built no ZWCAD (ou AutoCAD).
 2. `Alt+F11` (VBA IDE) → Importar `ASBUILTENERGE.bas` como módulo.
 3. Rodar a macro `ExportarTextosParaExcel` (via `Alt+F8` ou `-VBARUN`).
-4. O Excel é aberto em segundo plano (invisível), processado, salvo e fechado automaticamente. O resultado é salvo em `%USERPROFILE%\Downloads\<NomeDoDesenho>_TEXTOS.xlsx` (ou com timestamp se já existir).
-5. Ao final, uma tela HTA (`mshta.exe`) exibe um resumo da exportação (contagens) — ver `MostrarAnimacaoVelocidade`.
+4. O Excel é aberto em segundo plano (invisível), processado, salvo e fechado. O resultado vai para `%USERPROFILE%\Downloads\<NomeDoDesenho>_TEXTOS.xlsx` (ou com timestamp se já existir).
+5. Ao final, uma tela HTA (`mshta.exe`) mostra um resumo da exportação.
 
-## Fluxo de execução (`ExportarTextosParaExcel`, linha 3521)
+## Fluxo de execução (`ExportarTextosParaExcel`)
 
 ```
+inicioExecucao = Now
 Monta mapa Layer → Cor ACI (CorLayerSegura)
   → Itera ThisDrawing.Blocks (ModelSpace/Layout/XRef) procurando TEXT/MTEXT
       → Classifica cada texto: Familia + Score de confiança (ClassificarComConfianca)
-      → Extrai Status (StatusPorLayer), Nome Base (poste), Cod. Estrutura (Mid(txt,10,7))
+      → Status (StatusPorLayer), Nome Base (poste), Cod. Estrutura (Mid(txt,10,7))
+      → Fonte da Classificação (FonteClassificacaoTexto) + Revisão (RevisaoTexto)
   → Cria Workbook Excel (Excel.Application invisível)
-  → Aba "Textos"      — 1 linha por TEXT/MTEXT lido, com todas as colunas calculadas
-  → Aba "Resumo"       — agregações (por família, status, altura de poste, cabos, outros) + gráficos
-  → LerBlocosComAtributos   — INSERTs de postes com atributos NUMERO/EXISTENTE/PROJETADO/...
-  → LerBlocosCabo           — INSERTs RDARA1110/1111 (cabos) com atributos TCABO/DISTANCIA/...
-  → LerBlocosOutros         — INSERTs genéricos (trafo, chave, religador, para-raio, mufla...)
-  → LerBlocosPiaui          — blocos-símbolo sem atributos (padrão Piauí: PP, EP, CB_AT...)
-  → Unifica tudo em arrays u* (uTipo/uFam/uBloco/uStat/uDesc/uBase/uDist/uMet/uX/uY)
-  → CriarAbaStatus × 3      — "Mat. Instalados" / "Mat. Desinstalados" / "Mat. Existentes"
-  → CriarAbaAlertas         — (só se houver textos) inconsistências/baixa confiança
-  → CalcularProximidade + CriarAbaVinculos   — vincula item → poste mais próximo (X,Y)
-  → CriarAbaBOM             — quantitativo agrupado por Status/Família/Descrição
-  → CriarAbaBlocosPorFamilia ("Blocos")      — aba unificada organizada em seções por família
-  → Oculta abas auxiliares (Alertas, Vinculos, Quantitativo (BOM))
-  → Move "Blocos" para 1ª posição
-  → wb.SaveAs (.xlsx) + wb.Close + xl.Quit
-  → MostrarAnimacaoVelocidade   — tela HTA de resultado (mshta.exe)
+  → Aba "Textos"  — 1 linha por TEXT/MTEXT, 16 colunas
+  → Aba "Resumo"  — agregações + 2 gráficos (barras, pizza)
+  → LerBlocosComAtributos  (postes/estruturas; _POSTE/RDARA034/RDARA1100 = DUPLO;
+                            registra rejeitadoNome/Motivo/X/Y + postesIgnorados)
+  → LerBlocosCabo          (RDARA1110/1111 — cabos)
+  → LerBlocosOutros        (trafo, chave, religador, para-raio, mufla, isolador…)
+  → LerBlocosPiaui         (blocos-símbolo sem atributos — padrão Piauí)
+  → Unifica em arrays u* (uTipo/uFam/uBloco/uStat/uDesc/uBase/uDist/uMet/uX/uY)
+  → CriarAbaStatus × 3     — "Mat. Instalados/Desinstalados/Existentes"
+                             (resumo agrupado "8 D11600": Item/Qtd/Material/
+                              Família/Descrição/Metros)
+  → CriarAbaPendencias     — VISÍVEL (confiança baixa, CLASSIFICAR, coord. dup.,
+                             status não classif., postes ignorados pelo filtro)
+  → CalcularProximidade + CriarAbaVinculos   (oculta)
+  → CriarAbaBOM            — Quantitativo (BOM) (oculta)
+  → CriarAbaBlocosPorFamilia ("Blocos")
+  → CriarAbaLog ("Log")    — metadados + contagens + duração + caminho
+  → Oculta Vinculos e Quantitativo (BOM); move "Blocos" para 1ª aba
+  → wb.SaveAs (.xlsx, FORMATO_XLSX) + Close + Quit
+  → MostrarAnimacaoVelocidade  (tela HTA de resultado)
 ```
 
-Tratamento de erro: `On Error GoTo TratarErro` captura `Err.Number/Description/Source` e a variável `estagio` (atualizada a cada etapa), mostrando um `MsgBox` com o estágio exato da falha. Não há fallback quando `n = 0` (nenhum TEXT/MTEXT) — o fluxo continua e gera as abas baseadas em blocos normalmente.
+Tratamento de erro: `On Error GoTo TratarErro` captura `Err.Number/Description/Source` + a variável `estagio` (atualizada a cada etapa), mostrando um `MsgBox` com o estágio exato da falha. Não há fallback quando `n = 0` (sem TEXT/MTEXT) — o fluxo continua e gera as abas baseadas em blocos.
 
 ## Abas geradas
 
-| Aba | Origem | Descrição |
-|-----|--------|-----------|
-| `Blocos` | `CriarAbaBlocosPorFamilia` | Todos os blocos (postes+cabos+outros+Piauí) organizados em seções por família — primeira aba |
-| `Textos` | fluxo principal | 1 linha por TEXT/MTEXT do desenho, com classificação completa (colunas 1-13 + coluna 14 "Nome do Material") |
-| `Resumo` | fluxo principal | Agregações por família/status/altura/cabo + 2 gráficos (barras, pizza) |
-| `Mat. Instalados` | `CriarAbaStatus` | Só o resumo agrupado (Item "8 D11600", Qtd, Material, Família/Tipo, Descrição, Metros) — status "MATERIAIS INSTALADOS" |
-| `Mat. Desinstalados` | `CriarAbaStatus` | Idem, para status "MATERIAIS DESINSTALADOS" |
-| `Mat. Existentes` | `CriarAbaStatus` | Idem, para status "MATERIAIS EXISTENTES" |
-| `Alertas` *(oculta)* | `CriarAbaAlertas` | Confiança baixa, família `CLASSIFICAR`, coordenadas duplicadas, status não classificado, postes com status conflitante |
-| `Vinculos` *(oculta)* | `CriarAbaVinculos` | Cada item vinculado ao poste mais próximo (proximidade X,Y) |
-| `Quantitativo (BOM)` *(oculta)* | `CriarAbaBOM` | Quantitativo agrupado por Status × Família × Descrição (metros para cabos, contagem para o resto) |
+| Aba | Visível? | Origem | Descrição |
+|-----|----------|--------|-----------|
+| `Blocos` | sim (1ª) | `CriarAbaBlocosPorFamilia` | Todos os blocos (postes+cabos+outros+Piauí) em seções por família |
+| `Textos` | sim | fluxo principal | 1 linha por TEXT/MTEXT; 16 colunas (ver abaixo) |
+| `Resumo` | sim | fluxo principal | Agregações por família/status/altura/cabo + gráficos |
+| `Mat. Instalados` | sim | `CriarAbaStatus` | Resumo agrupado `"8 D11600"` — status INSTALADOS |
+| `Mat. Desinstalados` | sim | `CriarAbaStatus` | Idem — status DESINSTALADOS |
+| `Mat. Existentes` | sim | `CriarAbaStatus` | Idem — status EXISTENTES |
+| `Pendencias` | sim | `CriarAbaPendencias` | Confiança baixa, CLASSIFICAR, coords duplicadas, não classificados, **postes ignorados pelo filtro** |
+| `Vinculos` | **oculta** | `CriarAbaVinculos` | Cada item vinculado ao poste mais próximo (X,Y) |
+| `Quantitativo (BOM)` | **oculta** | `CriarAbaBOM` | Quantitativo por Status × Família × Descrição |
+| `Log` | sim | `CriarAbaLog` | Metadados da execução (app, versão, DWG, tempos, contagens, saída) |
+
+> A aba `Alertas` da v3 **não existe mais** — foi substituída pela `Pendencias` (visível). As abas `Postes (Blocos)`, `Cabos (Blocos)` e a `Blocos` unificada (`CriarAbaBlocos`/`CriarAbaCabos`/`CriarAbaBlocosUnificada`) existem como rotinas mas o fluxo principal usa `CriarAbaBlocosPorFamilia`.
+
+### Colunas da aba `Textos` (16)
+
+| # | Coluna | Origem |
+|---|--------|--------|
+| 1 | Layer | `ent.Layer` |
+| 2 | Status | `StatusPorLayer` |
+| 3 | Cor ACI | `CorEntidadeSegura`/layer |
+| 4 | Nome da Cor | `NomeCorACI` |
+| 5 | Conteudo do Texto | TEXT/MTEXT (MText sem códigos) |
+| 6 | Familia | `ClassificarComConfianca` |
+| 7 | Nome Base (Poste) | `ExtrairNomeBasePoste` |
+| 8 | Confianca | `NivelConfianca` (Alta/Media/Baixa) |
+| 9 | Score | 0–100 |
+| 10–11 | X, Y | ponto de inserção |
+| 12 | Altura Texto | `.Height` |
+| 13 | Cod. Estrutura | `Mid(texto,10,7)` (destaque amarelo) |
+| 14 | Nome do Material | `ExtrairNomeMaterial` (destaque amarelo) |
+| 15 | **Fonte da Classificacao** | `FonteClassificacaoTexto` (destaque) |
+| 16 | **Revisao** | `RevisaoTexto` (OK / REVISAR) |
+
+**Fonte da Classificação** (`FonteClassificacaoTexto`) retorna, por prioridade: `TEXTO VAZIO` → `HASHTAG + CONTEUDO` → `REGRA DO LAYER RAMAL` → `CODIGO SAP` → `CONTEUDO + LAYER` → `SEM REGRA SUFICIENTE` → `CONTEUDO`.
+
+**Revisão** (`RevisaoTexto`) = `REVISAR` quando status = NÃO CLASSIFICADO, ou família = `CLASSIFICAR`/`-`, ou confiança = `Baixa`; senão `OK`.
 
 ## Estrutura de dados em memória
 
-### Arrays paralelos — textos (TEXT/MTEXT do desenho)
-
-Populados no laço principal de `ExportarTextosParaExcel`, redimensionados dinamicamente (capacidade dobra ao estourar):
+### Arrays paralelos — textos (TEXT/MTEXT)
 
 ```vba
-arrLayer()    As String   ' nome do layer
-arrAci()      As Integer  ' cor ACI resolvida (entidade > layer > fallback 7)
-arrCor()      As String   ' nome amigável da cor (NomeCorACI)
-arrTexto()    As String   ' conteúdo do TEXT/MTEXT (MText sem códigos de formatação)
-arrFam()      As String   ' família classificada (ClassificarComConfianca)
-arrStatus()   As String   ' status pelo layer (StatusPorLayer)
-arrNomeBase() As String   ' nome base extraído (ExtrairNomeBasePoste)
-arrScore()    As Integer  ' score de confiança 0..100
-arrConfianca() As String  ' "Alta" / "Media" / "Baixa" (NivelConfianca)
-arrX(), arrY() As Double  ' ponto de inserção
-arrH()        As Double   ' altura do texto
-arrCodEst()   As String   ' Mid(texto, 10, 7) — código de estrutura fixo por posição
-arrNomeMaterial() As String ' NOME DO MATERIAL (planilha RECLASSIFICAR MATERIAL — ver abaixo)
+arrLayer(), arrAci(), arrCor(), arrTexto(), arrFam(), arrStatus()
+arrNomeBase(), arrScore(), arrConfianca(), arrX(), arrY(), arrH()
+arrCodEst()         ' Mid(texto,10,7)
+arrNomeMaterial()   ' Nome do Material
+' (col. 15/16 são calculadas na escrita via FonteClassificacaoTexto/RevisaoTexto)
 ```
 
 ### Arrays paralelos — blocos unificados (u*)
 
-Montados a partir de 4 fontes (postes, cabos, outros, Piauí) e usados por `CriarAbaStatus`, `CriarAbaBlocosPorFamilia`:
-
 ```vba
-uTipo(), uFam()   As String   ' tipo/família final (pode ser reclassificado por descrição)
-uBloco()          As String   ' nome do bloco (INSERT) no CAD
-uStat()           As String   ' status final (MATERIAIS INSTALADOS/DESINSTALADOS/EXISTENTES)
-uNum()            As String   ' atributo NUMERO (só postes)
-uDesc()           As String   ' descrição textual (atributo relevante ou concatenação)
-uBase()           As String   ' nome base / família do cabo
-uDist()           As String   ' distância textual (ex.: "485,5m")
-uMet()            As Double   ' metros (só cabos)
-uX(), uY()        As Double   ' coordenadas
+uTipo(), uFam(), uBloco(), uStat(), uNum(), uDesc(), uBase(),
+uDist(), uMet(), uX(), uY()
 ```
 
-### Tipos de fonte de bloco
+### Rastreio de rejeições (novo na v4.0)
 
-| Função de leitura | Blocos alvo | Observações |
+Blocos de poste que não passam no filtro Existente/Projetado são guardados para a aba `Pendencias`:
+
+```vba
+rejeitadoNome(), rejeitadoMotivo(), rejeitadoX(), rejeitadoY()
+postesIgnorados   ' contagem
+```
+
+### Fontes de leitura de blocos
+
+| Função | Blocos alvo | Observações |
 |---|---|---|
-| `LerBlocosComAtributos` | `RDARA034`, `RDARA1100`, `_POSTE`, demais `RDARA*` com atributo NUMERO+EXISTENTE/PROJETADO | Postes/estruturas. `RDARA034`/`RDARA1100`/`_POSTE` são "DUPLO": geram 2 linhas (existente + projetado) |
-| `LerBlocosCabo` | `RDARA1110`/`RDARA1111` (ou nome contendo "CABO") | Cabos com atributos `TCABO`, `DISTANCIA`, `=DISTANC` (calculada), `AM_AI_FA`, `AM_AI_NE`, `DIST_OB` |
-| `LerBlocosOutros` | Demais `INSERT` com atributos, que não são poste nem cabo | Trafo, chave fusível/faca, para-raio, religador, regulador, mufla, aterramento, etc. Classificados via `FamiliaDeBloco` |
-| `LerBlocosPiaui` | Blocos-símbolo **sem atributos**, identificados só pelo **nome** (padrão Piauí/PLPT) | `PP`→poste instalado, `EP/PE/PEXIS`→poste existente, `CB_AT*/CB_BT*`→cabo instalado, `CHAVEP`→chave instalada, `CHFE`→chave existente, `STRAFOE`/`T7-E`→trafo existente |
+| `LerBlocosComAtributos` | `RDARA034`, `RDARA1100`, `_POSTE`, demais `RDARA*` com NUMERO+EXISTENTE/PROJETADO | `RDARA034`/`RDARA1100`/`_POSTE` são **DUPLO** (2 linhas: existente + projetado) |
+| `LerBlocosCabo` | `RDARA1110`/`RDARA1111` (ou nome com "CABO") | Atributos `TCABO`, `DISTANCIA`, `=DISTANC`, `AM_AI_FA`, `AM_AI_NE`, `DIST_OB` |
+| `LerBlocosOutros` | demais `INSERT` com atributos (não poste nem cabo) | Trafo, chave fusível/faca, para-raio, religador, regulador, mufla, isolador — via `FamiliaDeBloco` |
+| `LerBlocosPiaui` | blocos-símbolo **sem atributos** (padrão Piauí/PLPT) | `PP`→poste inst.; `EP/PE/PEXIS`→poste exist.; `CB_AT*/CB_BT*`→cabo inst.; `CHAVEP`→chave inst.; `CHFE`→chave exist.; `STRAFOE`/`T7-E`→trafo exist. |
 
 ## Regras de negócio principais
 
 ### Status por LAYER (`StatusPorLayer`)
-Fallback quando o bloco não define status.
-
 | Palavra-chave no layer | Status |
 |---|---|
-| `RAMAIS_NO_MODEL` / `RAMAIS NO MODEL` | MATERIAIS INSTALADOS (regra explícita, prioridade máxima) |
-| `#INSTALADO` | MATERIAIS INSTALADOS |
-| `#RETIRADO` | MATERIAIS DESINSTALADOS |
-| `TEXTOS A IMPLANTAR` / `A IMPLANTAR` | MATERIAIS INSTALADOS |
-| `TEXTOS A REMOVER` / `A REMOVER` | MATERIAIS DESINSTALADOS |
-| `TEXTOS EXISTENTES` / `EXISTENTES` | MATERIAIS EXISTENTES |
-| (nenhuma) | NAO CLASSIFICADO |
+| `RAMAIS_NO_MODEL` | `MATERIAIS INSTALADOS` (prioridade máxima) |
+| `#INSTALADO` | `MATERIAIS INSTALADOS` |
+| `#RETIRADO` | `MATERIAIS DESINSTALADOS` |
+| `A IMPLANTAR` | `MATERIAIS INSTALADOS` |
+| `A REMOVER` | `MATERIAIS DESINSTALADOS` |
+| `EXISTENTES` | `MATERIAIS EXISTENTES` |
+| (nenhuma) | `NAO CLASSIFICADO` |
 
-### Status por NOME DO BLOCO (`StatusPorBloco`) — **prioridade sobre o layer**
-
+### Status por NOME DO BLOCO (`StatusPorBloco`) — prioridade sobre o layer
 | Bloco | Status |
 |---|---|
-| `RDARA034`, `RDARA1100` | `DUPLO` (existente=desinstalado quando ambos preenchidos ou hashtag; projetado=sempre instalado) |
-| `_POSTE` (atributos `PST_EXISTENTE` / `PST_INSTALAR`, `PST_ID`=Nº componente) | `DUPLO` (mesma lógica do `RDARA1100`): **Estrutura Existente** sozinha → `MATERIAIS EXISTENTES`; **Existente + a Instalar** → existente vira `MATERIAIS DESINSTALADOS`; **Estrutura a Instalar** → sempre `MATERIAIS INSTALADOS` |
-| `RDARA1110`, `RDARA1011`, `RDARA121` | MATERIAIS INSTALADOS |
-| `RDARA1111`, `RDARA120` | MATERIAIS DESINSTALADOS |
-| `RDARA164`, `RDARA511`, `RDARA513`, `RDARA514`, `RDARA532`, `RDARA537`, `RDARA547` | MATERIAIS EXISTENTES |
-| `RDARA1002`, `RDARA1018`, `RDARA1023`, `RDARA1125`, `RDARA175`, `RDARA512` | MATERIAIS INSTALADOS (reclassificação — planilha "RECLASSIFICAR MATERIAL") |
+| `RDARA034`, `RDARA1100`, `_POSTE` | `DUPLO` |
+| `RDARA1110`, `RDARA1011`, `RDARA121` | INSTALADOS |
+| `RDARA1111`, `RDARA120` | DESINSTALADOS |
+| `RDARA164`, `RDARA511`, `RDARA513`, `RDARA514`, `RDARA532`, `RDARA537`, `RDARA547` | EXISTENTES |
+| `RDARA1002`, `RDARA1018`, `RDARA1023`, `RDARA1125`, `RDARA175`, `RDARA512` | INSTALADOS (reclassificação) |
 
-`BlocoCasa` faz o match seguro: aceita nome exato ou sufixo de versão (`RDARA120V3`), mas nunca casa com outro dígito (`RDARA120` ≠ `RDARA1200`).
+`BlocoCasa` casa nome exato ou sufixo de versão (`RDARA120V3`), nunca com outro dígito (`RDARA120` ≠ `RDARA1200`).
 
-**Regra do `#`**: qualquer atributo/texto começando com `#` força status **MATERIAIS DESINSTALADOS**, sobrepondo tudo (`ComecaComHashtag` / `temHashPoste`).
+**Regra do `#`:** texto/atributo iniciando com `#` força `MATERIAIS DESINSTALADOS` (`ComecaComHashtag`).
 
-### Classificação de família — texto livre (`ClassificarFamilia` + `ClassificarComConfianca`)
+#### Bloco `_POSTE` (DUPLO)
+Atributos `PST_EXISTENTE` / `PST_INSTALAR` (e `PST_ID` = Nº componente): **Estrutura Existente** sozinha → EXISTENTES; **Existente + a Instalar** → existente vira DESINSTALADOS; **Estrutura a Instalar** → sempre INSTALADOS.
 
-Famílias reconhecidas por palavra-chave no conteúdo do TEXT/MTEXT: `ATERRAMENTO` (`ATERR`, `FRANKLIN` — haste captora —, `ATER"`/`ATER "` — abreviação com aspas em seguida, para não colidir com `MATERIAL=...` —, ou texto que **começa** com `HAST` após a quantidade — ex. `"1 HAST PR RAIO"`, ver `ComecaComPalavra` —), `MUFLA`, `PARA RAIO BT/MT` (`PR RAIO`, `PR-`, `PARA RAIO`, `PARARAIO`), `ELO`, `CH FUS` (`CH FUS`, `CH. FUS`, `CORTA CIRCUITO` — sinônimo —, ou combinação `kV`+`kA` na descrição técnica), `CH FACA`, `TRAFO`, `RAMAL` (padrão `mm²` **ou** padrão `<qtd><CODIGO>(<metros>+...)` — ver abaixo), `COND NU` (padrão `#CAA` ou apenas `CAA` em qualquer posição, ex. `"3#4(4)CAA"`), `POSTE DT` (prefixo `DT`), `POSTE CIRCULAR` (prefixo `C`), `POSTE DE MADEIRA` (prefixo `M`, ex. `M9`, `M11`), `POSTE FIBRA` (prefixo `V`, ex. `V9600`, `V11300`), `ESTRUTURA MT` (regex `[TNU]\d`). Sem match → `CLASSIFICAR`.
+### Classificação de família — texto (`ClassificarFamilia` / `ClassificarComConfianca`)
+Famílias por palavra-chave: `ATERRAMENTO` (`ATERR`, `FRANKLIN`, `ATER"`/`ATER "`, ou texto começando com `HAST` após a quantidade — `ComecaComPalavra`), `MUFLA`, `PARA RAIO BT/MT` (`PR RAIO`/`PR-`/`PARA RAIO`/`PARARAIO`), `ELO`, `CH FUS` (`CH FUS`/`CH. FUS`/`CORTA CIRCUITO`/`kV`+`kA`), `CH FACA`, `TRAFO`, `RAMAL` (`mm²` ou `<qtd><CÓDIGO>(<metros>+...)`), `COND NU` (`CAA`), `POSTE DT` (`DT`), `POSTE CIRCULAR` (`C`+dígito+`/`), `POSTE DE MADEIRA` (`M`+dígito), `POSTE FIBRA` (`V`+dígito), `ESTRUTURA MT` (`[TNU]\d`). Sem match → `CLASSIFICAR`.
 
-Antes de qualquer comparação, `ClassificarFamilia`/`ExtrairNomeBasePoste` chamam `RemoverEnvoltorioHashtag`, que desembrulha textos de material desinstalado no formato `#(...)` (ex.: `"#(M9-S203-EPP)"` → `"M9-S203-EPP"`) para que as regras de prefixo continuem funcionando — o `#` em si já é tratado à parte para o STATUS.
+Antes das comparações, remove-se o envoltório `#(...)` via `RemoverEnvoltorioHashtag`.
 
-**Cuidado ao editar a regra `HAST`**: um texto que só *contém* "HAST" no meio (ex.: `"3 PR RAIO MT-1 HAST PR"`) continua caindo em `PARA RAIO MT` — só textos que **começam** com "HAST" (após a quantidade numérica) viram `ATERRAMENTO`. Isso resolve a ambiguidade entre "haste de aterramento" (item principal) e "para-raio com haste" (haste é só um acessório do item).
+### Código SAP de estrutura (prioridade) — `EhCodigoEstruturaSAP` + `FamiliaPosteDoPrefixo`
+`Mid(texto,10,7)` só é usado quando o texto tem o formato `<8 dígitos><separador>...` (código SAP, ex.: `66046515-D11600-N3-PR-S1I`). Quando o código extraído começa por prefixo de poste reconhecido (D→DT, V→FIBRA, C→CIRCULAR, M→MADEIRA), **essa família tem prioridade** sobre palavras-chave (anotações acessórias como `-PR-`/`-TR-` não sobrepõem o material principal). `FamiliaPosteDoPrefixo` retorna `""` para prefixos não-poste (N/S/T…), que **não** forçam POSTE.
 
-Score de confiança (0-100, ver `ClassificarComConfianca`): soma pontos por padrão de conteúdo (sinais fortes = 40-50 pts: `ATERR`, `MUFLA`, `PARA RAIO`, `CH.FUS`, `CH.FACA`, `KVA`, `#CAA`, `ELO`, padrão RAMAL com parênteses; sinais médios = 10-30 pts) + reforço/correção pelo nome do **layer** (`FamiliaPorLayer`, ±25-30 pts, agora com dicas para `MADEIRA`/`FIBRA` também). Nível: `>=70` Alta, `45..69` Media, `<45` Baixa (`NivelConfianca`).
+### Quantidade embutida em blocos / textos
+- Para famílias **sem metragem real** (tudo exceto `CABO`/`RAMAL`/`COND NU`/`COND ISOLADO` — `EhFamiliaComMetros`), o campo `uMet`/`bMet` carrega uma **quantidade** embutida:
+  - **ISOLADOR**: nº no início da descrição (`ExtrairQuantidadeInicial`) — `"3 ISOL. SUSP."` → 3.
+  - **CH FUSIVEL**: valor de `Q2=` na descrição pipe-delimitada (`ExtrairValorChaveNumerico`).
+  - demais: 1 por bloco.
+- Para **textos** (v4.0): `QuantidadeDoTexto`/`ExtrairQuantidadeMarcada` leem marcadores `Q=`/`QT:`/`QTD =`; sem marcador, 1 por texto.
+- No resumo (`CriarAbaStatus`), a coluna **Qtd** soma essas quantidades; para famílias com metragem real, a metragem vai em **Metros (total)**.
 
-#### RAMAL com metragem entre parênteses (`EhPadraoRamalMetros` / `ExtrairCodigoRamal` / `SomarMetrosRamal`)
-
-Padrão reconhecido: `<quantidade opcional><CODIGO letras+dígitos>(<trecho1>+<trecho2>+...)`, ex.: `"7T10(30m+18m+25m+30m+26m+10m+10)"` ou `"4T10(12m+11m+15m+14m)-2Q10(20m+18m)"` (pode haver múltiplos grupos separados por `-`; múltiplos grupos possíveis). Também aceito envolto em `"#(...)"` quando desinstalado.
-- `ExtrairCodigoRamal` retorna o **primeiro** código encontrado (ex.: `"T10"`) — usado como "NOME DO MATERIAL" mesmo quando há mais de um grupo no mesmo texto.
-- `SomarMetrosRamal` soma **todos** os valores numéricos dentro de **todos** os grupos de parênteses do texto (aceita valores com ou sem sufixo `"m"`).
-
-#### Postes por prefixo de código (`FamiliaPosteDoPrefixo`)
-
-Quando o poste é identificado via o "Cod. Estrutura" posicional (`Mid(texto,10,7)`, ver abaixo) em vez do início do texto, a família específica é deduzida pelo prefixo do código extraído:
-
-| Prefixo | Família |
-|---|---|
-| `D...` (ex.: `D11600`) | `POSTE DT` |
-| `V...` (ex.: `V9600`, `V11300`) | `POSTE FIBRA` |
-| `C...` | `POSTE CIRCULAR` |
-| `M...` (ex.: `M9`, `M11`) | `POSTE DE MADEIRA` |
-| outro (N, S, T, etc.) | `""` (vazio — **NÃO** é poste) |
-
-> **Importante:** prefixos não reconhecidos retornam string vazia (antes retornavam `POSTE` genérico). Isso evitava que qualquer código com letra+dígito na posição 10 (ex.: `N1`, `S021`, `T10`) fosse rotulado como POSTE por engano.
-
-#### Coluna "Nome do Material" (`ExtrairNomeMaterial`)
-
-Nova coluna na aba `Textos` (posição 14, após "Cod. Estrutura"), calculada a partir da família já determinada:
-- Famílias de poste (`POSTE DT/FIBRA/CIRCULAR/DE MADEIRA`) → código do poste (`D11600`, `V9600`, `M9`, etc.), priorizando o valor extraído via Cod. Estrutura quando presente.
-- `RAMAL` → código do material via `ExtrairCodigoRamal` (ex.: `T10`).
-- Demais famílias → vazio.
-
-Essa reclassificação foi levantada a partir da planilha `RECLASSIFICAR.xlsx` (abas `TEXTOS` e `BLOCO`), fornecida pelo usuário como base de exemplos reais para calibrar as regras acima.
-
-### Classificação de família — blocos com atributos (`FamiliaDeBloco`)
-Prioridade: (1) `FamiliaForcadaBloco` (mapa fixo por nome de bloco — ver tabela de status acima), (2) `EhBlocoCabo`/`EhBlocoPoste` (nome ou palavra "CABO"/"POSTE"), (3) palavra-chave em nome+atributos (RELIGADOR, REGULADOR, PARA RAIO, FUSIVEL, CH FACA, CHAVE, **ISOLADOR**, TRAFO, MUFLA, ATERR, MEDIDOR, CAPACITOR, RAMAL) → senão `OUTRO`.
-
-### Reclassificação na unificação (dentro de `ExportarTextosParaExcel`)
-Ao montar os arrays `u*`, a descrição do bloco de poste/outro é reavaliada:
-- contém `ATERR` → família `ATERRAMENTO`
-- começa com `MT`/`BT` → família `CABO` (mesmo vindo de um bloco "poste")
-- contém `ISOL` (ex.: `RDARA1100` com atributo "3 ISOL. SUSP.") → família `ISOLADOR`, com **quantidade extraída do número no início do texto** (`ExtrairQuantidadeInicial`) — "3 ISOL. SUSP." → 3 unidades
-- nome base com **1 dígito** (ex.: `CE1`, `N3`) → `ESTRUTURA` (não `POSTE`, que exige ≥2 dígitos — `ContaDigitosBase`)
-- caso contrário → `POSTE`
-- descrição começando com `#` → força `MATERIAIS DESINSTALADOS`
-
-### Quantidade embutida em blocos (campo "Metros" reaproveitado)
-Para famílias que **não** representam metragem real (tudo exceto `CABO`/`RAMAL`/`COND NU`/`COND ISOLADO` — ver `EhFamiliaComMetros`), o campo `uMet`/`bMet` é reaproveitado para carregar uma **quantidade** embutida no texto/atributo do bloco, em vez de comprimento:
-- **ISOLADOR**: quantidade = número no início da descrição (`ExtrairQuantidadeInicial`), ex. `"3 ISOL. SUSP."` → 3.
-- **CH FUSIVEL**: quantidade = valor da chave `Q2=` dentro da descrição pipe-delimitada (`ExtrairValorChaveNumerico`, ex.: `"ELO=15K | Q2=3 | MATERIAL=POL. | ..."` → 3 chaves fusíveis).
-- Demais famílias sem quantidade explícita: assume-se 1 unidade por bloco.
-
-Na aba de resumo (`CriarAbaStatus`), a coluna **Qtd** soma essa quantidade embutida (em vez de contar 1 por linha de bloco) para família sem metragem real; para `CABO`/`RAMAL`/`COND NU`/`COND ISOLADO`, a metragem real continua sendo somada na coluna **Metros (total)** como antes.
-
-### Extração de nome base de poste (`ExtrairNomeBasePoste` / `ExtrairNomeBasePosteBloco`)
-Extrai prefixo de letras (até 3) + primeiro bloco de dígitos + opcionalmente `/dígitos`. Ex.: `"C12/600 N3-N3D S021"` → `"C12/600"`; `"M11 N1 S024 EA1"` → `"M11"`; `"DT11/300 N1 S034"` → `"DT11/300"`.
-
-### Código de Estrutura fixo (com prioridade e validação de formato)
-Para cada TEXT/MTEXT, extrai `Mid(conteudo, 10, 7)` como "Cod. Estrutura", **mas somente quando o texto tem de fato o formato de código SAP** `"<8 dígitos><separador>..."` — validado por `EhCodigoEstruturaSAP` (ex.: `"66046515-D11600-N3-PR-S1I"` → `"D11600"`). Antes a extração era aplicada a *qualquer* texto com ≥10 caracteres, o que fazia muitos materiais não-poste virarem POSTE.
-
-Quando o código extraído começa por um **prefixo de poste reconhecido** (D/V/C/M), essa família de poste tem **prioridade** sobre a classificação por palavra-chave (score 90). Motivo: anotações acessórias como `-PR-` (para-raio no poste) ou `-TR-` (trafo no poste) não devem sobrepor o material principal — ex.: `"66046515-D11600-N3-PR-S1I"` é `POSTE DT`, não `PARA RAIO MT`. Prefixos não-poste (N, S, T…) não forçam nada e o texto mantém a classificação por palavra-chave (ou `CLASSIFICAR`).
+### Metros com decimal (`ExtrairMetrosCabo`)
+Em textos tipo `"716.0m"`, conta só os dígitos **antes do ponto** como metros (ignora a fração).
 
 ### Vínculo por proximidade (`CalcularProximidade`)
-Para cada item que não é poste, encontra o poste mais próximo (distância euclidiana em X,Y). Postes vinculam consigo mesmos (distância 0). Usado na aba `Vinculos`.
+Para cada item não-poste, encontra o poste mais próximo (distância euclidiana X,Y). Usado na aba `Vinculos` (oculta).
 
-## Cores e Layout
+## Aba `Log` (`CriarAbaLog` / `EscreverCampoLog`)
+Tabela Campo × Valor com: Aplicação, Versão, DWG, Início, Fim, Duração (segundos), Textos, Postes aceitos, Postes ignorados, Cabos, Outros materiais, Blocos Piauí, Registros unificados, Arquivo de saída.
 
-| Constante/uso | Cor | Contexto |
-|---|---|---|
-| Título "MATERIAIS INSTALADOS" | Verde `RGB(0,112,0)` | `CriarAbaStatus` |
-| Título "MATERIAIS DESINSTALADOS" | Vermelho `RGB(180,0,0)` | `CriarAbaStatus` |
-| Título "MATERIAIS EXISTENTES" | Azul `RGB(0,70,140)` | `CriarAbaStatus` |
-| Confiança Alta/Media/Baixa | Verde/Amarelo/Vermelho `RGB(198,239,206)` / `RGB(255,235,156)` / `RGB(255,199,206)` | Aba `Textos` |
-| Cabeçalhos de seção | Azul `RGB(68,114,196)` texto branco | `EscreverSecao` (aba Resumo) |
-| Título aba Alertas | Vermelho `RGB(192,0,0)` | `CriarAbaAlertas` |
-
-## Gráficos (aba Resumo)
-
-`AdicionarGraficos`: escreve dados auxiliares em colunas ocultas (P/Q para família, S/T para status) e cria:
-- Gráfico de barras horizontais (`xlBarClustered`) — Total por Família de Material.
-- Gráfico de pizza (`xlPie`) — Distribuição por Status, com rótulos de percentual.
-
-## Tela final (HTA)
-
-`MostrarAnimacaoVelocidade` (linha 4393) gera um `.hta` temporário e o abre via `mshta.exe` (requer Windows), exibindo um resumo simples e "flat" (sem animações) com as contagens da exportação (textos, postes, cabos, outros, Piauí, caminho do arquivo salvo).
-
-## Diferenças em relação ao módulo `AnaliseCKCP_OTIMIZADO.bas`
-
-Este módulo é um projeto **independente** do `AnaliseCKCP_OTIMIZADO.bas` (documentado no `CLAUDE.md` da raiz): opera sobre **desenhos CAD** (ZWCAD/AutoCAD, via automação de blocos/atributos/entidades de texto) para gerar o levantamento de as-built, enquanto o `AnaliseCKCP` opera sobre **planilhas de export do SAP (CKCP)** dentro do próprio Excel. Não compartilham dicionários, variáveis globais nem fluxo de execução.
+## Aba `Pendencias` (`CriarAbaPendencias`)
+Seções: **A)** confiança Baixa · **B)** família `CLASSIFICAR` · **C)** coordenadas duplicadas · **D)** status `NAO CLASSIFICADO` · **E)** mesmo nome base em status conflitantes · **F)** blocos de poste ignorados pelo filtro Existente/Projetado (usa `rejeitadoNome/Motivo/X/Y` + `postesIgnorados`).
 
 ## Pontos de atenção para futuras mudanças
+- **`Mid(texto,10,7)`** é posicional e frágil — só dispara quando `EhCodigoEstruturaSAP` confirma o formato `<8 dígitos><separador>`, e só força poste para prefixos D/V/C/M.
+- **`ReDim Preserve`**: todo array novo precisa entrar nos blocos de crescimento espelhados (leitura de texto e as 2 linhas de postes DUPLO).
+- **`BlocoCasa`** é a barreira contra falso-positivo entre blocos (`RDARA120` vs `RDARA1200`).
+- **`FamiliaPosteDoPrefixo` → `""`** para prefixos não reconhecidos (evita superclassificação como POSTE).
+- **Padrão Piauí** coexiste com o RS (`RDARA*`) por não haver sobreposição de nomes.
+- **Vinculos / Quantitativo (BOM) só com `n > 0`** (precisam de textos soltos).
+- **Automação Excel** sem tratamento de versão (`CreateObject("Excel.Application")`) — falhas caem em `TratarErro`.
 
-- **`Mid(texto, 10, 7)`** (Cod. Estrutura) é posicional e frágil — qualquer mudança no padrão de texto do desenho quebra essa extração. Agora só é aplicado quando `EhCodigoEstruturaSAP` confirma o formato `<8 dígitos><separador>`, e só força família de poste para prefixos reconhecidos (D/V/C/M).
-- **Filtro `nB > cap` / `ReDim Preserve`**: todo array novo precisa ser adicionado nos blocos de crescimento (há 4 pontos de crescimento espelhados: leitura de texto, leitura de postes DUPLO linha 1 e linha 2).
-- **`BlocoCasa`** é a única barreira contra falso-positivo entre blocos (`RDARA120` vs `RDARA1200`) — qualquer novo código de bloco deve ser adicionado com atenção a colisões de prefixo.
-- **Padrão Piauí (`MapaPiaui`) coexiste com o padrão RS (`RDARA*`)** por não haver sobreposição de nomes; novos padrões regionais devem seguir o mesmo cuidado.
-- **Abas auxiliares (`Alertas`, `Vinculos`, `Quantitativo (BOM)`) só são geradas se `n > 0`** (existem textos soltos no desenho) — desenhos 100% baseados em blocos com atributos não as populam.
-- **Automação Excel é síncrona e sem tratamento de versão** (`CreateObject("Excel.Application")`) — falhas de Excel não instalado ou versão incompatível caem no handler genérico `TratarErro`.
+## Diferença em relação ao `AnaliseCKCP_OTIMIZADO.bas`
+Projeto **independente**: ASBUILTENERGE opera sobre **desenhos CAD** (ZWCAD/AutoCAD, via blocos/atributos/textos); `AnaliseCKCP` opera sobre **planilhas de export do SAP (CKCP)** dentro do Excel. Não compartilham dicionários, variáveis globais nem fluxo.
+
+## Índice de Subs/Functions (71)
+O índice completo com números de linha está no próprio `.bas` (`grep -nE "^(Private|Public) (Sub|Function) "`). Principais blocos: leitura de cor (`CorLayerSegura`/`CorEntidadeSegura`), status (`StatusPorLayer`/`StatusPorBloco`), classificação (`ClassificarFamilia`/`ClassificarComConfianca`/`FamiliaDeBloco`), extração (`ExtrairNomeBasePoste`/`ExtrairNomeMaterial`/`ExtrairQuantidade*`), rastreabilidade (`FonteClassificacaoTexto`/`RevisaoTexto`), leitura de blocos (`LerBlocos*`), abas (`CriarAba*`), macro principal (`ExportarTextosParaExcel`) e tela final (`MostrarAnimacaoVelocidade`).
