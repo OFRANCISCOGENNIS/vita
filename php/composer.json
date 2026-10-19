@@ -1,0 +1,27 @@
+{
+    "name": "anonymousks/analise-ckcp",
+    "description": "Análise de custos CKCP (SAP) — port PHP modular do módulo VBA AnaliseCKCP.",
+    "type": "project",
+    "license": "proprietary",
+    "require": {
+        "php": ">=8.1",
+        "phpoffice/phpspreadsheet": "^1.29"
+    },
+    "autoload": {
+        "psr-4": {
+            "AnaliseCKCP\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "AnaliseCKCP\\Tests\\": "tests/"
+        }
+    },
+    "bin": [
+        "bin/analyze.php"
+    ],
+    "config": {
+        "optimize-autoloader": true,
+        "sort-packages": true
+    }
+}
