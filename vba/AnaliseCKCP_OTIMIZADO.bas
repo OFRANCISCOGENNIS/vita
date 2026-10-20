@@ -3623,6 +3623,8 @@ Private Sub Gerar_MaterialVsServico()
     ' (MAT. UC / MAT. COM), por familia. Usado como fallback quando a familia
     ' nao esta na tabela fixa dTipoCls -> evita falso "SEM UC".
     Dim dFamTipo As Object: Set dFamTipo = CreateObject("Scripting.Dictionary")
+    ' dFamKey: FAMILIA (campo do catalogo de materiais) por chave PEP|CLS2
+    Dim dFamKey As Object: Set dFamKey = CreateObject("Scripting.Dictionary")
     Dim cls3m As String, famN As String
     For i = 1 To UBound(dados, 1)
         pep = Trim$(CStr(dados(i, cPEP))): If pep = "" Then GoTo Prox
@@ -3646,6 +3648,9 @@ Private Sub Gerar_MaterialVsServico()
             dMat(k) = dMat(k) + q
             dKeys(k) = 1
             If q < 0 Then dNeg(k) = 1
+            ' FAMILIA do catalogo de materiais (idx 0) - material tem prioridade
+            Dim famM As String: famM = MatInfoLinha(i, 0)
+            If famM <> "" And famM <> "(SEM FAMILIA)" Then dFamKey(k) = famM
         Else
             cls2 = SrvInfoLinha(i, 1)                  ' CLS2 do catalogo/base enriquecida
             If cls2 = "" Then cls2 = "(SEM CLS2)"
@@ -3989,12 +3994,12 @@ ProxEQ:
         Next r
     End If
 
-    Dim outp() As Variant: ReDim outp(0 To nKeep, 1 To 13)
+    Dim outp() As Variant: ReDim outp(0 To nKeep, 1 To 14)
     outp(0, 1) = "STATUS_PEP4": outp(0, 2) = "PEP3NIVEL": outp(0, 3) = "PEP4NIVEL"
     outp(0, 4) = "CLS2": outp(0, 5) = "TIPO"
     outp(0, 6) = "MAT": outp(0, 7) = "SRV": outp(0, 8) = "DIFERENCA"
     outp(0, 9) = "SITUACAO": outp(0, 10) = "TIPO_PEP": outp(0, 11) = "PI"
-    outp(0, 12) = "OBS1": outp(0, 13) = "OBS2"
+    outp(0, 12) = "OBS1": outp(0, 13) = "OBS2": outp(0, 14) = "FAMILIA"
 
     Dim rr As Long, p As Variant, pp As String, mq As Double, sq As Double, dif As Double
     Dim p3MvS As String
@@ -4137,6 +4142,8 @@ ProxEQ:
                    Format$(CfgNum("MARGEM_ADERENCIA", 10), "0.##") & "%"
         End If
         outp(rr, 13) = obs2
+        ' FAMILIA (campo do catalogo de materiais); vazio p/ chave so de servico
+        outp(rr, 14) = IIf(dFamKey.Exists(ks(r)), CStr(dFamKey(ks(r))), "")
 
         ' -------------------------------------------------------------------
         ' FASE 1.2: alimenta os vereditos ODI em memoria, replicando a regra
