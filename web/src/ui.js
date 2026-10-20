@@ -151,15 +151,48 @@ function classificar() {
   $('#btn-csv').disabled = ultimoResultado.length === 0;
 }
 
-function baixarCSV() {
+async function copiarCSV() {
   if (ultimoResultado.length === 0) return;
-  const blob = new Blob([registrosParaCSV(ultimoResultado)], { type: 'text/csv;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'asbuilt_classificado.csv';
-  a.click();
-  URL.revokeObjectURL(url);
+  const csv = registrosParaCSV(ultimoResultado);
+  const btn = $('#btn-csv');
+  const original = btn.textContent;
+  const avisar = (txt) => { btn.textContent = txt; setTimeout(() => { btn.textContent = original; }, 1800); };
+
+  // Copiar é o caminho confiável em qualquer contexto (inclusive no sandbox
+  // de preview, onde downloads por link não funcionam).
+  try {
+    await navigator.clipboard.writeText(csv);
+    avisar('CSV copiado ✓');
+    return;
+  } catch { /* segue para fallback */ }
+
+  // Fallback 1: seleção de texto para cópia manual.
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = csv;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand && document.execCommand('copy');
+    document.body.removeChild(ta);
+    if (ok) { avisar('CSV copiado ✓'); return; }
+  } catch { /* segue para fallback de download */ }
+
+  // Fallback 2: download (funciona quando o app é servido do repositório).
+  try {
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'asbuilt_classificado.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+    avisar('CSV gerado ✓');
+  } catch {
+    avisar('Falhou — copie manualmente');
+  }
 }
 
 function init() {
@@ -170,7 +203,7 @@ function init() {
     $('#resultados').hidden = true;
     ultimoResultado = [];
   });
-  $('#btn-csv').addEventListener('click', baixarCSV);
+  $('#btn-csv').addEventListener('click', copiarCSV);
 }
 
 document.addEventListener('DOMContentLoaded', init);
