@@ -3991,7 +3991,7 @@ ProxEQ:
 
     Dim outp() As Variant: ReDim outp(0 To nKeep, 1 To 13)
     outp(0, 1) = "STATUS_PEP4": outp(0, 2) = "PEP3NIVEL": outp(0, 3) = "PEP4NIVEL"
-    outp(0, 4) = "CLASSIFICACAO": outp(0, 5) = "TIPO"
+    outp(0, 4) = "CLS2": outp(0, 5) = "TIPO"
     outp(0, 6) = "MAT": outp(0, 7) = "SRV": outp(0, 8) = "DIFERENCA"
     outp(0, 9) = "SITUACAO": outp(0, 10) = "TIPO_PEP": outp(0, 11) = "PI"
     outp(0, 12) = "OBS1": outp(0, 13) = "OBS2"
