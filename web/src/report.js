@@ -52,11 +52,22 @@ export function resumoPorStatus(registros) {
   return out;
 }
 
-/** Totais por família (para o painel de indicadores). */
+/** Totais por família (para o painel de indicadores e gráfico de barras). */
 export function totaisPorFamilia(registros) {
   const m = new Map();
   for (const r of registros) m.set(r.familia, (m.get(r.familia) ?? 0) + 1);
   return [...m.entries()].sort((a, b) => b[1] - a[1]);
+}
+
+/** Totais por status, na ordem canônica (para a faixa de distribuição). */
+export function totaisPorStatus(registros) {
+  const ordem = [
+    'MATERIAIS INSTALADOS', 'MATERIAIS DESINSTALADOS',
+    'MATERIAIS EXISTENTES', 'NAO CLASSIFICADO',
+  ];
+  const m = new Map();
+  for (const r of registros) m.set(r.status, (m.get(r.status) ?? 0) + 1);
+  return ordem.filter((s) => m.has(s)).map((s) => [s, m.get(s)]);
 }
 
 const CSV_COLS = [

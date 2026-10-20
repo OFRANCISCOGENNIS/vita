@@ -6,18 +6,22 @@
   <title>AsBuilt Energe</title>
   <meta name="description" content="Classificador web de materiais de as-built de rede elétrica — porte do motor VBA ASBUILTENERGE." />
   <link rel="stylesheet" href="assets/app.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
   <header class="topo">
-    <div class="wrap">
-      <span class="tag">MVP · v0.1</span>
-      <h1>AsBuilt Energe — Classificador de Materiais</h1>
-      <p>Cole os textos do as-built e receba família, status, nome do material e o resumo agrupado. Mesmas regras da macro ASBUILTENERGE (v4.0).</p>
+    <div class="wrap topo-flex">
+      <div>
+        <span class="tag">MVP · v0.2</span>
+        <h1>AsBuilt Energe — Classificador de Materiais</h1>
+        <p>Cole os textos do as-built ou envie o Excel da aba “Textos”. Mesmas regras da macro ASBUILTENERGE (v4.0).</p>
+      </div>
+      <button id="btn-tema" class="btn-tema" type="button" title="Alternar tema">🖥 Sistema</button>
     </div>
   </header>
 
   <main class="wrap">
-    <section class="card">
+    <section class="card" id="zona-drop">
       <h2>1. Entrada</h2>
       <div class="linha-campos">
         <div>
@@ -29,25 +33,33 @@
           <input type="text" id="layer" placeholder="#INSTALADO, #RETIRADO, EXISTENTES…" />
         </div>
       </div>
-      <p class="hint">Dica: para informar o layer por linha, use <code>LAYER&nbsp;↹&nbsp;texto</code> (tab) ou <code>LAYER ;; texto</code>.</p>
+      <p class="hint">Dica: informe o layer por linha com <code>LAYER&nbsp;↹&nbsp;texto</code> (tab) ou <code>LAYER ;; texto</code>. Ou arraste um arquivo aqui.</p>
       <div class="botoes">
         <button id="btn-classificar" class="primario">Classificar</button>
         <button id="btn-exemplo" class="secundario">Carregar exemplo</button>
+        <label class="secundario botao-arquivo" for="arquivo">Enviar Excel/CSV</label>
+        <input type="file" id="arquivo" accept=".xlsx,.xls,.xlsm,.csv,.txt" hidden />
         <button id="btn-limpar" class="secundario">Limpar</button>
       </div>
+      <p id="msg" class="msg" hidden></p>
     </section>
 
     <div id="resultados" hidden>
       <div id="indicadores"></div>
 
       <section class="card">
-        <h2>2. Resumo de materiais agrupados</h2>
+        <h2>2. Visão geral</h2>
+        <div id="graficos" class="graficos-grid"></div>
+      </section>
+
+      <section class="card">
+        <h2>3. Resumo de materiais agrupados</h2>
         <div id="resumo" class="resumo-grid"></div>
       </section>
 
       <section class="card">
-        <h2>3. Detalhamento
-          <button id="btn-csv" class="secundario" style="float:right" disabled>Copiar CSV</button>
+        <h2>4. Detalhamento
+          <button id="btn-csv" class="secundario botao-direita" disabled>Copiar CSV</button>
         </h2>
         <div class="tabela-rolagem">
           <table id="tabela">
