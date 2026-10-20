@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AsBuilt Energe</title>
+  <meta name="description" content="Classificador web de materiais de as-built de rede elétrica — porte do motor VBA ASBUILTENERGE." />
+  <link rel="stylesheet" href="assets/app.css" />
+</head>
+<body>
+  <header class="topo">
+    <div class="wrap">
+      <span class="tag">MVP · v0.1</span>
+      <h1>AsBuilt Energe — Classificador de Materiais</h1>
+      <p>Cole os textos do as-built e receba família, status, nome do material e o resumo agrupado. Mesmas regras da macro ASBUILTENERGE (v4.0).</p>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="card">
+      <h2>1. Entrada</h2>
+      <div class="linha-campos">
+        <div>
+          <label class="campo" for="entrada">Textos (um por linha)</label>
+          <textarea id="entrada" placeholder="Ex.: 66046515-D11600-N3-PR-S1I&#10;7T10(30m+18m)&#10;1 CORTA CIRCUITO"></textarea>
+        </div>
+        <div>
+          <label class="campo" for="layer">Layer (opcional, define o status)</label>
+          <input type="text" id="layer" placeholder="#INSTALADO, #RETIRADO, EXISTENTES…" />
+        </div>
+      </div>
+      <p class="hint">Dica: para informar o layer por linha, use <code>LAYER&nbsp;↹&nbsp;texto</code> (tab) ou <code>LAYER ;; texto</code>.</p>
+      <div class="botoes">
+        <button id="btn-classificar" class="primario">Classificar</button>
+        <button id="btn-exemplo" class="secundario">Carregar exemplo</button>
+        <button id="btn-limpar" class="secundario">Limpar</button>
+      </div>
+    </section>
+
+    <div id="resultados" hidden>
+      <div id="indicadores"></div>
+
+      <section class="card">
+        <h2>2. Resumo de materiais agrupados</h2>
+        <div id="resumo" class="resumo-grid"></div>
+      </section>
+
+      <section class="card">
+        <h2>3. Detalhamento
+          <button id="btn-csv" class="secundario" style="float:right" disabled>Baixar CSV</button>
+        </h2>
+        <div class="tabela-rolagem">
+          <table id="tabela">
+            <thead>
+              <tr>
+                <th>Conteúdo</th><th>Layer</th><th>Status</th><th>Família</th>
+                <th>Nome Material</th><th>Cód. Estrutura</th><th>Confiança</th>
+                <th>Metros</th><th>Fonte</th><th>Revisão</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <footer>
+    AsBuilt Energe · motor portado de <code>vba/ASBUILTENERGE.bas</code> ·
+    processamento 100% no navegador (nenhum dado sai do dispositivo).
+  </footer>
+
+  <script type="module" src="src/ui.js"></script>
+</body>
+</html>

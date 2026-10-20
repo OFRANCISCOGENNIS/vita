@@ -1,0 +1,11 @@
+{
+  "name": "asbuilt-energe-web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "MVP web do classificador de materiais de as-built (porte do motor VBA ASBUILTENERGE).",
+  "scripts": {
+    "dev": "python3 -m http.server 8080",
+    "serve": "npx --yes serve ."
+  }
+}
