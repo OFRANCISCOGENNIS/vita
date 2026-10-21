@@ -1376,9 +1376,9 @@ Private Sub CarregarCatalogoServicos()
 
     Dim caminho As String
     caminho = CaminhoCatalogo("CAT_SERVICOS", _
+        "%USERPROFILE%\Downloads\SERVICOS_ATUAIS.xlsx;" & _
         "%USERPROFILE%\Downloads\SERVICOS_ATUAIS_3.xlsx;%USERPROFILE%\Downloads\SERVICOS_ATUAIS (3).xlsx;" & _
-        "%USERPROFILE%\Downloads\SERVICOS_ATUAIS_2.xlsx;%USERPROFILE%\Downloads\SERVICOS_ATUAIS (2).xlsx;" & _
-        "%USERPROFILE%\Downloads\SERVICOS_ATUAIS.xlsx")
+        "%USERPROFILE%\Downloads\SERVICOS_ATUAIS_2.xlsx;%USERPROFILE%\Downloads\SERVICOS_ATUAIS (2).xlsx")
     If caminho = "" Then
         Dim f As Variant
         f = Application.GetOpenFilename( _
@@ -5275,8 +5275,16 @@ Private Sub Gerar_Servico()
         famSv = NormClassif(FamiliaAlias(SrvInfoLinha(i, 1)))
         If famSv = "ESCAVACAO" Then dCava(pep) = dCava(pep) + Abs(ToNum(dados(i, cQtd)))
         If famSv = "POSTE RD" Then dPosteSrv(pep) = dPosteSrv(pep) + Abs(ToNum(dados(i, cQtd)))
-        If codSrv = "" Or codSrv = "0" Then GoTo Prox   ' sem COD_SERVICO -> nao traz
-        k = pep & "|" & codSrv
+        If codSrv = "" Or codSrv = "0" Then
+            ' Sem COD_SERVICO: so traz se for servico de fato (CLS1=SERVICO ou
+            ' CLS3=MAO DE OBRA) -> mantem CA/indiretos fora. Agrupa por descricao.
+            Dim cls1s As String: cls1s = UCase$(SemAcento(SrvInfoLinha(i, 0)))
+            Dim cls3s As String: cls3s = UCase$(SemAcento(SrvInfoLinha(i, 2)))
+            If InStr(cls1s, "SERVICO") = 0 And InStr(cls3s, "MAO DE OBRA") = 0 Then GoTo Prox
+            k = pep & "|SC|" & UCase$(Trim$(TextoCampo(i, cTexto)))
+        Else
+            k = pep & "|" & codSrv
+        End If
         If Not dFirst.Exists(k) Then dFirst(k) = i
         dQ(k) = dQ(k) + ToNum(dados(i, cQtd)) * ComboFator(dados(i, cMaterial))
         dV(k) = dV(k) + ToNum(dados(i, cValor))
@@ -7206,7 +7214,7 @@ Private Sub GarantirConfig()
     Dim def As Variant
     def = Array( _
         Array("CAT_MATERIAIS", "%USERPROFILE%\Downloads\MATERIAS_ATUAIS_4.xlsx;%USERPROFILE%\Downloads\MATERIAS_ATUAIS (2).xlsx;%USERPROFILE%\Downloads\MATERIAS_ATUAIS.xlsx", "Caminhos do catalogo de materiais (separar alternativas por ;)"), _
-        Array("CAT_SERVICOS", "%USERPROFILE%\Downloads\SERVICOS_ATUAIS_3.xlsx;%USERPROFILE%\Downloads\SERVICOS_ATUAIS_2.xlsx;%USERPROFILE%\Downloads\SERVICOS_ATUAIS.xlsx", "Caminho do catalogo de servicos"), _
+        Array("CAT_SERVICOS", "%USERPROFILE%\Downloads\SERVICOS_ATUAIS.xlsx;%USERPROFILE%\Downloads\SERVICOS_ATUAIS_3.xlsx;%USERPROFILE%\Downloads\SERVICOS_ATUAIS_2.xlsx", "Caminho do catalogo de servicos"), _
         Array("CAT_CLASSE", "%USERPROFILE%\Downloads\CLASSE_CUSTO_ATUAIS_2.xlsx;%USERPROFILE%\Downloads\CLASSE_CUSTO_ATUAIS.xlsx", "Caminhos do catalogo de classe de custo"), _
         Array("CAT_CABO", "%USERPROFILE%\Downloads\CONVERSOES_CABO_ATUAIS.xlsx", "Caminho da conversao de cabo KG->m (opcional)"), _
         Array("CAT_COMBO", "%USERPROFILE%\Downloads\SRV_COMBO_ATUAIS.xlsx", "Caminho do catalogo SRV COMBO"), _
