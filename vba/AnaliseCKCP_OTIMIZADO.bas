@@ -4661,7 +4661,7 @@ ProxEQ:
     End If
 
     Dim outp() As Variant: ReDim outp(0 To nKeep, 1 To 15)
-    outp(0, 1) = "STATUS_PEP4": outp(0, 2) = "PEP3NIVEL": outp(0, 3) = "PEP4NIVEL"
+    outp(0, 1) = "STATUS_PEP3NIVEL": outp(0, 2) = "PEP3NIVEL": outp(0, 3) = "PEP4NIVEL"
     outp(0, 4) = "CLS2": outp(0, 5) = "TIPO"
     outp(0, 6) = "MAT": outp(0, 7) = "SRV": outp(0, 8) = "DIFERENCA"
     outp(0, 9) = "SITUACAO": outp(0, 10) = "TIPO_PEP": outp(0, 11) = "PI"
@@ -4833,6 +4833,24 @@ ProxEQ:
         End If
 PulaNulo:
     Next r
+
+    ' STATUS_PEP3NIVEL (col 1): o PEP3 so e APROVADO se TODOS os PEP4NIVEL
+    ' estiverem aprovados; basta um PEP4 REPROVADO para reprovar todo o PEP3.
+    ' (col 2 = PEP3NIVEL). Aplica o mesmo status em todas as linhas do PEP3.
+    Dim dP3St As Object: Set dP3St = CreateObject("Scripting.Dictionary")
+    Dim z As Long, p3z As String
+    For z = 1 To rr
+        p3z = CStr(outp(z, 2))
+        If CStr(outp(z, 1)) = "REPROVADO" Then
+            dP3St(p3z) = "REPROVADO"
+        ElseIf Not dP3St.Exists(p3z) Then
+            dP3St(p3z) = "APROVADO"
+        End If
+    Next z
+    For z = 1 To rr
+        outp(z, 1) = dP3St(CStr(outp(z, 2)))
+    Next z
+
     EscreverAba "MATERIAL vs SERVICO", outp
 End Sub
 
