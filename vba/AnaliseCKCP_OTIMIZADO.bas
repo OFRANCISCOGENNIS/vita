@@ -4563,6 +4563,24 @@ Prox:
                 End If
         End Select
     Next r
+
+    ' CH FUS esperado por PEP a partir dos trafos instalados: cada TRAFO
+    ' monofasico (1F/1-2F) espera 1 chave fusivel; TRIFASICO (3F) espera 3.
+    ' Conta pela qtd de material da familia TRAFO e a fase vem do texto breve.
+    Dim dChFusEsp As Object: Set dChFusEsp = CreateObject("Scripting.Dictionary")
+    Dim iTF As Long, pepTF As String, qTF As Double, txTF As String, fatTF As Long
+    For iTF = 1 To UBound(dados, 1)
+        pepTF = Trim$(CStr(dados(iTF, cPEP))): If pepTF = "" Then GoTo ProxTF
+        If Not EhMaterial(CStr(dados(iTF, cClassif))) Then GoTo ProxTF
+        If NormClassif(FamiliaAlias(MatInfoLinha(iTF, 2))) <> "TRAFO" Then GoTo ProxTF
+        qTF = ToNum(dados(iTF, cQtd))
+        If qTF <= 0 Then GoTo ProxTF            ' so instalacao (qtd positiva)
+        txTF = UCase$(SemAcento(TextoCampo(iTF, cTexto)))
+        fatTF = 1
+        If InStr(txTF, "3F") > 0 Or InStr(txTF, "TRIF") > 0 Then fatTF = 3
+        dChFusEsp(pepTF) = dChFusEsp(pepTF) + qTF * fatTF
+ProxTF:
+    Next iTF
     ' Servicos especificos que cobrem acessorios de TRAFO (CH FUS, PARA RAIO MT/BT):
     ' 5500200645 - servico de inst/troca de trafo, paga os acessorios.
     ' d572Fam: pep4 -> familia do servico 5500000572 (para regra SRV>MAT=REPROVADO)
@@ -4677,13 +4695,17 @@ ProxEQ:
             ' COND COBRE como aterramento de PARA RAIO BT/MT, REGULADOR ou TRAFO.
             If Not aderiu And NormClassif(clsv) = "COND COBRE" _
                And dEquipPep.Exists(pep4v) Then aderiu = True
-            ' TRAFO / REGULADOR: servico de trafo/regulador cobre CH FUS,
-            ' PARA RAIO MT e PARA RAIO BT (o servico paga pelos acessorios).
+            ' TRAFO / REGULADOR: servico de trafo/regulador cobre PARA RAIO MT/BT.
             If Not aderiu And trafRegCov.Exists(pep4v) Then
                 Select Case NormClassif(clsv)
-                    Case "CH FUS", "PARA RAIO MT", "PARA RAIO BT"
+                    Case "PARA RAIO MT", "PARA RAIO BT"
                         aderiu = True
                 End Select
+            End If
+            ' CH FUS: trafo instalado espera N chaves fusiveis (1F=1 / 3F=3).
+            ' Aderente se a qtd de CH FUS material nao exceder o esperado.
+            If Not aderiu And NormClassif(clsv) = "CH FUS" And dChFusEsp.Exists(pep4v) Then
+                If Abs(mv) <= CDbl(dChFusEsp(pep4v)) + 0.001 Then aderiu = True
             End If
             ' CH FUS paga por servico especifico (5500000618 / 5500200645)
             If Not aderiu And chFusCov.Exists(pep4v) And NormClassif(clsv) = "CH FUS" Then aderiu = True
@@ -4884,11 +4906,14 @@ ProxEQ:
             outp(rr, 8) = dif
             outp(rr, 9) = "ADERENTE"   ' cabo de conexao da CH SU FACA (7 m por servico)
         ElseIf trafRegCov.Exists(pp) And _
-               (NormClassif(CStr(p(1))) = "CH FUS" Or _
-                NormClassif(CStr(p(1))) = "PARA RAIO MT" Or _
+               (NormClassif(CStr(p(1))) = "PARA RAIO MT" Or _
                 NormClassif(CStr(p(1))) = "PARA RAIO BT") Then
             outp(rr, 8) = dif
-            outp(rr, 9) = "ADERENTE"   ' acessorio coberto por SRV de TRAFO/REGULADOR
+            outp(rr, 9) = "ADERENTE"   ' para-raio coberto por SRV de TRAFO/REGULADOR
+        ElseIf NormClassif(CStr(p(1))) = "CH FUS" And dChFusEsp.Exists(pp) _
+               And Abs(mq) <= CDbl(dChFusEsp(pp)) + 0.001 Then
+            outp(rr, 8) = dif
+            outp(rr, 9) = "ADERENTE"   ' CH FUS dentro do esperado pelos trafos (1F=1/3F=3)
         ElseIf chFusCov.Exists(pp) And NormClassif(CStr(p(1))) = "CH FUS" Then
             outp(rr, 8) = dif
             outp(rr, 9) = "ADERENTE"   ' CH fusivel paga por servico (5500000618/5500200645)
@@ -6092,6 +6117,7 @@ Private Sub Gerar_Regras()
     s = s & "ADERENCIA|RAMAL (75 m por servico)|Cada servico de RAMAL contempla ate 75 m de material RAMAL. Se MAT <= SRV x 75, o RAMAL fica ADERENTE." & vbLf
     s = s & "ADERENCIA|RAMAL cobre cabo (30 m por servico)|Cada servico de RAMAL libera 30 m. Se SRV(RAMAL) x 30 cobrir (>=) o total de cabo do PEP, os cabos/condutores ficam ADERENTES." & vbLf
     s = s & "ADERENCIA|RELIGADOR (60 m por servico)|Cada servico de RELIGADOR libera 60 m para tornar aderentes COND PROT, CABO ISOLADO e COND COBRE (2 servicos = 120 m, etc.)." & vbLf
+    s = s & "ADERENCIA|TRAFO -> CH FUS (1F=1 / 3F=3)|Cada trafo instalado espera chaves fusiveis: monofasico (1F) = 1 CH FUS; trifasico (3F) = 3 CH FUS. A fase vem do texto do trafo. CH FUS e ADERENTE se a qtd de material nao exceder o esperado pelos trafos do PEP. PARA RAIO MT/BT seguem cobertos pelo servico de trafo/regulador." & vbLf
     s = s & "ADERENCIA|COND NU + CORDOALHA|O servico de COND NU contempla o material CORDOALHA no mesmo PEP." & vbLf
     s = s & "ADERENCIA|CH SU FACA (PI = ERD)|Em PI do tipo ERD, cada servico de RELIGADOR deixa aderentes ate 6 CH SU FACA." & vbLf
     s = s & "ADERENCIA|COND COBRE como conexao da CH SU FACA|Quando ha servico de CH SU FACA no PEP, o COND COBRE (conexao) fica ADERENTE." & vbLf
