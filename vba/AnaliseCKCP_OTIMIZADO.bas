@@ -74,6 +74,7 @@ Private dTipoCls As Object  ' CLASSIFICACAO(CLS2 normalizada) -> TIPO (COM/UC/UA
 Private dFamEquiv As Object ' CLS2 servico (norm) -> familia material equivalente
 Private dSrvPuro As Object  ' CLS2 servico (norm) -> 1 (servico sem material esperado)
 Private dFamNivel As Object ' FAMILIA (norm) -> nivel (PRIMARIO/SECUNDARIO/NA)
+Private dTempos As Object   ' ETAPA/ABA -> segundos de processamento (cronometro)
 Private rawHeaders As Variant
 Private rawColCount As Long
 Private gSplashOK As Boolean
@@ -145,6 +146,8 @@ Private dDescSrv As Object     ' COD_SERVICO -> descricao (Denominacao)
 
 Sub GerarRelatorio()
     Dim t As Double: t = Timer
+    Dim ta As Double                      ' cronometro por aba
+    Set dTempos = CreateObject("Scripting.Dictionary")
     Application.ScreenUpdating = False
     Application.Calculation = xlCalculationManual
     Application.DisplayAlerts = False
@@ -222,27 +225,29 @@ Sub GerarRelatorio()
     gEtapa = "CarregarEquivSrvMat": CarregarEquivSrvMat
     gEtapa = "CarregarSrvPuro": CarregarSrvPuro
     gEtapa = "CarregarFamiliaNivel": CarregarFamiliaNivel
+    dTempos("CARGA BASE + CATALOGOS") = Timer - t
 
-    ' 4) Gera cada aba
-    gEtapa = "Gerar_RazaoCJ": Gerar_RazaoCJ
-    gEtapa = "Gerar_AlertasCriticos": Gerar_AlertasCriticos
-    gEtapa = "Gerar_MaterialVsServico": Gerar_MaterialVsServico
-    gEtapa = "Gerar_Material": Gerar_Material
-    gEtapa = "Gerar_Servico": Gerar_Servico
-    gEtapa = "Gerar_AnaliseCA": Gerar_AnaliseCA
-    gEtapa = "Gerar_ServicoSemMaterial": Gerar_ServicoSemMaterial
-    gEtapa = "Gerar_NaoClassificados": Gerar_NaoClassificados
-    gEtapa = "Gerar_RacionalizacaoCOM": Gerar_RacionalizacaoCOM
-    gEtapa = "Gerar_Regras": Gerar_Regras
+    ' 4) Gera cada aba (cada chamada e cronometrada em dTempos)
+    gEtapa = "Gerar_RazaoCJ": ta = Timer: Gerar_RazaoCJ: dTempos("RAZAO CJ") = Timer - ta
+    gEtapa = "Gerar_AlertasCriticos": ta = Timer: Gerar_AlertasCriticos: dTempos("ALERTAS CRITICOS") = Timer - ta
+    gEtapa = "Gerar_MaterialVsServico": ta = Timer: Gerar_MaterialVsServico: dTempos("MATERIAL vs SERVICO") = Timer - ta
+    gEtapa = "Gerar_Material": ta = Timer: Gerar_Material: dTempos("MATERIAL") = Timer - ta
+    gEtapa = "Gerar_Servico": ta = Timer: Gerar_Servico: dTempos("SERVICO") = Timer - ta
+    gEtapa = "Gerar_AnaliseCA": ta = Timer: Gerar_AnaliseCA: dTempos("ANALISE DE CA") = Timer - ta
+    gEtapa = "Gerar_ServicoSemMaterial": ta = Timer: Gerar_ServicoSemMaterial: dTempos("SERVICO SEM MATERIAL") = Timer - ta
+    gEtapa = "Gerar_NaoClassificados": ta = Timer: Gerar_NaoClassificados: dTempos("NAO CLASSIFICADOS") = Timer - ta
+    gEtapa = "Gerar_RacionalizacaoCOM": ta = Timer: Gerar_RacionalizacaoCOM: dTempos("RACIONALIZACAO COM") = Timer - ta
+    gEtapa = "Gerar_Regras": ta = Timer: Gerar_Regras: dTempos("REGRAS") = Timer - ta
 
     ' Checklist do processo: criado automaticamente (preserva marcacoes se ja existir)
-    gEtapa = "GerarChecklistCKCP": GerarChecklistCKCP True
+    gEtapa = "GerarChecklistCKCP": ta = Timer: GerarChecklistCKCP True: dTempos("CHECKLIST CKCP") = Timer - ta
 
     ' FASE 5: ordena as guias por fluxo de leitura e ativa o painel
-    gEtapa = "OrganizarAbas": OrganizarAbas
+    gEtapa = "OrganizarAbas": ta = Timer: OrganizarAbas: dTempos("ORGANIZAR ABAS") = Timer - ta
 
     Application.Calculation = xlCalculationAutomatic
     Application.ScreenUpdating = True
+    gEtapa = "MostrarTempos": MostrarTempos (Timer - t)
     gEtapa = "MostrarTelaFuturista": MostrarTelaFuturista nLin, (Timer - t)
     GoTo Fim
 
@@ -333,6 +338,53 @@ Private Sub MostrarTelaFuturista(ByVal nLin As Long, ByVal seg As Double)
 
     ' O painel permanece na tela; o botao OK (FecharSplashCKCP) apaga as formas.
     On Error GoTo 0
+End Sub
+
+' Mostra o ranking de tempo de cada aba/etapa (descrescente) em uma MsgBox.
+' Desativavel pela chave CONFIG MOSTRAR_TEMPOS = 0.
+Private Sub MostrarTempos(ByVal totalSeg As Double)
+    If dTempos Is Nothing Then Exit Sub
+    If dTempos.Count = 0 Then Exit Sub
+    If CfgTxt("MOSTRAR_TEMPOS", "1") = "0" Then Exit Sub
+
+    ' copia chaves/valores para arrays e ordena por tempo (desc) - selection sort
+    Dim n As Long: n = dTempos.Count
+    Dim nomes() As String, secs() As Double, i As Long, j As Long, mx As Long
+    ReDim nomes(0 To n - 1): ReDim secs(0 To n - 1)
+    Dim kk As Variant: i = 0
+    For Each kk In dTempos.Keys
+        nomes(i) = CStr(kk): secs(i) = CDbl(dTempos(kk)): i = i + 1
+    Next kk
+    For i = 0 To n - 2
+        mx = i
+        For j = i + 1 To n - 1
+            If secs(j) > secs(mx) Then mx = j
+        Next j
+        If mx <> i Then
+            Dim ts As Double, tn As String
+            ts = secs(i): secs(i) = secs(mx): secs(mx) = ts
+            tn = nomes(i): nomes(i) = nomes(mx): nomes(mx) = tn
+        End If
+    Next i
+
+    Dim somaAbas As Double
+    For i = 0 To n - 1: somaAbas = somaAbas + secs(i): Next i
+    If totalSeg <= 0 Then totalSeg = somaAbas
+
+    Dim msg As String, pct As Double, pos As Long
+    msg = "TEMPO DE CARREGAMENTO POR ABA / ETAPA" & vbLf & _
+          "(ranking do mais lento para o mais rapido)" & vbLf & _
+          String(44, "-") & vbLf
+    For i = 0 To n - 1
+        pos = i + 1
+        pct = 0: If totalSeg > 0 Then pct = secs(i) / totalSeg * 100
+        msg = msg & Format$(pos, "00") & ". " & _
+              nomes(i) & String$(IIf(26 - Len(nomes(i)) > 1, 26 - Len(nomes(i)), 1), " ") & _
+              Format$(secs(i), "0.00") & "s   (" & Format$(pct, "0") & "%)" & vbLf
+    Next i
+    msg = msg & String(44, "-") & vbLf & _
+          "TEMPO TOTAL: " & Format$(totalSeg, "0.00") & "s"
+    MsgBox msg, vbInformation, "Tempos de processamento - CKCP"
 End Sub
 
 Private Sub AddTxt(ws As Worksheet, nm As String, L As Double, T As Double, _
@@ -7244,7 +7296,8 @@ Private Sub GarantirConfig()
         Array("CLASSE_COMBUSTIVEL", "8119980000", "Classe de custo de combustiveis -> categoria OUTROS na ANALISE DE CA"), _
         Array("EQUIV_SRV_MAT", "", "De-para extra CLS2 servico=familia material (ex.: JUMPER=ALCA;X=Y)"), _
         Array("SRV_PURO", "", "Familias extra de servico sem material esperado (separadas por ;)"), _
-        Array("FAM_UAR", "", "Familias UAR extra (equivalentes a UC; nao geram alerta SEM UC). Separadas por ;"))
+        Array("FAM_UAR", "", "Familias UAR extra (equivalentes a UC; nao geram alerta SEM UC). Separadas por ;"), _
+        Array("MOSTRAR_TEMPOS", "1", "Mostra o ranking de tempo por aba ao final (0 = desliga)"))
 
     ' indexa chaves ja existentes
     Dim ult As Long: ult = ws.Cells(ws.Rows.Count, 1).End(xlUp).Row
