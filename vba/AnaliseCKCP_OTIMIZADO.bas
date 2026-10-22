@@ -647,6 +647,14 @@ Private Function LinhaTipoAplic(ByVal lin As Long) As String
 End Function
 
 Private Function MatInfoLinha(ByVal lin As Long, ByVal idx As Long) As String
+    ' Override fixo: 124030044 (CONEC.CUN ESTRIBO) sempre MAT. COM
+    If NormCod(dados(lin, cMaterial)) = "124030044" Then
+        Select Case idx
+            Case 1: MatInfoLinha = "MATERIAL": Exit Function
+            Case 2: MatInfoLinha = "CONECTOR": Exit Function
+            Case 3: MatInfoLinha = "MAT. COM": Exit Function
+        End Select
+    End If
     MatInfoLinha = CatInfo(dados(lin, cMaterial), idx)
     If MatInfoLinha <> "" Then Exit Function
 
@@ -672,8 +680,10 @@ Private Function Cls2SrvOverride(codSrv As Variant) As String
     Cls2SrvOverride = ""
     Dim c As String: c = NormCod(codSrv)
     Select Case c
-        Case "5500000582", "5500000575", "5500000576"
+        Case "5500000582", "5500000575", "5500000576", "5500000581"
             Cls2SrvOverride = "COND PROT"
+        Case "5500000817"
+            Cls2SrvOverride = "EQUIPAMENTO MONOFASICO"
     End Select
 End Function
 
@@ -1503,6 +1513,7 @@ Private Sub CarregarReclassificacaoServicos()
     ReclasSrv "5400099848", "SERVICO", "CONEXAO", "MAO DE OBRA"
     ReclasSrv "5400099851", "SERVICO", "CONEXAO", "MAO DE OBRA"
     ReclasSrv "5301800152", "SERVICO", "ALUGUEL GERADOR", "RISCO"
+    ReclasSrv "5500000817", "SERVICO", "EQUIPAMENTO MONOFASICO", "MAO DE OBRA"
 End Sub
 
 Private Sub ReclasSrv(ByVal cod As String, ByVal c1 As String, _
@@ -2574,6 +2585,7 @@ Private Sub CarregarComboServico()
     dCombo("5500000582") = "3|"   ' equivale a 3 cabos -> multiplica QTD por 3
     dCombo("5500000575") = "3|"   ' equivale a 3 cabos -> multiplica QTD por 3
     dCombo("5500000576") = "3|"   ' AHO202_B INST COND -> equivale a 3 cabos
+    dCombo("5500000581") = "3|"   ' AHO204_A INST RD COMPACT -> equivale a 3 cabos
 
     Dim caminho As String
     caminho = CaminhoCatalogo("CAT_COMBO", "%USERPROFILE%\Downloads\SRV_COMBO_ATUAIS.xlsx")
@@ -4337,6 +4349,16 @@ Private Function EhCabo(ByVal cls2 As String) As Boolean
               Or s = "RAMAL")
 End Function
 
+' 122060001 CABO ACO COBREADO: abaixo de 10 kg no PEP4 nao reprova.
+' O restante do material da familia ainda precisa caber no servico.
+Private Function AcoCobreadoIsento(dKg As Object, dM As Object, ByVal k As String, _
+                                   ByVal mv As Double, ByVal sv As Double) As Boolean
+    AcoCobreadoIsento = False
+    If Not dKg.Exists(k) Then Exit Function
+    If Abs(CDbl(dKg(k))) >= 10 Then Exit Function
+    If Abs(mv - CDbl(dM(k))) <= Abs(sv) + 0.001 Then AcoCobreadoIsento = True
+End Function
+
 ' Familias que o servico de RELIGADOR torna aderentes (ate 60 m por religador)
 Private Function CobertoReligador(ByVal cls2 As String) As Boolean
     Dim s As String: s = NormClassif(cls2)
@@ -4490,6 +4512,9 @@ Private Sub Gerar_MaterialVsServico()
     Dim dLigKeyN As Object: Set dLigKeyN = CreateObject("Scripting.Dictionary")
     Dim codLig As String, lgP() As String, lgI As Long
     Dim cls3m As String, famN As String
+    ' 122060001 (cabo aco cobreado): < 10 kg no PEP4 nao reprova a familia
+    Dim dAcoKg As Object: Set dAcoKg = CreateObject("Scripting.Dictionary")
+    Dim dAcoM As Object:  Set dAcoM = CreateObject("Scripting.Dictionary")
     For i = 1 To UBound(dados, 1)
         pep = Trim$(CStr(dados(i, cPEP))): If pep = "" Then GoTo Prox
         q = ToNum(dados(i, cQtd))
@@ -4511,6 +4536,10 @@ Private Sub Gerar_MaterialVsServico()
             k = pep & "|" & cls2
             dMat(k) = dMat(k) + q
             dKeys(k) = 1
+            If NormCod(dados(i, cMaterial)) = "122060001" Then
+                dAcoKg(k) = dAcoKg(k) + ToNum(dados(i, cQtd))
+                dAcoM(k) = dAcoM(k) + q
+            End If
             If q < 0 Then dNeg(k) = 1
             ' FAMILIA do catalogo de materiais (idx 0) - material tem prioridade
             Dim famM As String: famM = MatInfoLinha(i, 0)
@@ -4807,6 +4836,8 @@ ProxEQ:
             If Not aderiu And chFusCov.Exists(pep4v) And NormClassif(clsv) = "CH FUS" Then aderiu = True
             ' LIGACAO SERV X MAT: grupo de ligacao fechado no PEP4 (material + servico)
             If Not aderiu And dLigKeyOk.Exists(ks(r)) Then aderiu = True
+            ' 122060001 < 10 kg: desconsiderado; o restante do MAT deve caber no SRV
+            If Not aderiu Then aderiu = AcoCobreadoIsento(dAcoKg, dAcoM, ks(r), mv, sv)
             ' TRAFO / REGULADOR (MAT) coberto por SRV de TRAFO_OU_REGULADOR no PEP.
             If Not aderiu And dTrafOrRegSrv.Exists(pep4v) And dTrafHasMatPep.Exists(pep4v) _
                And (NormClassif(clsv) = "TRAFO" Or NormClassif(clsv) = "REGULADOR") Then aderiu = True
@@ -5019,6 +5050,9 @@ ProxEQ:
         ElseIf dLigKeyOk.Exists(ks(r)) Then
             outp(rr, 8) = dif
             outp(rr, 9) = "ADERENTE"   ' grupo LIGACAO SERV X MAT fechado no PEP4
+        ElseIf AcoCobreadoIsento(dAcoKg, dAcoM, ks(r), mq, sq) Then
+            outp(rr, 8) = dif
+            outp(rr, 9) = "ADERENTE"   ' 122060001 < 10 kg nao reprova
         ElseIf dTrafOrRegSrv.Exists(pp) And dTrafHasMatPep.Exists(pp) And _
                (NormClassif(CStr(p(1))) = "TRAFO" Or _
                 NormClassif(CStr(p(1))) = "REGULADOR") Then
@@ -5572,8 +5606,14 @@ Private Sub Gerar_Servico()
             k = pep & "|" & codSrv
         End If
         If Not dFirst.Exists(k) Then dFirst(k) = i
-        ' QTD crua (UN) na aba SERVICO; o fator COMBO so se aplica na MATERIAL vs SERVICO.
-        dQ(k) = dQ(k) + ToNum(dados(i, cQtd))
+        ' QTD crua (UN) na aba SERVICO; exceto 5500000576/5500000581 (x3 tambem aqui).
+        ' Os demais combos so se aplicam na MATERIAL vs SERVICO.
+        Select Case codSrv
+            Case "5500000576", "5500000581"
+                dQ(k) = dQ(k) + ToNum(dados(i, cQtd)) * 3
+            Case Else
+                dQ(k) = dQ(k) + ToNum(dados(i, cQtd))
+        End Select
         dV(k) = dV(k) + ToNum(dados(i, cValor))
 Prox:
     Next i
@@ -6224,6 +6264,9 @@ Private Sub Gerar_Regras()
     s = s & "ADERENCIA|RELIGADOR (60 m por servico)|Cada servico de RELIGADOR libera 60 m para tornar aderentes COND PROT, CABO ISOLADO e COND COBRE (2 servicos = 120 m, etc.)." & vbLf
     s = s & "ADERENCIA|TRAFO -> CH FUS (1F=1 / 3F=3)|Cada trafo instalado espera chaves fusiveis: monofasico (1F) = 1 CH FUS; trifasico (3F) = 3 CH FUS. A fase vem do texto do trafo. CH FUS e ADERENTE se a qtd de material nao exceder o esperado pelos trafos do PEP. PARA RAIO MT/BT seguem cobertos pelo servico de trafo/regulador." & vbLf
     s = s & "ADERENCIA|LIGACAO SERV X MAT|Grupos de ligacao (planilha LIGACAO DE MATERIAL E SERVICO) unem codigos de servico e material, inclusive de familias diferentes. Quando o PEP4 tem material E servico do mesmo grupo lancados, a ligacao fecha: as linhas dessas familias ficam ADERENTES e a coluna LIGACAO SERV X MAT mostra o numero do grupo." & vbLf
+    s = s & "ADERENCIA|CABO ACO COBREADO < 10 KG|Material 122060001 com menos de 10 kg no PEP4 nao reprova a familia (o restante do material ainda deve caber no servico)." & vbLf
+    s = s & "QUANTIDADE|SRV x3 (576/581)|Servicos 5500000576 e 5500000581 equivalem a 3 cabos: QTD x3 na aba SERVICO e na MATERIAL vs SERVICO (familia COND PROT)." & vbLf
+    s = s & "CLASSIFICACAO|OVERRIDES FIXOS|Material 124030044 = CONECTOR / MAT. COM. Servico 5500000817 = CLS2 EQUIPAMENTO MONOFASICO." & vbLf
     s = s & "ADERENCIA|COND NU + CORDOALHA|O servico de COND NU contempla o material CORDOALHA no mesmo PEP." & vbLf
     s = s & "ADERENCIA|CH SU FACA (PI = ERD)|Em PI do tipo ERD, cada servico de RELIGADOR deixa aderentes ate 6 CH SU FACA." & vbLf
     s = s & "ADERENCIA|COND COBRE como conexao da CH SU FACA|Quando ha servico de CH SU FACA no PEP, o COND COBRE (conexao) fica ADERENTE." & vbLf
