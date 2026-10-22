@@ -670,7 +670,7 @@ Private Function Cls2SrvOverride(codSrv As Variant) As String
     Cls2SrvOverride = ""
     Dim c As String: c = NormCod(codSrv)
     Select Case c
-        Case "5500000582", "5500000575"
+        Case "5500000582", "5500000575", "5500000576"
             Cls2SrvOverride = "COND PROT"
     End Select
 End Function
@@ -2571,6 +2571,7 @@ Private Sub CarregarComboServico()
     ' O loop do arquivo usa Not dCombo.Exists(cod), entao estes prevalecem.
     dCombo("5500000582") = "3|"   ' equivale a 3 cabos -> multiplica QTD por 3
     dCombo("5500000575") = "3|"   ' equivale a 3 cabos -> multiplica QTD por 3
+    dCombo("5500000576") = "3|"   ' AHO202_B INST COND -> equivale a 3 cabos
 
     Dim caminho As String
     caminho = CaminhoCatalogo("CAT_COMBO", "%USERPROFILE%\Downloads\SRV_COMBO_ATUAIS.xlsx")
@@ -5468,7 +5469,8 @@ Private Sub Gerar_Servico()
             k = pep & "|" & codSrv
         End If
         If Not dFirst.Exists(k) Then dFirst(k) = i
-        dQ(k) = dQ(k) + ToNum(dados(i, cQtd)) * ComboFator(dados(i, cMaterial))
+        ' QTD crua (UN) na aba SERVICO; o fator COMBO so se aplica na MATERIAL vs SERVICO.
+        dQ(k) = dQ(k) + ToNum(dados(i, cQtd))
         dV(k) = dV(k) + ToNum(dados(i, cValor))
 Prox:
     Next i
