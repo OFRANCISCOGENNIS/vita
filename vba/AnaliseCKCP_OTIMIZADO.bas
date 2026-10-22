@@ -4515,6 +4515,8 @@ Private Sub Gerar_MaterialVsServico()
     ' 122060001 (cabo aco cobreado): < 10 kg no PEP4 nao reprova a familia
     Dim dAcoKg As Object: Set dAcoKg = CreateObject("Scripting.Dictionary")
     Dim dAcoM As Object:  Set dAcoM = CreateObject("Scripting.Dictionary")
+    ' PEP4 com servico de equipamento de protecao (5500000820/5500000817)
+    Dim dEqProt As Object: Set dEqProt = CreateObject("Scripting.Dictionary")
     For i = 1 To UBound(dados, 1)
         pep = Trim$(CStr(dados(i, cPEP))): If pep = "" Then GoTo Prox
         q = ToNum(dados(i, cQtd))
@@ -4559,6 +4561,11 @@ Private Sub Gerar_MaterialVsServico()
             ' marca que este PEP4 tem pelo menos um servico lancado
             If Not dPep4TemSrv.Exists(pep) Then dPep4TemSrv(pep) = 1
         End If
+        If Not EhMaterial(CStr(dados(i, cClassif))) And q <> 0 Then
+            Select Case NormCod(dados(i, cMaterial))
+                Case "5500000820", "5500000817": dEqProt(pep) = 1
+            End Select
+        End If
         ' LIGACAO SERV X MAT: registra os grupos de ligacao do codigo neste PEP4
         ' (dLigMat/dLigSrv: PEP4|grupo presente; dLigKeyN: PEP4|CLS2 -> grupos)
         If Not dLig Is Nothing Then
@@ -4598,6 +4605,20 @@ Prox:
         Next lgI
         If sLg <> "" Then dLigKeyOk(kLg) = sLg
     Next kLg
+
+    ' Servicos 5500000820/5500000817 estao ligados aos materiais CH FUS,
+    ' CH SU FACA e PARA RAIO: familias cobertas no PEP4 -> ADERENTES.
+    Dim kEq As Variant, famEq As String
+    For Each kEq In dKeys.Keys
+        If dEqProt.Exists(Split(CStr(kEq), "|")(0)) Then
+            famEq = NormClassif(Split(CStr(kEq), "|")(1))
+            Select Case famEq
+                Case "CH FUS", "CH SU FACA", "CH FACA", "PARA RAIO", "PARA RAIO AT", _
+                     "PARA RAIO MT", "PARA RAIO BT"
+                    If Not dLigKeyOk.Exists(kEq) Then dLigKeyOk(kEq) = "EQP"
+            End Select
+        End If
+    Next kEq
 
     Dim ks As Variant: ks = dKeys.Keys
 
@@ -6265,6 +6286,7 @@ Private Sub Gerar_Regras()
     s = s & "ADERENCIA|TRAFO -> CH FUS (1F=1 / 3F=3)|Cada trafo instalado espera chaves fusiveis: monofasico (1F) = 1 CH FUS; trifasico (3F) = 3 CH FUS. A fase vem do texto do trafo. CH FUS e ADERENTE se a qtd de material nao exceder o esperado pelos trafos do PEP. PARA RAIO MT/BT seguem cobertos pelo servico de trafo/regulador." & vbLf
     s = s & "ADERENCIA|LIGACAO SERV X MAT|Grupos de ligacao (planilha LIGACAO DE MATERIAL E SERVICO) unem codigos de servico e material, inclusive de familias diferentes. Quando o PEP4 tem material E servico do mesmo grupo lancados, a ligacao fecha: as linhas dessas familias ficam ADERENTES e a coluna LIGACAO SERV X MAT mostra o numero do grupo." & vbLf
     s = s & "ADERENCIA|CABO ACO COBREADO < 10 KG|Material 122060001 com menos de 10 kg no PEP4 nao reprova a familia (o restante do material ainda deve caber no servico)." & vbLf
+    s = s & "ADERENCIA|SRV 5500000820/817 x CH FUS, CH FACA, PARA RAIO|Servicos 5500000820 e 5500000817 estao ligados aos materiais das familias CH FUS, CH SU FACA e PARA RAIO: com um deles lancado no PEP4, essas familias ficam ADERENTES (LIGACAO = EQP)." & vbLf
     s = s & "QUANTIDADE|SRV x3 (576/581)|Servicos 5500000576 e 5500000581 equivalem a 3 cabos: QTD x3 na aba SERVICO e na MATERIAL vs SERVICO (familia COND PROT)." & vbLf
     s = s & "CLASSIFICACAO|OVERRIDES FIXOS|Material 124030044 = CONECTOR / MAT. COM. Servico 5500000817 = CLS2 EQUIPAMENTO MONOFASICO." & vbLf
     s = s & "ADERENCIA|COND NU + CORDOALHA|O servico de COND NU contempla o material CORDOALHA no mesmo PEP." & vbLf
