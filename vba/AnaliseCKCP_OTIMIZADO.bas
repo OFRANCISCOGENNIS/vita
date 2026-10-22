@@ -647,14 +647,14 @@ Private Function LinhaTipoAplic(ByVal lin As Long) As String
 End Function
 
 Private Function MatInfoLinha(ByVal lin As Long, ByVal idx As Long) As String
-    ' Override fixo: 124030044 (CONEC.CUN ESTRIBO) sempre MAT. COM
-    If NormCod(dados(lin, cMaterial)) = "124030044" Then
-        Select Case idx
-            Case 1: MatInfoLinha = "MATERIAL": Exit Function
-            Case 2: MatInfoLinha = "CONECTOR": Exit Function
-            Case 3: MatInfoLinha = "MAT. COM": Exit Function
-        End Select
-    End If
+    ' Override fixo: 124030044 e 124180290 sempre CONECTOR / MAT. COM
+    Select Case NormCod(dados(lin, cMaterial))
+        Case "124030044", "124180290"
+            If idx >= 1 And idx <= 3 Then
+                MatInfoLinha = Choose(idx, "MATERIAL", "CONECTOR", "MAT. COM")
+                Exit Function
+            End If
+    End Select
     MatInfoLinha = CatInfo(dados(lin, cMaterial), idx)
     If MatInfoLinha <> "" Then Exit Function
 
@@ -6288,7 +6288,7 @@ Private Sub Gerar_Regras()
     s = s & "ADERENCIA|CABO ACO COBREADO < 10 KG|Material 122060001 com menos de 10 kg no PEP4 nao reprova a familia (o restante do material ainda deve caber no servico)." & vbLf
     s = s & "ADERENCIA|SRV 5500000820/817 x CH FUS, CH FACA, PARA RAIO|Servicos 5500000820 e 5500000817 estao ligados aos materiais das familias CH FUS, CH SU FACA e PARA RAIO: com um deles lancado no PEP4, essas familias ficam ADERENTES (LIGACAO = EQP)." & vbLf
     s = s & "QUANTIDADE|SRV x3 (576/581)|Servicos 5500000576 e 5500000581 equivalem a 3 cabos: QTD x3 na aba SERVICO e na MATERIAL vs SERVICO (familia COND PROT)." & vbLf
-    s = s & "CLASSIFICACAO|OVERRIDES FIXOS|Material 124030044 = CONECTOR / MAT. COM. Servico 5500000817 = CLS2 EQUIPAMENTO MONOFASICO." & vbLf
+    s = s & "CLASSIFICACAO|OVERRIDES FIXOS|Materiais 124030044 e 124180290 = CONECTOR / MAT. COM. Servico 5500000817 = CLS2 EQUIPAMENTO MONOFASICO." & vbLf
     s = s & "ADERENCIA|COND NU + CORDOALHA|O servico de COND NU contempla o material CORDOALHA no mesmo PEP." & vbLf
     s = s & "ADERENCIA|CH SU FACA (PI = ERD)|Em PI do tipo ERD, cada servico de RELIGADOR deixa aderentes ate 6 CH SU FACA." & vbLf
     s = s & "ADERENCIA|COND COBRE como conexao da CH SU FACA|Quando ha servico de CH SU FACA no PEP, o COND COBRE (conexao) fica ADERENTE." & vbLf

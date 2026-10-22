@@ -242,5 +242,5 @@ Versão atual: **8.745 linhas · 71 Subs · 75 Functions** (módulo `AnaliseCKCP
 ### Regras fixas por codigo (out/2026)
 - `5500000576`, `5500000581`: QTD x3 na aba SERVICO e na MATERIAL vs SERVICO (CLS2 COND PROT).
 - `122060001` (cabo aco cobreado): < 10 kg no PEP4 nao reprova a familia (`AcoCobreadoIsento`).
-- `124030044`: material forcado CONECTOR / MAT. COM (`MatInfoLinha`).
+- `124030044`, `124180290`: material forcado CONECTOR / MAT. COM (`MatInfoLinha`).
 - `5500000817`: servico forcado CLS2 EQUIPAMENTO MONOFASICO (`Cls2SrvOverride` + `ReclasSrv`).
