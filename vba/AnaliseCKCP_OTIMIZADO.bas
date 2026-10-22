@@ -75,6 +75,7 @@ Private dFamEquiv As Object ' CLS2 servico (norm) -> familia material equivalent
 Private dSrvPuro As Object  ' CLS2 servico (norm) -> 1 (servico sem material esperado)
 Private dFamNivel As Object ' FAMILIA (norm) -> nivel (PRIMARIO/SECUNDARIO/NA)
 Private dTempos As Object   ' ETAPA/ABA -> segundos de processamento (cronometro)
+Private dLig As Object      ' COD (serv/mat) -> grupos de LIGACAO SERV X MAT ("1;4;")
 Private rawHeaders As Variant
 Private rawColCount As Long
 Private gSplashOK As Boolean
@@ -225,6 +226,7 @@ Sub GerarRelatorio()
     gEtapa = "CarregarEquivSrvMat": CarregarEquivSrvMat
     gEtapa = "CarregarSrvPuro": CarregarSrvPuro
     gEtapa = "CarregarFamiliaNivel": CarregarFamiliaNivel
+    gEtapa = "CarregarLigacoesSrvMat": CarregarLigacoesSrvMat
     dTempos("CARGA BASE + CATALOGOS") = Timer - t
 
     ' 4) Gera cada aba (cada chamada e cronometrada em dTempos)
@@ -3587,6 +3589,57 @@ Private Function EhServicoPuro(ByVal cls2 As String) As Boolean
     EhServicoPuro = dSrvPuro.Exists(NormClassif(cls2))
 End Function
 
+Private Sub CarregarLigacoesSrvMat()
+    ' Grupos de LIGACAO SERV X MAT (planilha LIGACAO DE MATERIAL E SERVICO).
+    ' Codigos de servico e material do mesmo grupo, lancados no mesmo PEP4,
+    ' se conectam e ficam ADERENTES na aba MATERIAL vs SERVICO.
+    Set dLig = CreateObject("Scripting.Dictionary")
+    AddLig "5020000118", 1   ' SRV RET POSTE DE MADEIRA LM
+    AddLig "179340003", 1   ' MAT SUCATA POSTE MADEIRA
+    AddLig "5500000591", 2   ' SRV AHO208_B_RET CON 16 50MM2 CU/EQUIV AL-LM
+    AddLig "122020012", 2   ' MAT CABO NU AL CAA 4AWG SWAN MNT
+    AddLig "5020000093", 3   ' SRV RET POSTE CONCRETO ATE 14M LM
+    AddLig "5020000118", 3   ' SRV RET POSTE DE MADEIRA LM
+    AddLig "133000010", 4   ' MAT POSTE CONC DT B 9M 300DAN PDE
+    AddLig "133000006", 4   ' MAT POSTE CONC DT D 9M 150DAN PDE
+    AddLig "179340003", 4   ' MAT SUCATA POSTE MADEIRA
+    AddLig "5020000093", 4   ' SRV RET POSTE CONCRETO ATE 14M LM
+    AddLig "5020000118", 4   ' SRV RET POSTE DE MADEIRA LM
+    AddLig "122120029", 5   ' MAT CABO COB AL 185MM 15KV XLPE+HDPE+SMC
+    AddLig "122120033", 5   ' MAT CABO COB AL 50MM 15KV XLPE+HDPE+SMC
+    AddLig "5022000276", 5   ' SRV INST COND COBERTO RDC 35-70MM2 LM
+    AddLig "5022000278", 5   ' SRV INST COND COBERTO RDC 95-185MM2 LM
+    AddLig "5500000591", 6   ' SRV AHO208_B_RET CON 16 50MM2 CU/EQUIV AL-LM
+    AddLig "122020012", 6   ' MAT CABO NU AL CAA 4AWG SWAN MNT
+    AddLig "179340003", 7   ' MAT SUCATA POSTE MADEIRA
+    AddLig "5500000764", 7   ' SRV AHO805_B_RET POST PASS MT 10-15MT LV-LM
+    AddLig "5025300122", 8   ' SRV INST ESTR CP RELIGADOR/SEC 3F >400A LM
+    AddLig "102220046", 8   ' MAT TP IND 36,2KV 1,2P75 500VA G1 EXT PDE
+    AddLig "102310194", 8   ' MAT TP,13,8-11,4KV,EXT.GSCT004/21,EXC GO
+    AddLig "122020012", 9   ' MAT CABO NU AL CAA 4AWG SWAN MNT
+    AddLig "5500000590", 9   ' SRV AHO208_A_RET CON 16 50MM2 CU/EQUIV AL-LM
+    AddLig "105310001", 10   ' MAT CHAVE FUS C POR/POL 34,5KV 100A 5KA PDE
+    AddLig "105010022", 10   ' MAT CH SEC 1P VHI 36,2KV 630A 12,5KA RD PDE
+    AddLig "5500000617", 10   ' SRV AHO218_A_INST (FACA,FUSIVEIS,LAMINAS)-LM
+    AddLig "105310029", 11   ' MAT CH,FUS,36.2KV,100A,5KA,PORC,S.L,BLQ
+    AddLig "105000007", 11   ' MAT CHAVE SEC 1P 15KV 400A 12,5KA MHI(BLQ)
+    AddLig "5500000626", 11   ' SRV AHO221_A_RET (FACA, FUSIVEIS, LAMINA)-LM
+    AddLig "122020002", 12   ' MAT CABO AL NU CA 2 AWG IRIS
+    AddLig "122020003", 12   ' MAT CABO NU AL CA 2/0AWG ASTER MNT
+    AddLig "5500000591", 12   ' SRV AHO208_B_RET CON 16 50MM2 CU/EQUIV AL-LM
+    AddLig "105310001", 13   ' MAT CHAVE FUS C POR/POL 34,5KV 100A 5KA PDE
+    AddLig "5500000627", 13   ' SRV AHO221_B_RET (FACA, FUSIVEIS, LAMINA)-LM
+    AddLig "122020001", 14   ' MAT CABO AL NU CA 1/0AWG POPPY
+    AddLig "122020002", 14   ' MAT CABO AL NU CA 2 AWG IRIS
+    AddLig "5500000590", 14   ' SRV AHO208_A_RET CON 16 50MM2 CU/EQUIV AL-LM
+End Sub
+
+Private Sub AddLig(ByVal cod As String, ByVal grupo As Long)
+    If dLig Is Nothing Then Set dLig = CreateObject("Scripting.Dictionary")
+    cod = NormCod(cod)
+    If InStr(";" & dLig(cod), ";" & grupo & ";") = 0 Then dLig(cod) = dLig(cod) & grupo & ";"
+End Sub
+
 Private Sub CarregarFamiliaNivel()
     ' Nivel da familia (FAMILIAS_ATUAIS): P=PRIMARIO, S=SECUNDARIO, demais=NA.
     Set dFamNivel = CreateObject("Scripting.Dictionary")
@@ -4431,6 +4484,11 @@ Private Sub Gerar_MaterialVsServico()
     Dim dFamTipo As Object: Set dFamTipo = CreateObject("Scripting.Dictionary")
     ' dFamKey: FAMILIA (campo do catalogo de materiais) por chave PEP|CLS2
     Dim dFamKey As Object: Set dFamKey = CreateObject("Scripting.Dictionary")
+    ' Ligacao SERV x MAT (grupos da planilha LIGACAO DE MATERIAL E SERVICO)
+    Dim dLigMat As Object:  Set dLigMat = CreateObject("Scripting.Dictionary")
+    Dim dLigSrv As Object:  Set dLigSrv = CreateObject("Scripting.Dictionary")
+    Dim dLigKeyN As Object: Set dLigKeyN = CreateObject("Scripting.Dictionary")
+    Dim codLig As String, lgP() As String, lgI As Long
     Dim cls3m As String, famN As String
     For i = 1 To UBound(dados, 1)
         pep = Trim$(CStr(dados(i, cPEP))): If pep = "" Then GoTo Prox
@@ -4472,8 +4530,45 @@ Private Sub Gerar_MaterialVsServico()
             ' marca que este PEP4 tem pelo menos um servico lancado
             If Not dPep4TemSrv.Exists(pep) Then dPep4TemSrv(pep) = 1
         End If
+        ' LIGACAO SERV X MAT: registra os grupos de ligacao do codigo neste PEP4
+        ' (dLigMat/dLigSrv: PEP4|grupo presente; dLigKeyN: PEP4|CLS2 -> grupos)
+        If Not dLig Is Nothing Then
+            codLig = NormCod(dados(i, cMaterial))
+            If dLig.Exists(codLig) And (q <> 0 Or ToNum(dados(i, cValor)) <> 0) Then
+                lgP = Split(CStr(dLig(codLig)), ";")
+                For lgI = 0 To UBound(lgP)
+                    If lgP(lgI) <> "" Then
+                        If EhMaterial(CStr(dados(i, cClassif))) Then
+                            dLigMat(pep & "|" & lgP(lgI)) = 1
+                        Else
+                            dLigSrv(pep & "|" & lgP(lgI)) = 1
+                        End If
+                        If InStr(";" & dLigKeyN(k), ";" & lgP(lgI) & ";") = 0 Then _
+                            dLigKeyN(k) = dLigKeyN(k) & lgP(lgI) & ";"
+                    End If
+                Next lgI
+            End If
+        End If
 Prox:
     Next i
+
+    ' Grupo de ligacao FECHADO no PEP4 = tem material E servico do grupo lancados.
+    ' dLigKeyOk: PEP4|CLS2 -> numeros dos grupos fechados (ex.: "1, 4").
+    Dim dLigKeyOk As Object: Set dLigKeyOk = CreateObject("Scripting.Dictionary")
+    Dim kLg As Variant, pepLg As String, sLg As String
+    For Each kLg In dLigKeyN.Keys
+        pepLg = Split(CStr(kLg), "|")(0)
+        lgP = Split(CStr(dLigKeyN(kLg)), ";")
+        sLg = ""
+        For lgI = 0 To UBound(lgP)
+            If lgP(lgI) <> "" Then
+                If dLigMat.Exists(pepLg & "|" & lgP(lgI)) And dLigSrv.Exists(pepLg & "|" & lgP(lgI)) Then
+                    sLg = sLg & IIf(sLg = "", "", ", ") & lgP(lgI)
+                End If
+            End If
+        Next lgI
+        If sLg <> "" Then dLigKeyOk(kLg) = sLg
+    Next kLg
 
     Dim ks As Variant: ks = dKeys.Keys
 
@@ -4710,6 +4805,8 @@ ProxEQ:
             End If
             ' CH FUS paga por servico especifico (5500000618 / 5500200645)
             If Not aderiu And chFusCov.Exists(pep4v) And NormClassif(clsv) = "CH FUS" Then aderiu = True
+            ' LIGACAO SERV X MAT: grupo de ligacao fechado no PEP4 (material + servico)
+            If Not aderiu And dLigKeyOk.Exists(ks(r)) Then aderiu = True
             ' TRAFO / REGULADOR (MAT) coberto por SRV de TRAFO_OU_REGULADOR no PEP.
             If Not aderiu And dTrafOrRegSrv.Exists(pep4v) And dTrafHasMatPep.Exists(pep4v) _
                And (NormClassif(clsv) = "TRAFO" Or NormClassif(clsv) = "REGULADOR") Then aderiu = True
@@ -4822,12 +4919,13 @@ ProxEQ:
         Next r
     End If
 
-    Dim outp() As Variant: ReDim outp(0 To nKeep, 1 To 15)
+    Dim outp() As Variant: ReDim outp(0 To nKeep, 1 To 16)
     outp(0, 1) = "STATUS_PEP3NIVEL": outp(0, 2) = "PEP3NIVEL": outp(0, 3) = "PEP4NIVEL"
     outp(0, 4) = "CLS2": outp(0, 5) = "TIPO"
     outp(0, 6) = "MAT": outp(0, 7) = "SRV": outp(0, 8) = "DIFERENCA"
     outp(0, 9) = "SITUACAO": outp(0, 10) = "TIPO_PEP": outp(0, 11) = "PI"
     outp(0, 12) = "OBS1": outp(0, 13) = "OBS2": outp(0, 14) = "FAMILIA": outp(0, 15) = "NVL_FAM"
+    outp(0, 16) = "LIGACAO SERV X MAT"
 
     Dim rr As Long, p As Variant, pp As String, mq As Double, sq As Double, dif As Double
     Dim p3MvS As String
@@ -4918,6 +5016,9 @@ ProxEQ:
         ElseIf chFusCov.Exists(pp) And NormClassif(CStr(p(1))) = "CH FUS" Then
             outp(rr, 8) = dif
             outp(rr, 9) = "ADERENTE"   ' CH fusivel paga por servico (5500000618/5500200645)
+        ElseIf dLigKeyOk.Exists(ks(r)) Then
+            outp(rr, 8) = dif
+            outp(rr, 9) = "ADERENTE"   ' grupo LIGACAO SERV X MAT fechado no PEP4
         ElseIf dTrafOrRegSrv.Exists(pp) And dTrafHasMatPep.Exists(pp) And _
                (NormClassif(CStr(p(1))) = "TRAFO" Or _
                 NormClassif(CStr(p(1))) = "REGULADOR") Then
@@ -4976,6 +5077,8 @@ ProxEQ:
         ' FAMILIA (campo do catalogo de materiais); vazio p/ chave so de servico
         outp(rr, 14) = IIf(dFamKey.Exists(ks(r)), CStr(dFamKey(ks(r))), "")
         outp(rr, 15) = FamiliaNivel(CStr(p(1)))   ' nivel da familia (FAMILIAS_ATUAIS)
+        ' LIGACAO SERV X MAT: numero(s) do grupo de ligacao fechado nesta linha
+        If dLigKeyOk.Exists(ks(r)) Then outp(rr, 16) = CStr(dLigKeyOk(ks(r)))
 
         ' -------------------------------------------------------------------
         ' FASE 1.2: alimenta os vereditos ODI em memoria, replicando a regra
@@ -6120,6 +6223,7 @@ Private Sub Gerar_Regras()
     s = s & "ADERENCIA|RAMAL cobre cabo (30 m por servico)|Cada servico de RAMAL libera 30 m. Se SRV(RAMAL) x 30 cobrir (>=) o total de cabo do PEP, os cabos/condutores ficam ADERENTES." & vbLf
     s = s & "ADERENCIA|RELIGADOR (60 m por servico)|Cada servico de RELIGADOR libera 60 m para tornar aderentes COND PROT, CABO ISOLADO e COND COBRE (2 servicos = 120 m, etc.)." & vbLf
     s = s & "ADERENCIA|TRAFO -> CH FUS (1F=1 / 3F=3)|Cada trafo instalado espera chaves fusiveis: monofasico (1F) = 1 CH FUS; trifasico (3F) = 3 CH FUS. A fase vem do texto do trafo. CH FUS e ADERENTE se a qtd de material nao exceder o esperado pelos trafos do PEP. PARA RAIO MT/BT seguem cobertos pelo servico de trafo/regulador." & vbLf
+    s = s & "ADERENCIA|LIGACAO SERV X MAT|Grupos de ligacao (planilha LIGACAO DE MATERIAL E SERVICO) unem codigos de servico e material, inclusive de familias diferentes. Quando o PEP4 tem material E servico do mesmo grupo lancados, a ligacao fecha: as linhas dessas familias ficam ADERENTES e a coluna LIGACAO SERV X MAT mostra o numero do grupo." & vbLf
     s = s & "ADERENCIA|COND NU + CORDOALHA|O servico de COND NU contempla o material CORDOALHA no mesmo PEP." & vbLf
     s = s & "ADERENCIA|CH SU FACA (PI = ERD)|Em PI do tipo ERD, cada servico de RELIGADOR deixa aderentes ate 6 CH SU FACA." & vbLf
     s = s & "ADERENCIA|COND COBRE como conexao da CH SU FACA|Quando ha servico de CH SU FACA no PEP, o COND COBRE (conexao) fica ADERENTE." & vbLf
