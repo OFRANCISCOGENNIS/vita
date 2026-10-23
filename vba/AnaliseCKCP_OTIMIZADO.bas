@@ -166,7 +166,7 @@ Sub GerarRelatorio()
     abasObsoletas = Array("RISCO", "ANOMALIAS", "ANALISE REGIONAL", _
                           "PEND CLASSIFICACAO", "RESUMO POR PEP", "CLASSIFICACAO", _
                           "MAT vs SERV AT", "PREMISSAS", "CLASSE DE CUSTO", _
-                          "PAINEL EXECUTIVO", "PORTFOLIO OBRA")
+                          "PAINEL EXECUTIVO", "PORTFOLIO OBRA", "RACIONALIZACAO COM")
     Dim ix As Long
     For ix = 0 To UBound(abasObsoletas)
         On Error Resume Next
@@ -239,7 +239,7 @@ Sub GerarRelatorio()
     gEtapa = "Gerar_AnaliseCA": ta = Timer: Gerar_AnaliseCA: dTempos("ANALISE DE CA") = Timer - ta
     gEtapa = "Gerar_ServicoSemMaterial": ta = Timer: Gerar_ServicoSemMaterial: dTempos("SERVICO SEM MATERIAL") = Timer - ta
     gEtapa = "Gerar_NaoClassificados": ta = Timer: Gerar_NaoClassificados: dTempos("NAO CLASSIFICADOS") = Timer - ta
-    gEtapa = "Gerar_RacionalizacaoCOM": ta = Timer: Gerar_RacionalizacaoCOM: dTempos("RACIONALIZACAO COM") = Timer - ta
+    ' RACIONALIZACAO COM removida (arquivo mais leve); a aba antiga e apagada em abasObsoletas.
     gEtapa = "Gerar_Regras": ta = Timer: Gerar_Regras: dTempos("REGRAS") = Timer - ta
 
     ' Checklist do processo: criado automaticamente (preserva marcacoes se ja existir)
@@ -7230,293 +7230,6 @@ ProxNC:
 End Sub
 
 
-'==============================================================================
-'  ABA: RACIONALIZACAO COM
-'  Valida materiais COM contra gabaritos de proporcao NT.006 (13,8kV).
-'  Para cada PEP4 + material COM, verifica se a quantidade esta dentro da
-'  faixa esperada em relacao a sua ancora (ex.: 2-3 isoladores por cruzeta).
-'
-'  Status possiveis:
-'    ANCORA          — material de referencia (ex.: CRUZETA)
-'    OK              — dentro da faixa NT.006 (±10%)
-'    EXCESSO         — acima da faixa maxima
-'    INSUFICIENTE    — abaixo da faixa minima
-'    SEM ANCORA      — ancora nao lancada no mesmo PEP
-'    ESTORNO SEM ENTRADA — qtd liquida negativa
-'    QTD ZERO        — qtd liquida = 0
-'    SEM REFERENCIA  — material nao mapeado no NT.006
-'==============================================================================
-Private Sub Gerar_RacionalizacaoCOM()
-
-    ' --- Carrega mapa NT.006 ---
-    Dim nt006RC As Object: Set nt006RC = CriarMapaNT006_RC()
-
-    ' --- Consolida COMs por PEP4 + COD_MATERIAL (qtd liquida) ---
-    Dim dQRC As Object: Set dQRC = CreateObject("Scripting.Dictionary")
-    Dim dInfoRC As Object: Set dInfoRC = CreateObject("Scripting.Dictionary")
-
-    Dim i As Long, pepRC As String, matRC As String, kRC As String, qRC As Double
-    For i = 1 To UBound(dados, 1)
-        pepRC = Trim$(CStr(dados(i, cPEP))): If pepRC = "" Then GoTo ProxRC
-        If UCase$(Trim$(CStr(dados(i, cClassif)))) <> "COM" Then GoTo ProxRC
-        matRC = NormCod(dados(i, cMaterial))
-        If matRC = "" Or matRC = "0" Then GoTo ProxRC
-        qRC = ToNum(dados(i, cQtd))
-        kRC = pepRC & "|" & matRC
-        dQRC(kRC) = dQRC(kRC) + qRC
-        If Not dInfoRC.Exists(kRC) Then
-            dInfoRC(kRC) = Array(pepRC, ValorCampo(i, cTexto), ValorCampo(i, cUML))
-        End If
-ProxRC:
-    Next i
-
-    ' --- Calcula ancoras por PEP4 + familia ---
-    Dim dAncRC As Object: Set dAncRC = CreateObject("Scripting.Dictionary")
-    Dim kvRC As Variant
-    For Each kvRC In dQRC.Keys
-        Dim pvRC() As String: pvRC = Split(CStr(kvRC), "|")
-        Dim p4RC As String: p4RC = CStr(pvRC(0))
-        Dim mRC As String: mRC = CStr(pvRC(1))
-        If nt006RC.Exists(mRC) Then
-            Dim tmRC As Object: Set tmRC = nt006RC(mRC)
-            If CBool(tmRC("EhAncora")) Then
-                Dim aKRC As String: aKRC = p4RC & "|" & CStr(tmRC("Familia"))
-                dAncRC(aKRC) = dAncRC(aKRC) + CDbl(dQRC(kvRC))
-            End If
-        End If
-    Next kvRC
-
-    ' --- Monta output (sem pre-ordenacao; OrdenarAba cuida do sort) ----------
-    Dim nRC As Long: nRC = dQRC.Count
-    Dim outpRC() As Variant: ReDim outpRC(0 To nRC, 1 To 15)
-    outpRC(0, 1)  = "PEP4NIVEL":         outpRC(0, 2)  = "PEP3NIVEL"
-    outpRC(0, 3)  = "COD_MATERIAL":      outpRC(0, 4)  = "DESCRICAO_MATERIAL"
-    outpRC(0, 5)  = "UML":               outpRC(0, 6)  = "QTD_LIQUIDA"
-    outpRC(0, 7)  = "FAMILIA_NT006":     outpRC(0, 8)  = "COD_NT006"
-    outpRC(0, 9)  = "DESCRICAO_NT006":   outpRC(0, 10) = "ANCORA_FAMILIA"
-    outpRC(0, 11) = "QTD_ANCORA":        outpRC(0, 12) = "FAIXA_MIN"
-    outpRC(0, 13) = "FAIXA_MAX":         outpRC(0, 14) = "REGRA_NT006"
-    outpRC(0, 15) = "STATUS_VALIDACAO"
-
-    Dim rrRC As Long: rrRC = 0
-    For Each kvRC In dQRC.Keys
-        kRC = CStr(kvRC)
-        pvRC = Split(kRC, "|")
-        p4RC = CStr(pvRC(0)): mRC = CStr(pvRC(1))
-        Dim qtdLRC As Double: qtdLRC = CDbl(dQRC(kRC))
-        Dim infRC As Variant: infRC = dInfoRC(kRC)
-
-        Dim famRC As String: famRC = "SEM REFERENCIA"
-        Dim codNTRC As String: codNTRC = "-"
-        Dim descrNTRC As String: descrNTRC = ""
-        Dim ancFamRC As String: ancFamRC = ""
-        Dim qtdAncRC As Double: qtdAncRC = 0
-        Dim fMinRC As Double: fMinRC = 0
-        Dim fMaxRC As Double: fMaxRC = 0
-        Dim regraRC As String: regraRC = ""
-        Dim statusRC As String: statusRC = "SEM REFERENCIA"
-        Dim ehAncRC As Boolean: ehAncRC = False
-
-        If nt006RC.Exists(mRC) Then
-            Dim tmRCv As Object: Set tmRCv = nt006RC(mRC)
-            famRC    = CStr(tmRCv("Familia"))
-            codNTRC  = CStr(tmRCv("CodNT006"))
-            descrNTRC = CStr(tmRCv("DescrNT006"))
-            ehAncRC  = CBool(tmRCv("EhAncora"))
-            regraRC  = CStr(tmRCv("DescrRegra"))
-            ancFamRC = CStr(tmRCv("AncoraDep"))
-
-            If ehAncRC Then
-                If qtdLRC < 0 Then
-                    statusRC = "ESTORNO SEM ENTRADA"
-                ElseIf qtdLRC = 0 Then
-                    statusRC = "QTD ZERO"
-                Else
-                    statusRC = "ANCORA"
-                End If
-            Else
-                Dim ancKRC As String: ancKRC = p4RC & "|" & ancFamRC
-                If dAncRC.Exists(ancKRC) Then
-                    qtdAncRC = CDbl(dAncRC(ancKRC))
-                    fMinRC = qtdAncRC * CDbl(tmRCv("RazaoMin")) * 0.9
-                    fMaxRC = qtdAncRC * CDbl(tmRCv("RazaoMax")) * 1.1
-                    If qtdLRC < 0 Then
-                        statusRC = "ESTORNO SEM ENTRADA"
-                    ElseIf qtdAncRC <= 0 Then
-                        statusRC = "SEM ANCORA"
-                    ElseIf qtdLRC < fMinRC Then
-                        statusRC = "INSUFICIENTE"
-                    ElseIf qtdLRC > fMaxRC Then
-                        statusRC = "EXCESSO"
-                    Else
-                        statusRC = "OK"
-                    End If
-                Else
-                    statusRC = "SEM ANCORA"
-                    ancFamRC = ancFamRC & " (nao lancada)"
-                End If
-            End If
-        End If
-
-        rrRC = rrRC + 1
-        outpRC(rrRC, 1)  = p4RC
-        outpRC(rrRC, 2)  = PEP3(p4RC)
-        outpRC(rrRC, 3)  = mRC
-        outpRC(rrRC, 4)  = CStr(infRC(1))
-        outpRC(rrRC, 5)  = CStr(infRC(2))
-        outpRC(rrRC, 6)  = Round(qtdLRC, 3)
-        outpRC(rrRC, 7)  = famRC
-        outpRC(rrRC, 8)  = codNTRC
-        outpRC(rrRC, 9)  = descrNTRC
-        outpRC(rrRC, 10) = ancFamRC
-        outpRC(rrRC, 11) = IIf(qtdAncRC > 0, Round(qtdAncRC, 3), "")
-        outpRC(rrRC, 12) = IIf(fMinRC > 0, Round(fMinRC, 2), "")
-        outpRC(rrRC, 13) = IIf(fMaxRC > 0, Round(fMaxRC, 2), "")
-        outpRC(rrRC, 14) = regraRC
-        outpRC(rrRC, 15) = statusRC
-    Next kvRC
-
-    EscreverAba "RACIONALIZACAO COM", outpRC
-
-    ' --- Colore coluna STATUS apos escrita (FASE 3.1: em blocos) -------------
-    ' Le a coluna ja ORDENADA da planilha e agrupa statuses contiguos.
-    Dim wsRC As Worksheet: Set wsRC = ActiveWorkbook.Worksheets("RACIONALIZACAO COM")
-    If rrRC >= 1 Then
-        Dim ultRC As Long: ultRC = rrRC + 1
-        Dim arrSt As Variant
-        If ultRC = 2 Then
-            ReDim arrSt(1 To 1, 1 To 1)
-            arrSt(1, 1) = wsRC.Cells(2, 15).Value
-        Else
-            arrSt = wsRC.Range(wsRC.Cells(2, 15), wsRC.Cells(ultRC, 15)).Value
-        End If
-        Dim stAnt As String, stCur As String, iniSt As Long, rr2 As Long
-        stAnt = Chr$(1): iniSt = 1
-        For rr2 = 1 To UBound(arrSt, 1)
-            stCur = UCase$(Trim$(CStr(arrSt(rr2, 1))))
-            If stCur <> stAnt Then
-                If rr2 > 1 Then PintarStatusRC wsRC, iniSt + 1, rr2, stAnt
-                stAnt = stCur: iniSt = rr2
-            End If
-        Next rr2
-        PintarStatusRC wsRC, iniSt + 1, UBound(arrSt, 1) + 1, stAnt
-    End If
-End Sub
-
-
-'==============================================================================
-'  MAPA NT.006 — retorna Dictionary: codSAP -> Dictionary com campos do material
-'  Usa Dictionary aninhado em vez de Type para compatibilidade com o modulo.
-'==============================================================================
-Private Function CriarMapaNT006_RC() As Object
-    Dim d As Object: Set d = CreateObject("Scripting.Dictionary")
-
-    ' Helper interno
-    ' AddMatRC d, cod, familia, nt006, descr, ehAncora, ancDep, rMin, rMax, regra
-
-    ' === CRUZETAS (ancora) ===
-    AddMatRC d, "133100007", "CRUZETA", "R-02", "Cruzeta concreto T 1900mm",    True,  "",             0,   0,   ""
-    AddMatRC d, "133100001", "CRUZETA", "R-02", "Cruzeta concreto L 1700mm",    True,  "",             0,   0,   ""
-    AddMatRC d, "133100006", "CRUZETA", "R-02", "Cruzeta concreto T 2200mm",    True,  "",             0,   0,   ""
-    AddMatRC d, "133400012", "CRUZETA", "R-02", "Cruzeta PRFV 90x112,5 2,4m",  True,  "",             0,   0,   ""
-    AddMatRC d, "133400003", "CRUZETA", "R-02", "Cruzeta PRFV",                 True,  "",             0,   0,   ""
-    AddMatRC d, "133400004", "CRUZETA", "R-02", "Cruzeta PRFV",                 True,  "",             0,   0,   ""
-
-    ' === ISOLADOR PILAR: 2-3 por cruzeta ===
-    AddMatRC d, "123140003", "ISOLADOR PILAR", "I-05", "Isolador pilar 15kV M16",    False, "CRUZETA", 2, 3.5, "2-3 iso. pilar por cruzeta (N1=3)"
-    AddMatRC d, "123140016", "ISOLADOR PILAR", "I-05", "Isolador pilar 24,2kV M16",  False, "CRUZETA", 2, 3.5, "2-3 iso. pilar por cruzeta"
-    AddMatRC d, "123140015", "ISOLADOR PILAR", "I-05", "Isolador pilar polim. 25kV", False, "CRUZETA", 2, 3.5, "2-3 iso. pilar por cruzeta"
-    AddMatRC d, "123140014", "ISOLADOR PILAR", "I-05", "Isolador pilar",             False, "CRUZETA", 2, 3.5, "2-3 iso. pilar por cruzeta"
-
-    ' === ISOLADOR SUSPENSAO (ancora) ===
-    AddMatRC d, "123230001", "ISOL SUSPENSAO", "I-06", "Isolador suspensao polim. 15kV", True, "", 0, 0, ""
-    AddMatRC d, "123230002", "ISOL SUSPENSAO", "I-06", "Isolador suspensao",             True, "", 0, 0, ""
-
-    ' === ARRUELA: 2-8 por cruzeta ===
-    AddMatRC d, "134830013", "ARRUELA", "A-02", "Arruela quad. 38x38x3mm F18", False, "CRUZETA", 2, 9, "2-8 arruelas por cruzeta"
-    AddMatRC d, "134830014", "ARRUELA", "A-02", "Arruela quad. lis 18x50x3mm", False, "CRUZETA", 2, 9, "2-8 arruelas por cruzeta"
-    AddMatRC d, "134830051", "ARRUELA", "A-02", "Arruela red pres M18",        False, "CRUZETA", 2, 9, "2-8 arruelas por cruzeta"
-
-    ' === PARAFUSO: 1-8 por cruzeta ===
-    AddMatRC d, "134700040", "PARAFUSO", "F-30", "Parafuso cab qd 125mm M16x2", False, "CRUZETA", 1, 8, "1-8 parafusos por cruzeta"
-    AddMatRC d, "134700043", "PARAFUSO", "F-30", "Parafuso cab qd 200mm M16x2", False, "CRUZETA", 1, 8, "1-8 parafusos por cruzeta"
-    AddMatRC d, "134700046", "PARAFUSO", "F-30", "Parafuso cab qd 250mm M16x2", False, "CRUZETA", 1, 8, "1-8 parafusos por cruzeta"
-    AddMatRC d, "134700047", "PARAFUSO", "F-30", "Parafuso cab qd 300mm M16x2", False, "CRUZETA", 1, 8, "1-8 parafusos por cruzeta"
-    AddMatRC d, "134700049", "PARAFUSO", "F-30", "Parafuso cab qd 400mm M16x2", False, "CRUZETA", 1, 8, "1-8 parafusos por cruzeta"
-    AddMatRC d, "134700028", "PARAFUSO", "F-30", "Parafuso cab abaul 16x45mm",  False, "CRUZETA", 1, 8, "1-8 parafusos por cruzeta"
-    AddMatRC d, "134700030", "PARAFUSO", "F-30", "Parafuso cab abaul 16x150mm", False, "CRUZETA", 1, 8, "1-8 parafusos por cruzeta"
-    AddMatRC d, "134700082", "PARAFUSO", "F-30", "Parafuso rosca dupla 16x500", False, "CRUZETA", 1, 8, "1-8 parafusos por cruzeta"
-
-    ' === PINO: 2-3 por cruzeta ===
-    AddMatRC d, "134280005", "PINO", "F-36", "Pino iso pilar autotrav M16x2", False, "CRUZETA", 2, 3.5, "~3 pinos por cruzeta (1 por isolador pilar)"
-    AddMatRC d, "134280002", "PINO", "F-37", "Pino curto suporte topo",       False, "CRUZETA", 1, 2.5, "1-2 pinos curtos por cruzeta"
-
-    ' === PORCA: 2-6 por cruzeta ===
-    AddMatRC d, "134800002", "PORCA", "A-21", "Porca quad. M16x2", False, "CRUZETA", 2, 6.5, "2-6 porcas por cruzeta"
-
-    ' === SELA DE CRUZETA: 2-4 por cruzeta ===
-    AddMatRC d, "134380004", "SELA CRUZETA", "-", "Sela cruzeta 110x116mm", False, "CRUZETA", 2, 4, "2-3 selas por cruzeta trifasica"
-    AddMatRC d, "134380005", "SELA CRUZETA", "-", "Sela cruzeta",           False, "CRUZETA", 2, 4, "2-3 selas por cruzeta"
-
-    ' === MAO FRANCESA: 1-2 por cruzeta ===
-    AddMatRC d, "134100006", "MAO FRANCESA", "-", "Mao francesa plana 726x38x5mm", False, "CRUZETA", 0.5, 2.5, "1-2 maos-francesas por cruzeta"
-
-    ' === GANCHO OLHAL (ancora suspensao) ===
-    AddMatRC d, "134250015", "GANCHO OLHAL", "F-13", "Gancho olhal 5000daN", True, "", 0, 0, ""
-
-    ' === MANILHA / OLHAL: 1:1 com gancho ===
-    AddMatRC d, "134200006", "MANILHA",        "F-22", "Manilha sapatilha 5000daN",  False, "GANCHO OLHAL", 0.8, 1.2, "1 manilha por ponto de suspensao"
-    AddMatRC d, "134250023", "OLHAL PARAFUSO", "-",    "Olhal parafuso M16 5000daN", False, "GANCHO OLHAL", 0.8, 1.2, "1 olhal por ponto de suspensao"
-    AddMatRC d, "134740023", "PARAFUSO OLHAL", "F-34", "Parafuso olhal M16x250mm",   False, "GANCHO OLHAL", 0.8, 1.2, "1 parafuso olhal por ponto de suspensao"
-
-    ' === HASTE DE ATERRAMENTO (ancora AT) ===
-    AddMatRC d, "134600010", "HASTE TERRA", "F-17", "Haste aco-cobreado 14,3mm 2,4m", True, "", 0, 0, ""
-    AddMatRC d, "134600004", "HASTE TERRA", "F-17", "Haste aco-cobreado 12,7mm 2,4m", True, "", 0, 0, ""
-
-    ' === CONECTOR HASTE: 1:1 com haste ===
-    AddMatRC d, "124140026", "CONEC HASTE", "M-10", "Conector cunha haste 6-16mm",  False, "HASTE TERRA", 0.8, 1.2, "1 conector por haste de aterramento"
-    AddMatRC d, "124140078", "CONEC HASTE", "M-10", "Conector aterramento p/haste", False, "HASTE TERRA", 0.8, 1.2, "1 conector por haste de aterramento"
-    AddMatRC d, "124140011", "CONEC HASTE", "M-10", "Conector cunha haste",         False, "HASTE TERRA", 0.8, 1.2, "1 conector por haste de aterramento"
-
-    ' === SUPORTE PARA-RAIOS (ancora PR) ===
-    AddMatRC d, "134190064", "SUP PARA-RAIO", "F-47", "Suporte L para-raios 38x205", True, "", 0, 0, ""
-
-    ' === PARA-RAIOS: 1:1 com suporte ===
-    AddMatRC d, "104010001", "PARA-RAIO", "E-29", "Para-raios ZnO 12kV 10kA", False, "SUP PARA-RAIO", 0.8, 1.2, "1 para-raios por suporte (1:1)"
-    AddMatRC d, "104010004", "PARA-RAIO", "E-29", "Para-raios ZnO 15kV",      False, "SUP PARA-RAIO", 0.8, 1.2, "1 para-raios por suporte (1:1)"
-
-    ' === CHAVE FUSIVEL (ancora) ===
-    AddMatRC d, "105300003", "CHAVE FUSIVEL", "E-09", "Chave fusivel 15kV 100A base C", True, "", 0, 0, ""
-
-    ' === TRANSFORMADOR (ancora) ===
-    AddMatRC d, "102100035", "TRAFO", "E-45", "Trafo trifasico 13,8kV 500kVA", True, "", 0, 0, ""
-    AddMatRC d, "102100036", "TRAFO", "E-45", "Trafo trifasico 13,8kV",        True, "", 0, 0, ""
-    AddMatRC d, "102100030", "TRAFO", "E-45", "Trafo monofasico",               True, "", 0, 0, ""
-
-    ' === CONECTOR RAMAL (ancora informativo) ===
-    AddMatRC d, "124010010", "CONEC RAMAL", "O-02", "Conector cunha CuEst tipo II",  True, "", 0, 0, ""
-    AddMatRC d, "124010012", "CONEC RAMAL", "O-02", "Conector cunha CuEst tipo III", True, "", 0, 0, ""
-
-    Set CriarMapaNT006_RC = d
-End Function
-
-Private Sub AddMatRC(d As Object, ByVal cod As String, ByVal familia As String, _
-                     ByVal nt006 As String, ByVal descr As String, ByVal ehAnc As Boolean, _
-                     ByVal ancDep As String, ByVal rMin As Double, ByVal rMax As Double, _
-                     ByVal regra As String)
-    If d.Exists(cod) Then Exit Sub   ' primeiro registro vence
-    Dim m As Object: Set m = CreateObject("Scripting.Dictionary")
-    m("Familia")    = familia
-    m("CodNT006")   = nt006
-    m("DescrNT006") = descr
-    m("EhAncora")   = ehAnc
-    m("AncoraDep")  = ancDep
-    m("RazaoMin")   = rMin
-    m("RazaoMax")   = rMax
-    m("DescrRegra") = regra
-    d.Add cod, m
-End Sub
-
 
 '==============================================================================
 '  FUNCOES ADICIONADAS NAS FASES 1, 3 e 4 (refatoracao)
@@ -7623,27 +7336,6 @@ Private Sub PintarRunVeredito(ws As Worksheet, ByVal jc As Long, _
                 .Interior.Color = COR_UI_NEU_BG
                 .Font.Color = COR_UI_NEU_FG
         End Select
-    End With
-End Sub
-
-Private Sub PintarStatusRC(ws As Worksheet, ByVal linIni As Long, _
-                           ByVal linFim As Long, ByVal st As String)
-    Dim bgRC As Long, fgRC As Long
-    Select Case st
-        Case "OK":                  bgRC = COR_UI_OK_BG:   fgRC = COR_UI_OK_FG
-        Case "ANCORA":              bgRC = COR_UI_INFO_BG: fgRC = COR_UI_INFO_FG
-        Case "EXCESSO":             bgRC = COR_UI_WARN_BG: fgRC = COR_UI_WARN_FG
-        Case "INSUFICIENTE":        bgRC = COR_UI_BAD_BG:  fgRC = COR_UI_BAD_FG
-        Case "ESTORNO SEM ENTRADA": bgRC = COR_UI_BAD_BG:  fgRC = COR_UI_BAD_FG
-        Case "QTD ZERO":            bgRC = COR_UI_BAD_BG:  fgRC = COR_UI_BAD_FG
-        Case "SEM ANCORA":          bgRC = COR_UI_WARN_BG: fgRC = COR_UI_NEU_FG
-        Case Else:                  bgRC = COR_UI_NEU_BG:  fgRC = COR_UI_NEU_FG
-    End Select
-    With ws.Range(ws.Cells(linIni, 15), ws.Cells(linFim, 15))
-        .Interior.Color = bgRC
-        .Font.Color = fgRC
-        .Font.Name = FONTE_UI
-        .Font.Bold = True
     End With
 End Sub
 
@@ -8053,7 +7745,7 @@ Private Sub OrganizarAbas()
     ordem = Array("PAINEL EXECUTIVO", "CHECKLIST CKCP", "PORTFOLIO OBRA", _
                   "ALERTAS CRITICOS", "MATERIAL vs SERVICO", "MATERIAL", "SERVICO", _
                   "SERVICO SEM MATERIAL", "ANALISE DE CA", _
-                  "NAO CLASSIFICADOS", "RACIONALIZACAO COM", "RAZAO CJ", "REGRAS")
+                  "NAO CLASSIFICADOS", "RAZAO CJ", "REGRAS")
     pos = 0
     For i = 0 To UBound(ordem)
         Set ws = Nothing

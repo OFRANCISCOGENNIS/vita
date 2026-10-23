@@ -107,7 +107,6 @@ Versão atual: **8.745 linhas · 71 Subs · 75 Functions** (módulo `AnaliseCKCP
 | 5751 | `Sub Gerar_ServicoSemMaterial()` | `SERVICO SEM MATERIAL` |
 | 5856 | `Sub Gerar_PortfolioObra()` | `PORTFOLIO OBRA` |
 | 6031 | `Sub Gerar_NaoClassificados()` | `NAO CLASSIFICADOS` |
-| 6114 | `Sub Gerar_RacionalizacaoCOM()` | `RACIONALIZACAO COM` |
 | 6939 | `Sub Gerar_MatVsServAT()` | `MAT vs SERV AT` (módulo AT) |
 | 8204 | `Sub CriarPremissas()` | `PREMISSAS` |
 
@@ -117,8 +116,8 @@ Versão atual: **8.745 linhas · 71 Subs · 75 Functions** (módulo `AnaliseCKCP
 ### Helpers de ALERTAS
 5153 `EscreverCardAlerta` · 5195 `EscreverCabecalhoAlerta`
 
-### Helpers de RACIONALIZACAO COM
-6276 `CriarMapaNT006_RC` · 6368 `AddMatRC` · 6390 `EhPepEmergencia` · 6395 `AtvPrevista`
+### Helpers diversos
+6390 `EhPepEmergencia` · 6395 `AtvPrevista`
 
 ### Classes de viagem
 5724 `EhClasseViagem` · 5735 `DescClasseViagem`
@@ -244,3 +243,5 @@ Versão atual: **8.745 linhas · 71 Subs · 75 Functions** (módulo `AnaliseCKCP
 - `122060001` (cabo aco cobreado): < 10 kg no PEP4 nao reprova a familia (`AcoCobreadoIsento`).
 - `124030044`, `124180290`: material forcado CONECTOR / MAT. COM (`MatInfoLinha`).
 - `5500000817`: servico forcado CLS2 EQUIPAMENTO MONOFASICO (`Cls2SrvOverride` + `ReclasSrv`).
+
+- Aba `RACIONALIZACAO COM` removida (arquivo mais leve): Sub `Gerar_RacionalizacaoCOM` e helpers NT.006 excluidos; aba antiga apagada via `abasObsoletas`.

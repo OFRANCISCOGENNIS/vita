@@ -38,7 +38,6 @@ GarantirConfig / CarregarConfig
   → Gerar_AnaliseCA
   → Gerar_ServicoSemMaterial
   → Gerar_NaoClassificados
-  → Gerar_RacionalizacaoCOM
   → Gerar_Regras
   → OrganizarAbas
   → MostrarTelaFuturista        (painel HUD desenhado com Shapes)
@@ -61,7 +60,6 @@ GarantirConfig / CarregarConfig
 | `SERVICO SEM MATERIAL` | Serviços lançados sem material correspondente |
 | `PORTFOLIO OBRA` | Portfólio de obras por PEP |
 | `NAO CLASSIFICADOS` | Itens sem classificação CLS1/2/3 |
-| `RACIONALIZACAO COM` | Racionalização de itens COM |
 | `CONFIG` | Parâmetros centralizados (editável pelo usuário) |
 | `PREMISSAS` | Premissas e regras de negócio documentadas |
 
@@ -187,7 +185,6 @@ Dois códigos de serviço recebem `CLS2 = "COND PROT"` forçado para casar com m
 - **ClassificacaoPendente**: CLS3 vazio, ou qualquer nível com valor "CLASSIFICAR".
 - **Classes de viagem**: marcadas no catálogo de classes; excluídas de certas análises.
 - **PEP emergência**: identificado por função `EhPepEmergencia`; tratamento diferenciado.
-- **Racionalização COM**: cruza itens COM com mapa NT006 para identificar sobreposições.
 
 ## Índice rápido de Subs/Functions
 
