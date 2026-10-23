@@ -4711,6 +4711,29 @@ Prox:
         End If
     Next kEq
 
+    ' CH FUS x CH SU FACA sao ligadas: no PEP4, soma MAT e SRV das duas familias;
+    ' se o total de MAT bate com o total de SRV (margem), as duas ficam ADERENTES.
+    Dim dFxM As Object: Set dFxM = CreateObject("Scripting.Dictionary")
+    Dim dFxS As Object: Set dFxS = CreateObject("Scripting.Dictionary")
+    Dim pFx As String, kFx As Variant
+    For Each kFx In dKeys.Keys
+        Select Case NormClassif(Split(CStr(kFx), "|")(1))
+            Case "CH FUS", "CH SU FACA"
+                pFx = Split(CStr(kFx), "|")(0)
+                If dMat.Exists(kFx) Then dFxM(pFx) = dFxM(pFx) + Abs(dMat(kFx))
+                If dSrv.Exists(kFx) Then dFxS(pFx) = dFxS(pFx) + Abs(dSrv(kFx))
+        End Select
+    Next kFx
+    For Each kFx In dKeys.Keys
+        Select Case NormClassif(Split(CStr(kFx), "|")(1))
+            Case "CH FUS", "CH SU FACA"
+                pFx = Split(CStr(kFx), "|")(0)
+                If dFxM(pFx) > 0 And dFxS(pFx) > 0 And DentroMargem(dFxM(pFx), dFxS(pFx)) Then
+                    If Not dLigKeyOk.Exists(kFx) Then dLigKeyOk(kFx) = "CH FUS/FACA"
+                End If
+        End Select
+    Next kFx
+
     Dim ks As Variant: ks = dKeys.Keys
 
     ' 1a passada: conta as chaves que NAO sao NULO (MAT=0 e SRV=0)
@@ -6424,6 +6447,7 @@ Private Sub Gerar_Regras()
     s = s & "UNIFICACAO DE FAMILIAS|Equivalencias so para servico|O de-para EQUIV_SRV_MAT (CONEXAO->CONECTOR, ESTRUT RDC->ESPACADOR LOSAG, ESTRUT MT S/CRUZ->CRUZETA, CONECTOR->RAMAL...) vale apenas para a familia do SERVICO. Nomes de familia sao comparados sem acento (ESPACADOR = ESPACADOR com cedilha)." & vbLf
     s = s & "ADERENCIA|5025300148 RET ESTR CP TRAFO DT 3F|Cada servico 5025300148 no PEP4 paga 3 retiradas de CH FUS e 3 retiradas de PARA RAIO MT: essas familias ficam ADERENTES se MAT <= SRV da familia + 3 x qtd do servico." & vbLf
     s = s & "QUANTIDADE|Cabos 122020001 / 122020008|Na MATERIAL vs SERVICO: 122020001 (POPPY) = QTD x 6,78; 122020008 (RAVEN) = QTD x 4,63. Na aba MATERIAL continuam em KG." & vbLf
+    s = s & "ADERENCIA|CH FUS x CH SU FACA|Familias ligadas: no PEP4 soma MAT e SRV de CH FUS + CH SU FACA; se o total de MAT bate com o de SRV (margem), as duas ficam ADERENTES (LIGACAO = CH FUS/FACA). Ex.: CH FUS MAT 1 + CH SU FACA SRV 1." & vbLf
     s = s & "QUANTIDADE|SRV x3 (576/581)|Servicos 5500000576 e 5500000581 equivalem a 3 cabos: QTD x3 na aba SERVICO e na MATERIAL vs SERVICO (familia COND PROT)." & vbLf
     s = s & "CLASSIFICACAO|OVERRIDES FIXOS|Materiais 124030044 e 124180290 = CONECTOR / MAT. COM. Material 179340003 (SUCATA POSTE MADEIRA) = POSTE RD / MAT. UC. Servico 5500000817 = CLS2 EQUIPAMENTO MONOFASICO. Servico 5500000572 = CLS2 COND PROT, QTD x3 na MATERIAL vs SERVICO." & vbLf
     s = s & "ADERENCIA|COND NU + CORDOALHA|O servico de COND NU contempla o material CORDOALHA no mesmo PEP." & vbLf
