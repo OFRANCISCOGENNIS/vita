@@ -4713,28 +4713,36 @@ Prox:
         End If
     Next kEq
 
-    ' CH FUS x CH SU FACA sao ligadas: no PEP4, soma MAT e SRV das duas familias;
-    ' se o total de MAT bate com o total de SRV (margem), as duas ficam ADERENTES.
-    Dim dFxM As Object: Set dFxM = CreateObject("Scripting.Dictionary")
-    Dim dFxS As Object: Set dFxS = CreateObject("Scripting.Dictionary")
-    Dim pFx As String, kFx As Variant
-    For Each kFx In dKeys.Keys
-        Select Case NormClassif(Split(CStr(kFx), "|")(1))
-            Case "CH FUS", "CH SU FACA"
+    ' Pares de familias ligadas (MAT de uma x SRV da outra): no PEP4 soma MAT e
+    ' SRV das duas familias; se o total de MAT bate com o de SRV (margem),
+    ' as duas ficam ADERENTES.
+    '   CH FUS x CH SU FACA ; HASTE ANCORA ESTAI x POSTE CAPITEL
+    Dim parFam As Variant, ip As Long
+    parFam = Array("CH FUS|CH SU FACA|CH FUS/FACA", _
+                   "HASTE ANCORA ESTAI|POSTE CAPITEL|HASTE/POSTE CAPITEL")
+    Dim dFxM As Object, dFxS As Object, pFx As String, kFx As Variant, fPar() As String
+    For ip = 0 To UBound(parFam)
+        fPar = Split(parFam(ip), "|")
+        Set dFxM = CreateObject("Scripting.Dictionary")
+        Set dFxS = CreateObject("Scripting.Dictionary")
+        For Each kFx In dKeys.Keys
+            famN = NormClassif(Split(CStr(kFx), "|")(1))
+            If famN = fPar(0) Or famN = fPar(1) Then
                 pFx = Split(CStr(kFx), "|")(0)
                 If dMat.Exists(kFx) Then dFxM(pFx) = dFxM(pFx) + Abs(dMat(kFx))
                 If dSrv.Exists(kFx) Then dFxS(pFx) = dFxS(pFx) + Abs(dSrv(kFx))
-        End Select
-    Next kFx
-    For Each kFx In dKeys.Keys
-        Select Case NormClassif(Split(CStr(kFx), "|")(1))
-            Case "CH FUS", "CH SU FACA"
+            End If
+        Next kFx
+        For Each kFx In dKeys.Keys
+            famN = NormClassif(Split(CStr(kFx), "|")(1))
+            If famN = fPar(0) Or famN = fPar(1) Then
                 pFx = Split(CStr(kFx), "|")(0)
                 If dFxM(pFx) > 0 And dFxS(pFx) > 0 And DentroMargem(dFxM(pFx), dFxS(pFx)) Then
-                    If Not dLigKeyOk.Exists(kFx) Then dLigKeyOk(kFx) = "CH FUS/FACA"
+                    If Not dLigKeyOk.Exists(kFx) Then dLigKeyOk(kFx) = fPar(2)
                 End If
-        End Select
-    Next kFx
+            End If
+        Next kFx
+    Next ip
 
     Dim ks As Variant: ks = dKeys.Keys
 
@@ -6537,6 +6545,7 @@ Private Sub Gerar_Regras()
     s = s & "ABA MATERIAL|QTD_MVS / CLS2_MVS / CONVERSAO_MVS|Mostram como cada material entra na MATERIAL vs SERVICO: quantidade convertida (cabos KG x fator = metros), familia apos unificacao (ex.: COND NU -> COND PROT) e a formula aplicada." & vbLf
     s = s & "ABA SERVICO|QTD_MVS / CLS2_MVS / CONVERSAO_MVS|Mostram como cada servico entra na MATERIAL vs SERVICO: quantidade com fator COMBO (ex.: x3, /3), familia apos equivalencia (ex.: CONEXAO -> CONECTOR) e a formula aplicada." & vbLf
     s = s & "ABA MATERIAL|ALERTA_PRECO (media +-30%)|Somente ODI e ODM. PRECO_MEDIO_MATERIAL = soma |VALOR| / soma |QTD| do material nos PEPs ODI/ODM. DIF_MEDIA_% compara o preco unitario da linha com essa media; acima de 30% (para mais ou para menos) -> ALERTA > 30%." & vbLf
+    s = s & "ADERENCIA|HASTE ANCORA ESTAI x POSTE CAPITEL|Familias ligadas: no PEP4 soma MAT e SRV de HASTE ANCORA ESTAI + POSTE CAPITEL; se o total de MAT bate com o de SRV (margem), as duas ficam ADERENTES (LIGACAO = HASTE/POSTE CAPITEL)." & vbLf
     s = s & "QUANTIDADE|SRV x3 (576/581)|Servicos 5500000576 e 5500000581 equivalem a 3 cabos: QTD x3 na aba SERVICO e na MATERIAL vs SERVICO (familia COND PROT)." & vbLf
     s = s & "CLASSIFICACAO|OVERRIDES FIXOS|Materiais 124030044 e 124180290 = CONECTOR / MAT. COM. Material 179340003 (SUCATA POSTE MADEIRA) = POSTE RD / MAT. UC. Servico 5500000817 = CLS2 EQUIPAMENTO MONOFASICO. Servico 5500000572 = CLS2 COND PROT, QTD 1:1 (sem conversao)." & vbLf
     s = s & "ADERENCIA|COND NU + CORDOALHA|O servico de COND NU contempla o material CORDOALHA no mesmo PEP." & vbLf
