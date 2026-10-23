@@ -5775,6 +5775,7 @@ Private Sub Gerar_Servico()
     ' Linhas sem COD_SERVICO nao sao trazidas.
     Dim dQ As Object, dV As Object, dFirst As Object
     Set dQ = CreateObject("Scripting.Dictionary")
+    Dim dQraw As Object: Set dQraw = CreateObject("Scripting.Dictionary")   ' QTD crua (p/ QTD_MVS)
     Set dV = CreateObject("Scripting.Dictionary")
     Set dFirst = CreateObject("Scripting.Dictionary")   ' chave -> indice da 1a linha
 
@@ -5817,6 +5818,7 @@ Private Sub Gerar_Servico()
             Case Else
                 dQ(k) = dQ(k) + ToNum(dados(i, cQtd))
         End Select
+        dQraw(k) = dQraw(k) + ToNum(dados(i, cQtd))
         dV(k) = dV(k) + ToNum(dados(i, cValor))
 Prox:
     Next i
@@ -5830,7 +5832,7 @@ Prox:
         If Not (Round(dQ(ks(r)), 2) = 0 And Round(dV(ks(r)), 2) = 0) Then nKeep = nKeep + 1
     Next r
 
-    Dim outp() As Variant: ReDim outp(0 To nKeep, 1 To 17)
+    Dim outp() As Variant: ReDim outp(0 To nKeep, 1 To 20)
     outp(0, 1) = "PEP4NIVEL": outp(0, 2) = "PEP3": outp(0, 3) = "TIPO_PEP"
     outp(0, 4) = "COD_SERVICO": outp(0, 5) = "DESCRICAO_SERVICO"
     outp(0, 6) = "CLASSE_CUSTO"
@@ -5839,6 +5841,7 @@ Prox:
     outp(0, 13) = "TIPO_APLICACAO": outp(0, 14) = "GRUPO_PERC"
     outp(0, 15) = "ALERTA_VALOR": outp(0, 16) = "APROPRIACAO"
     outp(0, 17) = "ADERENCIA"
+    outp(0, 18) = "QTD_MVS": outp(0, 19) = "CLS2_MVS": outp(0, 20) = "CONVERSAO_MVS"
 
     ki = 0
     Dim codSrvOut As String, und As String, taSrv As String, tpPep As String
@@ -5925,6 +5928,25 @@ Prox:
                 outp(ki, 16) = "CAVA (" & Format$(qCava, "0.##") & ") > POSTE (" & _
                                Format$(qPoste, "0.##") & ")"
             End If
+        End If
+        ' Conversao para a MATERIAL vs SERVICO (mesma regra de Gerar_MaterialVsServico):
+        ' QTD_MVS = QTD crua x fator COMBO; CLS2_MVS = familia apos equivalencia.
+        Dim fatS As Double: fatS = ComboFator(dados(fi, cMaterial))
+        outp(ki, 18) = Round(dQraw(k) * fatS, 2)
+        outp(ki, 19) = FamiliaAlias(SrvInfoLinha(fi, 1))
+        If Abs(fatS - 1) < 0.000001 Then
+            outp(ki, 20) = "SEM CONVERSAO (1:1)"
+        ElseIf Abs(fatS - 1 / 3) < 0.000001 Then
+            outp(ki, 20) = "QTD / 3"
+        Else
+            outp(ki, 20) = "QTD x " & Format$(fatS, "0.####") & " (COMBO)"
+        End If
+        Select Case codSrvOut
+            Case "5500000576", "5500000581"
+                outp(ki, 20) = outp(ki, 20) & " | x3 ja aplicado na QTD_ENTRADA"
+        End Select
+        If NormClassif(CStr(outp(ki, 19))) <> NormClassif(CStr(outp(ki, 11))) Then
+            outp(ki, 20) = outp(ki, 20) & " | familia " & CStr(outp(ki, 11)) & " -> " & CStr(outp(ki, 19))
         End If
 PulaZero:
     Next r
@@ -6478,6 +6500,7 @@ Private Sub Gerar_Regras()
     s = s & "ADERENCIA|CH FUS x CH SU FACA|Familias ligadas: no PEP4 soma MAT e SRV de CH FUS + CH SU FACA; se o total de MAT bate com o de SRV (margem), as duas ficam ADERENTES (LIGACAO = CH FUS/FACA). Ex.: CH FUS MAT 1 + CH SU FACA SRV 1." & vbLf
     s = s & "ADERENCIA|CABO ISOLADO < 15|Na MATERIAL vs SERVICO, CABO ISOLADO com MAT e SRV menores que 15 fica ADERENTE (nao reprova), mesmo sem servico lancado." & vbLf
     s = s & "ABA MATERIAL|QTD_MVS / CLS2_MVS / CONVERSAO_MVS|Mostram como cada material entra na MATERIAL vs SERVICO: quantidade convertida (cabos KG x fator = metros), familia apos unificacao (ex.: COND NU -> COND PROT) e a formula aplicada." & vbLf
+    s = s & "ABA SERVICO|QTD_MVS / CLS2_MVS / CONVERSAO_MVS|Mostram como cada servico entra na MATERIAL vs SERVICO: quantidade com fator COMBO (ex.: x3, /3), familia apos equivalencia (ex.: CONEXAO -> CONECTOR) e a formula aplicada." & vbLf
     s = s & "QUANTIDADE|SRV x3 (576/581)|Servicos 5500000576 e 5500000581 equivalem a 3 cabos: QTD x3 na aba SERVICO e na MATERIAL vs SERVICO (familia COND PROT)." & vbLf
     s = s & "CLASSIFICACAO|OVERRIDES FIXOS|Materiais 124030044 e 124180290 = CONECTOR / MAT. COM. Material 179340003 (SUCATA POSTE MADEIRA) = POSTE RD / MAT. UC. Servico 5500000817 = CLS2 EQUIPAMENTO MONOFASICO. Servico 5500000572 = CLS2 COND PROT, QTD / 3 na MATERIAL vs SERVICO." & vbLf
     s = s & "ADERENCIA|COND NU + CORDOALHA|O servico de COND NU contempla o material CORDOALHA no mesmo PEP." & vbLf
