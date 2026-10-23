@@ -4362,15 +4362,18 @@ End Function
 ' COND ISOLADO e COND ISOLADO/PROT -> COND PROT.
 ' COND NU -> COND PROT: servico de cabo protegido cobre o material cabo nu
 ' e vice-versa (ambos sao condutores de linha, o servico paga os dois).
-Private Function FamiliaAlias(ByVal cls2 As String) As String
+Private Function FamiliaAlias(ByVal cls2 As String, _
+                              Optional ByVal ehMaterial As Boolean = False) As String
     Dim k As String: k = NormClassif(cls2)
     Select Case k
         Case "COND ISOLADO/PROT", "COND ISOLADO", "COND NU": FamiliaAlias = "COND PROT"
         Case Else
-            FamiliaAlias = cls2
-            ' De-para servico -> material equivalente (CarregarEquivSrvMat)
-            If Not dFamEquiv Is Nothing Then
-                If dFamEquiv.Exists(k) Then FamiliaAlias = dFamEquiv(k)
+            FamiliaAlias = k
+            ' De-para servico -> material equivalente (CarregarEquivSrvMat).
+            ' So para SERVICO: a familia de MATERIAL fica como esta (senao o
+            ' material CONECTOR virava RAMAL e o servico CONEXAO->CONECTOR ficava sem par).
+            If Not ehMaterial And Not dFamEquiv Is Nothing Then
+                If dFamEquiv.Exists(k) Then FamiliaAlias = NormClassif(dFamEquiv(k))
             End If
     End Select
 End Function
@@ -4567,7 +4570,7 @@ Private Sub Gerar_MaterialVsServico()
         If EhMaterial(CStr(dados(i, cClassif))) Then
             cls2 = MatInfoLinha(i, 2)                  ' CLS2 do catalogo/base enriquecida
             If cls2 = "" Then cls2 = "(SEM CLS2)"
-            cls2 = FamiliaAlias(cls2)                  ' unifica familias equivalentes
+            cls2 = FamiliaAlias(cls2, True)                  ' unifica familias equivalentes
             ' TIPO por CLS3 do item (MAT. UC / MAT. COM); UC prevalece
             cls3m = UCase$(MatInfoLinha(i, 3))
             famN = NormClassif(cls2)
@@ -4763,7 +4766,7 @@ Prox:
     For iTF = 1 To UBound(dados, 1)
         pepTF = Trim$(CStr(dados(iTF, cPEP))): If pepTF = "" Then GoTo ProxTF
         If Not EhMaterial(CStr(dados(iTF, cClassif))) Then GoTo ProxTF
-        If NormClassif(FamiliaAlias(MatInfoLinha(iTF, 2))) <> "TRAFO" Then GoTo ProxTF
+        If NormClassif(FamiliaAlias(MatInfoLinha(iTF, 2), True)) <> "TRAFO" Then GoTo ProxTF
         qTF = ToNum(dados(iTF, cQtd))
         If qTF <= 0 Then GoTo ProxTF            ' so instalacao (qtd positiva)
         txTF = UCase$(SemAcento(TextoCampo(iTF, cTexto)))
@@ -4808,7 +4811,7 @@ ProxSE:
     For iEQ = 1 To UBound(dados, 1)
         pepEQ = Trim$(CStr(dados(iEQ, cPEP))): If pepEQ = "" Then GoTo ProxEQ
         If EhMaterial(CStr(dados(iEQ, cClassif))) Then
-            clsEQ = NormClassif(FamiliaAlias(MatInfoLinha(iEQ, 2)))
+            clsEQ = NormClassif(FamiliaAlias(MatInfoLinha(iEQ, 2), True))
         Else
             clsEQ = NormClassif(FamiliaAlias(SrvInfoLinha(iEQ, 1)))
         End If
@@ -5688,7 +5691,7 @@ Private Sub Gerar_Servico()
         pep = Trim$(CStr(dados(i, cPEP))): If pep = "" Then GoTo Prox
         If EhMaterial(CStr(dados(i, cClassif))) Then
             ' poste (material) do PEP -> numero de postes
-            If NormClassif(FamiliaAlias(MatInfoLinha(i, 2))) = "POSTE RD" Then _
+            If NormClassif(FamiliaAlias(MatInfoLinha(i, 2), True)) = "POSTE RD" Then _
                 dPosteMat(pep) = dPosteMat(pep) + Abs(ToNum(dados(i, cQtd)))
             GoTo Prox
         End If
@@ -5860,7 +5863,7 @@ Private Sub Gerar_AlertasCriticos()
     For i = 1 To UBound(dados, 1)
         pep = Trim$(CStr(dados(i, cPEP))): If pep = "" Then GoTo ProxUAR
         If Not EhMaterial(CStr(dados(i, cClassif))) Then GoTo ProxUAR
-        cls2u = FamiliaAlias(MatInfoLinha(i, 2))
+        cls2u = FamiliaAlias(MatInfoLinha(i, 2), True)
         If UCase$(TipoDaClassif(cls2u, TextoCampo(i, cTexto))) = "UAR" Then dPepUAR(pep) = 1
 ProxUAR:
     Next i
@@ -5872,7 +5875,7 @@ ProxUAR:
         If TipoPEPCodigo(pep) = "D" Then GoTo PreCalc
         If Not dPepTodos.Exists(pep) Then dPepTodos(pep) = 1
         If EhMaterial(CStr(dados(i, cClassif))) Then
-            cls2 = FamiliaAlias(MatInfoLinha(i, 2))
+            cls2 = FamiliaAlias(MatInfoLinha(i, 2), True)
             Dim tUC As String: tUC = UCase$(TipoDaClassif(cls2, TextoCampo(i, cTexto)))
             ' Fallback: familia sem TIPO -> usa CLS3 do catalogo (MAT. UC)
             If tUC = "" And InStr(UCase$(MatInfoLinha(i, 3)), "UC") > 0 Then tUC = "UC"
@@ -6371,6 +6374,7 @@ Private Sub Gerar_Regras()
     s = s & "ADERENCIA|COND NU = COND PROT|As familias COND NU e COND PROT sao tratadas como similares: material e servico de uma cobrem os da outra (unificadas em COND PROT na MATERIAL vs SERVICO)." & vbLf
     s = s & "VEREDITO PEP|Familias criticas|POSTE RD, TRAFO, PARA RAIO MT/BT, CH FUS, COND NU, MEDIDOR, KIT PLPT, POSTE PDR ACO, COND COBRE, CH SU FACA, RELIGADOR, TP_TC, COND PROT, COND ISOLADO, SECCIONADOR, BATERIA, REGULADOR, POSTE CAPITEL e CH FUS RELIG: NAO ADERENTE em qualquer PEP4 (ODD, ODI, ODM ou ODS) reprova o PEP3." & vbLf
     s = s & "CLASSIFICACAO|Classificacao vazia (sucata ODD)|Lancamento com Classificacao vazia mas com codigo de material no catalogo (ou classe de custo 811...) e tratado como MATERIAL (UC/COM pelo CLS3). Ex.: 179340003 SUCATA POSTE MADEIRA entra como POSTE RD." & vbLf
+    s = s & "UNIFICACAO DE FAMILIAS|Equivalencias so para servico|O de-para EQUIV_SRV_MAT (CONEXAO->CONECTOR, ESTRUT RDC->ESPACADOR LOSAG, ESTRUT MT S/CRUZ->CRUZETA, CONECTOR->RAMAL...) vale apenas para a familia do SERVICO. Nomes de familia sao comparados sem acento (ESPACADOR = ESPACADOR com cedilha)." & vbLf
     s = s & "QUANTIDADE|SRV x3 (576/581)|Servicos 5500000576 e 5500000581 equivalem a 3 cabos: QTD x3 na aba SERVICO e na MATERIAL vs SERVICO (familia COND PROT)." & vbLf
     s = s & "CLASSIFICACAO|OVERRIDES FIXOS|Materiais 124030044 e 124180290 = CONECTOR / MAT. COM. Material 179340003 (SUCATA POSTE MADEIRA) = POSTE RD / MAT. UC. Servico 5500000817 = CLS2 EQUIPAMENTO MONOFASICO." & vbLf
     s = s & "ADERENCIA|COND NU + CORDOALHA|O servico de COND NU contempla o material CORDOALHA no mesmo PEP." & vbLf
@@ -6886,7 +6890,7 @@ Private Sub Gerar_ServicoSemMaterial()
     For i = 1 To UBound(dados, 1)
         pepSM = Trim$(CStr(dados(i, cPEP))): If pepSM = "" Then GoTo P1
         If EhMaterial(CStr(dados(i, cClassif))) Then
-            cls2SM = FamiliaAlias(MatInfoLinha(i, 2))
+            cls2SM = FamiliaAlias(MatInfoLinha(i, 2), True)
             If cls2SM = "" Then cls2SM = "(SEM CLS2)"
             kSM = pepSM & "|" & cls2SM
             dMatSM(kSM) = dMatSM(kSM) + Abs(ToNum(dados(i, cQtd)))
