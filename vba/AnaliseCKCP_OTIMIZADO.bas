@@ -4407,6 +4407,18 @@ Private Function FamiliaCritica(ByVal cls2 As String) As Boolean
     End Select
 End Function
 
+' 5025300148 (RET ESTR CP TRAFO DT 3F): cada servico paga 3 retiradas de
+' CH FUS e 3 de PARA RAIO MT. Aderente se MAT <= SRV da familia + 3 x qtd.
+Private Function CobreRetTrafo3F(dRet As Object, ByVal pep4 As String, ByVal cls2 As String, _
+                                 ByVal mv As Double, ByVal sv As Double) As Boolean
+    CobreRetTrafo3F = False
+    If Not dRet.Exists(pep4) Then Exit Function
+    Select Case NormClassif(cls2)
+        Case "CH FUS", "PARA RAIO MT"
+            If Abs(mv) <= Abs(sv) + 3 * CDbl(dRet(pep4)) + 0.001 Then CobreRetTrafo3F = True
+    End Select
+End Function
+
 ' 122060001 CABO ACO COBREADO: abaixo de 10 kg no PEP4 nao reprova.
 ' O restante do material da familia ainda precisa caber no servico.
 Private Function AcoCobreadoIsento(dKg As Object, dM As Object, ByVal k As String, _
@@ -4575,6 +4587,9 @@ Private Sub Gerar_MaterialVsServico()
     Dim dAcoM As Object:  Set dAcoM = CreateObject("Scripting.Dictionary")
     ' PEP4 com servico de equipamento de protecao (5500000820/5500000817)
     Dim dEqProt As Object: Set dEqProt = CreateObject("Scripting.Dictionary")
+    ' PEP4 -> qtd do servico 5025300148 (RET ESTR CP TRAFO DT 3F): cada um paga
+    ' 3 retiradas de CH FUS e 3 retiradas de PARA RAIO MT
+    Dim dRetTr3F As Object: Set dRetTr3F = CreateObject("Scripting.Dictionary")
     For i = 1 To UBound(dados, 1)
         pep = Trim$(CStr(dados(i, cPEP))): If pep = "" Then GoTo Prox
         q = ToNum(dados(i, cQtd))
@@ -4622,6 +4637,7 @@ Private Sub Gerar_MaterialVsServico()
         If Not EhMaterial(CStr(dados(i, cClassif))) And q <> 0 Then
             Select Case NormCod(dados(i, cMaterial))
                 Case "5500000820", "5500000817": dEqProt(pep) = 1
+                Case "5025300148": dRetTr3F(pep) = dRetTr3F(pep) + Abs(q)
             End Select
         End If
         ' LIGACAO SERV X MAT: registra os grupos de ligacao do codigo neste PEP4
@@ -4918,6 +4934,7 @@ ProxEQ:
             If Not aderiu And dLigKeyOk.Exists(ks(r)) Then aderiu = True
             ' 122060001 < 10 kg: desconsiderado; o restante do MAT deve caber no SRV
             If Not aderiu Then aderiu = AcoCobreadoIsento(dAcoKg, dAcoM, ks(r), mv, sv)
+            If Not aderiu Then aderiu = CobreRetTrafo3F(dRetTr3F, pep4v, clsv, mv, sv)
             ' TRAFO / REGULADOR (MAT) coberto por SRV de TRAFO_OU_REGULADOR no PEP.
             If Not aderiu And dTrafOrRegSrv.Exists(pep4v) And dTrafHasMatPep.Exists(pep4v) _
                And (NormClassif(clsv) = "TRAFO" Or NormClassif(clsv) = "REGULADOR") Then aderiu = True
@@ -5135,6 +5152,9 @@ ProxEQ:
         ElseIf AcoCobreadoIsento(dAcoKg, dAcoM, ks(r), mq, sq) Then
             outp(rr, 8) = dif
             outp(rr, 9) = "ADERENTE"   ' 122060001 < 10 kg nao reprova
+        ElseIf CobreRetTrafo3F(dRetTr3F, pp, CStr(p(1)), mq, sq) Then
+            outp(rr, 8) = dif
+            outp(rr, 9) = "ADERENTE"   ' 5025300148 paga 3 CH FUS + 3 PARA RAIO MT
         ElseIf dTrafOrRegSrv.Exists(pp) And dTrafHasMatPep.Exists(pp) And _
                (NormClassif(CStr(p(1))) = "TRAFO" Or _
                 NormClassif(CStr(p(1))) = "REGULADOR") Then
@@ -6386,6 +6406,7 @@ Private Sub Gerar_Regras()
     s = s & "VEREDITO PEP|Familias criticas|POSTE RD, TRAFO, PARA RAIO MT/BT, CH FUS, COND NU, MEDIDOR, KIT PLPT, POSTE PDR ACO, COND COBRE, CH SU FACA, RELIGADOR, TP_TC, COND PROT, COND ISOLADO, SECCIONADOR, BATERIA, REGULADOR, POSTE CAPITEL e CH FUS RELIG: NAO ADERENTE em qualquer PEP4 (ODD, ODI, ODM ou ODS) reprova o PEP3." & vbLf
     s = s & "CLASSIFICACAO|Classificacao vazia (sucata ODD)|Lancamento com Classificacao vazia mas com codigo de material no catalogo (ou classe de custo 811...) e tratado como MATERIAL (UC/COM pelo CLS3). Ex.: 179340003 SUCATA POSTE MADEIRA entra como POSTE RD." & vbLf
     s = s & "UNIFICACAO DE FAMILIAS|Equivalencias so para servico|O de-para EQUIV_SRV_MAT (CONEXAO->CONECTOR, ESTRUT RDC->ESPACADOR LOSAG, ESTRUT MT S/CRUZ->CRUZETA, CONECTOR->RAMAL...) vale apenas para a familia do SERVICO. Nomes de familia sao comparados sem acento (ESPACADOR = ESPACADOR com cedilha)." & vbLf
+    s = s & "ADERENCIA|5025300148 RET ESTR CP TRAFO DT 3F|Cada servico 5025300148 no PEP4 paga 3 retiradas de CH FUS e 3 retiradas de PARA RAIO MT: essas familias ficam ADERENTES se MAT <= SRV da familia + 3 x qtd do servico." & vbLf
     s = s & "QUANTIDADE|SRV x3 (576/581)|Servicos 5500000576 e 5500000581 equivalem a 3 cabos: QTD x3 na aba SERVICO e na MATERIAL vs SERVICO (familia COND PROT)." & vbLf
     s = s & "CLASSIFICACAO|OVERRIDES FIXOS|Materiais 124030044 e 124180290 = CONECTOR / MAT. COM. Material 179340003 (SUCATA POSTE MADEIRA) = POSTE RD / MAT. UC. Servico 5500000817 = CLS2 EQUIPAMENTO MONOFASICO. Servico 5500000572 = CLS2 COND PROT, QTD x3 na MATERIAL vs SERVICO." & vbLf
     s = s & "ADERENCIA|COND NU + CORDOALHA|O servico de COND NU contempla o material CORDOALHA no mesmo PEP." & vbLf
