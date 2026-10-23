@@ -648,11 +648,17 @@ Private Function LinhaTipoAplic(ByVal lin As Long) As String
 End Function
 
 Private Function MatInfoLinha(ByVal lin As Long, ByVal idx As Long) As String
-    ' Override fixo: 124030044 e 124180290 sempre CONECTOR / MAT. COM
+    ' Override fixo: 124030044 e 124180290 sempre CONECTOR / MAT. COM;
+    ' 179340003 (SUCATA POSTE MADEIRA) sempre POSTE RD / MAT. UC
     Select Case NormCod(dados(lin, cMaterial))
         Case "124030044", "124180290"
             If idx >= 1 And idx <= 3 Then
                 MatInfoLinha = Choose(idx, "MATERIAL", "CONECTOR", "MAT. COM")
+                Exit Function
+            End If
+        Case "179340003"   ' SUCATA POSTE MADEIRA -> POSTE RD
+            If idx >= 1 And idx <= 3 Then
+                MatInfoLinha = Choose(idx, "MATERIAL", "POSTE RD", "MAT. UC")
                 Exit Function
             End If
     End Select
@@ -752,7 +758,9 @@ Private Sub PreencherClassifVazia()
         If Trim$(CStr(dados(i, cClassif))) = "" Then
             cod = NormCod(dados(i, cMaterial))
             If cod <> "" And cod <> "0" Then
-                If CatInfo(cod, 1) <> "" Or Left$(TextoCampo(i, cClasse), 3) = "811" Then
+                If cod = "179340003" Then
+                    dados(i, cClassif) = "UC"      ' SUCATA POSTE MADEIRA = POSTE RD (UC)
+                ElseIf CatInfo(cod, 1) <> "" Or Left$(TextoCampo(i, cClasse), 3) = "811" Then
                     c3 = UCase$(CatInfo(cod, 3))
                     If InStr(c3, "UC") > 0 Then
                         dados(i, cClassif) = "UC"
@@ -6364,7 +6372,7 @@ Private Sub Gerar_Regras()
     s = s & "VEREDITO PEP|Familias criticas|POSTE RD, TRAFO, PARA RAIO MT/BT, CH FUS, COND NU, MEDIDOR, KIT PLPT, POSTE PDR ACO, COND COBRE, CH SU FACA, RELIGADOR, TP_TC, COND PROT, COND ISOLADO, SECCIONADOR, BATERIA, REGULADOR, POSTE CAPITEL e CH FUS RELIG: NAO ADERENTE em qualquer PEP4 (ODD, ODI, ODM ou ODS) reprova o PEP3." & vbLf
     s = s & "CLASSIFICACAO|Classificacao vazia (sucata ODD)|Lancamento com Classificacao vazia mas com codigo de material no catalogo (ou classe de custo 811...) e tratado como MATERIAL (UC/COM pelo CLS3). Ex.: 179340003 SUCATA POSTE MADEIRA entra como POSTE RD." & vbLf
     s = s & "QUANTIDADE|SRV x3 (576/581)|Servicos 5500000576 e 5500000581 equivalem a 3 cabos: QTD x3 na aba SERVICO e na MATERIAL vs SERVICO (familia COND PROT)." & vbLf
-    s = s & "CLASSIFICACAO|OVERRIDES FIXOS|Materiais 124030044 e 124180290 = CONECTOR / MAT. COM. Servico 5500000817 = CLS2 EQUIPAMENTO MONOFASICO." & vbLf
+    s = s & "CLASSIFICACAO|OVERRIDES FIXOS|Materiais 124030044 e 124180290 = CONECTOR / MAT. COM. Material 179340003 (SUCATA POSTE MADEIRA) = POSTE RD / MAT. UC. Servico 5500000817 = CLS2 EQUIPAMENTO MONOFASICO." & vbLf
     s = s & "ADERENCIA|COND NU + CORDOALHA|O servico de COND NU contempla o material CORDOALHA no mesmo PEP." & vbLf
     s = s & "ADERENCIA|CH SU FACA (PI = ERD)|Em PI do tipo ERD, cada servico de RELIGADOR deixa aderentes ate 6 CH SU FACA." & vbLf
     s = s & "ADERENCIA|COND COBRE como conexao da CH SU FACA|Quando ha servico de CH SU FACA no PEP, o COND COBRE (conexao) fica ADERENTE." & vbLf
