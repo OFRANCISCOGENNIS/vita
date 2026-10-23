@@ -4349,6 +4349,17 @@ Private Function EhCabo(ByVal cls2 As String) As Boolean
               Or s = "RAMAL")
 End Function
 
+' Familias criticas: NAO ADERENTE em qualquer PEP4 (ODD/ODI/ODM/ODS) reprova o PEP3.
+Private Function FamiliaCritica(ByVal cls2 As String) As Boolean
+    Select Case NormClassif(cls2)
+        Case "POSTE RD", "TRAFO", "PARA RAIO MT", "CH FUS", "COND NU", "MEDIDOR", _
+             "KIT PLPT", "POSTE PDR ACO", "PARA RAIO BT", "COND COBRE", "CH SU FACA", _
+             "RELIGADOR", "TP_TC", "COND PROT", "COND ISOLADO", "SECCIONADOR", _
+             "BATERIA", "REGULADOR", "POSTE CAPITEL", "CH FUS RELIG"
+            FamiliaCritica = True
+    End Select
+End Function
+
 ' 122060001 CABO ACO COBREADO: abaixo de 10 kg no PEP4 nao reprova.
 ' O restante do material da familia ainda precisa caber no servico.
 Private Function AcoCobreadoIsento(dKg As Object, dM As Object, ByVal k As String, _
@@ -4981,6 +4992,8 @@ ProxEQ:
     outp(0, 16) = "LIGACAO SERV X MAT"
 
     Dim rr As Long, p As Variant, pp As String, mq As Double, sq As Double, dif As Double
+    ' dP3Crit: PEP3 -> familias criticas NAO ADERENTES (ex.: "TRAFO (.D)")
+    Dim dP3Crit As Object: Set dP3Crit = CreateObject("Scripting.Dictionary")
     Dim p3MvS As String
     rr = 0
     For r = 0 To dKeys.Count - 1
@@ -5095,6 +5108,17 @@ ProxEQ:
         outp(rr, 10) = TipoPEPCodigo(pp)
         outp(rr, 11) = SegmentoPI(pp)
 
+        ' Familia critica NAO ADERENTE em qualquer tipo de PEP (ODD/ODI/ODM/ODS)
+        ' -> reprova o PEP3 (aplicado no pos-processamento do STATUS).
+        If CStr(outp(rr, 9)) = "NAO ADERENTE" And FamiliaCritica(CStr(p(1))) Then
+            Dim critTx As String: critTx = CStr(p(1)) & " (" & Right$(pp, 2) & ")"
+            Dim critAt As String: critAt = CStr(dP3Crit(PEP3(pp)))
+            If InStr(critAt, critTx) = 0 Then
+                If critAt <> "" Then critAt = critAt & ", "
+                dP3Crit(PEP3(pp)) = critAt & critTx
+            End If
+        End If
+
         ' OBS1: motivo do REPROVADO
         Dim obs1 As String: obs1 = ""
         Dim p3obs As String: p3obs = PEP3(pp)
@@ -5171,8 +5195,31 @@ PulaNulo:
             dP3St(p3z) = "APROVADO"
         End If
     Next z
+    ' Familia critica NAO ADERENTE (qualquer PEP4) reprova o PEP3
+    Dim kc As Variant
+    For Each kc In dP3Crit.Keys
+        If CStr(dP3Crit(kc)) <> "" Then
+            dP3St(CStr(kc)) = "REPROVADO"
+            dMvSVerd(CStr(kc)) = "REPROVADO"
+        End If
+    Next kc
     For z = 1 To rr
-        outp(z, 1) = dP3St(CStr(outp(z, 2)))
+        p3z = CStr(outp(z, 2))
+        outp(z, 1) = dP3St(p3z)
+        If dP3Crit.Exists(p3z) Then
+            If CStr(dP3Crit(p3z)) <> "" Then
+                If FamiliaCritica(CStr(outp(z, 4))) And CStr(outp(z, 9)) = "NAO ADERENTE" _
+                   And InStr(CStr(outp(z, 12)), "Familia critica") = 0 Then
+                    outp(z, 12) = "Familia critica NAO ADERENTE" & _
+                        IIf(CStr(outp(z, 12)) = "", "", " | " & CStr(outp(z, 12)))
+                End If
+                If Left$(CStr(outp(z, 13)), 13) = "PEP3 APROVADO" Then
+                    outp(z, 13) = "PEP3 REPROVADO: familia critica NAO ADERENTE: " & CStr(dP3Crit(p3z))
+                ElseIf InStr(CStr(outp(z, 13)), "familia critica") = 0 Then
+                    outp(z, 13) = CStr(outp(z, 13)) & " ; familia critica NAO ADERENTE: " & CStr(dP3Crit(p3z))
+                End If
+            End If
+        End If
     Next z
 
     EscreverAba "MATERIAL vs SERVICO", outp
@@ -6289,6 +6336,7 @@ Private Sub Gerar_Regras()
     s = s & "ADERENCIA|CABO ACO COBREADO < 10 KG|Material 122060001 com menos de 10 kg no PEP4 nao reprova a familia (o restante do material ainda deve caber no servico)." & vbLf
     s = s & "ADERENCIA|SRV 5500000820/817 x CH FUS, CH FACA, PARA RAIO|Servicos 5500000820 e 5500000817 estao ligados aos materiais das familias CH FUS, CH SU FACA, PARA RAIO e RELIGADOR: com um deles lancado no PEP4, essas familias ficam ADERENTES (LIGACAO = EQP)." & vbLf
     s = s & "ADERENCIA|COND NU = COND PROT|As familias COND NU e COND PROT sao tratadas como similares: material e servico de uma cobrem os da outra (unificadas em COND PROT na MATERIAL vs SERVICO)." & vbLf
+    s = s & "VEREDITO PEP|Familias criticas|POSTE RD, TRAFO, PARA RAIO MT/BT, CH FUS, COND NU, MEDIDOR, KIT PLPT, POSTE PDR ACO, COND COBRE, CH SU FACA, RELIGADOR, TP_TC, COND PROT, COND ISOLADO, SECCIONADOR, BATERIA, REGULADOR, POSTE CAPITEL e CH FUS RELIG: NAO ADERENTE em qualquer PEP4 (ODD, ODI, ODM ou ODS) reprova o PEP3." & vbLf
     s = s & "QUANTIDADE|SRV x3 (576/581)|Servicos 5500000576 e 5500000581 equivalem a 3 cabos: QTD x3 na aba SERVICO e na MATERIAL vs SERVICO (familia COND PROT)." & vbLf
     s = s & "CLASSIFICACAO|OVERRIDES FIXOS|Materiais 124030044 e 124180290 = CONECTOR / MAT. COM. Servico 5500000817 = CLS2 EQUIPAMENTO MONOFASICO." & vbLf
     s = s & "ADERENCIA|COND NU + CORDOALHA|O servico de COND NU contempla o material CORDOALHA no mesmo PEP." & vbLf
