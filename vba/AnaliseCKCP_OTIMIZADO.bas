@@ -2604,7 +2604,7 @@ Private Function CaboFator(codMat As Variant) As Double
     Select Case cod
         Case "122020001": CaboFator = 6.78: Exit Function   ' CABO AL NU CA 1/0AWG POPPY (x6,78)
         Case "122020008": CaboFator = 4.63: Exit Function   ' CABO NU AL CAA 1/0AWG RAVEN (x4,63)
-        Case "122020002": CaboFator = 10.76 / 3: Exit Function   ' CABO AL NU CA 2 AWG IRIS (x10,76/3)
+        Case "122020002": CaboFator = 10.76: Exit Function   ' CABO AL NU CA 2 AWG IRIS (x10,76)
     End Select
     If dCabo.Exists(cod) Then CaboFator = dCabo(cod)
 End Function
@@ -5740,7 +5740,7 @@ PulaConta:
             ElseIf NormCod(dados(fi, cMaterial)) = "122020001" Then
                 outp(rr, 18) = "QTD x 6,78 (KG -> M)"
             ElseIf NormCod(dados(fi, cMaterial)) = "122020002" Then
-                outp(rr, 18) = "QTD x 10,76 / 3 (KG -> M)"
+                outp(rr, 18) = "QTD x 10,76 (KG -> M)"
             Else
                 outp(rr, 18) = "QTD x " & Format$(fatM, "0.0###") & " (KG -> M)"
             End If
@@ -6539,7 +6539,7 @@ Private Sub Gerar_Regras()
     s = s & "CLASSIFICACAO|Classificacao vazia (sucata ODD)|Lancamento com Classificacao vazia mas com codigo de material no catalogo (ou classe de custo 811...) e tratado como MATERIAL (UC/COM pelo CLS3). Ex.: 179340003 SUCATA POSTE MADEIRA entra como POSTE RD." & vbLf
     s = s & "UNIFICACAO DE FAMILIAS|Equivalencias so para servico|O de-para EQUIV_SRV_MAT (CONEXAO->CONECTOR, ESTRUT RDC->ESPACADOR LOSAG, ESTRUT MT S/CRUZ->CRUZETA, CONECTOR->RAMAL...) vale apenas para a familia do SERVICO. Nomes de familia sao comparados sem acento (ESPACADOR = ESPACADOR com cedilha)." & vbLf
     s = s & "ADERENCIA|5025300148 RET ESTR CP TRAFO DT 3F|Cada servico 5025300148 no PEP4 paga 3 retiradas de CH FUS e 3 retiradas de PARA RAIO MT: essas familias ficam ADERENTES se MAT <= SRV da familia + 3 x qtd do servico." & vbLf
-    s = s & "QUANTIDADE|Cabos 122020001 / 122020008|Na MATERIAL vs SERVICO: 122020001 (POPPY) = QTD x 6,78; 122020008 (RAVEN) = QTD x 4,63; 122020002 (IRIS) = QTD x 10,76 / 3. Na aba MATERIAL continuam em KG." & vbLf
+    s = s & "QUANTIDADE|Cabos 122020001 / 122020008|Na MATERIAL vs SERVICO: 122020001 (POPPY) = QTD x 6,78; 122020008 (RAVEN) = QTD x 4,63; 122020002 (IRIS) = QTD x 10,76. Na aba MATERIAL continuam em KG." & vbLf
     s = s & "ADERENCIA|CH FUS x CH SU FACA|Familias ligadas: no PEP4 soma MAT e SRV de CH FUS + CH SU FACA; se o total de MAT bate com o de SRV (margem), as duas ficam ADERENTES (LIGACAO = CH FUS/FACA). Ex.: CH FUS MAT 1 + CH SU FACA SRV 1." & vbLf
     s = s & "ADERENCIA|CABO ISOLADO < 15|Na MATERIAL vs SERVICO, CABO ISOLADO com MAT e SRV menores que 15 fica ADERENTE (nao reprova), mesmo sem servico lancado." & vbLf
     s = s & "ABA MATERIAL|QTD_MVS / CLS2_MVS / CONVERSAO_MVS|Mostram como cada material entra na MATERIAL vs SERVICO: quantidade convertida (cabos KG x fator = metros), familia apos unificacao (ex.: COND NU -> COND PROT) e a formula aplicada." & vbLf
