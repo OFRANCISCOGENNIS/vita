@@ -2673,8 +2673,8 @@ Private Function ComboFator(codSrv As Variant) As Double
     ComboFator = 1
     If dCombo Is Nothing Then Exit Function
     Dim cod As String: cod = NormCod(codSrv)
-    ' 5500000572 (AHO201_A INST CONDUTOR 16/50MM): QTD / 3 na MATERIAL vs SERVICO
-    If cod = "5500000572" Then ComboFator = 1 / 3: Exit Function
+    ' 5500000572 (AHO201_A INST CONDUTOR 16/50MM): 1:1 (sem conversao)
+    If cod = "5500000572" Then ComboFator = 1: Exit Function
     If Not dCombo.Exists(cod) Then Exit Function
     Dim p() As String: p = Split(dCombo(cod), "|")
     Dim fator As Double: fator = ToNum(p(0))
@@ -6505,7 +6505,7 @@ Private Sub Gerar_Regras()
     s = s & "ABA MATERIAL|QTD_MVS / CLS2_MVS / CONVERSAO_MVS|Mostram como cada material entra na MATERIAL vs SERVICO: quantidade convertida (cabos KG x fator = metros), familia apos unificacao (ex.: COND NU -> COND PROT) e a formula aplicada." & vbLf
     s = s & "ABA SERVICO|QTD_MVS / CLS2_MVS / CONVERSAO_MVS|Mostram como cada servico entra na MATERIAL vs SERVICO: quantidade com fator COMBO (ex.: x3, /3), familia apos equivalencia (ex.: CONEXAO -> CONECTOR) e a formula aplicada." & vbLf
     s = s & "QUANTIDADE|SRV x3 (576/581)|Servicos 5500000576 e 5500000581 equivalem a 3 cabos: QTD x3 na aba SERVICO e na MATERIAL vs SERVICO (familia COND PROT)." & vbLf
-    s = s & "CLASSIFICACAO|OVERRIDES FIXOS|Materiais 124030044 e 124180290 = CONECTOR / MAT. COM. Material 179340003 (SUCATA POSTE MADEIRA) = POSTE RD / MAT. UC. Servico 5500000817 = CLS2 EQUIPAMENTO MONOFASICO. Servico 5500000572 = CLS2 COND PROT, QTD / 3 na MATERIAL vs SERVICO." & vbLf
+    s = s & "CLASSIFICACAO|OVERRIDES FIXOS|Materiais 124030044 e 124180290 = CONECTOR / MAT. COM. Material 179340003 (SUCATA POSTE MADEIRA) = POSTE RD / MAT. UC. Servico 5500000817 = CLS2 EQUIPAMENTO MONOFASICO. Servico 5500000572 = CLS2 COND PROT, QTD 1:1 (sem conversao)." & vbLf
     s = s & "ADERENCIA|COND NU + CORDOALHA|O servico de COND NU contempla o material CORDOALHA no mesmo PEP." & vbLf
     s = s & "ADERENCIA|CH SU FACA (PI = ERD)|Em PI do tipo ERD, cada servico de RELIGADOR deixa aderentes ate 6 CH SU FACA." & vbLf
     s = s & "ADERENCIA|COND COBRE como conexao da CH SU FACA|Quando ha servico de CH SU FACA no PEP, o COND COBRE (conexao) fica ADERENTE." & vbLf
