@@ -200,6 +200,7 @@ Sub GerarRelatorio()
 
     ' 3b) Carrega o catalogo de MATERIAIS (FAMILIA, CLS1/2/3)
     gEtapa = "CarregarCatalogoMateriais": CarregarCatalogoMateriais
+    gEtapa = "PreencherClassifVazia": PreencherClassifVazia
 
     ' 3c) Descricoes embutidas de servico (prioridade) ANTES do catalogo externo,
     '     que preenche as descricoes faltantes a partir de TEXTO BREVE do arquivo.
@@ -740,6 +741,30 @@ End Function
 '==============================================================================
 '  CATLOGO DE MATERIAIS (FAMILIA, CLS1, CLS2, CLS3)
 '==============================================================================
+' Linhas de material com "Classificacao" vazia no SAP (ex.: sucata em ODD:
+' 179340003 SUCATA POSTE MADEIRA) eram tratadas como servico. Se o codigo
+' esta no catalogo de materiais ou a classe de custo e de material (811...),
+' preenche UC/COM pelo CLS3 do catalogo para entrarem como MATERIAL.
+Private Sub PreencherClassifVazia()
+    If cClassif <= 0 Or cMaterial <= 0 Then Exit Sub
+    Dim i As Long, cod As String, c3 As String
+    For i = 1 To UBound(dados, 1)
+        If Trim$(CStr(dados(i, cClassif))) = "" Then
+            cod = NormCod(dados(i, cMaterial))
+            If cod <> "" And cod <> "0" Then
+                If CatInfo(cod, 1) <> "" Or Left$(TextoCampo(i, cClasse), 3) = "811" Then
+                    c3 = UCase$(CatInfo(cod, 3))
+                    If InStr(c3, "UC") > 0 Then
+                        dados(i, cClassif) = "UC"
+                    Else
+                        dados(i, cClassif) = "COM"
+                    End If
+                End If
+            End If
+        End If
+    Next i
+End Sub
+
 Private Sub CarregarCatalogoMateriais()
     Set dCatMat = CreateObject("Scripting.Dictionary")
 
@@ -6337,6 +6362,7 @@ Private Sub Gerar_Regras()
     s = s & "ADERENCIA|SRV 5500000820/817 x CH FUS, CH FACA, PARA RAIO|Servicos 5500000820 e 5500000817 estao ligados aos materiais das familias CH FUS, CH SU FACA, PARA RAIO e RELIGADOR: com um deles lancado no PEP4, essas familias ficam ADERENTES (LIGACAO = EQP)." & vbLf
     s = s & "ADERENCIA|COND NU = COND PROT|As familias COND NU e COND PROT sao tratadas como similares: material e servico de uma cobrem os da outra (unificadas em COND PROT na MATERIAL vs SERVICO)." & vbLf
     s = s & "VEREDITO PEP|Familias criticas|POSTE RD, TRAFO, PARA RAIO MT/BT, CH FUS, COND NU, MEDIDOR, KIT PLPT, POSTE PDR ACO, COND COBRE, CH SU FACA, RELIGADOR, TP_TC, COND PROT, COND ISOLADO, SECCIONADOR, BATERIA, REGULADOR, POSTE CAPITEL e CH FUS RELIG: NAO ADERENTE em qualquer PEP4 (ODD, ODI, ODM ou ODS) reprova o PEP3." & vbLf
+    s = s & "CLASSIFICACAO|Classificacao vazia (sucata ODD)|Lancamento com Classificacao vazia mas com codigo de material no catalogo (ou classe de custo 811...) e tratado como MATERIAL (UC/COM pelo CLS3). Ex.: 179340003 SUCATA POSTE MADEIRA entra como POSTE RD." & vbLf
     s = s & "QUANTIDADE|SRV x3 (576/581)|Servicos 5500000576 e 5500000581 equivalem a 3 cabos: QTD x3 na aba SERVICO e na MATERIAL vs SERVICO (familia COND PROT)." & vbLf
     s = s & "CLASSIFICACAO|OVERRIDES FIXOS|Materiais 124030044 e 124180290 = CONECTOR / MAT. COM. Servico 5500000817 = CLS2 EQUIPAMENTO MONOFASICO." & vbLf
     s = s & "ADERENCIA|COND NU + CORDOALHA|O servico de COND NU contempla o material CORDOALHA no mesmo PEP." & vbLf
