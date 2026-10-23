@@ -5649,13 +5649,14 @@ Prox:
 PulaConta:
     Next r
 
-    Dim outp() As Variant: ReDim outp(0 To nKeep, 1 To 15)
+    Dim outp() As Variant: ReDim outp(0 To nKeep, 1 To 18)
     outp(0, 1) = "PEP4NIVEL": outp(0, 2) = "PEP3": outp(0, 3) = "TIPO_PEP"
     outp(0, 4) = "CLASSE_CUSTO": outp(0, 5) = "MATERIAL": outp(0, 6) = "TEXTO_MATERIAL"
     outp(0, 7) = "UML": outp(0, 8) = "QTD_ENTRADA": outp(0, 9) = "VALOR_MOEDA"
     outp(0, 10) = "CLASSIFICACAO": outp(0, 11) = "CLS2"
     outp(0, 12) = "PRECO_UNITARIO": outp(0, 13) = "ADERENCIA"
     outp(0, 14) = "SITUACAO": outp(0, 15) = "OBS_SITUACAO"
+    outp(0, 16) = "QTD_MVS": outp(0, 17) = "CLS2_MVS": outp(0, 18) = "CONVERSAO_MVS"
 
     Dim rr As Long: rr = 0
     For r = 0 To dFirst.Count - 1
@@ -5700,6 +5701,20 @@ PulaConta:
             Dim sitP() As String: sitP = Split(sitS, "|")
             outp(rr, 14) = CLng(sitP(0))
             outp(rr, 15) = sitP(1)
+        End If
+        ' Conversao para a MATERIAL vs SERVICO (mesma regra de Gerar_MaterialVsServico):
+        ' QTD_MVS = QTD x fator de cabo (KG -> M); CLS2_MVS = familia apos unificacao.
+        Dim fatM As Double: fatM = CaboFator(dados(fi, cMaterial))
+        outp(rr, 17) = FamiliaAlias(MatInfoLinha(fi, 2), True)
+        If fatM > 0 Then
+            outp(rr, 16) = Round(dQ(k) * fatM, 2)
+            outp(rr, 18) = "QTD x " & Format$(fatM, "0.0###") & " (KG -> M)"
+        Else
+            outp(rr, 16) = q
+            outp(rr, 18) = "SEM CONVERSAO (1:1)"
+        End If
+        If NormClassif(CStr(outp(rr, 17))) <> NormClassif(CStr(outp(rr, 11))) Then
+            outp(rr, 18) = outp(rr, 18) & " | familia " & CStr(outp(rr, 11)) & " -> " & CStr(outp(rr, 17))
         End If
 PulaLin:
     Next r
@@ -6456,6 +6471,7 @@ Private Sub Gerar_Regras()
     s = s & "QUANTIDADE|Cabos 122020001 / 122020008|Na MATERIAL vs SERVICO: 122020001 (POPPY) = QTD x 6,78; 122020008 (RAVEN) = QTD x 4,63. Na aba MATERIAL continuam em KG." & vbLf
     s = s & "ADERENCIA|CH FUS x CH SU FACA|Familias ligadas: no PEP4 soma MAT e SRV de CH FUS + CH SU FACA; se o total de MAT bate com o de SRV (margem), as duas ficam ADERENTES (LIGACAO = CH FUS/FACA). Ex.: CH FUS MAT 1 + CH SU FACA SRV 1." & vbLf
     s = s & "ADERENCIA|CABO ISOLADO < 15|Na MATERIAL vs SERVICO, CABO ISOLADO com MAT e SRV menores que 15 fica ADERENTE (nao reprova), mesmo sem servico lancado." & vbLf
+    s = s & "ABA MATERIAL|QTD_MVS / CLS2_MVS / CONVERSAO_MVS|Mostram como cada material entra na MATERIAL vs SERVICO: quantidade convertida (cabos KG x fator = metros), familia apos unificacao (ex.: COND NU -> COND PROT) e a formula aplicada." & vbLf
     s = s & "QUANTIDADE|SRV x3 (576/581)|Servicos 5500000576 e 5500000581 equivalem a 3 cabos: QTD x3 na aba SERVICO e na MATERIAL vs SERVICO (familia COND PROT)." & vbLf
     s = s & "CLASSIFICACAO|OVERRIDES FIXOS|Materiais 124030044 e 124180290 = CONECTOR / MAT. COM. Material 179340003 (SUCATA POSTE MADEIRA) = POSTE RD / MAT. UC. Servico 5500000817 = CLS2 EQUIPAMENTO MONOFASICO. Servico 5500000572 = CLS2 COND PROT, QTD / 3 na MATERIAL vs SERVICO." & vbLf
     s = s & "ADERENCIA|COND NU + CORDOALHA|O servico de COND NU contempla o material CORDOALHA no mesmo PEP." & vbLf
