@@ -4974,6 +4974,9 @@ ProxEQ:
             ' 122060001 < 10 kg: desconsiderado; o restante do MAT deve caber no SRV
             If Not aderiu Then aderiu = AcoCobreadoIsento(dAcoKg, dAcoM, ks(r), mv, sv)
             If Not aderiu Then aderiu = CobreRetTrafo3F(dRetTr3F, pep4v, clsv, mv, sv)
+            ' CABO ISOLADO < 15 nao reprova (independe de haver servico)
+            If Not aderiu And NormClassif(clsv) = "CABO ISOLADO" _
+               And Abs(mv) < 15 And Abs(sv) < 15 Then aderiu = True
             ' TRAFO / REGULADOR (MAT) coberto por SRV de TRAFO_OU_REGULADOR no PEP.
             If Not aderiu And dTrafOrRegSrv.Exists(pep4v) And dTrafHasMatPep.Exists(pep4v) _
                And (NormClassif(clsv) = "TRAFO" Or NormClassif(clsv) = "REGULADOR") Then aderiu = True
@@ -5191,6 +5194,9 @@ ProxEQ:
         ElseIf AcoCobreadoIsento(dAcoKg, dAcoM, ks(r), mq, sq) Then
             outp(rr, 8) = dif
             outp(rr, 9) = "ADERENTE"   ' 122060001 < 10 kg nao reprova
+        ElseIf NormClassif(CStr(p(1))) = "CABO ISOLADO" And Abs(mq) < 15 And Abs(sq) < 15 Then
+            outp(rr, 8) = dif
+            outp(rr, 9) = "ADERENTE"   ' CABO ISOLADO < 15 nao reprova
         ElseIf CobreRetTrafo3F(dRetTr3F, pp, CStr(p(1)), mq, sq) Then
             outp(rr, 8) = dif
             outp(rr, 9) = "ADERENTE"   ' 5025300148 paga 3 CH FUS + 3 PARA RAIO MT
@@ -6448,6 +6454,7 @@ Private Sub Gerar_Regras()
     s = s & "ADERENCIA|5025300148 RET ESTR CP TRAFO DT 3F|Cada servico 5025300148 no PEP4 paga 3 retiradas de CH FUS e 3 retiradas de PARA RAIO MT: essas familias ficam ADERENTES se MAT <= SRV da familia + 3 x qtd do servico." & vbLf
     s = s & "QUANTIDADE|Cabos 122020001 / 122020008|Na MATERIAL vs SERVICO: 122020001 (POPPY) = QTD x 6,78; 122020008 (RAVEN) = QTD x 4,63. Na aba MATERIAL continuam em KG." & vbLf
     s = s & "ADERENCIA|CH FUS x CH SU FACA|Familias ligadas: no PEP4 soma MAT e SRV de CH FUS + CH SU FACA; se o total de MAT bate com o de SRV (margem), as duas ficam ADERENTES (LIGACAO = CH FUS/FACA). Ex.: CH FUS MAT 1 + CH SU FACA SRV 1." & vbLf
+    s = s & "ADERENCIA|CABO ISOLADO < 15|Na MATERIAL vs SERVICO, CABO ISOLADO com MAT e SRV menores que 15 fica ADERENTE (nao reprova), mesmo sem servico lancado." & vbLf
     s = s & "QUANTIDADE|SRV x3 (576/581)|Servicos 5500000576 e 5500000581 equivalem a 3 cabos: QTD x3 na aba SERVICO e na MATERIAL vs SERVICO (familia COND PROT)." & vbLf
     s = s & "CLASSIFICACAO|OVERRIDES FIXOS|Materiais 124030044 e 124180290 = CONECTOR / MAT. COM. Material 179340003 (SUCATA POSTE MADEIRA) = POSTE RD / MAT. UC. Servico 5500000817 = CLS2 EQUIPAMENTO MONOFASICO. Servico 5500000572 = CLS2 COND PROT, QTD x3 na MATERIAL vs SERVICO." & vbLf
     s = s & "ADERENCIA|COND NU + CORDOALHA|O servico de COND NU contempla o material CORDOALHA no mesmo PEP." & vbLf
