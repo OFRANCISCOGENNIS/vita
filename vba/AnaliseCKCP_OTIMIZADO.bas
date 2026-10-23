@@ -4607,14 +4607,15 @@ Prox:
     Next kLg
 
     ' Servicos 5500000820/5500000817 estao ligados aos materiais CH FUS,
-    ' CH SU FACA e PARA RAIO: familias cobertas no PEP4 -> ADERENTES.
+    ' CH SU FACA, PARA RAIO e RELIGADOR (817 era CLS2 RELIGADOR no catalogo):
+    ' familias cobertas no PEP4 -> ADERENTES.
     Dim kEq As Variant, famEq As String
     For Each kEq In dKeys.Keys
         If dEqProt.Exists(Split(CStr(kEq), "|")(0)) Then
             famEq = NormClassif(Split(CStr(kEq), "|")(1))
             Select Case famEq
                 Case "CH FUS", "CH SU FACA", "CH FACA", "PARA RAIO", "PARA RAIO AT", _
-                     "PARA RAIO MT", "PARA RAIO BT"
+                     "PARA RAIO MT", "PARA RAIO BT", "RELIGADOR"
                     If Not dLigKeyOk.Exists(kEq) Then dLigKeyOk(kEq) = "EQP"
             End Select
         End If
@@ -6286,7 +6287,7 @@ Private Sub Gerar_Regras()
     s = s & "ADERENCIA|TRAFO -> CH FUS (1F=1 / 3F=3)|Cada trafo instalado espera chaves fusiveis: monofasico (1F) = 1 CH FUS; trifasico (3F) = 3 CH FUS. A fase vem do texto do trafo. CH FUS e ADERENTE se a qtd de material nao exceder o esperado pelos trafos do PEP. PARA RAIO MT/BT seguem cobertos pelo servico de trafo/regulador." & vbLf
     s = s & "ADERENCIA|LIGACAO SERV X MAT|Grupos de ligacao (planilha LIGACAO DE MATERIAL E SERVICO) unem codigos de servico e material, inclusive de familias diferentes. Quando o PEP4 tem material E servico do mesmo grupo lancados, a ligacao fecha: as linhas dessas familias ficam ADERENTES e a coluna LIGACAO SERV X MAT mostra o numero do grupo." & vbLf
     s = s & "ADERENCIA|CABO ACO COBREADO < 10 KG|Material 122060001 com menos de 10 kg no PEP4 nao reprova a familia (o restante do material ainda deve caber no servico)." & vbLf
-    s = s & "ADERENCIA|SRV 5500000820/817 x CH FUS, CH FACA, PARA RAIO|Servicos 5500000820 e 5500000817 estao ligados aos materiais das familias CH FUS, CH SU FACA e PARA RAIO: com um deles lancado no PEP4, essas familias ficam ADERENTES (LIGACAO = EQP)." & vbLf
+    s = s & "ADERENCIA|SRV 5500000820/817 x CH FUS, CH FACA, PARA RAIO|Servicos 5500000820 e 5500000817 estao ligados aos materiais das familias CH FUS, CH SU FACA, PARA RAIO e RELIGADOR: com um deles lancado no PEP4, essas familias ficam ADERENTES (LIGACAO = EQP)." & vbLf
     s = s & "ADERENCIA|COND NU = COND PROT|As familias COND NU e COND PROT sao tratadas como similares: material e servico de uma cobrem os da outra (unificadas em COND PROT na MATERIAL vs SERVICO)." & vbLf
     s = s & "QUANTIDADE|SRV x3 (576/581)|Servicos 5500000576 e 5500000581 equivalem a 3 cabos: QTD x3 na aba SERVICO e na MATERIAL vs SERVICO (familia COND PROT)." & vbLf
     s = s & "CLASSIFICACAO|OVERRIDES FIXOS|Materiais 124030044 e 124180290 = CONECTOR / MAT. COM. Servico 5500000817 = CLS2 EQUIPAMENTO MONOFASICO." & vbLf
