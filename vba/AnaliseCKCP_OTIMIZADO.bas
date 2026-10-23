@@ -2600,10 +2600,10 @@ Private Function CaboFator(codMat As Variant) As Double
     CaboFator = 0
     If dCabo Is Nothing Then Exit Function
     Dim cod As String: cod = NormCod(codMat)
-    ' Fixos (prevalecem sobre o catalogo): QTD x fator / 3
+    ' Fixos (prevalecem sobre o catalogo): QTD x fator (/3 desfeito: x3 de volta)
     Select Case cod
-        Case "122020001": CaboFator = 6.78 / 3: Exit Function   ' CABO AL NU CA 1/0AWG POPPY
-        Case "122020008": CaboFator = 4.63 / 3: Exit Function   ' CABO NU AL CAA 1/0AWG RAVEN
+        Case "122020001": CaboFator = 6.78: Exit Function   ' CABO AL NU CA 1/0AWG POPPY
+        Case "122020008": CaboFator = 4.63: Exit Function   ' CABO NU AL CAA 1/0AWG RAVEN
     End Select
     If dCabo.Exists(cod) Then CaboFator = dCabo(cod)
 End Function
@@ -6423,7 +6423,7 @@ Private Sub Gerar_Regras()
     s = s & "CLASSIFICACAO|Classificacao vazia (sucata ODD)|Lancamento com Classificacao vazia mas com codigo de material no catalogo (ou classe de custo 811...) e tratado como MATERIAL (UC/COM pelo CLS3). Ex.: 179340003 SUCATA POSTE MADEIRA entra como POSTE RD." & vbLf
     s = s & "UNIFICACAO DE FAMILIAS|Equivalencias so para servico|O de-para EQUIV_SRV_MAT (CONEXAO->CONECTOR, ESTRUT RDC->ESPACADOR LOSAG, ESTRUT MT S/CRUZ->CRUZETA, CONECTOR->RAMAL...) vale apenas para a familia do SERVICO. Nomes de familia sao comparados sem acento (ESPACADOR = ESPACADOR com cedilha)." & vbLf
     s = s & "ADERENCIA|5025300148 RET ESTR CP TRAFO DT 3F|Cada servico 5025300148 no PEP4 paga 3 retiradas de CH FUS e 3 retiradas de PARA RAIO MT: essas familias ficam ADERENTES se MAT <= SRV da familia + 3 x qtd do servico." & vbLf
-    s = s & "QUANTIDADE|Cabos 122020001 / 122020008|Na MATERIAL vs SERVICO: 122020001 (POPPY) = QTD x 6,78 / 3; 122020008 (RAVEN) = QTD x 4,63 / 3. Na aba MATERIAL continuam em KG." & vbLf
+    s = s & "QUANTIDADE|Cabos 122020001 / 122020008|Na MATERIAL vs SERVICO: 122020001 (POPPY) = QTD x 6,78; 122020008 (RAVEN) = QTD x 4,63. Na aba MATERIAL continuam em KG." & vbLf
     s = s & "QUANTIDADE|SRV x3 (576/581)|Servicos 5500000576 e 5500000581 equivalem a 3 cabos: QTD x3 na aba SERVICO e na MATERIAL vs SERVICO (familia COND PROT)." & vbLf
     s = s & "CLASSIFICACAO|OVERRIDES FIXOS|Materiais 124030044 e 124180290 = CONECTOR / MAT. COM. Material 179340003 (SUCATA POSTE MADEIRA) = POSTE RD / MAT. UC. Servico 5500000817 = CLS2 EQUIPAMENTO MONOFASICO. Servico 5500000572 = CLS2 COND PROT, QTD x3 na MATERIAL vs SERVICO." & vbLf
     s = s & "ADERENCIA|COND NU + CORDOALHA|O servico de COND NU contempla o material CORDOALHA no mesmo PEP." & vbLf
