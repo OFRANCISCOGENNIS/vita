@@ -5637,6 +5637,18 @@ Prox:
     Dim ks As Variant: ks = dFirst.Keys
     Dim r As Long, fi As Long, q As Double, val As Double
 
+    ' Preco medio por MATERIAL (todos os PEPs): soma |VALOR| / soma |QTD|
+    Dim dPmV As Object: Set dPmV = CreateObject("Scripting.Dictionary")
+    Dim dPmQ As Object: Set dPmQ = CreateObject("Scripting.Dictionary")
+    Dim codPm As String
+    For r = 0 To dFirst.Count - 1
+        If Round(dQ(ks(r)), 2) <> 0 Then
+            codPm = Split(CStr(ks(r)), "|")(1)
+            dPmV(codPm) = dPmV(codPm) + Abs(dV(ks(r)))
+            dPmQ(codPm) = dPmQ(codPm) + Abs(dQ(ks(r)))
+        End If
+    Next r
+
     ' 1a passada: conta as linhas que ficam (exclui QTD=0 e VALOR=0)
     Dim nKeep As Long
     For r = 0 To dFirst.Count - 1
@@ -5650,7 +5662,7 @@ Prox:
 PulaConta:
     Next r
 
-    Dim outp() As Variant: ReDim outp(0 To nKeep, 1 To 18)
+    Dim outp() As Variant: ReDim outp(0 To nKeep, 1 To 21)
     outp(0, 1) = "PEP4NIVEL": outp(0, 2) = "PEP3": outp(0, 3) = "TIPO_PEP"
     outp(0, 4) = "CLASSE_CUSTO": outp(0, 5) = "MATERIAL": outp(0, 6) = "TEXTO_MATERIAL"
     outp(0, 7) = "UML": outp(0, 8) = "QTD_ENTRADA": outp(0, 9) = "VALOR_MOEDA"
@@ -5658,6 +5670,7 @@ PulaConta:
     outp(0, 12) = "PRECO_UNITARIO": outp(0, 13) = "ADERENCIA"
     outp(0, 14) = "SITUACAO": outp(0, 15) = "OBS_SITUACAO"
     outp(0, 16) = "QTD_MVS": outp(0, 17) = "CLS2_MVS": outp(0, 18) = "CONVERSAO_MVS"
+    outp(0, 19) = "PRECO_MEDIO_MATERIAL": outp(0, 20) = "DIF_MEDIA_%": outp(0, 21) = "ALERTA_PRECO"
 
     Dim rr As Long: rr = 0
     For r = 0 To dFirst.Count - 1
@@ -5724,6 +5737,19 @@ PulaConta:
         End If
         If NormClassif(CStr(outp(rr, 17))) <> NormClassif(CStr(outp(rr, 11))) Then
             outp(rr, 18) = outp(rr, 18) & " | familia " & CStr(outp(rr, 11)) & " -> " & CStr(outp(rr, 17))
+        End If
+        ' Preco unitario x media do material: diferenca > 30% -> ALERTA
+        Dim codA As String: codA = NormCod(dados(fi, cMaterial))
+        If dPmQ.Exists(codA) And q <> 0 Then
+            If dPmQ(codA) > 0 Then
+                Dim pMed As Double: pMed = dPmV(codA) / dPmQ(codA)
+                outp(rr, 19) = Round(pMed, 4)
+                If pMed > 0 Then
+                    Dim difPm As Double: difPm = (Abs(dV(k) / dQ(k)) - pMed) / pMed
+                    outp(rr, 20) = Round(difPm * 100, 1)
+                    outp(rr, 21) = IIf(Abs(difPm) > 0.3, "ALERTA > 30%", "OK")
+                End If
+            End If
         End If
 PulaLin:
     Next r
@@ -6504,6 +6530,7 @@ Private Sub Gerar_Regras()
     s = s & "ADERENCIA|CABO ISOLADO < 15|Na MATERIAL vs SERVICO, CABO ISOLADO com MAT e SRV menores que 15 fica ADERENTE (nao reprova), mesmo sem servico lancado." & vbLf
     s = s & "ABA MATERIAL|QTD_MVS / CLS2_MVS / CONVERSAO_MVS|Mostram como cada material entra na MATERIAL vs SERVICO: quantidade convertida (cabos KG x fator = metros), familia apos unificacao (ex.: COND NU -> COND PROT) e a formula aplicada." & vbLf
     s = s & "ABA SERVICO|QTD_MVS / CLS2_MVS / CONVERSAO_MVS|Mostram como cada servico entra na MATERIAL vs SERVICO: quantidade com fator COMBO (ex.: x3, /3), familia apos equivalencia (ex.: CONEXAO -> CONECTOR) e a formula aplicada." & vbLf
+    s = s & "ABA MATERIAL|ALERTA_PRECO (media +-30%)|PRECO_MEDIO_MATERIAL = soma |VALOR| / soma |QTD| do material em todos os PEPs. DIF_MEDIA_% compara o preco unitario da linha com essa media; acima de 30% (para mais ou para menos) -> ALERTA > 30%." & vbLf
     s = s & "QUANTIDADE|SRV x3 (576/581)|Servicos 5500000576 e 5500000581 equivalem a 3 cabos: QTD x3 na aba SERVICO e na MATERIAL vs SERVICO (familia COND PROT)." & vbLf
     s = s & "CLASSIFICACAO|OVERRIDES FIXOS|Materiais 124030044 e 124180290 = CONECTOR / MAT. COM. Material 179340003 (SUCATA POSTE MADEIRA) = POSTE RD / MAT. UC. Servico 5500000817 = CLS2 EQUIPAMENTO MONOFASICO. Servico 5500000572 = CLS2 COND PROT, QTD 1:1 (sem conversao)." & vbLf
     s = s & "ADERENCIA|COND NU + CORDOALHA|O servico de COND NU contempla o material CORDOALHA no mesmo PEP." & vbLf
