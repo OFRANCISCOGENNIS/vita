@@ -6208,6 +6208,45 @@ ProxBcalc:
 ProxB:
     Next kvG
 
+    ' --- COM COM DIVERGENCIA DE PRECO: material COM (ODI/ODM) cujo preco
+    '     unitario difere mais que DIV_PRECO_COM % (CONFIG, padrao 30) da media
+    '     do proprio material (soma |VALOR| / soma |QTD| nos PEPs ODI/ODM) ---
+    gEtapa = "Alertas: COM divergencia"
+    Dim dPmV As Object: Set dPmV = CreateObject("Scripting.Dictionary")
+    Dim dPmQ As Object: Set dPmQ = CreateObject("Scripting.Dictionary")
+    Dim pKg() As String, tpKg As String, pMed As Double, puKg As Double, difKg As Double
+    Dim limDiv As Double: limDiv = CfgNum("DIV_PRECO_COM", 30) / 100
+    For Each kvG In dGFirst.Keys
+        pKg = Split(CStr(kvG), "|")
+        tpKg = TipoPEPCodigo(pKg(0))
+        If (tpKg = "I" Or tpKg = "M") And Round(dGQ(kvG), 2) <> 0 Then
+            dPmV(pKg(1)) = dPmV(pKg(1)) + Abs(dGV(kvG))
+            dPmQ(pKg(1)) = dPmQ(pKg(1)) + Abs(dGQ(kvG))
+        End If
+    Next kvG
+    For Each kvG In dGFirst.Keys
+        pKg = Split(CStr(kvG), "|")
+        If pKg(2) <> "COM" Then GoTo ProxDv
+        tpKg = TipoPEPCodigo(pKg(0))
+        If tpKg <> "I" And tpKg <> "M" Then GoTo ProxDv
+        qG = Round(dGQ(kvG), 2): vG = Round(dGV(kvG), 2)
+        If qG = 0 Or Not dPmQ.Exists(pKg(1)) Then GoTo ProxDv
+        If dPmQ(pKg(1)) = 0 Then GoTo ProxDv
+        pMed = dPmV(pKg(1)) / dPmQ(pKg(1))
+        If pMed <= 0 Then GoTo ProxDv
+        puKg = Abs(dGV(kvG) / dGQ(kvG))
+        difKg = (puKg - pMed) / pMed
+        If Abs(difKg) <= limDiv Then GoTo ProxDv
+        fiG = dGFirst(kvG)
+        AddAlertaLinha dAl, "COM COM DIVERGENCIA DE PRECO", pKg(0), pKg(1), _
+            ValorCampo(fiG, cTexto), MatInfoLinha(fiG, 2), vG, qG, Round(puKg, 4), _
+            "Media R$ " & Format$(pMed, "#,##0.00"), _
+            "Preco unit R$ " & Format$(puKg, "#,##0.00") & " difere " & _
+            Format$(difKg * 100, "+0;-0") & "% da media do material (limite " & _
+            Format$(limDiv * 100, "0") & "%)"
+ProxDv:
+    Next kvG
+
     ' --- CLASSE VIAGEM: Alimentacao / Passagem / Hospedagem com valor > 0 ---
     gEtapa = "Alertas: viagem"
     Dim dEVal As Object: Set dEVal = CreateObject("Scripting.Dictionary")
@@ -6403,6 +6442,7 @@ Private Function CorAlerta(ByVal tipo As String, ByVal forte As Boolean) As Long
         Case "MATERIAL NEGATIVO NA ODI/ODM/ODS": CorAlerta = IIf(forte, RGB(192, 0, 0), RGB(252, 226, 228))
         Case "MATERIAL POSITIVO EM ODD": CorAlerta = IIf(forte, RGB(214, 99, 0), RGB(252, 233, 219))
         Case "MATERIAL NAO ADERENTE":    CorAlerta = IIf(forte, RGB(190, 24, 93), RGB(252, 231, 243))
+        Case "COM COM DIVERGENCIA DE PRECO": CorAlerta = IIf(forte, RGB(67, 56, 202), RGB(224, 231, 255))
         Case "PEP SEM MATERIAL":         CorAlerta = IIf(forte, RGB(46, 117, 182), RGB(230, 240, 248))
         Case "PEP SEM SERVICO":          CorAlerta = IIf(forte, RGB(196, 89, 17), RGB(255, 238, 230))
         Case "CLASSE VIAGEM":            CorAlerta = IIf(forte, RGB(15, 130, 115), RGB(220, 245, 240))
@@ -7426,6 +7466,7 @@ Private Sub GarantirConfig()
         Array("PERC_ATV_PADRAO", "25", "Percentual ATV PREVISTA para os demais PEPs (%)"), _
         Array("PERC_MOP", "5.483", "Percentual do CALCULO DO MOP sobre o total sem MOP (%)"), _
         Array("MARGEM_ADERENCIA", "10", "Margem da aderencia MAT vs SRV (%)"), _
+        Array("DIV_PRECO_COM", "30", "ALERTAS CRITICOS: divergencia de preco de material COM vs media (%)"), _
         Array("CLASSES_VIAGEM", "8111290000;8210390000;8210550000", "Classes de custo de viagem (Alimentacao;Passagem;Hospedagem)"), _
         Array("CLASSE_COMBUSTIVEL", "8119980000", "Classe de custo de combustiveis -> categoria OUTROS na ANALISE DE CA"), _
         Array("EQUIV_SRV_MAT", "", "De-para extra CLS2 servico=familia material (ex.: JUMPER=ALCA;X=Y)"), _
