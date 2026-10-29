@@ -114,7 +114,7 @@ Versão atual: **8.745 linhas · 71 Subs · 75 Functions** (módulo `AnaliseCKCP
 4272 `ValorCat` · 4277 `CategoriaAnaliseCA` · 4325 `CategoriaPorClasseCusto` · 4340 `ClasseCustoDadosOutros` · 4346 `MapCategoriaCA`
 
 ### Helpers de ALERTAS
-5153 `EscreverCardAlerta` · 5195 `EscreverCabecalhoAlerta`
+`AddAlertaLinha` · `CorAlerta`
 
 ### Helpers diversos
 6390 `EhPepEmergencia` · 6395 `AtvPrevista`
@@ -245,3 +245,4 @@ Versão atual: **8.745 linhas · 71 Subs · 75 Functions** (módulo `AnaliseCKCP
 - `5500000817`: servico forcado CLS2 EQUIPAMENTO MONOFASICO (`Cls2SrvOverride` + `ReclasSrv`).
 
 - Aba `RACIONALIZACAO COM` removida (arquivo mais leve): Sub `Gerar_RacionalizacaoCOM` e helpers NT.006 excluidos; aba antiga apagada via `abasObsoletas`.
+- Aba `ALERTAS CRITICOS` redesenhada no layout "PAINEL DE ALERTAS CRITICOS" (titulo vermelho, chips por tipo, tabela unica de 11 colunas colorida por tipo); helpers `EscreverCardAlerta`/`EscreverCabecalhoAlerta` substituidos por `AddAlertaLinha`/`CorAlerta`.

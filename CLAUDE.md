@@ -55,7 +55,7 @@ GarantirConfig / CarregarConfig
 | `CLASSE DE CUSTO` | Resumo por classe de custo SAP |
 | `MATERIAL` | Detalhe de materiais |
 | `SERVICO` | Detalhe de serviços |
-| `ALERTAS CRITICOS` | Cards de alertas (regras violadas, inconformidades) |
+| `ALERTAS CRITICOS` | Painel de alertas: titulo, chips por tipo e tabela unica colorida por tipo |
 | `REGRAS` | Tabela de regras aplicadas |
 | `SERVICO SEM MATERIAL` | Serviços lançados sem material correspondente |
 | `PORTFOLIO OBRA` | Portfólio de obras por PEP |
