@@ -6140,12 +6140,12 @@ ProxBcalc:
         Else
             If qG < 0 Then motG = "QTD-"
             If vG < 0 Then motG = Trim$(motG & " VALOR-")
-            tipoAl = "MATERIAL NEGATIVO"
+            tipoAl = "MATERIAL NEGATIVO NA ODI"
         End If
         If motG = "" Then GoTo ProxB   ' ADERENTE -> ignora
         If tipoAl = "MATERIAL POSITIVO EM ODD" Then
             motG = "PEP ODD com " & motG & " (esperado negativo) - item NAO ADERENTE"
-        ElseIf tipoAl = "MATERIAL NEGATIVO" Then
+        ElseIf tipoAl = "MATERIAL NEGATIVO NA ODI" Then
             motG = "PEP " & tpAneel & " com " & motG & " (esperado positivo) - item NAO ADERENTE"
         Else
             motG = tpAneel & ": " & motG
@@ -6350,7 +6350,7 @@ Private Function CorAlerta(ByVal tipo As String, ByVal forte As Boolean) As Long
     Select Case tipo
         Case "PEP SEM UC":               CorAlerta = IIf(forte, RGB(214, 158, 0), RGB(255, 244, 214))
         Case "UC SEM SERVICO":           CorAlerta = IIf(forte, RGB(96, 64, 196), RGB(225, 223, 245))
-        Case "MATERIAL NEGATIVO":        CorAlerta = IIf(forte, RGB(192, 0, 0), RGB(252, 226, 228))
+        Case "MATERIAL NEGATIVO NA ODI": CorAlerta = IIf(forte, RGB(192, 0, 0), RGB(252, 226, 228))
         Case "MATERIAL POSITIVO EM ODD": CorAlerta = IIf(forte, RGB(214, 99, 0), RGB(252, 233, 219))
         Case "MATERIAL NAO ADERENTE":    CorAlerta = IIf(forte, RGB(190, 24, 93), RGB(252, 231, 243))
         Case "CLASSE VIAGEM":            CorAlerta = IIf(forte, RGB(15, 130, 115), RGB(220, 245, 240))
