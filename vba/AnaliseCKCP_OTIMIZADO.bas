@@ -6069,11 +6069,47 @@ PreCalc:
 SomaPep:
     Next i
 
-    ' --- PEP SEM UC: PEP4 (exceto ODD) sem nenhuma familia UC ---
+    ' PEPs com material (QTD ou VALOR liquido <> 0 em algum codigo) e com servico
+    ' (linha nao-material com codigo e QTD/VALOR <> 0), para PEP SEM MATERIAL/SERVICO.
+    Dim dMatNet As Object: Set dMatNet = CreateObject("Scripting.Dictionary")
+    Dim dPepMatOk As Object: Set dPepMatOk = CreateObject("Scripting.Dictionary")
+    Dim dPepSrvOk As Object: Set dPepSrvOk = CreateObject("Scripting.Dictionary")
+    Dim kMn As Variant, codPs As String
+    For i = 1 To UBound(dados, 1)
+        pep = Trim$(CStr(dados(i, cPEP))): If pep = "" Or dPepUAR.Exists(pep) Then GoTo ProxPs
+        If EhMaterial(CStr(dados(i, cClassif))) Then
+            ' soma liquida por PEP|codigo (lancamento + estorno se anulam)
+            kMn = pep & "|" & NormCod(dados(i, cMaterial))
+            dMatNet(kMn & "|V") = dMatNet(kMn & "|V") + ToNum(dados(i, cValor))
+            dMatNet(kMn & "|Q") = dMatNet(kMn & "|Q") + ToNum(dados(i, cQtd))
+        Else
+            codPs = NormCod(dados(i, cMaterial))
+            If codPs <> "" And codPs <> "0" Then
+                If Round(ToNum(dados(i, cValor)), 2) <> 0 Or Round(ToNum(dados(i, cQtd)), 2) <> 0 Then dPepSrvOk(pep) = 1
+            End If
+        End If
+ProxPs:
+    Next i
+    For Each kMn In dMatNet.Keys
+        If Round(CDbl(dMatNet(kMn)), 2) <> 0 Then dPepMatOk(Split(CStr(kMn), "|")(0)) = 1
+    Next kMn
+
+    ' --- PEP SEM MATERIAL: PEP4 sem nenhum material com QTD/VALOR liquido ---
     Dim pk As Variant
+    For Each pk In dPepCnt.Keys
+        pep = CStr(pk)
+        If Not dPepMatOk.Exists(pep) Then
+            AddAlertaLinha dAl, "PEP SEM MATERIAL", pep, Empty, Empty, Empty, _
+                Round(IIf(dPepValor.Exists(pep), dPepValor(pep), 0), 2), Empty, Empty, _
+                dPepCnt(pep) & " lancamento(s)", _
+                TipoPEPANEEL(pep) & " sem nenhum material lancado (ou apenas lancamento + estorno)"
+        End If
+    Next pk
+
+    ' --- PEP SEM UC: PEP4 (exceto ODD) com material mas sem nenhuma familia UC ---
     For Each pk In dPepTodos.Keys
         pep = CStr(pk)
-        If Not dPepTemUC.Exists(pep) Then
+        If Not dPepTemUC.Exists(pep) And dPepMatOk.Exists(pep) Then
             AddAlertaLinha dAl, "PEP SEM UC", pep, Empty, Empty, Empty, _
                 Round(IIf(dPepValor.Exists(pep), dPepValor(pep), 0), 2), Empty, Empty, _
                 IIf(dPepCnt.Exists(pep), dPepCnt(pep), 0) & " lancamento(s)", _
@@ -6082,13 +6118,27 @@ SomaPep:
     Next pk
 
     ' --- UC SEM SERVICO: PEP4 com material UC e nenhum servico lancado ---
+    Dim dJaSemSrv As Object: Set dJaSemSrv = CreateObject("Scripting.Dictionary")
     For Each pk In dPepTemUC.Keys
         pep = CStr(pk)
         If Not dPepTemSrv.Exists(pep) Then
+            dJaSemSrv(pep) = 1
             AddAlertaLinha dAl, "UC SEM SERVICO", pep, Empty, Empty, Empty, _
                 Round(IIf(dPepValor.Exists(pep), dPepValor(pep), 0), 2), Empty, Empty, _
                 IIf(dPepCnt.Exists(pep), dPepCnt(pep), 0) & " lancamento(s)", _
                 "Material UC lancado sem servico - verificar mao de obra faltante"
+        End If
+    Next pk
+
+    ' --- PEP SEM SERVICO: PEP4 sem nenhum servico com QTD/VALOR (qualquer tipo
+    '     de PEP); os ja listados em UC SEM SERVICO nao se repetem ---
+    For Each pk In dPepCnt.Keys
+        pep = CStr(pk)
+        If Not dPepSrvOk.Exists(pep) And Not dJaSemSrv.Exists(pep) Then
+            AddAlertaLinha dAl, "PEP SEM SERVICO", pep, Empty, Empty, Empty, _
+                Round(IIf(dPepValor.Exists(pep), dPepValor(pep), 0), 2), Empty, Empty, _
+                dPepCnt(pep) & " lancamento(s)", _
+                TipoPEPANEEL(pep) & " sem nenhum servico lancado"
         End If
     Next pk
 
@@ -6353,6 +6403,8 @@ Private Function CorAlerta(ByVal tipo As String, ByVal forte As Boolean) As Long
         Case "MATERIAL NEGATIVO NA ODI/ODM/ODS": CorAlerta = IIf(forte, RGB(192, 0, 0), RGB(252, 226, 228))
         Case "MATERIAL POSITIVO EM ODD": CorAlerta = IIf(forte, RGB(214, 99, 0), RGB(252, 233, 219))
         Case "MATERIAL NAO ADERENTE":    CorAlerta = IIf(forte, RGB(190, 24, 93), RGB(252, 231, 243))
+        Case "PEP SEM MATERIAL":         CorAlerta = IIf(forte, RGB(46, 117, 182), RGB(230, 240, 248))
+        Case "PEP SEM SERVICO":          CorAlerta = IIf(forte, RGB(196, 89, 17), RGB(255, 238, 230))
         Case "CLASSE VIAGEM":            CorAlerta = IIf(forte, RGB(15, 130, 115), RGB(220, 245, 240))
         Case Else:                       CorAlerta = IIf(forte, RGB(46, 117, 182), RGB(230, 240, 248))
     End Select
